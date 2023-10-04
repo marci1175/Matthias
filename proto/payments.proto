@@ -1,0 +1,15 @@
+syntax = "proto3";
+package messages;
+
+service Message {
+    rpc SendMessage (MessageRequest) returns (MessageResponse);
+}
+
+message MessageRequest {
+    string message    = 1;
+    bool is_sync = 2;
+}
+
+message MessageResponse {
+    string message    = 1;
+}
