@@ -57,7 +57,7 @@ impl eframe::App for TemplateApp {
         _frame.set_window_size(self.window_size);
 
 
-        //for image loading
+        //For image loading
         egui_extras::install_image_loaders(ctx);
 
         //Main page
