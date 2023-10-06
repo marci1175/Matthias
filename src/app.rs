@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use egui::{panel::Side, vec2, Align, Image, Layout, RichText, Vec2};
 use tonic::server;
 
@@ -30,10 +32,17 @@ pub struct TemplateApp {
     //msg
     usr_msg: String,
     incoming_msg: String,
+
+    //thread communication
+    #[serde(skip)]
+    rx : mpsc::Receiver<String>,
+    #[serde(skip)]
+    tx : mpsc::Sender<String>,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
+        let (tx, rx) = mpsc::channel::<String>();
         Self {
             //server settings
             server_req_password: false,
@@ -54,6 +63,9 @@ impl Default for TemplateApp {
             //msg
             usr_msg: String::new(),
             incoming_msg: String::new(),
+            //thread communication
+            rx,
+            tx,
         }
     }
 }
@@ -77,7 +89,7 @@ impl eframe::App for TemplateApp {
         /*devlog:
         TODO: MAKE QUALITY BETTER!!!
         TODO: MAKE BASIC SERVER UI, IMPLEMENT BASIC FUNCTIONALITY
-
+        TODO: MAKE CLIENT UI BETTER
         */
 
         //window options
@@ -184,7 +196,12 @@ impl eframe::App for TemplateApp {
                 egui::ScrollArea::vertical()
                     .id_source("msg_area")
                     .stick_to_bottom(true)
-                    .show(ui, |ui| {});
+                    .show(ui, |ui| {
+                        ui.label(
+                            RichText::from(&self.incoming_msg)
+                                .size(self.font_size)
+                        );
+                    });
             });
 
             //usr_input
@@ -215,13 +232,14 @@ impl eframe::App for TemplateApp {
                     );
                     if ui.button("Send").clicked() {
                         let temp_msg = self.usr_msg.clone();
-                        self.usr_msg.clear();
                         
-                        tokio::spawn(async {
+                        let tx = self.tx.clone();
+                        
+                        tokio::spawn(async move {
 
                             match client::send_msg(temp_msg).await {
                                 Ok(ok) => {
-
+                                    tx.send(ok);
                                 },
                                 Err(err) => {
                                     println!("{}",err);
@@ -229,7 +247,15 @@ impl eframe::App for TemplateApp {
                             };
                             
                         });
-                        
+
+                        match self.rx.try_recv() {
+                            Ok(ok) => {
+                                self.incoming_msg = ok
+                            }
+                            Err(err) => {
+                                println!("{}", err);
+                            }
+                        };
                     };
                 });
 

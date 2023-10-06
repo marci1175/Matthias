@@ -24,6 +24,7 @@ log = "0.4"
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 tonic-build = "0.10.2"
+mpsc = "0.2.1"
 
 [build-dependencies]
 tonic-build = "0.7"
