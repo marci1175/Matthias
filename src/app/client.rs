@@ -5,11 +5,10 @@ pub mod Messages {
     tonic::include_proto!("messages");
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//main is for sending
+pub async fn send_msg(msg: String) -> Result<String, Box<dyn std::error::Error>> {
     let mut client = MessageClient::connect("http://[::1]:50051").await?;
-    let mut msg: String = String::new();
-    std::io::stdin().read_line(&mut msg).expect("msg");
+
     let request = tonic::Request::new(MessageRequest {
         message: msg.trim().to_string(),
         is_sync: false,
@@ -17,7 +16,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let response = client.send_message(request).await?;
 
-    println!("RESPONSE={:?}", response);
+    let message = response.into_inner().message;
 
-    Ok(())
+    println!("RESPONSE={}", message);
+
+    Ok(message)
 }

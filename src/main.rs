@@ -2,7 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> eframe::Result<()> {
+#[tokio::main]
+async fn main() -> eframe::Result<()> {
     env_logger::init();
 
     let native_options = eframe::NativeOptions {
