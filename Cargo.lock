@@ -946,6 +946,7 @@ dependencies = [
  "tonic-build 0.10.2",
  "tonic-build 0.7.2",
  "wasm-bindgen-futures",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]

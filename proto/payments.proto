@@ -6,10 +6,11 @@ service Message {
 }
 
 message MessageRequest {
-    string message    = 1;
+    string message = 1;
     bool is_sync = 2;
+    string password = 3;
 }
 
 message MessageResponse {
-    string message    = 1;
+    string message = 1;
 }

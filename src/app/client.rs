@@ -1,24 +1,25 @@
-use Messages::message_client::MessageClient;
-use Messages::{MessageRequest, MessageResponse};
+use messages::message_client::MessageClient;
+use messages::{MessageRequest, MessageResponse};
 
-pub mod Messages {
+pub mod messages {
     tonic::include_proto!("messages");
 }
 
 //main is for sending
-pub async fn send_msg(msg: String) -> Result<String, Box<dyn std::error::Error>> {
-    let mut client = MessageClient::connect("http://[::1]:50051").await?;
-
+pub async fn send_msg(msg: String, passw : String, ip : String, is_sync : bool) -> Result<String, Box<dyn std::error::Error>> {
+    let mut client = MessageClient::connect(format!("http://{}", ip)).await?;
+    
     let request = tonic::Request::new(MessageRequest {
         message: msg.trim().to_string(),
-        is_sync: false,
+        is_sync: is_sync,
+        password: passw,
     });
 
     let response = client.send_message(request).await?;
-
+    
     let message = response.into_inner().message;
 
-    println!("RESPONSE={}", message);
+    dbg!(&message);
 
     Ok(message)
 }

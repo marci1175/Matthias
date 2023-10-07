@@ -1,18 +1,34 @@
-use std::sync::mpsc;
-
-use egui::{panel::Side, vec2, Align, Image, Layout, RichText, Vec2};
-use tonic::server;
+use std::{sync::mpsc , io};
+use log::debug;
+use windows_sys::w;
+use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
+use egui::{vec2, Align, Layout, RichText};
 
 mod client;
+mod server;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
+    //server main
+
+    #[serde(skip)]
+    server_has_started: bool,
     //server settings
+
     #[serde(skip)]
     server_req_password: bool,
 
     server_password: String,
+
+    #[serde(skip)]
+    open_on_port: String,
+
+    //thread communication for server
+    #[serde(skip)]
+    srx : mpsc::Receiver<String>,
+    #[serde(skip)]
+    stx : mpsc::Sender<String>,
 
     //child windows
     #[serde(skip)]
@@ -24,7 +40,8 @@ pub struct TemplateApp {
     #[serde(skip)]
     server_mode: bool,
 
-    //client_mode
+    //client main
+    send_on_ip: String,
 
     //font
     font_size: f32,
@@ -33,7 +50,7 @@ pub struct TemplateApp {
     usr_msg: String,
     incoming_msg: String,
 
-    //thread communication
+    //thread communication for client
     #[serde(skip)]
     rx : mpsc::Receiver<String>,
     #[serde(skip)]
@@ -43,10 +60,18 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel::<String>();
+        let (stx, srx) = mpsc::channel::<String>();
         Self {
+            //server_main
+            server_has_started: false,
             //server settings
             server_req_password: false,
             server_password: String::default(),
+            open_on_port: String::default(),
+
+            //thread communication for server
+            srx,
+            stx,
 
             //child windows
             settings_window: false,
@@ -55,8 +80,8 @@ impl Default for TemplateApp {
             client_mode: false,
             server_mode: false,
 
-            //client_mode
-
+            //client main
+            send_on_ip: String::new(),
             //font
             font_size: 20.,
 
@@ -105,8 +130,6 @@ impl eframe::App for TemplateApp {
             _frame.set_window_size(vec2(700., 300.));
 
             egui::CentralPanel::default().show(ctx, |ui| {
-                let Layout = Layout::left_to_right(Align::Center);
-
                 ui.columns(2, |ui| {
                     ui[0].with_layout(
                         Layout::centered_and_justified(egui::Direction::TopDown),
@@ -163,13 +186,75 @@ impl eframe::App for TemplateApp {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     ui.label(RichText::from("Server mode").strong().size(30.));
                     ui.label(RichText::from("Message stream").size(20.));
+                    if !self.server_has_started {
+
+                        ui.label(RichText::from("Server setup").size(30.).strong());
+                        ui.separator();
+                        ui.label(RichText::from("Open on port").size(20.));
+                        ui.text_edit_singleline(&mut self.open_on_port);
+
+                        let temp_open_on_port = &self.open_on_port;
+
+                        if ui.button("Start").clicked() {
+                            let temp_tx = self.stx.clone();
+                            self.server_has_started = match temp_open_on_port.parse::<i32>(){
+                                Ok(port) => {
+                                    tokio::spawn(async move {
+
+                                        match server::server_main(port.to_string()).await {
+                                            Ok(ok) => {
+                                                dbg!(&ok);
+
+                                                let mut concatenated_string = String::new();
+
+                                                for s in &ok {
+                                                    concatenated_string.push_str(s);
+                                                }
+
+                                                match temp_tx.send(ok.join(&concatenated_string)){
+                                                    Ok(_) => {},
+                                                    Err(err) => {println!("ln 214 {}", err)},
+                                                };
+
+                                            },
+                                            Err(err) => {
+                                                println!("ln 208 {:?}", err);
+                                            }
+                                        };
+                                    
+                                    });
+                                    true
+                                },
+                                Err(_) => {
+                                    unsafe {
+                                        MessageBoxW(0, w!("asd"), w!("asd"), 0);
+                                    }
+                                    false
+                                }
+                            };
+                            
+                        }
+                    }
+                    else {
+                        //if server has already started
+                        match self.srx.try_recv(){
+                            Ok(ok) => {
+                                ui.label(
+                                    RichText::from(ok).size(15.)
+                                );
+                            },
+                            Err(err) => {
+                                //println!("ln  234 : {}", err);
+                            },
+                        };
+                    }
                 });
             });
         }
 
         //Client page
         if self.client_mode {
-            //settings
+           
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "setting_area").show(
                 ctx,
                 |ui| {
@@ -189,11 +274,13 @@ impl eframe::App for TemplateApp {
                     ui.allocate_space(vec2(ui.available_width(), 5.));
                 },
             );
-
+            
+            
             //msg_area
             egui::CentralPanel::default().show(ctx, |ui| {
                 //Messages go here
-                egui::ScrollArea::vertical()
+                ui.allocate_ui(vec2(ui.available_width(), ui.available_height() - (_frame.info().window_info.size[1] / 5. + 10.)), |ui|{
+                    egui::ScrollArea::vertical()
                     .id_source("msg_area")
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
@@ -202,6 +289,9 @@ impl eframe::App for TemplateApp {
                                 .size(self.font_size)
                         );
                     });
+                });
+                
+                    
             });
 
             //usr_input
@@ -210,7 +300,7 @@ impl eframe::App for TemplateApp {
 
                 ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
                     ui.allocate_ui(
-                        vec2(ui.available_width() - 100., ctx.used_size()[1] / 5.),
+                        vec2(ui.available_width() - 100., _frame.info().window_info.size[1] / 5.),
                         |ui| {
                             egui::ScrollArea::vertical()
                                 .id_source("usr_input")
@@ -232,28 +322,42 @@ impl eframe::App for TemplateApp {
                     );
                     if ui.button("Send").clicked() {
                         let temp_msg = self.usr_msg.clone();
-                        
                         let tx = self.tx.clone();
-                        
-                        tokio::spawn(async move {
+                        let temp_port = match self.send_on_ip.clone().parse::<String>(){
+                            Ok(ok) => {
+                                tokio::spawn(async move {
 
-                            match client::send_msg(temp_msg).await {
-                                Ok(ok) => {
-                                    tx.send(ok);
-                                },
-                                Err(err) => {
-                                    println!("{}",err);
+                                match client::send_msg(temp_msg, "".into(), ok, false).await {
+                                    Ok(ok) => {
+                                        match tx.send(ok + "\n"){
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                println!("{}", err);
+                                            }
+                                        };
+                                    },
+                                    Err(err) => {
+                                        println!("ln 321 {}",err);
+                                    }
+                                };
+                                
+                            });
+                        },
+                            Err(_) => {
+                                unsafe {
+                                    MessageBoxW(0, w!("asd2"), w!("asd"), 0);
                                 }
-                            };
-                            
-                        });
+                            }
+                        };
+                        
 
                         match self.rx.try_recv() {
                             Ok(ok) => {
+                                dbg!(ok.clone());
                                 self.incoming_msg = ok
                             }
                             Err(err) => {
-                                println!("{}", err);
+                                println!("ln 332 {}", err);
                             }
                         };
                     };
@@ -261,6 +365,7 @@ impl eframe::App for TemplateApp {
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
             });
+            
         }
 
         //children windows
@@ -271,6 +376,12 @@ impl eframe::App for TemplateApp {
                 if self.client_mode {
                     ui.label("Message editor text size");
                     ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
+                    ui.separator();
+                    ui.label("Connect to an ip address");
+                    ui.text_edit_singleline(&mut self.send_on_ip);
+                    if ui.button("Sync").clicked() {
+
+                    };
                 } else if self.server_mode {
                     ui.checkbox(&mut self.server_req_password, "Server requires password");
                     if self.server_req_password {

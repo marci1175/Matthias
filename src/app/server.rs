@@ -1,4 +1,3 @@
-use std::ops::{Deref, DerefMut};
 use std::sync::Mutex;
 
 use tonic::{transport::Server, Request, Response, Status};
@@ -39,15 +38,18 @@ impl Message for MessageService {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
-    let btc_service = MessageService::default();
 
+pub async fn server_main(port : String) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    
+    let addr = format!("[::1]:{}", port).parse()?;
+    
+    let btc_service = MessageService::default();
+    let messages = &btc_service.messages.lock().unwrap().to_vec();
     Server::builder()
+
         .add_service(MessageServer::new(btc_service))
         .serve(addr)
         .await?;
 
-    Ok(())
+    Ok(messages.to_vec())
 }

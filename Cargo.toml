@@ -26,6 +26,13 @@ serde = { version = "1", features = ["derive"] }
 tonic-build = "0.10.2"
 mpsc = "0.2.1"
 
+[dependencies.windows-sys]
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+]
+
 [build-dependencies]
 tonic-build = "0.7"
 
