@@ -1,5 +1,4 @@
-use std::{sync::mpsc , io};
-use log::debug;
+use std::{sync::{mpsc, Once}};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use egui::{vec2, Align, Layout, RichText};
@@ -21,7 +20,6 @@ pub struct TemplateApp {
 
     server_password: String,
 
-    #[serde(skip)]
     open_on_port: String,
 
     //thread communication for server
@@ -47,7 +45,10 @@ pub struct TemplateApp {
     font_size: f32,
 
     //msg
+    #[serde(skip)]
     usr_msg: String,
+
+    #[serde(skip)]
     incoming_msg: String,
 
     //thread communication for client
@@ -55,12 +56,22 @@ pub struct TemplateApp {
     rx : mpsc::Receiver<String>,
     #[serde(skip)]
     tx : mpsc::Sender<String>,
+    //data sync
+    #[serde(skip)]
+    drx : mpsc::Receiver<String>,
+    #[serde(skip)]
+    dtx : mpsc::Sender<String>,
+    #[serde(skip)]
+    has_init: bool,
+    #[serde(skip)]
+    autosync_sender: Option<mpsc::Sender<String>>,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel::<String>();
         let (stx, srx) = mpsc::channel::<String>();
+        let (dtx, drx) = mpsc::channel::<String>();
         Self {
             //server_main
             server_has_started: false,
@@ -88,9 +99,14 @@ impl Default for TemplateApp {
             //msg
             usr_msg: String::new(),
             incoming_msg: String::new(),
-            //thread communication
+            //thread communication for client
             rx,
             tx,
+            //data sync
+            drx,
+            dtx,
+            has_init: false,
+            autosync_sender: None,
         }
     }
 }
@@ -121,6 +137,18 @@ impl eframe::App for TemplateApp {
 
         //For image loading
         egui_extras::install_image_loaders(ctx);
+
+        /*
+        //data sync
+        
+        match client::send_msg("".into(), self.server_password.clone(), self.send_on_ip.clone(), true){
+            Ok(_) => {},
+            Err(_) => {}
+        }; 
+        */
+
+
+        //Login Page
 
         //Main page
         if !(self.client_mode || self.server_mode) {
@@ -234,19 +262,10 @@ impl eframe::App for TemplateApp {
                             };
                             
                         }
+                        ui.separator();
                     }
                     else {
-                        //if server has already started
-                        match self.srx.try_recv(){
-                            Ok(ok) => {
-                                ui.label(
-                                    RichText::from(ok).size(15.)
-                                );
-                            },
-                            Err(err) => {
-                                //println!("ln  234 : {}", err);
-                            },
-                        };
+                        
                     }
                 });
             });
@@ -320,16 +339,20 @@ impl eframe::App for TemplateApp {
                                 });
                         },
                     );
-                    if ui.button("Send").clicked() {
+                    if ui.add(
+                        egui::widgets::ImageButton::new(
+                            egui::include_image!("../icons/send_msg.png")
+                        )
+                    ).clicked(){
                         let temp_msg = self.usr_msg.clone();
                         let tx = self.tx.clone();
-                        let temp_port = match self.send_on_ip.clone().parse::<String>(){
+                        let _ = match self.send_on_ip.clone().parse::<String>(){
                             Ok(ok) => {
                                 tokio::spawn(async move {
 
                                 match client::send_msg(temp_msg, "".into(), ok, false).await {
                                     Ok(ok) => {
-                                        match tx.send(ok + "\n"){
+                                        match tx.send(ok){
                                             Ok(_) => {}
                                             Err(err) => {
                                                 println!("{}", err);
@@ -349,25 +372,25 @@ impl eframe::App for TemplateApp {
                                 }
                             }
                         };
-                        
-
-                        match self.rx.try_recv() {
-                            Ok(ok) => {
-                                dbg!(ok.clone());
-                                self.incoming_msg = ok
-                            }
-                            Err(err) => {
-                                println!("ln 332 {}", err);
-                            }
-                        };
-                    };
+                    }
                 });
+                //receive server answer unconditionally
+                match self.rx.try_recv() {
+                    Ok(ok) => {
+                        dbg!(ok.clone());
+                        self.incoming_msg = ok
+                    }
+                    Err(err) => {
+                        println!("ln 332 {}", err);
+                    }
+                };
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
             });
             
         }
-
+        
+        
         //children windows
         egui::Window::new("Settings")
             .open(&mut self.settings_window)
@@ -379,9 +402,6 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Connect to an ip address");
                     ui.text_edit_singleline(&mut self.send_on_ip);
-                    if ui.button("Sync").clicked() {
-
-                    };
                 } else if self.server_mode {
                     ui.checkbox(&mut self.server_req_password, "Server requires password");
                     if self.server_req_password {

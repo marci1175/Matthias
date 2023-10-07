@@ -19,7 +19,7 @@ pub async fn send_msg(msg: String, passw : String, ip : String, is_sync : bool) 
     
     let message = response.into_inner().message;
 
-    dbg!(&message);
+    
 
     Ok(message)
 }

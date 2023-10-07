@@ -24,14 +24,27 @@ impl Message for MessageService {
         if !&req.is_sync {
             match self.messages.lock(){
                 Ok(mut ok) => {
-                    ok.push(req.message);
+                    ok.push(req.message + "\n");
                 },
                 Err(_) => {},
             };
         }
+        let shared_messages = self.messages.lock().unwrap().clone();
 
+        let handle = std::thread::spawn(move || {
+            let final_msg: String = shared_messages
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<String>();
+
+            final_msg
+        });
+
+        // Wait for the spawned thread to finish
+        let final_msg = handle.join().unwrap();
+        
         let reply = MessageResponse {
-            message: format!("{:?}", &self.messages.lock()).into(),
+            message: format!("{}", final_msg)
         };
 
         Ok(Response::new(reply))
