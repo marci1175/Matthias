@@ -6,9 +6,14 @@ pub mod messages {
 }
 
 //main is for sending
-pub async fn send_msg(msg: String, passw : String, ip : String, is_sync : bool) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn send_msg(
+    msg: String,
+    passw: String,
+    ip: String,
+    is_sync: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut client = MessageClient::connect(format!("http://{}", ip)).await?;
-    
+
     let request = tonic::Request::new(MessageRequest {
         message: msg.trim().to_string(),
         is_sync: is_sync,
@@ -16,10 +21,8 @@ pub async fn send_msg(msg: String, passw : String, ip : String, is_sync : bool) 
     });
 
     let response = client.send_message(request).await?;
-    
-    let message = response.into_inner().message;
 
-    
+    let message = response.into_inner().message;
 
     Ok(message)
 }
