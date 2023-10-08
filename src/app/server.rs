@@ -1,5 +1,7 @@
 use std::sync::Mutex;
 use chrono::Local;
+use chrono::format::StrftimeItems;
+
 use tonic::{transport::Server, Request, Response, Status};
 
 use messages::message_server::{Message, MessageServer};
@@ -24,10 +26,14 @@ impl Message for MessageService {
 
         let req = request.into_inner();
 
+        let current_datetime = Local::now();
+        let format = StrftimeItems::new("%Y-%m-%d %H-%M");
+        let formatted_datetime = current_datetime.format_with_items(format);
+
         if !&req.is_sync {
             match self.messages.lock() {
                 Ok(mut ok) => {
-                    ok.push(format!("{} | {} ", req.sent_by ,req.message) + "\n");
+                    ok.push(format!("{} $ {} | {} ", formatted_datetime , req.sent_by ,req.message) + "\n");
                 }
                 Err(_) => {}
             };
@@ -48,9 +54,8 @@ impl Message for MessageService {
 
         let reply = MessageResponse {
             message: format!("{}", final_msg),
-            message_time: format!("{}", Local::now()),
         };
-        dbg!(reply.clone());
+        
         Ok(Response::new(reply))
     }
 }

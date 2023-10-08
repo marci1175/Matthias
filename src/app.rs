@@ -61,7 +61,8 @@ pub struct TemplateApp {
     //msg
     #[serde(skip)]
     usr_msg: String,
-
+    #[serde(skip)]
+    incoming_msg_time: Vec<String>,
     #[serde(skip)]
     incoming_msg: String,
 
@@ -117,6 +118,7 @@ impl Default for TemplateApp {
 
             //msg
             usr_msg: String::new(),
+            incoming_msg_time: Vec::new(),
             incoming_msg: String::new(),
             //thread communication for client
             rx,
@@ -394,14 +396,14 @@ impl eframe::App for TemplateApp {
                             .stick_to_bottom(true)
                             .show(ui, |ui| {
                                 /*
-                                let incoming_msg: Vec<&str> = self.incoming_msg.split(";").collect();
-                                let collect_msg: Vec<&str> = incoming_msg.iter().take(incoming_msg.len() - 1).cloned().collect();
-                                let final_msg = collect_msg.concat();
-                                let final_time = collect_msg[incoming_msg.len() - 1];
+                                for i in 0..self.incoming_msg.len() {
+                                    ui.label(RichText::from(self.incoming_msg[i].clone()).size(self.font_size));
+                                    ui.label(RichText::from(self.incoming_msg_time[i].clone()).size(self.font_size / 2.).weak());
+                                }
                                  */
-
-                                ui.label(RichText::from(&self.incoming_msg).size(self.font_size));
-                                //ui.label(RichText::from(final_time).size(self.font_size / 2.).weak())
+                                ui.label(RichText::from(self.incoming_msg.clone()).size(self.font_size));
+                                
+                                
                             });
                     },
                 );
@@ -450,7 +452,6 @@ impl eframe::App for TemplateApp {
                                 tokio::spawn(async move {
                                     match client::send_msg(username ,temp_msg, "".into(), ok, false).await {
                                         Ok(ok) => {
-                                            let ok = format!("{};{}", ok.0, ok.1);
                                             match tx.send(ok) {
                                                 Ok(_) => {}
                                                 Err(err) => {
@@ -473,10 +474,18 @@ impl eframe::App for TemplateApp {
                 //receive server answer unconditionally
                 match self.rx.try_recv() {
                     Ok(ok) => {
-                       
+                        /*let incoming_msg: Vec<&str> = ok.split(";").collect();
+                        let collect_msg: Vec<&str> = incoming_msg.iter().take(incoming_msg.len() - 1).cloned().collect();
+                        let final_msg = collect_msg.concat();
+                        let final_time = incoming_msg[incoming_msg.len() - 1].to_string();
+
+                        self.incoming_msg.push(final_msg);
+                        self.incoming_msg_time.push(final_time);
+                        */
                         self.incoming_msg = ok
+
                     }
-                    Err(err) => {
+                    Err(_err) => {
                         //println!("ln 332 {}", err);
                     }
                 };

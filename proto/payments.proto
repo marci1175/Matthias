@@ -14,5 +14,4 @@ message MessageRequest {
 
 message MessageResponse {
     string message = 1;
-    string message_time = 2;
 }

@@ -12,7 +12,7 @@ pub async fn send_msg(
     passw: String,
     ip: String,
     is_sync: bool,
-) -> Result<(String, String), Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut client = MessageClient::connect(format!("http://{}", ip)).await?;
 
     let request = tonic::Request::new(MessageRequest {
@@ -24,9 +24,7 @@ pub async fn send_msg(
 
     let response = client.send_message(request).await?.into_inner().clone();
 
-    let date = response.message_time;
-
     let message = response.message;
 
-    Ok((message, date))
+    Ok(message)
 }
