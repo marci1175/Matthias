@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-
+use chrono::Local;
 use tonic::{transport::Server, Request, Response, Status};
 
 use messages::message_server::{Message, MessageServer};
@@ -27,7 +27,7 @@ impl Message for MessageService {
         if !&req.is_sync {
             match self.messages.lock() {
                 Ok(mut ok) => {
-                    ok.push(req.message + "\n");
+                    ok.push(format!("{} | {} ", req.sent_by ,req.message) + "\n");
                 }
                 Err(_) => {}
             };
@@ -48,8 +48,9 @@ impl Message for MessageService {
 
         let reply = MessageResponse {
             message: format!("{}", final_msg),
+            message_time: format!("{}", Local::now()),
         };
-
+        dbg!(reply.clone());
         Ok(Response::new(reply))
     }
 }

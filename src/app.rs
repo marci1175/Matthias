@@ -393,7 +393,15 @@ impl eframe::App for TemplateApp {
                             .id_source("msg_area")
                             .stick_to_bottom(true)
                             .show(ui, |ui| {
+                                /*
+                                let incoming_msg: Vec<&str> = self.incoming_msg.split(";").collect();
+                                let collect_msg: Vec<&str> = incoming_msg.iter().take(incoming_msg.len() - 1).cloned().collect();
+                                let final_msg = collect_msg.concat();
+                                let final_time = collect_msg[incoming_msg.len() - 1];
+                                 */
+
                                 ui.label(RichText::from(&self.incoming_msg).size(self.font_size));
+                                //ui.label(RichText::from(final_time).size(self.font_size / 2.).weak())
                             });
                     },
                 );
@@ -436,11 +444,13 @@ impl eframe::App for TemplateApp {
                     {
                         let temp_msg = self.usr_msg.clone();
                         let tx = self.tx.clone();
+                        let username = self.username.clone();
                         let _ = match self.send_on_ip.clone().parse::<String>() {
                             Ok(ok) => {
                                 tokio::spawn(async move {
-                                    match client::send_msg(temp_msg, "".into(), ok, false).await {
+                                    match client::send_msg(username ,temp_msg, "".into(), ok, false).await {
                                         Ok(ok) => {
+                                            let ok = format!("{};{}", ok.0, ok.1);
                                             match tx.send(ok) {
                                                 Ok(_) => {}
                                                 Err(err) => {
@@ -463,11 +473,11 @@ impl eframe::App for TemplateApp {
                 //receive server answer unconditionally
                 match self.rx.try_recv() {
                     Ok(ok) => {
-                        dbg!(ok.clone());
+                       
                         self.incoming_msg = ok
                     }
                     Err(err) => {
-                        println!("ln 332 {}", err);
+                        //println!("ln 332 {}", err);
                     }
                 };
 
@@ -544,7 +554,7 @@ fn register(username: String, passw: String) -> bool {
                 win_usr, username
             )).is_ok() {
                     println!("File already exists");
-                    std::thread::spawn(|| unsafe {
+                    std::thread::spawn( || unsafe {
                         MessageBoxW(0, w!("User already exists"), w!("Error"), MB_ICONWARNING);
                     });
                     return false;

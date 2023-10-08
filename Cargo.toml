@@ -26,6 +26,7 @@ serde = { version = "1", features = ["derive"] }
 tonic-build = "0.10.2"
 mpsc = "0.2.1"
 base64 = "0.21.4"
+chrono = "0.4.31"
 
 
 [dependencies.windows-sys]
