@@ -1,8 +1,17 @@
+use base64::engine::general_purpose;
+use base64::Engine;
 use egui::{vec2, Align, Layout, RichText};
-use std::sync::{mpsc, Once};
+use std::env;
+use std::fs;
+use std::fs::File;
+use std::str::from_utf8;
+use std::sync::mpsc;
 use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    MessageBoxW, MB_ICONEXCLAMATION, MB_ICONINFORMATION, MB_ICONWARNING,
+};
 
+use std::io::{self, Read, Write};
 mod client;
 mod server;
 
@@ -11,6 +20,7 @@ mod server;
 pub struct TemplateApp {
     //login page
     username: String,
+    #[serde(skip)]
     password: String,
 
     //server main
@@ -158,36 +168,73 @@ impl eframe::App for TemplateApp {
 
         //Login Page
         if !(self.mode_selector || self.server_mode || self.client_mode) {
-
             //windows settings
             _frame.set_window_size(vec2(500., 200.));
 
             egui::CentralPanel::default().show(ctx, |ui| {
-                ui.with_layout(Layout::top_down(Align::Center), |ui|{
+                ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     ui.label(RichText::from("széChat v3").strong().size(25.));
                     ui.label("Username");
                     ui.text_edit_singleline(&mut self.username);
                     ui.label("Password");
-                    ui.text_edit_singleline(&mut self.password);
-                    if ui.button("Login").clicked() {
-                        self.mode_selector = login(self.username.clone(), self.password.clone());
+
+                    ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
+
+                    if ui.button("Login").clicked()
+                        && !(self.password.is_empty() && self.username.is_empty())
+                    {
+                        match login(self.username.clone(), self.password.clone()) {
+                            true => {
+                                self.mode_selector = true;
+                            }
+                            false => {
+                                std::thread::spawn(|| unsafe {
+                                    MessageBoxW(
+                                        0,
+                                        w!("Invalid password or username"),
+                                        w!("Error"),
+                                        MB_ICONEXCLAMATION,
+                                    );
+                                });
+                            }
+                        };
                     }
+
                     ui.separator();
                     ui.label(RichText::from("You dont have an account yet?").weak());
                     if ui.button("Register").clicked() {
-
-                    }
+                        match register(self.username.clone(), self.password.clone()) {
+                            true => {
+                                std::thread::spawn(|| unsafe {
+                                    MessageBoxW(
+                                        0,
+                                        w!("Successfully registered!"),
+                                        w!("Success"),
+                                        MB_ICONINFORMATION,
+                                    );
+                                });
+                            }
+                            false => {}
+                        };
+                    };
                 });
             });
         }
         //Main page
-        if self.mode_selector {
+        if self.mode_selector && !(self.server_mode || self.client_mode) {
             //main
 
             //window settings
             _frame.set_window_size(vec2(700., 300.));
 
             egui::CentralPanel::default().show(ctx, |ui| {
+                ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                    ui.label(
+                        RichText::from(format!("Welcome, {}", self.username))
+                            .size(20.)
+                            .weak(),
+                    );
+                });
                 ui.columns(2, |ui| {
                     ui[0].with_layout(
                         Layout::centered_and_justified(egui::Direction::TopDown),
@@ -216,6 +263,7 @@ impl eframe::App for TemplateApp {
                                 .clicked()
                             {
                                 self.server_mode = true;
+
                                 _frame.set_window_size(vec2(1000., 900.));
                             };
                         },
@@ -313,7 +361,9 @@ impl eframe::App for TemplateApp {
                             {
                                 self.client_mode = false;
                             };
-                        }).response.on_hover_text("Logout");
+                        })
+                        .response
+                        .on_hover_text("Logout");
                         ui.allocate_ui(vec2(300., 40.), |ui| {
                             if ui
                                 .add(egui::widgets::ImageButton::new(egui::include_image!(
@@ -445,6 +495,92 @@ impl eframe::App for TemplateApp {
             });
     }
 }
-fn login(username : String, passw : String) -> bool {
-return true;
+fn login(username: String, passw: String) -> bool {
+    match env::var("USERNAME") {
+        Ok(win_usr) => {
+            match File::open(format!(
+                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
+                win_usr, username
+            )) {
+                Ok(ok) => {
+                    let mut reader: io::BufReader<File> = io::BufReader::new(ok);
+                    let mut buffer = String::new();
+
+                    // Read the contents of the file into a buffer
+                    match reader.read_to_string(&mut buffer) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            println!("{}", err);
+                        }
+                    };
+                    let decoded = general_purpose::STANDARD.decode(buffer).expect("Nigga");
+                    let decoded: Vec<&str> = match from_utf8(&decoded) {
+                        Ok(ok) => ok.lines().collect(),
+                        Err(_) => todo!( /* apad */ ),
+                    };
+
+                    return decoded[0] == username && decoded[1] == passw;
+                }
+                Err(_) => {
+                    return false;
+                }
+            };
+        }
+        Err(_) => {
+            return false;
+        }
+    }
+}
+fn register(username: String, passw: String) -> bool {
+    match env::var("USERNAME") {
+        Ok(win_usr) => {
+            let _create_dir = fs::create_dir(format!(
+                "C:\\Users\\{}\\AppData\\Roaming\\szeChat",
+                username
+            ));
+
+            if std::fs::metadata(format!(
+                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
+                win_usr, username
+            )).is_ok() {
+                    println!("File already exists");
+                    std::thread::spawn(|| unsafe {
+                        MessageBoxW(0, w!("User already exists"), w!("Error"), MB_ICONWARNING);
+                    });
+                    return false;
+            }
+
+            let mut file = File::create(format!(
+                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
+                win_usr, username
+            ))
+            .unwrap();
+
+            let b64 = general_purpose::STANDARD.encode(format!("{}\n{}", username, passw));
+
+            println!("{}", &b64);
+
+            match file.write_all(b64.as_bytes()) {
+                Ok(_) => {
+                    println!("File wrote sexsexfully");
+                    return true;
+                }
+                Err(_) => {
+                    std::thread::spawn(|| unsafe {
+                        MessageBoxW(
+                            0,
+                            w!("Failed to create folder"),
+                            w!("Error"),
+                            MB_ICONWARNING,
+                        );
+                    });
+                    return false;
+                }
+            };
+        }
+        Err(_) => {
+            println!("Unable to retrieve the username.");
+            return false;
+        }
+    }
 }

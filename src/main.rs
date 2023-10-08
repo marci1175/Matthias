@@ -14,6 +14,6 @@ async fn main() -> eframe::Result<()> {
     eframe::run_native(
         "széChat v3",
         native_options,
-        Box::new(|cc| Box::new(eframe_template::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(szeChat::TemplateApp::new(cc))),
     )
 }

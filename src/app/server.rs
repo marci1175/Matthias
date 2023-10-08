@@ -2,10 +2,10 @@ use std::sync::Mutex;
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use Messages::message_server::{Message, MessageServer};
-use Messages::{MessageRequest, MessageResponse};
+use messages::message_server::{Message, MessageServer};
+use messages::{MessageRequest, MessageResponse};
 
-pub mod Messages {
+pub mod messages {
     tonic::include_proto!("messages");
 }
 

@@ -929,27 +929,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eframe_template"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
- "egui_extras",
- "env_logger",
- "image",
- "log",
- "mpsc",
- "prost 0.10.4",
- "serde",
- "tokio",
- "tonic",
- "tonic-build 0.10.2",
- "tonic-build 0.7.2",
- "wasm-bindgen-futures",
- "windows-sys 0.45.0",
-]
-
-[[package]]
 name = "egui"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3114,6 +3093,28 @@ name = "sync_wrapper"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
+
+[[package]]
+name = "szeChat"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.4",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "env_logger",
+ "image",
+ "log",
+ "mpsc",
+ "prost 0.10.4",
+ "serde",
+ "tokio",
+ "tonic",
+ "tonic-build 0.10.2",
+ "tonic-build 0.7.2",
+ "wasm-bindgen-futures",
+ "windows-sys 0.45.0",
+]
 
 [[package]]
 name = "tempfile"

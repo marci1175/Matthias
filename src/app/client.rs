@@ -1,5 +1,5 @@
 use messages::message_client::MessageClient;
-use messages::{MessageRequest, MessageResponse};
+use messages::MessageRequest;
 
 pub mod messages {
     tonic::include_proto!("messages");
