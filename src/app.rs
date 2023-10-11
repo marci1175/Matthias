@@ -1,19 +1,16 @@
-use base64::engine::general_purpose;
-use base64::Engine;
+
 use egui::{vec2, Align, Layout, RichText};
-use std::env;
-use std::fs;
-use std::fs::File;
-use std::str::from_utf8;
 use std::sync::mpsc;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    MessageBoxW, MB_ICONEXCLAMATION, MB_ICONINFORMATION, MB_ICONWARNING,
+    MessageBoxW, MB_ICONEXCLAMATION, MB_ICONINFORMATION,
 };
 
-use std::io::{self, Read, Write};
 mod client;
 mod server;
+mod account_manager;
+
+use account_manager::{login, register, main};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -148,10 +145,13 @@ impl eframe::App for TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        main();
         /*devlog:
+
         TODO: MAKE QUALITY BETTER!!!
-        TODO: MAKE LOGIN PAGE
         TODO: MAKE CLIENT UI BETTER
+        TODO: IMPEMENT PASSWORD FOR SERVERS
+
         */
 
         //window options
@@ -512,94 +512,5 @@ impl eframe::App for TemplateApp {
                     }
                 }
             });
-    }
-}
-fn login(username: String, passw: String) -> bool {
-    match env::var("USERNAME") {
-        Ok(win_usr) => {
-            match File::open(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
-                win_usr, username
-            )) {
-                Ok(ok) => {
-                    let mut reader: io::BufReader<File> = io::BufReader::new(ok);
-                    let mut buffer = String::new();
-
-                    // Read the contents of the file into a buffer
-                    match reader.read_to_string(&mut buffer) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            println!("{}", err);
-                        }
-                    };
-                    let decoded = general_purpose::STANDARD.decode(buffer).expect("Nigga");
-                    let decoded: Vec<&str> = match from_utf8(&decoded) {
-                        Ok(ok) => ok.lines().collect(),
-                        Err(_) => todo!( /* apad */ ),
-                    };
-
-                    return decoded[0] == username && decoded[1] == passw;
-                }
-                Err(_) => {
-                    return false;
-                }
-            };
-        }
-        Err(_) => {
-            return false;
-        }
-    }
-}
-fn register(username: String, passw: String) -> bool {
-    match env::var("USERNAME") {
-        Ok(win_usr) => {
-            let _create_dir = fs::create_dir(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat",
-                username
-            ));
-
-            if std::fs::metadata(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
-                win_usr, username
-            )).is_ok() {
-                    println!("File already exists");
-                    std::thread::spawn( || unsafe {
-                        MessageBoxW(0, w!("User already exists"), w!("Error"), MB_ICONWARNING);
-                    });
-                    return false;
-            }
-
-            let mut file = File::create(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
-                win_usr, username
-            ))
-            .unwrap();
-
-            let b64 = general_purpose::STANDARD.encode(format!("{}\n{}", username, passw));
-
-            println!("{}", &b64);
-
-            match file.write_all(b64.as_bytes()) {
-                Ok(_) => {
-                    println!("File wrote sexsexfully");
-                    return true;
-                }
-                Err(_) => {
-                    std::thread::spawn(|| unsafe {
-                        MessageBoxW(
-                            0,
-                            w!("Failed to create folder"),
-                            w!("Error"),
-                            MB_ICONWARNING,
-                        );
-                    });
-                    return false;
-                }
-            };
-        }
-        Err(_) => {
-            println!("Unable to retrieve the username.");
-            return false;
-        }
     }
 }

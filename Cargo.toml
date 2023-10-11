@@ -1,7 +1,7 @@
 [package]
 name = "szeChat"
 version = "0.1.0"
-authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
+authors = ["Varga Marcell <v.marcell4000@gmail.com>"]
 edition = "2021"
 rust-version = "1.71"
 
@@ -11,6 +11,7 @@ egui = "0.23.0"
 egui_extras = { version = "0.23", features = ["all_loaders"] }
 image = { version = "0.24", features = ["jpeg", "png"] } # Add the types you want support for
 tonic = "0.7"
+
 prost = "0.10"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 eframe = { version = "0.23.0", default-features = false, features = [
@@ -27,6 +28,8 @@ tonic-build = "0.10.2"
 mpsc = "0.2.1"
 base64 = "0.21.4"
 chrono = "0.4.31"
+ring = "0.17.3"
+data-encoding = "2.4.0"
 
 
 [dependencies.windows-sys]
