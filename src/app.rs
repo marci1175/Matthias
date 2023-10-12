@@ -16,15 +16,15 @@ use account_manager::{login, register, encrypt};
 #[serde(default)]
 pub struct TemplateApp {
     //login page
-    username: String,
+    login_username: String,
     #[serde(skip)]
-    password: String,
+    login_password: String,
 
     //server main
     #[serde(skip)]
     server_has_started: bool,
     //server settings
-    #[serde(skip)]
+    
     server_req_password: bool,
 
     server_password: String,
@@ -87,8 +87,8 @@ impl Default for TemplateApp {
         let (dtx, drx) = mpsc::channel::<String>();
         Self {
             //login page
-            username: String::new(),
-            password: String::new(),
+            login_username: String::new(),
+            login_password: String::new(),
 
             //server_main
             server_has_started: false,
@@ -179,15 +179,15 @@ impl eframe::App for TemplateApp {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     ui.label(RichText::from("széChat v3").strong().size(25.));
                     ui.label("Username");
-                    ui.text_edit_singleline(&mut self.username);
+                    ui.text_edit_singleline(&mut self.login_username);
                     ui.label("Password");
 
-                    ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
+                    ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
 
                     if ui.button("Login").clicked()
-                        && !(self.password.is_empty() && self.username.is_empty())
+                        && !(self.login_password.is_empty() && self.login_username.is_empty())
                     {
-                        match login(self.username.clone(), self.password.clone()) {
+                        match login(self.login_username.clone(), self.login_password.clone()) {
                             true => {
                                 self.mode_selector = true;
                             }
@@ -207,7 +207,7 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label(RichText::from("You dont have an account yet?").weak());
                     if ui.button("Register").clicked() {
-                        match register(self.username.clone(), self.password.clone()) {
+                        match register(self.login_username.clone(), self.login_password.clone()) {
                             true => {
                                 std::thread::spawn(|| unsafe {
                                     MessageBoxW(
@@ -234,7 +234,7 @@ impl eframe::App for TemplateApp {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     ui.label(
-                        RichText::from(format!("Welcome, {}", self.username))
+                        RichText::from(format!("Welcome, {}", self.login_username))
                             .size(20.)
                             .weak(),
                     );
@@ -296,6 +296,9 @@ impl eframe::App for TemplateApp {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     ui.label(RichText::from("Server mode").strong().size(30.));
                     ui.label(RichText::from("Message stream").size(20.));
+                    if self.server_req_password && !self.server_password.is_empty() {
+                        ui.label(RichText::from(format!("Password : {}", self.server_password)));
+                    }
                     if !self.server_has_started {
                         ui.label(RichText::from("Server setup").size(30.).strong());
                         ui.separator();
@@ -309,6 +312,7 @@ impl eframe::App for TemplateApp {
                         let temp_open_on_port = &self.open_on_port;
 
                         if ui.button("Start").clicked() {
+                            
                             let temp_tx = self.stx.clone();
                             let server_pw = self.server_password.clone();
                             self.server_has_started = match temp_open_on_port.parse::<i32>() {
@@ -348,6 +352,7 @@ impl eframe::App for TemplateApp {
                         }
                         ui.separator();
                     } else {
+                        
                     }
                 });
             });
@@ -452,7 +457,7 @@ impl eframe::App for TemplateApp {
                     {
                         let temp_msg = self.usr_msg.clone();
                         let tx = self.tx.clone();
-                        let username = self.username.clone();
+                        let username = self.login_username.clone();
                         let passw = self.client_password.clone();
                         let _ = match self.send_on_ip.clone().parse::<String>() {
                             Ok(ok) => {
