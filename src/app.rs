@@ -10,7 +10,7 @@ mod client;
 mod server;
 mod account_manager;
 
-use account_manager::{login, register, main};
+use account_manager::{login, register, encrypt};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -51,7 +51,8 @@ pub struct TemplateApp {
 
     //client main
     send_on_ip: String,
-
+    req_passw: bool,
+    client_password: String,
     //font
     font_size: f32,
 
@@ -110,6 +111,8 @@ impl Default for TemplateApp {
 
             //client main
             send_on_ip: String::new(),
+            req_passw: false,
+            client_password: String::new(),
             //font
             font_size: 20.,
 
@@ -145,7 +148,6 @@ impl eframe::App for TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        main();
         /*devlog:
 
         TODO: MAKE QUALITY BETTER!!!
@@ -299,15 +301,20 @@ impl eframe::App for TemplateApp {
                         ui.separator();
                         ui.label(RichText::from("Open on port").size(20.));
                         ui.text_edit_singleline(&mut self.open_on_port);
-
+                        ui.separator();
+                        ui.checkbox(&mut self.server_req_password, "Server requires password");
+                        if self.server_req_password {
+                            ui.text_edit_singleline(&mut self.server_password);
+                        }
                         let temp_open_on_port = &self.open_on_port;
 
                         if ui.button("Start").clicked() {
                             let temp_tx = self.stx.clone();
+                            let server_pw = self.server_password.clone();
                             self.server_has_started = match temp_open_on_port.parse::<i32>() {
                                 Ok(port) => {
                                     tokio::spawn(async move {
-                                        match server::server_main(port.to_string()).await {
+                                        match server::server_main(port.to_string(), server_pw).await {
                                             Ok(ok) => {
                                                 dbg!(&ok);
 
@@ -391,19 +398,18 @@ impl eframe::App for TemplateApp {
                         ui.available_height() - (_frame.info().window_info.size[1] / 5. + 10.),
                     ),
                     |ui| {
+                        
                         egui::ScrollArea::vertical()
                             .id_source("msg_area")
                             .stick_to_bottom(true)
                             .show(ui, |ui| {
-                                /*
-                                for i in 0..self.incoming_msg.len() {
-                                    ui.label(RichText::from(self.incoming_msg[i].clone()).size(self.font_size));
-                                    ui.label(RichText::from(self.incoming_msg_time[i].clone()).size(self.font_size / 2.).weak());
-                                }
-                                 */
-                                ui.label(RichText::from(self.incoming_msg.clone()).size(self.font_size));
+                                ui.separator();
                                 
+                                ui.allocate_ui(ui.available_size(), |ui|{
+                                    ui.label(RichText::from(self.incoming_msg.clone()).size(self.font_size));
+                                });
                                 
+                                ui.separator();
                             });
                     },
                 );
@@ -447,10 +453,11 @@ impl eframe::App for TemplateApp {
                         let temp_msg = self.usr_msg.clone();
                         let tx = self.tx.clone();
                         let username = self.username.clone();
+                        let passw = self.client_password.clone();
                         let _ = match self.send_on_ip.clone().parse::<String>() {
                             Ok(ok) => {
                                 tokio::spawn(async move {
-                                    match client::send_msg(username ,temp_msg, "".into(), ok, false).await {
+                                    match client::send_msg(username ,temp_msg, passw, ok, false).await {
                                         Ok(ok) => {
                                             match tx.send(ok) {
                                                 Ok(_) => {}
@@ -505,11 +512,12 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Connect to an ip address");
                     ui.text_edit_singleline(&mut self.send_on_ip);
+                    ui.checkbox(&mut self.req_passw, "Set password");
+                    if self.req_passw {
+                        ui.text_edit_singleline(&mut self.client_password);
+                    };
                 } else if self.server_mode {
-                    ui.checkbox(&mut self.server_req_password, "Server requires password");
-                    if self.server_req_password {
-                        ui.text_edit_singleline(&mut self.server_password);
-                    }
+                    
                 }
             });
     }

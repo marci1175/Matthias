@@ -9,6 +9,29 @@ use std::fs;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str::from_utf8;
+use aes::cipher::{
+    BlockCipher, BlockEncrypt, BlockDecrypt, KeyInit,
+    generic_array::GenericArray,
+};
+use aes::Aes256;
+pub fn encrypt(passw: String) -> String {
+
+    let key = GenericArray::from([0u8; 32]);
+
+    let mut block = GenericArray::from([42u8; 16]);
+
+    let cipher = Aes256::new(&key);
+
+    let block_copy = block.clone();
+
+    cipher.encrypt_block(&mut block);
+    println!("{:?}", block);
+    cipher.decrypt_block(&mut block);
+    println!("{:?}", block);
+
+    let cipher = Aes256::new(&key);
+    "fasz".into()
+}
 
 pub fn login(username: String, passw: String) -> bool {
     match env::var("USERNAME") {
@@ -100,51 +123,3 @@ pub fn register(username: String, passw: String) -> bool {
     }
 }
 
-use data_encoding::HEXUPPER;
-use ring::error::Unspecified;
-use ring::rand::SecureRandom;
-use ring::{digest, pbkdf2, rand};
-use std::num::NonZeroU32;
-
-pub fn main() -> Result<(), Unspecified> {
-    let decryp_key = "Marcell";
-    let cred_len: usize = decryp_key.len();
-    let n_iter = NonZeroU32::new(100_000).unwrap();
-    let rng = rand::SystemRandom::new();
-
-    let mut salt = [0u8; cred_len];
-    rng.fill(&mut salt)?;
-
-    let password = "Guess Me If You Can!";
-    let mut pbkdf2_hash = [0u8; cred_len];
-    pbkdf2::derive(
-        pbkdf2::PBKDF2_HMAC_SHA512,
-        n_iter,
-        &salt,
-        password.as_bytes(),
-        &mut pbkdf2_hash,
-    );
-    println!("Salt: {}", HEXUPPER.encode(&salt));
-    println!("PBKDF2 hash: {}", HEXUPPER.encode(&pbkdf2_hash));
-
-    let should_succeed = pbkdf2::verify(
-        pbkdf2::PBKDF2_HMAC_SHA512,
-        n_iter,
-        &salt,
-        password.as_bytes(),
-        &pbkdf2_hash,
-    );
-    let wrong_password = "Definitely not the correct password";
-    let should_fail = pbkdf2::verify(
-        pbkdf2::PBKDF2_HMAC_SHA512,
-        n_iter,
-        &salt,
-        wrong_password.as_bytes(),
-        &pbkdf2_hash,
-    );
-
-    assert!(should_succeed.is_ok());
-    assert!(!should_fail.is_ok());
-
-    Ok(())
-}
