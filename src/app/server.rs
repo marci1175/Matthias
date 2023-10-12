@@ -1,6 +1,6 @@
-use std::sync::Mutex;
-use chrono::Local;
 use chrono::format::StrftimeItems;
+use chrono::Local;
+use std::sync::Mutex;
 
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -35,13 +35,18 @@ impl Message for MessageService {
         if !&req.is_sync && &req.password.trim() == &self.passw.trim() {
             match self.messages.lock() {
                 Ok(mut ok) => {
-                    ok.push(format!("{} $ {} | {} ", formatted_datetime , req.sent_by ,req.message) + "\n");
+                    ok.push(
+                        format!(
+                            "{} $ {} | {} ",
+                            formatted_datetime, req.sent_by, req.message
+                        ) + "\n",
+                    );
                 }
                 Err(_) => {}
             };
         }
         let shared_messages = self.messages.lock().unwrap().clone();
-        
+
         let handle = std::thread::spawn(move || {
             let final_msg: String = shared_messages
                 .iter()
@@ -57,7 +62,7 @@ impl Message for MessageService {
             let reply = MessageResponse {
                 message: format!("{}", final_msg),
             };
-            
+
             Ok(Response::new(reply))
         }
         //invalid passw
@@ -70,9 +75,12 @@ impl Message for MessageService {
     }
 }
 
-pub async fn server_main(port: String, password : String) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub async fn server_main(
+    port: String,
+    password: String,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let addr = format!("[::1]:{}", port).parse()?;
-    
+
     let mut btc_service = MessageService::default();
     btc_service.passw = password;
     let messages = &btc_service.messages.lock().unwrap().to_vec();

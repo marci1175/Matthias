@@ -1,21 +1,15 @@
+use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+use aes::Aes256;
 use base64::engine::general_purpose;
 use base64::Engine;
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    MessageBoxW, MB_ICONWARNING,
-};
 use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str::from_utf8;
-use aes::cipher::{
-    BlockCipher, BlockEncrypt, BlockDecrypt, KeyInit,
-    generic_array::GenericArray,
-};
-use aes::Aes256;
+use windows_sys::w;
+use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONWARNING};
 pub fn encrypt(passw: String) -> String {
-
     let key = GenericArray::from([0u8; 32]);
 
     let mut block = GenericArray::from([42u8; 16]);
@@ -29,7 +23,6 @@ pub fn encrypt(passw: String) -> String {
     cipher.decrypt_block(&mut block);
     println!("{:?}", block);
 
-    let cipher = Aes256::new(&key);
     "fasz".into()
 }
 
@@ -80,12 +73,14 @@ pub fn register(username: String, passw: String) -> bool {
             if std::fs::metadata(format!(
                 "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
                 win_usr, username
-            )).is_ok() {
-                    println!("File already exists");
-                    std::thread::spawn( || unsafe {
-                        MessageBoxW(0, w!("User already exists"), w!("Error"), MB_ICONWARNING);
-                    });
-                    return false;
+            ))
+            .is_ok()
+            {
+                println!("File already exists");
+                std::thread::spawn(|| unsafe {
+                    MessageBoxW(0, w!("User already exists"), w!("Error"), MB_ICONWARNING);
+                });
+                return false;
             }
 
             let mut file = File::create(format!(
@@ -122,4 +117,3 @@ pub fn register(username: String, passw: String) -> bool {
         }
     }
 }
-
