@@ -1,5 +1,6 @@
+use std::time::Duration;
 use egui::{vec2, Align, Layout, RichText};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     MessageBoxW, MB_ICONEXCLAMATION, MB_ICONINFORMATION,
@@ -8,8 +9,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 mod account_manager;
 mod client;
 mod server;
+mod networking;
+use account_manager::{login, register};
 
-use account_manager::{encrypt, login, register};
+use self::networking::ipv4_get;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -22,6 +25,8 @@ pub struct TemplateApp {
     //server main
     #[serde(skip)]
     server_has_started: bool,
+    #[serde(skip)]
+    public_ip: String,
     //server settings
     server_req_password: bool,
 
@@ -90,6 +95,8 @@ impl Default for TemplateApp {
 
             //server_main
             server_has_started: false,
+            public_ip: String::new(),
+
             //server settings
             server_req_password: false,
             server_password: String::default(),
@@ -345,7 +352,7 @@ impl eframe::App for TemplateApp {
                                 }
                                 Err(_) => {
                                     unsafe {
-                                        MessageBoxW(0, w!("asd"), w!("asd"), 0);
+                                        MessageBoxW(0, w!("Error"), w!("Enter a valid port!"), 0);
                                     }
                                     false
                                 }
@@ -353,6 +360,17 @@ impl eframe::App for TemplateApp {
                         }
                         ui.separator();
                     } else {
+                        if self.public_ip.is_empty() {
+                            let tx = self.dtx.clone();
+                            std::thread::spawn(move || {
+                                tx.send(ipv4_get().unwrap())
+                            });
+                            match self.drx.recv(){
+                                Ok(ok) => { self.public_ip = ok },
+                                Err(err) => { eprintln!("{}", err) },
+                            }
+                        }
+                        ui.text_edit_singleline(&mut format!("Public ip address : {}", self.public_ip.trim()));
                     }
                 });
             });
