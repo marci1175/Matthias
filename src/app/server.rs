@@ -6,7 +6,7 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use messages::message_server::{Message, MessageServer};
 use messages::{MessageRequest, MessageResponse};
-use windows_sys::Win32::Foundation::ERROR_CLOUD_FILE_US_MESSAGE_TIMEOUT;
+
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -29,7 +29,7 @@ impl Message for MessageService {
         let req = request.into_inner();
 
         let current_datetime = Local::now();
-        let format = StrftimeItems::new("%Y-%m-%d %H-%M");
+        let format = StrftimeItems::new("%Y.%m.%d. %H:%M");
         let formatted_datetime = current_datetime.format_with_items(format);
 
         if !&req.is_sync && &req.password.trim() == &self.passw.trim() {
@@ -78,9 +78,12 @@ impl Message for MessageService {
 pub async fn server_main(
     port: String,
     password: String,
+    ip_v4: bool,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let addr = format!("[::1]:{}", port).parse()?;
-
+    let mut addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;
+    if !ip_v4 {
+        addr = format!("[::]:{}", port).parse()?;
+    }
     let mut btc_service = MessageService::default();
     btc_service.passw = password;
     let messages = &btc_service.messages.lock().unwrap().to_vec();

@@ -1,4 +1,5 @@
-use aes::cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit};
+
+use aes::cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit};
 use aes::Aes256;
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -9,6 +10,7 @@ use std::io::{self, Read, Write};
 use std::str::from_utf8;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONWARNING};
+
 pub fn encrypt(passw: String) -> String {
     let key = GenericArray::from([0u8; 32]);
 
@@ -23,7 +25,7 @@ pub fn encrypt(passw: String) -> String {
     cipher.decrypt_block(&mut block);
     println!("{:?}", block);
 
-    "fasz".into()
+    passw.into()
 }
 
 pub fn login(username: String, passw: String) -> bool {
@@ -63,16 +65,16 @@ pub fn login(username: String, passw: String) -> bool {
     }
 }
 pub fn register(username: String, passw: String) -> bool {
-    match env::var("USERNAME") {
-        Ok(win_usr) => {
+    match env::var("APPDATA") {
+        Ok(app_data) => {
             let _create_dir = fs::create_dir(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat",
-                username
+                "{}\\szeChat",
+                app_data
             ));
 
             if std::fs::metadata(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
-                win_usr, username
+                "{}\\szeChat\\{}.szch",
+                app_data, username
             ))
             .is_ok()
             {
@@ -83,33 +85,39 @@ pub fn register(username: String, passw: String) -> bool {
                 return false;
             }
 
-            let mut file = File::create(format!(
-                "C:\\Users\\{}\\AppData\\Roaming\\szeChat\\{}.szch",
-                win_usr, username
-            ))
-            .unwrap();
+            match File::create(format!(
+                "{}\\szeChat\\{}.szch",
+                app_data, username
+            )){
+                Ok(mut file) => {
+                    let b64 = general_purpose::STANDARD.encode(format!("{}\n{}", username, passw));
 
-            let b64 = general_purpose::STANDARD.encode(format!("{}\n{}", username, passw));
+                    println!("{}", &b64);
 
-            println!("{}", &b64);
-
-            match file.write_all(b64.as_bytes()) {
-                Ok(_) => {
-                    println!("File wrote sexsexfully");
-                    return true;
-                }
-                Err(_) => {
-                    std::thread::spawn(|| unsafe {
-                        MessageBoxW(
-                            0,
-                            w!("Failed to create folder"),
-                            w!("Error"),
-                            MB_ICONWARNING,
-                        );
-                    });
-                    return false;
-                }
+                    match file.write_all(b64.as_bytes()) {
+                        Ok(_) => {
+                            println!("File wrote sexsexfully");
+                            return true;
+                        }
+                        Err(_) => {
+                            std::thread::spawn(|| unsafe {
+                                MessageBoxW(
+                                    0,
+                                    w!("Failed to create folder"),
+                                    w!("Error"),
+                                    MB_ICONWARNING,
+                                );
+                            });
+                            return false;
+                        }
+                    };
+                },
+                Err(e) => {
+                    panic!("{e}")
+                },
             };
+
+            
         }
         Err(_) => {
             println!("Unable to retrieve the username.");

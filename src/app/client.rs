@@ -13,10 +13,11 @@ pub async fn send_msg(
     ip: String,
     is_sync: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let mut client = MessageClient::connect(format!("http://{}", ip)).await?;
+    let mut client: MessageClient<tonic::transport::Channel> =
+        MessageClient::connect(format!("http://{}", ip)).await?;
 
     let request = tonic::Request::new(MessageRequest {
-        message: msg,
+        message: msg.trim().to_string(),
         sent_by: username,
         is_sync: is_sync,
         password: passw,

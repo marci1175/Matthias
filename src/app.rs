@@ -1,6 +1,6 @@
-use std::time::Duration;
 use egui::{vec2, Align, Layout, RichText};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::mpsc;
+
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     MessageBoxW, MB_ICONEXCLAMATION, MB_ICONINFORMATION,
@@ -8,11 +8,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 mod account_manager;
 mod client;
-mod server;
 mod networking;
+mod server;
 use account_manager::{login, register};
 
-use self::networking::ipv4_get;
+use self::networking::{ipv4_get, ipv6_get};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -23,6 +23,7 @@ pub struct TemplateApp {
     login_password: String,
 
     //server main
+    ipv4_mode: bool,
     #[serde(skip)]
     server_has_started: bool,
     #[serde(skip)]
@@ -94,6 +95,7 @@ impl Default for TemplateApp {
             login_password: String::new(),
 
             //server_main
+            ipv4_mode: true,
             server_has_started: false,
             public_ip: String::new(),
 
@@ -211,7 +213,10 @@ impl eframe::App for TemplateApp {
 
                     ui.separator();
                     ui.label(RichText::from("You dont have an account yet?").weak());
-                    if ui.button("Register").clicked() {
+                    if ui.button("Register").clicked()
+                        && !self.login_username.is_empty()
+                        && !self.login_password.is_empty()
+                    {
                         match register(self.login_username.clone(), self.login_password.clone()) {
                             true => {
                                 std::thread::spawn(|| unsafe {
@@ -318,14 +323,15 @@ impl eframe::App for TemplateApp {
                             ui.text_edit_singleline(&mut self.server_password);
                         }
                         let temp_open_on_port = &self.open_on_port;
-
+                        ui.checkbox(&mut self.ipv4_mode, "Internet protocol (IP) v4 mode");
                         if ui.button("Start").clicked() {
                             let temp_tx = self.stx.clone();
                             let server_pw = self.server_password.clone();
+                            let ip_v4 = self.ipv4_mode;
                             self.server_has_started = match temp_open_on_port.parse::<i32>() {
                                 Ok(port) => {
                                     tokio::spawn(async move {
-                                        match server::server_main(port.to_string(), server_pw).await
+                                        match server::server_main(port.to_string(), server_pw, ip_v4).await
                                         {
                                             Ok(ok) => {
                                                 dbg!(&ok);
@@ -363,14 +369,27 @@ impl eframe::App for TemplateApp {
                         if self.public_ip.is_empty() {
                             let tx = self.dtx.clone();
                             std::thread::spawn(move || {
-                                tx.send(ipv4_get().unwrap())
+                                let combined_ips = ipv4_get().unwrap_or_else(|_|{"Couldnt connect to the internet".to_string()})+ ";" + &ipv6_get().unwrap_or_else(|_| {"Couldnt connect to the internet".to_string()});  
+                                tx.send(combined_ips)
                             });
-                            match self.drx.recv(){
-                                Ok(ok) => { self.public_ip = ok },
-                                Err(err) => { eprintln!("{}", err) },
+                            match self.drx.recv() {
+                                Ok(ok) => self.public_ip = ok,
+                                Err(err) => {
+                                    eprintln!("{}", err)
+                                }
                             }
                         }
-                        ui.text_edit_singleline(&mut format!("Public ip address : {}", self.public_ip.trim()));
+                        let pub_ip: Vec<&str> = self.public_ip.rsplit(";").collect();
+                        if self.ipv4_mode {
+                            ui.label(RichText::from("Public ipV4 address : ").size(20.));
+                            ui.text_edit_singleline(&mut format!("{}", pub_ip[1].trim()));
+                        }
+                        else {
+                            ui.label(RichText::from("Public ipV6 address : ").size(20.));
+                            ui.text_edit_singleline(&mut format!("{}", pub_ip[0].trim()));
+                        }
+                        ui.label(RichText::from("Port").size(15.).weak());
+                        ui.text_edit_singleline(&mut format!("{}", self.open_on_port));
                     }
                 });
             });
@@ -494,7 +513,8 @@ impl eframe::App for TemplateApp {
                                             };
                                         }
                                         Err(err) => {
-                                            println!("ln 321 {}", err);
+                                            
+                                            println!("ln 321 {:?}", err.source());
                                         }
                                     };
                                 });
