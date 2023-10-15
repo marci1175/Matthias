@@ -2,7 +2,6 @@ use aes::cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyIn
 use aes::Aes256;
 use base64::engine::general_purpose;
 use base64::Engine;
-use std::borrow::BorrowMut;
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -40,7 +39,7 @@ pub fn login(username: String, passw: String) -> (bool, Option<File>) {
                         Ok(ok_clone) => {
                             let mut reader: io::BufReader<File> = io::BufReader::new(ok_clone);
                             let mut buffer = String::new();
-                            
+
                             // Read the contents of the file into a buffer
                             match reader.read_to_string(&mut buffer) {
                                 Ok(_) => {}
@@ -48,18 +47,18 @@ pub fn login(username: String, passw: String) -> (bool, Option<File>) {
                                     println!("{}", err);
                                 }
                             };
-                            let decoded = general_purpose::STANDARD.decode(buffer).expect("Brah wat");
+                            let decoded =
+                                general_purpose::STANDARD.decode(buffer).expect("Brah wat");
                             let decoded_clone = decoded.clone();
                             let decoded: Vec<&str> = match from_utf8(&decoded_clone) {
                                 Ok(ok) => ok.lines().collect(),
                                 Err(_) => todo!( /* apad */ ),
                             };
                             return (decoded[0] == username && decoded[1] == passw, Some(ok));
-                        },
+                        }
                         Err(_) => {
                             panic!("Failed to clone file reference.");
-                            
-                        },
+                        }
                     };
                 }
                 Err(_) => {

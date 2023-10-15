@@ -212,7 +212,7 @@ impl eframe::App for TemplateApp {
                                     );
                                 });
                             }
-                            //edge rust compiler
+                            //edging rust compiler
                             (true, None) => todo!(),
                             (false, Some(_)) => todo!(),
                         };
@@ -420,7 +420,6 @@ impl eframe::App for TemplateApp {
                         if self.server_req_password {
                             ui.text_edit_singleline(&mut self.server_password);
                         }
-                        
                     }
                 });
             });
@@ -527,30 +526,24 @@ impl eframe::App for TemplateApp {
                         let tx = self.tx.clone();
                         let username = self.login_username.clone();
                         let passw = self.client_password.clone();
-                        let _ = match self.send_on_ip.clone().parse::<String>() {
-                            Ok(ok) => {
-                                tokio::spawn(async move {
-                                    match client::send_msg(username, temp_msg, passw, ok, false)
-                                        .await
-                                    {
-                                        Ok(ok) => {
-                                            match tx.send(ok) {
-                                                Ok(_) => {}
-                                                Err(err) => {
-                                                    println!("{}", err);
-                                                }
-                                            };
-                                        }
+                        let ok = self.send_on_ip.clone();
+                        tokio::spawn(async move {
+                            match client::send_msg(username, temp_msg, passw, ok, false)
+                                .await
+                            {
+                                Ok(ok) => {
+                                    match tx.send(ok) {
+                                        Ok(_) => {}
                                         Err(err) => {
-                                            println!("ln 321 {:?}", err.source());
+                                            println!("{}", err);
                                         }
                                     };
-                                });
-                            }
-                            Err(_) => unsafe {
-                                MessageBoxW(0, w!("asd2"), w!("asd"), 0);
-                            },
-                        };
+                                }
+                                Err(err) => {
+                                    println!("ln 321 {:?}", err.source());
+                                }
+                            };
+                        });
                     }
                 });
                 //receive server answer unconditionally
@@ -576,15 +569,12 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Connect to an ip address");
                     ui.text_edit_singleline(&mut self.send_on_ip);
-                    if ui.button("Save ip").clicked() {
-
-                    }
+                    if ui.button("Save ip").clicked() {}
                     ui.checkbox(&mut self.req_passw, "Set password");
                     if self.req_passw {
                         ui.text_edit_singleline(&mut self.client_password);
                     };
                 } else if self.server_mode {
-
                 }
             });
     }

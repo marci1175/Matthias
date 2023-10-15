@@ -1,7 +1,5 @@
 use chrono::format::StrftimeItems;
 use chrono::Local;
-use mpsc::{self, SendError};
-use std::fmt::{Debug, Error};
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -30,7 +28,7 @@ impl Message for MessageService {
         let current_datetime = Local::now();
         let format = StrftimeItems::new("%Y.%m.%d. %H:%M");
         let formatted_datetime = current_datetime.format_with_items(format);
-
+        
         if !&req.is_sync && &req.password.trim() == &self.passw.trim() {
             match self.messages.lock() {
                 Ok(mut ok) => {
