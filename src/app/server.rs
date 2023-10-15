@@ -1,12 +1,12 @@
 use chrono::format::StrftimeItems;
 use chrono::Local;
+use mpsc::{self, SendError};
+use std::fmt::{Debug, Error};
 use std::sync::Mutex;
-
 use tonic::{transport::Server, Request, Response, Status};
 
 use messages::message_server::{Message, MessageServer};
 use messages::{MessageRequest, MessageResponse};
-
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -17,7 +17,6 @@ pub struct MessageService {
     pub messages: Mutex<Vec<String>>,
     pub passw: String,
 }
-
 #[tonic::async_trait]
 impl Message for MessageService {
     async fn send_message(
@@ -85,8 +84,11 @@ pub async fn server_main(
         addr = format!("[::]:{}", port).parse()?;
     }
     let mut btc_service = MessageService::default();
+
     btc_service.passw = password;
+
     let messages = &btc_service.messages.lock().unwrap().to_vec();
+
     Server::builder()
         .add_service(MessageServer::new(btc_service))
         .serve(addr)

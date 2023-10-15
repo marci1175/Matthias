@@ -1,4 +1,5 @@
 use egui::{vec2, Align, Layout, RichText};
+use std::fs::File;
 use std::sync::mpsc;
 
 use windows_sys::w;
@@ -52,7 +53,8 @@ pub struct TemplateApp {
     server_mode: bool,
     #[serde(skip)]
     mode_selector: bool,
-
+    #[serde(skip)]
+    opened_account: Option<File>,
     //client main
     send_on_ip: String,
     req_passw: bool,
@@ -115,6 +117,7 @@ impl Default for TemplateApp {
             client_mode: false,
             server_mode: false,
             mode_selector: false,
+            opened_account: None,
 
             //client main
             send_on_ip: String::new(),
@@ -195,10 +198,11 @@ impl eframe::App for TemplateApp {
                         && !(self.login_password.is_empty() && self.login_username.is_empty())
                     {
                         match login(self.login_username.clone(), self.login_password.clone()) {
-                            true => {
+                            (true, Some(file)) => {
                                 self.mode_selector = true;
+                                self.opened_account = Some(file);
                             }
-                            false => {
+                            (false, None) => {
                                 std::thread::spawn(|| unsafe {
                                     MessageBoxW(
                                         0,
@@ -208,6 +212,9 @@ impl eframe::App for TemplateApp {
                                     );
                                 });
                             }
+                            //edge rust compiler
+                            (true, None) => todo!(),
+                            (false, Some(_)) => todo!(),
                         };
                     }
 
@@ -290,16 +297,31 @@ impl eframe::App for TemplateApp {
         if self.server_mode {
             //settings
             egui::TopBottomPanel::top("srvr_settings").show(ctx, |ui| {
-                ui.allocate_ui(vec2(300., 40.), |ui| {
-                    if ui
-                        .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../icons/settings.png"
-                        )))
-                        .clicked()
-                    {
-                        self.settings_window = !self.settings_window;
-                    };
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    ui.allocate_ui(vec2(300., 40.), |ui| {
+                        if ui
+                            .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                "../icons/settings.png"
+                            )))
+                            .clicked()
+                        {
+                            self.settings_window = !self.settings_window;
+                        };
+                    });
+                    ui.allocate_ui(vec2(300., 40.), |ui| {
+                        if ui
+                            .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                "../icons/logout.png"
+                            )))
+                            .clicked()
+                        {
+                            self.server_mode = false;
+                        };
+                    })
+                    .response
+                    .on_hover_text("Logout");
                 });
+                ui.allocate_space(vec2(ui.available_width(), 5.));
             });
             //main
             egui::CentralPanel::default().show(ctx, |ui| {
@@ -317,11 +339,6 @@ impl eframe::App for TemplateApp {
                         ui.separator();
                         ui.label(RichText::from("Open on port").size(20.));
                         ui.text_edit_singleline(&mut self.open_on_port);
-                        ui.separator();
-                        ui.checkbox(&mut self.server_req_password, "Server requires password");
-                        if self.server_req_password {
-                            ui.text_edit_singleline(&mut self.server_password);
-                        }
                         let temp_open_on_port = &self.open_on_port;
                         ui.checkbox(&mut self.ipv4_mode, "Internet protocol (IP) v4 mode");
                         if ui.button("Start").clicked() {
@@ -331,7 +348,12 @@ impl eframe::App for TemplateApp {
                             self.server_has_started = match temp_open_on_port.parse::<i32>() {
                                 Ok(port) => {
                                     tokio::spawn(async move {
-                                        match server::server_main(port.to_string(), server_pw, ip_v4).await
+                                        match server::server_main(
+                                            port.to_string(),
+                                            server_pw,
+                                            ip_v4,
+                                        )
+                                        .await
                                         {
                                             Ok(ok) => {
                                                 dbg!(&ok);
@@ -369,7 +391,12 @@ impl eframe::App for TemplateApp {
                         if self.public_ip.is_empty() {
                             let tx = self.dtx.clone();
                             std::thread::spawn(move || {
-                                let combined_ips = ipv4_get().unwrap_or_else(|_|{"Couldnt connect to the internet".to_string()})+ ";" + &ipv6_get().unwrap_or_else(|_| {"Couldnt connect to the internet".to_string()});  
+                                let combined_ips = ipv4_get().unwrap_or_else(|_| {
+                                    "Couldnt connect to the internet".to_string()
+                                }) + ";"
+                                    + &ipv6_get().unwrap_or_else(|_| {
+                                        "Couldnt connect to the internet".to_string()
+                                    });
                                 tx.send(combined_ips)
                             });
                             match self.drx.recv() {
@@ -383,13 +410,17 @@ impl eframe::App for TemplateApp {
                         if self.ipv4_mode {
                             ui.label(RichText::from("Public ipV4 address : ").size(20.));
                             ui.text_edit_singleline(&mut format!("{}", pub_ip[1].trim()));
-                        }
-                        else {
+                        } else {
                             ui.label(RichText::from("Public ipV6 address : ").size(20.));
                             ui.text_edit_singleline(&mut format!("{}", pub_ip[0].trim()));
                         }
                         ui.label(RichText::from("Port").size(15.).weak());
                         ui.text_edit_singleline(&mut format!("{}", self.open_on_port));
+                        ui.checkbox(&mut self.server_req_password, "Server requires password");
+                        if self.server_req_password {
+                            ui.text_edit_singleline(&mut self.server_password);
+                        }
+                        
                     }
                 });
             });
@@ -400,8 +431,6 @@ impl eframe::App for TemplateApp {
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "setting_area").show(
                 ctx,
                 |ui| {
-                    ui.allocate_space(vec2(ui.available_width(), 5.));
-
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                         ui.allocate_ui(vec2(300., 40.), |ui| {
                             if ui
@@ -513,7 +542,6 @@ impl eframe::App for TemplateApp {
                                             };
                                         }
                                         Err(err) => {
-                                            
                                             println!("ln 321 {:?}", err.source());
                                         }
                                     };
@@ -527,17 +555,7 @@ impl eframe::App for TemplateApp {
                 });
                 //receive server answer unconditionally
                 match self.rx.try_recv() {
-                    Ok(ok) => {
-                        /*let incoming_msg: Vec<&str> = ok.split(";").collect();
-                        let collect_msg: Vec<&str> = incoming_msg.iter().take(incoming_msg.len() - 1).cloned().collect();
-                        let final_msg = collect_msg.concat();
-                        let final_time = incoming_msg[incoming_msg.len() - 1].to_string();
-
-                        self.incoming_msg.push(final_msg);
-                        self.incoming_msg_time.push(final_time);
-                        */
-                        self.incoming_msg = ok
-                    }
+                    Ok(ok) => self.incoming_msg = ok,
                     Err(_err) => {
                         //println!("ln 332 {}", err);
                     }
@@ -558,11 +576,15 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Connect to an ip address");
                     ui.text_edit_singleline(&mut self.send_on_ip);
+                    if ui.button("Save ip").clicked() {
+
+                    }
                     ui.checkbox(&mut self.req_passw, "Set password");
                     if self.req_passw {
                         ui.text_edit_singleline(&mut self.client_password);
                     };
                 } else if self.server_mode {
+
                 }
             });
     }
