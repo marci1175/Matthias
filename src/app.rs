@@ -1,6 +1,7 @@
 use egui::{vec2, Align, Layout, RichText};
 use std::fs::File;
 use std::sync::mpsc;
+use std::time::Duration;
 
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -83,7 +84,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     has_init: bool,
     #[serde(skip)]
-    autosync_sender: Option<mpsc::Sender<String>>,
+    autosync_sender: Option<mpsc::Receiver<String>>,
 }
 
 impl Default for TemplateApp {
@@ -171,14 +172,6 @@ impl eframe::App for TemplateApp {
         //For image loading
         egui_extras::install_image_loaders(ctx);
 
-        /*
-        //data sync
-
-        match client::send_msg("".into(), self.server_password.clone(), self.send_on_ip.clone(), true){
-            Ok(_) => {},
-            Err(_) => {}
-        };
-        */
 
         //Login Page
         if !(self.mode_selector || self.server_mode || self.client_mode) {
@@ -427,6 +420,44 @@ impl eframe::App for TemplateApp {
 
         //Client page
         if self.client_mode {
+            //data sync
+            let rx = self.autosync_sender.get_or_insert_with(|| {
+                let (tx, rx) = mpsc::channel::<String>();
+                let username = self.login_username.clone();
+                let passw = self.client_password.clone();
+                let ok = self.send_on_ip.clone();
+                tokio::spawn(async move {
+                    loop {
+                        match client::send_msg(username.clone(), "".into(), passw.clone(), ok.clone(), true)
+                            .await
+                        {
+                                Ok(ok) => {
+                                    match tx.send(ok) {
+                                        Ok(_) => {
+    
+                                        }
+                                        Err(err) => {
+                                            println!("{}", err);
+                                        }
+                                    };
+                                }
+                                Err(err) => {
+                                    println!("ln 197 {:?}", err.source());
+                                }
+                        };
+                        std::thread::sleep(Duration::from_secs(3));
+                    }
+                });
+                rx
+            });
+            match rx.try_recv() {
+                Ok(msg) => {
+                    self.incoming_msg = msg;
+                    //show messages
+                    ctx.request_repaint();
+                },
+                Err(err) => {println!("{}", err)},
+            }
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "setting_area").show(
                 ctx,
                 |ui| {
