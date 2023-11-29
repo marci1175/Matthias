@@ -1,0 +1,61 @@
+syntax = "proto3";
+package messages;
+
+service Message {
+
+    rpc SendMessage (MessageRequest) returns (MessageResponse);
+
+    rpc SyncMessage (MessageSync) returns (MessageResponse);
+
+    rpc ReciveFile (FileSend) returns (FileStatus);
+
+    rpc ServeFile (FileRequest) returns (FileResponse);
+
+}
+
+//ingoing
+message MessageRequest {
+    string message = 1;
+    string author = 2;
+    string password = 3;
+}
+
+//empty request, for syncing
+message MessageSync {
+    string password = 1;
+    
+}
+
+//outgoing
+message MessageResponse {
+    string message = 1;
+}
+
+// FILE IN
+
+//ingoing file
+message FileSend {
+    bytes file = 1;
+    string name = 2;
+    string passw = 3;
+    string author = 4;
+}
+
+//sent file status
+message FileStatus {
+    int32 error = 1;
+}
+
+// FILE OUT
+
+//request stored file
+message FileResponse {
+    bytes file = 1;
+    string name = 2;
+}
+
+//ask for indexed file
+message FileRequest {
+    int32 index = 1;
+}
+

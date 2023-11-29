@@ -1,0 +1,84 @@
+[package]
+name = "szeChat"
+version = "3.2.0"
+authors = ["Varga Marcell <v.marcell4000@gmail.com>"]
+edition = "2021"
+rust-version = "1.71"
+
+[dependencies]
+egui = "0.23.0"
+egui_extras = { version = "0.23", features = ["all_loaders"] }
+image = { version = "0.24", features = ["jpeg", "png"] } # Add the types you want support for
+tonic = {version = "0.7", features = ["tls"]}
+
+prost = "0.10"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+eframe = { version = "0.23.0", default-features = false, features = [
+    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+] }
+log = "0.4"
+
+# You only need serde if you want app persistence:
+serde = { version = "1", features = ["derive"] }
+tonic-build = "0.10.2"
+mpsc = "0.2.1"
+chrono = "0.4.31"
+reqwest = {version = "0.11.22", features = ["blocking"]}
+winres = "0.1.12"
+hex = "0.4.3"
+rust-argon2 = "2.0"
+instant-acme = "0.4.0"
+clap = "4.4.6"
+rcgen = "0.11.3"
+anyhow = "1.0.75"
+serde_json = "1.0.107"
+parse-macros = "0.1.0"
+clap_derive = "4.4.2"
+aes-gcm = "0.10.3"
+regex = "1.10.2"
+rfd = "0.12.1"
+device_query = "1.1.3"
+rand = "0.8.5"
+unicode_names2 = "1.2.0"
+
+
+[dependencies.windows-sys]
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+]
+
+[build-dependencies]
+tonic-build = "0.7"
+winres = "0.1.12"
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.10"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
+
+
+[patch.crates-io]
+
+# If you want to use the bleeding edge version of egui and eframe:
+# egui = { git = "https://github.com/emilk/egui", branch = "master" }
+# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+
+# If you fork https://github.com/emilk/egui you can test with:
+# egui = { path = "../egui/crates/egui" }
+# eframe = { path = "../egui/crates/eframe" }
