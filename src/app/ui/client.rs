@@ -31,7 +31,7 @@ impl TemplateApp {
 
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
-                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    tokio::time::sleep(Duration::from_secs_f32(1.5)).await;
                     println!("requested sync!");
                     dbg!(ip.clone());
                     match client::sync_msg(passw.clone(), ip.clone()).await {
