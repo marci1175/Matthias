@@ -6,7 +6,6 @@ use crate::app::backend::TemplateApp;
 use device_query::Keycode;
 use egui::{vec2, Align, Layout, RichText};
 
-use windows_sys::core::HSTRING;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONWARNING, MB_ICONERROR};
 
