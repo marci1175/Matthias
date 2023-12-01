@@ -1,3 +1,4 @@
+use chrono::Utc;
 use rand::rngs::ThreadRng;
 
 use std::collections::BTreeMap;
@@ -108,7 +109,7 @@ impl Default for TemplateApp {
             //fontbook
             filter: Default::default(),
             named_chars: Default::default(),
-            
+
             //login page
             login_username: String::new(),
             login_password: String::new(),
@@ -182,5 +183,60 @@ impl TemplateApp {
         }
 
         Default::default()
+    }
+}
+
+//Message Types
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+pub struct FileUpload {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+pub struct NormalMessage {
+    pub message: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+pub struct Image {
+    pub bytes: Vec<u8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum MessageType {
+    FileUpload(FileUpload),
+    Image(Image),
+    NormalMessage(NormalMessage),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct Message {
+    pub MessageType: MessageType,
+    pub Password: String,
+    pub Author: String,
+    pub MessageDate: String,
+    pub Destination: String,
+}
+
+impl Message {
+    pub fn struct_into_string(&self) -> String {
+        return serde_json::to_string(self).unwrap_or_default();
+    }
+    pub fn construct_normal_msg(
+        msg: &str,
+        ip: String,
+        password: String,
+        author: String,
+    ) -> Message {
+        Message {
+            MessageType: MessageType::NormalMessage(NormalMessage { message: msg.trim().to_string() }),
+            Password: password,
+            Author: author,
+            MessageDate: {
+                Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+            },
+            Destination: ip,
+        }
     }
 }

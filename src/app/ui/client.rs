@@ -13,7 +13,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONEXCLAMATIO
 use std::sync::mpsc;
 
 use crate::app::account_manager::write_file;
-use crate::app::backend::TemplateApp;
+use crate::app::backend::{TemplateApp, Message};
 use crate::app::client::{self, request_file, send_file};
 
 impl TemplateApp {
@@ -319,9 +319,9 @@ impl TemplateApp {
                                     true => self.client_password.clone(),
                                     false => "".into(),
                                 };
-                                let ok = self.send_on_ip.clone();
+                                let temp_ip = self.send_on_ip.clone();
                                 tokio::spawn(async move {
-                                    match client::send_msg(username, temp_msg, passw, ok)
+                                    match client::send_msg(Message::construct_normal_msg(&temp_msg, temp_ip, passw, username))
                                         .await
                                     {
                                         Ok(ok) => {

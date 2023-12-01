@@ -3,24 +3,21 @@ use std::path::PathBuf;
 use messages::{message_client::MessageClient, FileRequest, FileSend, MessageRequest, MessageSync};
 
 use self::messages::FileResponse;
+
+use super::backend::Message;
 pub mod messages {
     tonic::include_proto!("messages");
 }
 
 //main is for sending
 pub async fn send_msg(
-    username: String,
-    msg: String,
-    passw: String,
-    ip: String,
+    message: Message
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut client: MessageClient<tonic::transport::Channel> =
-        MessageClient::connect(format!("http://{}", ip)).await?;
+        MessageClient::connect(format!("http://{}", message.Destination)).await?;
 
     let request = tonic::Request::new(MessageRequest {
-        message: msg.trim().to_string(),
-        author: username,
-        password: passw,
+        message: message.struct_into_string(),
     });
 
     let response = client.send_message(request).await?.into_inner().clone();

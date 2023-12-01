@@ -1,0 +1,12 @@
+enum MessageType {
+    File_upload,
+    Image,
+    Message,
+}
+
+struct Message {
+    MessageType: MessageType,
+    File_upload: Option<[String; 2]>,
+    Image: Option<GenericArray>,
+    Message: Option<String>
+}

@@ -16,14 +16,11 @@ service Message {
 //ingoing
 message MessageRequest {
     string message = 1;
-    string author = 2;
-    string password = 3;
 }
 
 //empty request, for syncing
 message MessageSync {
     string password = 1;
-    
 }
 
 //outgoing

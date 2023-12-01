@@ -20,9 +20,11 @@ use instant_acme::{
 */
 
 use messages::{
-    message_server::{Message, MessageServer},
+    message_server::{Message as ServerMessage, MessageServer},
     FileRequest, FileResponse, FileSend, FileStatus, MessageRequest, MessageResponse, MessageSync,
 };
+
+use crate::app::backend::Message;
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -37,24 +39,31 @@ pub struct MessageService {
     pub file_paths: Mutex<Vec<PathBuf>>,
 }
 #[tonic::async_trait]
-impl Message for MessageService {
+impl ServerMessage for MessageService {
     async fn send_message(
         &self,
         request: Request<MessageRequest>,
     ) -> Result<Response<MessageResponse>, Status> {
         println!("Got a request: {:?}", request);
 
-        let req = request.into_inner();
-
+        let req_result: Result<Message, serde_json::Error> = serde_json::from_str(&request.into_inner().message);
+        let req: Message = req_result.unwrap();
+        
+        let req_message = match req.MessageType {
+            crate::app::backend::MessageType::FileUpload(_) => todo!(),
+            crate::app::backend::MessageType::Image(_) => todo!(),
+            crate::app::backend::MessageType::NormalMessage(ok) => ok.message,
+        };
+        
         let current_datetime = Local::now();
         let format = StrftimeItems::new("%Y.%m.%d. %H:%M");
         let formatted_datetime = current_datetime.format_with_items(format);
 
-        if req.password.trim() == self.passw.trim() {
+        if req.Password == self.passw.trim() {
             match self.messages.lock() {
                 Ok(mut ok) => {
                     ok.push(
-                        format!("{formatted_datetime} $ {} | {} ", req.author, req.message) + "\n",
+                        format!("{formatted_datetime} $ {} | {} ", req.Author, req_message) + "\n",
                     );
                 }
                 Err(err) => {
@@ -75,7 +84,7 @@ impl Message for MessageService {
 
         // Wait for the spawned thread to finish
         let final_msg = handle.join().unwrap();
-        if req.password.trim() == self.passw.trim() {
+        if req.Password.trim() == self.passw.trim() {
             let reply = MessageResponse {
                 message: final_msg.to_string(),
             };
@@ -213,12 +222,21 @@ impl Message for MessageService {
 
         let file_path_vec = self.file_paths.lock().unwrap();
 
+        //check for index in uploaded files path vector
+        // EX ::
+        //       Vec() => {"C:\Apad.exe", "C:\Kurva"}
+        // INPUT ::
+        //      1
+        // OUTPUT ::
+        //       "C:\Kurva" 
+
         let apad = &file_path_vec[req.index as usize];
 
         let file = fs::read(apad).unwrap();
 
         let file_name = apad.file_name().unwrap().to_string_lossy().to_string();
-
+        
+        //reply with file name, bytes
         let reply = FileResponse {
             file,
             name: file_name,
