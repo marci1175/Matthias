@@ -48,22 +48,12 @@ impl ServerMessage for MessageService {
 
         let req_result: Result<Message, serde_json::Error> = serde_json::from_str(&request.into_inner().message);
         let req: Message = req_result.unwrap();
-        
-        let req_message = match req.MessageType {
-            crate::app::backend::MessageType::FileUpload(_) => todo!(),
-            crate::app::backend::MessageType::Image(_) => todo!(),
-            crate::app::backend::MessageType::NormalMessage(ok) => ok.message,
-        };
-        
-        let current_datetime = Local::now();
-        let format = StrftimeItems::new("%Y.%m.%d. %H:%M");
-        let formatted_datetime = current_datetime.format_with_items(format);
 
-        if req.Password == self.passw.trim() {
+        if &req.Password == self.passw.trim() {
             match self.messages.lock() {
                 Ok(mut ok) => {
                     ok.push(
-                        format!("{formatted_datetime} $ {} | {} ", req.Author, req_message) + "\n",
+                        format!("{}", req.struct_into_string()) + "\n",
                     );
                 }
                 Err(err) => {
@@ -71,6 +61,7 @@ impl ServerMessage for MessageService {
                 }
             };
         }
+
         let shared_messages = self.messages.lock().unwrap().clone();
 
         let handle = std::thread::spawn(move || {
@@ -224,11 +215,11 @@ impl ServerMessage for MessageService {
 
         //check for index in uploaded files path vector
         // EX ::
-        //       Vec() => {"C:\Apad.exe", "C:\Kurva"}
+        //       Vec() => {"C:\Apad.exe", "C:\XD"}
         // INPUT ::
         //      1
         // OUTPUT ::
-        //       "C:\Kurva" 
+        //       "C:\XD" 
 
         let apad = &file_path_vec[req.index as usize];
 

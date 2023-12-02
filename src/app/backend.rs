@@ -187,30 +187,42 @@ impl TemplateApp {
 }
 
 //Message Types
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct FileUpload {
     pub name: String,
     pub bytes: Vec<u8>,
 }
 
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct NormalMessage {
     pub message: String,
 }
 
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Image {
     pub bytes: Vec<u8>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct SnycMessage {
+    /*Empty packet, only for syncing*/
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct FileRequest {
+    pub index: i32,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum MessageType {
+    SyncMessage(SnycMessage),
+    FileRequest(FileRequest),
     FileUpload(FileUpload),
     Image(Image),
     NormalMessage(NormalMessage),
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Message {
     pub MessageType: MessageType,
     pub Password: String,
