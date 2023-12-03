@@ -163,37 +163,42 @@ pub fn special_char_name(chr: char) -> Option<&'static str> {
 impl backend::TemplateApp {
     pub fn window_emoji(&mut self, ctx: &egui::Context) {
         egui::Window::new("Emoji")
-        .collapsible(false)
-        .show(ctx, |ui| {
-            ui.label(format!("Click to paste"));
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.label(format!("Click to paste"));
 
-            let filter = &self.filter;
-            let named_chars = self
-                .named_chars
-                .entry(egui::FontFamily::Monospace)
-                .or_insert_with(|| available_characters(ui, egui::FontFamily::Monospace));
+                let filter = &self.filter;
+                let named_chars = self
+                    .named_chars
+                    .entry(egui::FontFamily::Monospace)
+                    .or_insert_with(|| available_characters(ui, egui::FontFamily::Monospace));
 
-            ui.separator();
+                ui.separator();
 
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
 
-                    for (&chr, name) in named_chars {
-                        if filter.is_empty() || name.contains(filter) || *filter == chr.to_string()
-                        {
-                            let button = egui::Button::new(
-                                egui::RichText::new(chr.to_string()).font(egui::FontId { size: self.font_size, family: egui::FontFamily::Proportional }),
-                            )
-                            .frame(false);
+                        for (&chr, name) in named_chars {
+                            if filter.is_empty()
+                                || name.contains(filter)
+                                || *filter == chr.to_string()
+                            {
+                                let button = egui::Button::new(
+                                    egui::RichText::new(chr.to_string()).font(egui::FontId {
+                                        size: self.font_size,
+                                        family: egui::FontFamily::Proportional,
+                                    }),
+                                )
+                                .frame(false);
 
-                            if ui.add(button).clicked() {
-                                self.usr_msg.push(chr);
+                                if ui.add(button).clicked() {
+                                    self.usr_msg.push(chr);
+                                }
                             }
                         }
-                    }
+                    });
                 });
             });
-        });
     }
 }

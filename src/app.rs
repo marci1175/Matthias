@@ -15,7 +15,6 @@ use self::account_manager::{
     append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
 };
 
-use self::backend::{FileUpload, Message};
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
@@ -39,7 +38,7 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.keymap.clone());
-        
+
         /*
 
             :: custom font ::

@@ -50,7 +50,10 @@ impl TemplateApp {
                     let temp_open_on_port = &self.open_on_port;
                     ui.checkbox(&mut self.ipv4_mode, "Internet protocol (IP) v4 mode");
                     if ui.button("Start").clicked() {
-                        let temp_tx = self.stx.clone();
+                        
+                        //to be implemented for later msg showing to server mode
+                        let _temp_tx = self.stx.clone();
+
                         let server_pw = self.server_password.clone();
                         let ip_v4 = self.ipv4_mode;
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
@@ -59,22 +62,7 @@ impl TemplateApp {
                                     match server::server_main(port.to_string(), server_pw, ip_v4)
                                         .await
                                     {
-                                        Ok(ok) => {
-                                            dbg!(&ok);
-
-                                            let mut concatenated_string = String::new();
-
-                                            for s in &ok {
-                                                concatenated_string.push_str(s);
-                                            }
-
-                                            match temp_tx.send(ok.join(&concatenated_string)) {
-                                                Ok(_) => {}
-                                                Err(err) => {
-                                                    println!("ln 214 {}", err)
-                                                }
-                                            };
-                                        }
+                                        Ok(_temp_stuff) => {}
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
                                         }

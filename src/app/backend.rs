@@ -75,7 +75,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub incoming_msg_time: Vec<String>,
     #[serde(skip)]
-    pub incoming_msg: String,
+    pub incoming_msg: ServerMaster,
     //emoji fasz
     pub random_emoji: String,
     pub emoji: Vec<String>,
@@ -161,7 +161,7 @@ impl Default for TemplateApp {
             //msg
             usr_msg: String::new(),
             incoming_msg_time: Vec::new(),
-            incoming_msg: String::new(),
+            incoming_msg: ServerMaster::default(),
             //thread communication for client
             rx,
             tx,
@@ -189,6 +189,7 @@ impl TemplateApp {
 //Message Types
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct FileUpload {
+    pub extension: String,
     pub name: String,
     pub bytes: Vec<u8>,
 }
@@ -204,9 +205,7 @@ pub struct Image {
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct SnycMessage {
-    /*Empty packet, only for syncing*/
-}
+pub struct SnycMessage {/*Empty packet, only for syncing*/}
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct FileRequest {
@@ -242,13 +241,145 @@ impl Message {
         author: String,
     ) -> Message {
         Message {
-            MessageType: MessageType::NormalMessage(NormalMessage { message: msg.trim().to_string() }),
+            MessageType: MessageType::NormalMessage(NormalMessage {
+                message: msg.trim().to_string(),
+            }),
             Password: password,
             Author: author,
-            MessageDate: {
-                Utc::now().format("%Y.%m.%d. %H:%M").to_string()
-            },
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
             Destination: ip,
         }
+    }
+    pub fn construct_file_msg(
+        bytes: Vec<u8>,
+        file_name: PathBuf,
+        ip: String,
+        password: String,
+        author: String,
+    ) -> Message {
+        Message {
+            //Dont execute me please :3 |
+            //                          |
+            //                          V
+            MessageType: MessageType::FileUpload(FileUpload {
+                extension: file_name.extension().unwrap().to_str().unwrap().to_string(),
+                name: file_name
+                    .file_prefix()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                bytes: bytes,
+            }),
+
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
+    pub fn construct_sync_msg(ip: String, password: String, author: String) -> Message {
+        Message {
+            MessageType: MessageType::SyncMessage(SnycMessage {}),
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerFileUpload {
+    pub file_name: String,
+    pub index: i32,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerNormalMessage {
+    pub message: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerImage {
+    pub bytes: Vec<u8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ServerMessageType {
+    Upload(ServerFileUpload),
+    Normal(ServerNormalMessage),
+    Image(ServerImage),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerOutput {
+    pub MessageType: ServerMessageType,
+    pub Author: String,
+    pub MessageDate: String,
+}
+
+impl ServerOutput {
+    pub fn struct_into_string(&self) -> String {
+        return serde_json::to_string(self).unwrap_or_default();
+    }
+    pub fn convert_msg_to_servermsg(normal_msg: Message) -> ServerOutput {
+        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+        ServerOutput {
+            MessageType: ServerMessageType::Normal(ServerNormalMessage {
+                message: match normal_msg.MessageType {
+                    MessageType::SyncMessage(_) => todo!(),
+                    MessageType::FileRequest(_) => todo!(),
+                    MessageType::FileUpload(_) => todo!(),
+                    MessageType::Image(_) => todo!(),
+                    MessageType::NormalMessage(msg) => msg.message,
+                },
+            }),
+            Author: normal_msg.Author,
+            MessageDate: normal_msg.MessageDate,
+        }
+    }
+    pub fn convert_upload_to_servermsg(normal_msg: Message, index: i32) -> ServerOutput {
+        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+        ServerOutput {
+            MessageType: ServerMessageType::Upload(ServerFileUpload {
+                file_name: match normal_msg.MessageType {
+                    MessageType::SyncMessage(_) => todo!(),
+                    MessageType::FileRequest(_) => todo!(),
+                    MessageType::FileUpload(msg) => {
+                        format!("{}.{}", msg.name, msg.extension)
+                    }
+                    MessageType::Image(_) => todo!(),
+                    MessageType::NormalMessage(_) => todo!(),
+                },
+                index: index,
+            }),
+            Author: normal_msg.Author,
+            MessageDate: normal_msg.MessageDate,
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerMaster {
+    pub struct_list: Vec<ServerOutput>,
+}
+impl Default for ServerMaster {
+    fn default() -> Self {
+        Self {
+            struct_list: Vec::new(),
+        }
+    }
+}
+impl ServerMaster {
+    pub fn struct_into_string(&self) -> String {
+        return serde_json::to_string(self).unwrap_or_default();
+    }
+    pub fn convert_vec_serverout_into_server_master(
+        server_output_list: Vec<ServerOutput>,
+    ) -> ServerMaster {
+        return ServerMaster {
+            struct_list: server_output_list,
+        };
     }
 }

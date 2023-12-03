@@ -7,7 +7,7 @@ use device_query::Keycode;
 use egui::{vec2, Align, Layout, RichText};
 
 use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONWARNING, MB_ICONERROR};
+use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_ICONWARNING};
 
 impl TemplateApp {
     pub fn state_login(
@@ -42,7 +42,10 @@ impl TemplateApp {
                                 std::thread::spawn(move || unsafe {
                                     MessageBoxW(
                                         0,
-                                        str::encode_utf16(err.to_string().as_str()).chain(iter::once(0)).collect::<Vec<_>>().as_ptr(),
+                                        str::encode_utf16(err.to_string().as_str())
+                                            .chain(iter::once(0))
+                                            .collect::<Vec<_>>()
+                                            .as_ptr(),
                                         w!("Error"),
                                         MB_ICONERROR,
                                     );
@@ -64,7 +67,10 @@ impl TemplateApp {
                             std::thread::spawn(move || unsafe {
                                 MessageBoxW(
                                     0,
-                                    str::encode_utf16(err.to_string().as_str()).chain(iter::once(0)).collect::<Vec<_>>().as_ptr(),
+                                    str::encode_utf16(err.to_string().as_str())
+                                        .chain(iter::once(0))
+                                        .collect::<Vec<_>>()
+                                        .as_ptr(),
                                     w!("Error"),
                                     MB_ICONWARNING,
                                 );

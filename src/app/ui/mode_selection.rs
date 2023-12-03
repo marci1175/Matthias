@@ -1,7 +1,7 @@
 use crate::app::backend::TemplateApp;
 
 use eframe::Frame;
-use egui::{vec2, Align, Layout, RichText, ImageButton};
+use egui::{vec2, Align, ImageButton, Layout, RichText};
 
 use std::sync::atomic::Ordering;
 
@@ -13,26 +13,24 @@ impl TemplateApp {
         _frame.set_window_size(vec2(700., 300.));
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.allocate_ui(vec2(ui.available_width(), 20.), |ui|{
-                ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
+            ui.allocate_ui(vec2(ui.available_width(), 20.), |ui| {
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    ui.label(RichText::from("Welcome,").weak().size(20.));
                     ui.label(
-                        RichText::from("Welcome,").weak().size(20.)
-                    );
-                    ui.label(
-                        RichText::from(format!("{}", self.login_username)).strong().size(20.)
+                        RichText::from(format!("{}", self.login_username))
+                            .strong()
+                            .size(20.),
                     );
                     if ui.button("Logout").clicked() {
                         self.mode_selector = false;
-                    
                     }
                     /*if ui.add(
                         ImageButton::new(egui::include_image!("../../../icons/logout.png"))
                     ).clicked() {
-                        self.mode_selector = false;                         
+                        self.mode_selector = false;
                     } */
                 });
             });
-            
 
             ui.columns(2, |ui| {
                 ui[0].with_layout(

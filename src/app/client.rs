@@ -1,8 +1,4 @@
-use std::path::PathBuf;
-
-use messages::{message_client::MessageClient, FileRequest, FileSend, MessageRequest, MessageSync};
-
-use self::messages::FileResponse;
+use messages::{message_client::MessageClient, MessageRequest};
 
 use super::backend::Message;
 pub mod messages {
@@ -10,9 +6,7 @@ pub mod messages {
 }
 
 //main is for sending
-pub async fn send_msg(
-    message: Message
-) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn send_msg(message: Message) -> Result<String, Box<dyn std::error::Error>> {
     let mut client: MessageClient<tonic::transport::Channel> =
         MessageClient::connect(format!("http://{}", message.Destination)).await?;
 
@@ -20,13 +14,13 @@ pub async fn send_msg(
         message: message.struct_into_string(),
     });
 
-    let response = client.send_message(request).await?.into_inner().clone();
+    let response = client.message_main(request).await?.into_inner().clone();
 
     let message = response.message;
 
     Ok(message)
 }
-
+/*
 pub async fn sync_msg(passw: String, ip: String) -> Result<String, Box<dyn std::error::Error>> {
     let mut client: MessageClient<tonic::transport::Channel> =
         MessageClient::connect(format!("http://{}", ip)).await?;
@@ -78,3 +72,4 @@ pub async fn request_file(
 
     Ok(response)
 }
+ */

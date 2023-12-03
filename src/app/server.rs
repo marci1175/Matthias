@@ -1,5 +1,3 @@
-use chrono::{format::StrftimeItems, Local};
-
 use std::{env, fs, io::Write, path::PathBuf};
 
 use std::sync::Mutex;
@@ -21,10 +19,16 @@ use instant_acme::{
 
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
-    FileRequest, FileResponse, FileSend, FileStatus, MessageRequest, MessageResponse, MessageSync,
+    MessageRequest, MessageResponse,
 };
 
-use crate::app::backend::Message;
+use crate::app::backend::ServerMaster;
+use crate::app::backend::{
+    FileRequest as FileRequestStruct, FileUpload as FileUploadStruct, Message,
+    MessageType::{FileRequest, FileUpload, Image, NormalMessage, SyncMessage},
+};
+
+use super::backend::ServerOutput;
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -32,7 +36,7 @@ pub mod messages {
 
 #[derive(Debug, Default)]
 pub struct MessageService {
-    pub messages: Mutex<Vec<String>>,
+    pub messages: Mutex<Vec<ServerOutput>>,
     pub passw: String,
 
     //files
@@ -40,200 +44,36 @@ pub struct MessageService {
 }
 #[tonic::async_trait]
 impl ServerMessage for MessageService {
-    async fn send_message(
+    async fn message_main(
         &self,
         request: Request<MessageRequest>,
     ) -> Result<Response<MessageResponse>, Status> {
-        println!("Got a request: {:?}", request);
-
-        let req_result: Result<Message, serde_json::Error> = serde_json::from_str(&request.into_inner().message);
+        let req_result: Result<Message, serde_json::Error> =
+            serde_json::from_str(&request.into_inner().message);
         let req: Message = req_result.unwrap();
 
         if &req.Password == self.passw.trim() {
-            match self.messages.lock() {
-                Ok(mut ok) => {
-                    ok.push(
-                        format!("{}", req.struct_into_string()) + "\n",
-                    );
+            match &req.MessageType {
+                NormalMessage(msg) => self.NormalMessage(req).await,
+                SyncMessage(msg) => { /*Dont do anything we will always reply with the list of msgs*/
                 }
-                Err(err) => {
-                    println!("{err}")
+                Image(msg) => {
+                    todo!()
+                }
+                FileRequest(msg) => {
+                    todo!()
+                }
+                FileUpload(_) => {
+                    self.recive_file(req.clone()).await;
                 }
             };
-        }
 
-        let shared_messages = self.messages.lock().unwrap().clone();
-
-        let handle = std::thread::spawn(move || {
-            let final_msg: String = shared_messages
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<String>();
-
-            final_msg
-        });
-
-        // Wait for the spawned thread to finish
-        let final_msg = handle.join().unwrap();
-        if req.Password.trim() == self.passw.trim() {
-            let reply = MessageResponse {
-                message: final_msg.to_string(),
-            };
-
-            Ok(Response::new(reply))
-        }
-        //invalid passw
-        else {
-            let reply = MessageResponse {
-                message: "Invalid Password!".to_string(),
-            };
-            Ok(Response::new(reply))
-        }
-    }
-    async fn sync_message(
-        &self,
-        request: Request<MessageSync>,
-    ) -> Result<Response<MessageResponse>, Status> {
-        //pass matching p100 technology
-        if request.into_inner().password == self.passw {
-            let shared_messages = self.messages.lock().unwrap().clone();
-
-            let handle = std::thread::spawn(move || {
-                let final_msg: String = shared_messages
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<String>();
-
-                final_msg
-            });
-
-            // Wait for the spawned thread to finish
-            let final_msg = handle.join().unwrap();
-
-            let reply = MessageResponse { message: final_msg };
-            Ok(Response::new(reply))
+            return self.sync_message().await;
         } else {
-            let reply = MessageResponse {
-                message: "Invalid password!".into(),
-            };
-            Ok(Response::new(reply))
+            return Ok(Response::new(MessageResponse {
+                message: "Invalid Password!".into(),
+            }));
         }
-    }
-    async fn recive_file(
-        &self,
-        request: Request<FileSend>,
-    ) -> Result<Response<FileStatus>, Status> {
-        /*
-
-        error -> 0 success
-        error -> 1 Server : failed to get APPDATA arg
-        error -> 2 Server : failed to create file
-
-        */
-        let req = request.into_inner().clone();
-
-        if req.passw == self.passw {
-            let mut error_code: i32 = 0;
-
-            //500mb limit
-            if req.file.len() > 500000000 {
-                error_code = -1;
-            } else {
-                match env::var("APPDATA") {
-                    Ok(app_data) => {
-                        let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
-
-                        match fs::File::create(format!("{app_data}\\szeChat\\Server\\{}", req.name))
-                        {
-                            Ok(mut created_file) => {
-                                if let Err(err) = created_file.write_all(&req.file) {
-                                    println!("[{err}\n{}]", err.kind());
-                                };
-
-                                created_file.flush().unwrap();
-                                //success
-
-                                match self.file_paths.lock() {
-                                    Ok(mut ok) => {
-                                        ok.push(PathBuf::from(format!(
-                                            "{app_data}\\szeChat\\Server\\{}",
-                                            req.name
-                                        )));
-                                    }
-                                    Err(err) => {
-                                        println!("{err}")
-                                    }
-                                };
-                                let current_datetime = Local::now();
-                                let format = StrftimeItems::new("%Y.%m.%d. %H:%M");
-                                let formatted_datetime = current_datetime.format_with_items(format);
-                                match self.messages.lock() {
-                                    Ok(mut ok) => {
-                                        ok.push(format!(
-                                            //use a character before file upload which cannot be set as a file name
-                                            "{formatted_datetime} $ {} | >file_upload '{}' '{}'\n",
-                                            req.author,
-                                            req.name,
-                                            self.file_paths.lock().unwrap().len() - 1
-                                        ));
-                                    }
-                                    Err(err) => println!("{err}"),
-                                }
-                            }
-                            Err(err) => {
-                                println!(" [{err}\n{}]", err.kind());
-                                error_code = 2;
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        error_code = 1;
-                        println!("{err}")
-                    }
-                }
-            }
-
-            dbg!(&self.file_paths);
-
-            let reply = FileStatus { error: error_code };
-
-            Ok(Response::new(reply))
-        } else {
-            let reply = FileStatus { error: -2 };
-
-            Ok(Response::new(reply))
-        }
-    }
-
-    async fn serve_file(
-        &self,
-        request: Request<FileRequest>,
-    ) -> Result<Response<FileResponse>, Status> {
-        let req = request.into_inner().clone();
-
-        let file_path_vec = self.file_paths.lock().unwrap();
-
-        //check for index in uploaded files path vector
-        // EX ::
-        //       Vec() => {"C:\Apad.exe", "C:\XD"}
-        // INPUT ::
-        //      1
-        // OUTPUT ::
-        //       "C:\XD" 
-
-        let apad = &file_path_vec[req.index as usize];
-
-        let file = fs::read(apad).unwrap();
-
-        let file_name = apad.file_name().unwrap().to_string_lossy().to_string();
-        
-        //reply with file name, bytes
-        let reply = FileResponse {
-            file,
-            name: file_name,
-        };
-
-        Ok(Response::new(reply))
     }
 }
 
@@ -385,7 +225,7 @@ pub async fn server_main(
     port: String,
     password: String,
     ip_v4: bool,
-) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn std::error::Error>> {
     //apad().await;
     let mut addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;
     if !ip_v4 {
@@ -404,5 +244,98 @@ pub async fn server_main(
         .serve(addr)
         .await?;
 
-    Ok(messages.to_vec())
+    let reply: String = messages.iter().map(|f| f.struct_into_string()).collect();
+    Ok(reply)
+}
+
+impl MessageService {
+    pub async fn NormalMessage(&self, req: Message) {
+        match self.messages.lock() {
+            Ok(mut ok) => {
+                ok.push(ServerOutput::convert_msg_to_servermsg(req));
+            }
+            Err(err) => {
+                println!("{err}")
+            }
+        };
+    }
+    pub async fn sync_message(&self) -> Result<Response<MessageResponse>, Status> {
+        //pass matching p100 technology
+        let shared_messages = self.messages.lock().unwrap().clone();
+
+        let server_master = ServerMaster::convert_vec_serverout_into_server_master(shared_messages);
+
+        let final_msg: String = server_master.struct_into_string();
+
+        // Wait for the spawned thread to finish
+
+        let reply = MessageResponse { message: final_msg };
+        Ok(Response::new(reply))
+    }
+
+    pub async fn recive_file(&self, request: Message) {
+        /*
+
+        error -> 0 success
+        error -> 1 Server : failed to get APPDATA arg
+        error -> 2 Server : failed to create file
+
+        */
+        let mut error_code: i32 = 0;
+
+        if let FileUpload(req) = request.clone().MessageType {
+            //500mb limit
+            if req.bytes.len() > 500000000 {
+                error_code = -1;
+            } else {
+                match env::var("APPDATA") {
+                    Ok(app_data) => {
+                        let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
+
+                        match fs::File::create(format!("{app_data}\\szeChat\\Server\\{}", req.name))
+                        {
+                            Ok(mut created_file) => {
+                                if let Err(err) = created_file.write_all(&req.bytes) {
+                                    println!("[{err}\n{}]", err.kind());
+                                };
+
+                                created_file.flush().unwrap();
+                                //success
+
+                                match self.file_paths.lock() {
+                                    Ok(mut ok) => {
+                                        ok.push(PathBuf::from(format!(
+                                            "{app_data}\\szeChat\\Server\\{}",
+                                            req.name
+                                        )));
+                                    }
+                                    Err(err) => {
+                                        println!("{err}")
+                                    }
+                                };
+                                match self.messages.lock() {
+                                    Ok(mut ok) => {
+                                        ok.push(ServerOutput::convert_upload_to_servermsg(
+                                            request,
+                                            self.file_paths.lock().unwrap().len() as i32 - 1,
+                                        ));
+                                    }
+                                    Err(err) => println!("{err}"),
+                                }
+                            }
+                            Err(err) => {
+                                println!(" [{err}\n{}]", err.kind());
+                                error_code = 2;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        println!("{err}")
+                    }
+                }
+            }
+        }
+
+        dbg!(error_code);
+    }
 }

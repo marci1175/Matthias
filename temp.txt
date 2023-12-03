@@ -1,0 +1,82 @@
+        async fn serve_file(
+        &self,
+        request: Request<FileRequest>,
+    ) -> Result<Response<FileResponse>, Status> {
+        let req = request.into_inner().clone();
+
+        let file_path_vec = self.file_paths.lock().unwrap();
+
+        //check for index in uploaded files path vector
+        // EX ::
+        //       Vec() => {"C:\Apad.exe", "C:\XD"}
+        // INPUT ::
+        //      1
+        // OUTPUT ::
+        //       "C:\XD" 
+
+        let apad = &file_path_vec[req.index as usize];
+
+        let file = fs::read(apad).unwrap();
+
+        let file_name = apad.file_name().unwrap().to_string_lossy().to_string();
+        
+        //reply with file name, bytes
+        let reply = FileResponse {
+            file,
+            name: file_name,
+        };
+
+        Ok(Response::new(reply))
+    }
+
+
+
+    if i.contains("file_upload") {
+                                        //use a character before file upload which cannot be set as a file name
+                                        let sort_msg: Vec<&str> = i.split('>').collect();
+
+                                        let re = Regex::new(r#"'(.*?[^\\])'"#).unwrap();
+
+                                        let mut results: Vec<String> = Vec::new();
+
+                                        for captured in re.captures_iter(sort_msg[1]) {
+                                            if let Some(inner_text) = captured.get(1) {
+                                                results.push(inner_text.as_str().to_string());
+                                            }
+                                        }
+                                        ui.horizontal(|ui| {
+                                            ui.label(
+                                                RichText::from(sort_msg[0]).size(self.font_size),
+                                            );
+                                            if ui
+                                                .button(
+                                                    RichText::from(format!(
+                                                        "Download {}",
+                                                        results[0]
+                                                    ))
+                                                    .strong()
+                                                    .size(self.font_size),
+                                                )
+                                                .clicked()
+                                            {
+                                                let ip = self.send_on_ip.clone();
+                                                // tokio::spawn(async move {
+                                                //     match request_file(
+                                                //         results[1].parse::<i32>().unwrap(),
+                                                //         ip,
+                                                //     )
+                                                //     .await
+                                                //     {
+                                                //         Ok(file_reponse) => {
+                                                //             if let Err(err) =
+                                                //                 write_file(file_reponse)
+                                                //             {
+                                                //                 println!("{err}")
+                                                //             };
+                                                //         }
+                                                //         Err(err) => println!("{err}"),
+                                                //     };
+                                                // });
+                                            };
+                                        });
+                                    }
