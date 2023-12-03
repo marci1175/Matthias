@@ -4089,7 +4089,7 @@ dependencies = [
 
 [[package]]
 name = "szeChat"
-version = "3.2.0"
+version = "3.5.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4122,7 +4122,7 @@ dependencies = [
  "tonic-build 0.7.2",
  "unicode_names2",
  "wasm-bindgen-futures",
- "windows-sys 0.52.0",
+ "windows-sys 0.45.0",
  "winres",
 ]
 
