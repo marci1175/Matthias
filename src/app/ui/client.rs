@@ -122,12 +122,10 @@ impl TemplateApp {
             }
             else {
                 self.drop_file_animation = false;
-                self.how_on = 0.;
             }
 
-            let mut drop_file_id = Id::null();
 
-            if self.drop_file_animation {
+            if self.how_on >= 0. {
                 let window_size = ui.input(|reader| {reader.screen_rect().max}).to_vec2();
                 let font_id = FontId {
                     family: FontFamily::default(),
@@ -137,18 +135,24 @@ impl TemplateApp {
                 let drop_warning = Area::new("drop_warning").show(ctx, |ui|{
                 
                     ui.painter()
-                        .rect(egui::Rect { min: Pos2::new(window_size[0] / 3., window_size[0] / 5.), max: Pos2::new(window_size[0] / 1.5, window_size[0] / 3.) }, 5.0, Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8), Stroke::default());
+                        .rect(egui::Rect { min: Pos2::new(window_size[0] / 3., window_size[0] / 5. + self.how_on / 50.), max: Pos2::new(window_size[0] / 1.5, window_size[0] / 3. + self.how_on / 50.) }, 5.0, Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8), Stroke::default());
                     ui.painter()
-                        .text(Pos2::new(window_size[0] / 2., window_size[0] / 4.), Align2([Align::Center, Align::Center]), "Drop to upload", font_id, Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8));
+                        .text(Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.), Align2([Align::Center, Align::Center]), "Drop to upload", font_id, Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8));
                 
                 });
 
-                drop_file_id = drop_warning.response.id;
 
             }
 
-            self.how_on = ctx.animate_value_with_time(drop_file_id, 255., 2.);
-            
+            if self.drop_file_animation && !(self.how_on >= 255.) {
+                self.how_on += 1.; //step
+                ctx.request_repaint()
+            }
+            else if !self.drop_file_animation && self.how_on >= 0.{
+                self.how_on -= 1.;
+                ctx.request_repaint()
+            }
+
             //Messages go here
             ui.allocate_ui(
                 match self.usr_msg_expanded {
