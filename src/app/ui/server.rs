@@ -50,7 +50,6 @@ impl TemplateApp {
                     let temp_open_on_port = &self.open_on_port;
                     ui.checkbox(&mut self.ipv4_mode, "Internet protocol (IP) v4 mode");
                     if ui.button("Start").clicked() {
-                        
                         //to be implemented for later msg showing to server mode
                         let _temp_tx = self.stx.clone();
 

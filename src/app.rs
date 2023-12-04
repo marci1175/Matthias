@@ -60,9 +60,10 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-        TODO: MAKE CLIENT UI BETTER
-        TODO: IMPLEMENT EMOJIS
-
+        TODO: IMPLEMENT REPLYING
+        TODO: FIX FILE DOWNLOADING 
+        TODO: FIX ANIMATIONS
+        
         */
 
         //For image loading

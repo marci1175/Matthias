@@ -292,8 +292,10 @@ impl MessageService {
                     Ok(app_data) => {
                         let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
 
-                        match fs::File::create(format!("{app_data}\\szeChat\\Server\\{}", req.name))
-                        {
+                        match fs::File::create(format!(
+                            "{app_data}\\szeChat\\Server\\{}.{}",
+                            req.name, req.extension
+                        )) {
                             Ok(mut created_file) => {
                                 if let Err(err) = created_file.write_all(&req.bytes) {
                                     println!("[{err}\n{}]", err.kind());
@@ -305,8 +307,8 @@ impl MessageService {
                                 match self.file_paths.lock() {
                                     Ok(mut ok) => {
                                         ok.push(PathBuf::from(format!(
-                                            "{app_data}\\szeChat\\Server\\{}",
-                                            req.name
+                                            "{app_data}\\szeChat\\Server\\{}.{}",
+                                            req.name, req.extension
                                         )));
                                     }
                                     Err(err) => {

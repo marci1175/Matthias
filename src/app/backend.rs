@@ -68,7 +68,9 @@ pub struct TemplateApp {
     pub client_password: String,
     //font
     pub font_size: f32,
-
+    pub how_on: f32,
+    #[serde(skip)]
+    pub drop_file_animation: bool,
     //msg
     #[serde(skip)]
     pub usr_msg: String,
@@ -142,6 +144,8 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            how_on: 0.0,
+            drop_file_animation: false,
             usr_msg_expanded: false,
             send_on_ip: String::new(),
             req_passw: false,

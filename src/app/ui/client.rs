@@ -1,5 +1,9 @@
 use device_query::Keycode;
-use egui::{vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Layout, RichText};
+use egui::epaint::RectShape;
+use egui::{
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Layout, Pos2,
+    RichText, Stroke, Id
+};
 
 use rand::Rng;
 use regex::Regex;
@@ -14,7 +18,7 @@ use std::sync::mpsc;
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    Message, MessageType, NormalMessage, ServerMaster, ServerMessageType, ServerOutput, TemplateApp,
+    Message, ServerMaster, ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 
@@ -110,6 +114,41 @@ impl TemplateApp {
 
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
+
+            if ui.input(|input| !input.raw.clone().hovered_files.is_empty() ) {
+                
+                self.drop_file_animation = true;
+
+            }
+            else {
+                self.drop_file_animation = false;
+                self.how_on = 0.;
+            }
+
+            let mut drop_file_id = Id::null();
+
+            if self.drop_file_animation {
+                let window_size = ui.input(|reader| {reader.screen_rect().max}).to_vec2();
+                let font_id = FontId {
+                    family: FontFamily::default(),
+                    size: self.font_size,
+                };
+
+                let drop_warning = Area::new("drop_warning").show(ctx, |ui|{
+                
+                    ui.painter()
+                        .rect(egui::Rect { min: Pos2::new(window_size[0] / 3., window_size[0] / 5.), max: Pos2::new(window_size[0] / 1.5, window_size[0] / 3.) }, 5.0, Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8), Stroke::default());
+                    ui.painter()
+                        .text(Pos2::new(window_size[0] / 2., window_size[0] / 4.), Align2([Align::Center, Align::Center]), "Drop to upload", font_id, Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8));
+                
+                });
+
+                drop_file_id = drop_warning.response.id;
+
+            }
+
+            self.how_on = ctx.animate_value_with_time(drop_file_id, 255., 2.);
+            
             //Messages go here
             ui.allocate_ui(
                 match self.usr_msg_expanded {
@@ -128,17 +167,17 @@ impl TemplateApp {
                             ui.allocate_ui(ui.available_size(), |ui| {
                                 if self.send_on_ip.is_empty() {
                                     ui.with_layout(Layout::centered_and_justified(egui::Direction::TopDown), |ui|{
-                                        
                                         ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
-                                        
                                     });
                                 }
                                 for item in self.incoming_msg.clone().struct_list {
+                                    let mut i: &String = &Default::default();
+                                    if let ServerMessageType::Normal(item) = &item.MessageType {
+                                        i = &item.message;
+                                    }
                                     ui.group(|ui|
                                     {
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
-                                        if let ServerMessageType::Normal(item) = &item.MessageType {
-                                        let i = &item.message;
                                             if (i.contains('[') && i.contains(']'))
                                             && (i.contains('(') && i.contains(')'))
                                         {
@@ -198,7 +237,6 @@ impl TemplateApp {
                                         } else {
                                             ui.label(RichText::from(i).size(self.font_size));
                                         }
-                                    }
                                     if let ServerMessageType::Upload(file) = &item.MessageType {
                                         if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
                                             //Request file with index item.index
@@ -206,8 +244,15 @@ impl TemplateApp {
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                 }
-                                );
-                                }
+                                ).response.context_menu(|ui|{
+                                    if ui.button("Reply").clicked() {
+                                        //TODO: IMPLEMENT REPLYING
+                                    }
+                                    if ui.button("Copy text").clicked() {
+                                        ctx.copy_text(i.clone());
+                                    };
+                                });
+                                };
                             });
 
                             if !self.usr_msg_expanded {
