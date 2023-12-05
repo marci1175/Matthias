@@ -61,9 +61,9 @@ impl eframe::App for backend::TemplateApp {
         /*devlog:
 
         TODO: IMPLEMENT REPLYING
-        TODO: FIX FILE DOWNLOADING 
+        TODO: FIX FILE DOWNLOADING
         TODO: FIX ANIMATIONS
-        
+
         */
 
         //For image loading

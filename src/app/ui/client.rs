@@ -1,8 +1,8 @@
 use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Layout, Pos2,
-    RichText, Stroke, Id
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText,
+    Stroke,
 };
 
 use rand::Rng;
@@ -17,9 +17,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONSTOP};
 use std::sync::mpsc;
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{
-    Message, ServerMaster, ServerMessageType, TemplateApp,
-};
+use crate::app::backend::{Message, ServerMaster, ServerMessageType, TemplateApp};
 use crate::app::client::{self};
 
 impl TemplateApp {
@@ -116,7 +114,6 @@ impl TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
 
             if ui.input(|input| !input.raw.clone().hovered_files.is_empty() ) {
-                
                 self.drop_file_animation = true;
 
             }
@@ -125,8 +122,6 @@ impl TemplateApp {
                 self.drop_file_animation = false;
 
             }
-
-
             if self.how_on >= 0. {
                 let window_size = ui.input(|reader| {reader.screen_rect().max}).to_vec2();
                 let font_id = FontId {
@@ -135,22 +130,25 @@ impl TemplateApp {
                 };
 
                 Area::new("drop_warning").show(ctx, |ui|{
-                
                     ui.painter()
                         .rect(egui::Rect { min: Pos2::new(window_size[0] / 3., window_size[0] / 5. + self.how_on / 50.), max: Pos2::new(window_size[0] / 1.5, window_size[0] / 3. + self.how_on / 50.) }, 5.0, Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8), Stroke::default());
                     ui.painter()
                         .text(Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.), Align2([Align::Center, Align::Center]), "Drop to upload", font_id, Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8));
-                
                 });
-
-
             }
-
             self.how_on = ctx.animate_value_with_time(Id::from("drop_warning"), match self.drop_file_animation {
                 true => 255.,
                 false => 0.
             }, 0.4);
-            
+
+            let dropped_files = ui.input(|reader| {reader.raw.clone().dropped_files});
+            if !dropped_files.is_empty() {
+                let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
+
+                self.files_to_send.push(dropped_file_path);
+
+            }
+
             //Messages go here
             ui.allocate_ui(
                 match self.usr_msg_expanded {
@@ -289,7 +287,41 @@ impl TemplateApp {
         //usr_input
         egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
             ui.allocate_space(vec2(ui.available_width(), 5.));
-
+            if !self.files_to_send.is_empty() {
+                ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
+                    ui.allocate_ui(
+                        vec2(
+                            ui.available_width() - 100.,
+                            _frame.info().window_info.size[1] / 7.5,
+                        ),
+                        |ui| {
+                            for (index, item) in self.files_to_send.clone().iter().enumerate() {
+                                ui.group(|ui| {
+                                    ui.allocate_ui(vec2(200., 100.), |ui| {
+                                        ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                                            ui.label(
+                                                RichText::from(
+                                                    item.file_name()
+                                                        .unwrap_or_default()
+                                                        .to_string_lossy(),
+                                                )
+                                                .size(self.font_size),
+                                            )
+                                        });
+                                    });
+                                })
+                                .response
+                                .context_menu(|ui| {
+                                    if ui.button("Remove file").clicked() {
+                                        self.files_to_send.remove(index);
+                                    };
+                                });
+                            }
+                        },
+                    )
+                });
+                ui.separator();
+            }
             ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
                 ui.allocate_ui(
                     vec2(
@@ -332,24 +364,12 @@ impl TemplateApp {
                                 "../../../icons/send_msg.png"
                             )))
                             .clicked()
-                            || input_keys.contains(&Keycode::Enter)
-                                && !(input_keys.contains(&Keycode::LShift)
-                                    || input_keys.contains(&Keycode::RShift))
-                                && !(self.usr_msg.trim().is_empty()
-                                    || self.usr_msg.trim_end_matches('\n').is_empty())
+                            && !(self.usr_msg.trim().is_empty()
+                                || self.usr_msg.trim_end_matches('\n').is_empty())
+                            || input_keys.contains(&Keycode::Enter) && !(self.usr_msg.trim().is_empty()
+                            || self.usr_msg.trim_end_matches('\n').is_empty()) && !(input_keys.contains(&Keycode::LShift)
+                            || input_keys.contains(&Keycode::RShift))
                         {
-                            if self.usr_msg.contains("file_upload") {
-                                std::thread::spawn(|| unsafe {
-                                    MessageBoxW(
-                                        0,
-                                        w!("You can not send server messages!"),
-                                        w!("Error"),
-                                        MB_ICONSTOP,
-                                    );
-                                });
-                                return;
-                            }
-
                             let temp_msg = self.usr_msg.clone();
                             let tx = self.tx.clone();
                             let username = self.login_username.clone();
@@ -359,6 +379,7 @@ impl TemplateApp {
                                 false => "".into(),
                             };
                             let temp_ip = self.send_on_ip.clone();
+
                             tokio::spawn(async move {
                                 match client::send_msg(Message::construct_normal_msg(
                                     &temp_msg, temp_ip, passw, username,
@@ -378,7 +399,15 @@ impl TemplateApp {
                                     }
                                 };
                             });
+
                             self.usr_msg.clear();
+
+                            for file_path in self.files_to_send.clone() {
+                                self.send_file(file_path);
+                            }
+
+                            //clear vectors
+                            self.files_to_send.clear();
                         }
                     });
                     ui.allocate_ui(vec2(50., 50.), |ui| {
@@ -396,25 +425,7 @@ impl TemplateApp {
 
                             if let Some(file) = files {
                                 //send file
-                                match fs::read(file.clone()) {
-                                    Ok(file_bytes) => {
-                                        let passw = self.client_password.clone();
-                                        let ip = self.send_on_ip.clone();
-                                        let author = self.login_username.clone();
-
-                                        let message = Message::construct_file_msg(
-                                            file_bytes, file, ip, passw, author,
-                                        );
-
-                                        tokio::spawn(async move {
-                                            //ignore server response
-                                            let _ = client::send_msg(message).await;
-                                        });
-                                    }
-                                    Err(err) => {
-                                        println!("{err}")
-                                    }
-                                }
+                                self.send_file(file);
                             }
                         }
                     });
@@ -455,6 +466,18 @@ impl TemplateApp {
             };
 
             ui.allocate_space(vec2(ui.available_width(), 5.));
+        });
+    }
+
+    fn send_file(&mut self, file: std::path::PathBuf) {
+        let passw = self.client_password.clone();
+        let ip = self.send_on_ip.clone();
+        let author = self.login_username.clone();
+
+        let message = Message::construct_file_msg(file, ip, passw, author);
+
+        tokio::spawn(async move {
+            let _ = client::send_msg(message).await;
         });
     }
 }

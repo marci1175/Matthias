@@ -61,11 +61,15 @@ pub struct TemplateApp {
     pub opened_account_path: PathBuf,
     #[serde(skip)]
     pub opened_account: Option<File>,
+
     //client main
+    #[serde(skip)]
+    pub files_to_send: Vec<PathBuf>,
     pub usr_msg_expanded: bool,
     pub send_on_ip: String,
     pub req_passw: bool,
     pub client_password: String,
+
     //font
     pub font_size: f32,
     pub how_on: f32,
@@ -144,6 +148,7 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            files_to_send: Vec::new(),
             how_on: 0.0,
             drop_file_animation: false,
             usr_msg_expanded: false,
@@ -255,7 +260,6 @@ impl Message {
         }
     }
     pub fn construct_file_msg(
-        bytes: Vec<u8>,
         file_name: PathBuf,
         ip: String,
         password: String,
@@ -273,7 +277,7 @@ impl Message {
                     .to_str()
                     .unwrap()
                     .to_string(),
-                bytes: bytes,
+                bytes: std::fs::read(file_name).unwrap_or_default(),
             }),
 
             Password: password,
