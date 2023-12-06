@@ -2,12 +2,13 @@ use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText,
-    Stroke,
+    Stroke, ImageButton, TextBuffer,
 };
 
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
+use std::ffi::OsStr;
 use std::fs::{self};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -267,7 +268,7 @@ impl TemplateApp {
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.usr_msg_expanded {
-                    true => vec2(-41.0, -183.8),
+                    true => vec2(-41.0, -183.8 - match self.files_to_send.is_empty() {true => 0.0, false => _frame.info().window_info.size[1] / 5.5}),
                     false => vec2(-_frame.info().window_info.size[1] / 19.5, -10.),
                 },
             )
@@ -288,38 +289,78 @@ impl TemplateApp {
         egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
             ui.allocate_space(vec2(ui.available_width(), 5.));
             if !self.files_to_send.is_empty() {
-                ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-                    ui.allocate_ui(
-                        vec2(
-                            ui.available_width() - 100.,
-                            _frame.info().window_info.size[1] / 7.5,
-                        ),
-                        |ui| {
+                egui::ScrollArea::horizontal()
+                    .id_source("file_to_send")
+                    .stick_to_right(true)
+                    .show(ui, |ui|{
+                        ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
                             for (index, item) in self.files_to_send.clone().iter().enumerate() {
                                 ui.group(|ui| {
                                     ui.allocate_ui(vec2(200., 100.), |ui| {
-                                        ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                                            ui.label(
-                                                RichText::from(
-                                                    item.file_name()
-                                                        .unwrap_or_default()
-                                                        .to_string_lossy(),
-                                                )
-                                                .size(self.font_size),
-                                            )
+                                        ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
+                                            ui.with_layout(Layout::top_down(Align::Center), |ui| {
+
+                                                //file icon
+                                                ui.allocate_ui(vec2(75., 75.), |ui|{
+                                                    match item.extension().unwrap().to_string_lossy().to_ascii_lowercase().as_str() {
+                                                        //file extenisons
+                                                        "exe" | "msi" | "cmd" | "com" | "inf" | "bat" | "ipa" | "osx" | "pif" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/exe_icon.png")));
+                                                        }
+                                                        "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "z" | "tgz" | "tbz2" | "txz" | "sit" | "tar.gz" | "tar.bz2" | "tar.xz" | "zipp" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
+                                                        }
+                                                        "jpeg" | "jpg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "svg" | "ico" | "raw" | "heif" | "pdf" | "eps" | "ai" | "psd" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
+                                                        }
+                                                        "wav" | "mp3" | "ogg" | "flac" | "aac" | "midi" | "wma" | "aiff" | "ape" | "alac" | "amr" | "caf" | "au" | "ra" | "m4a" | "ac3" | "dts" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/sound_icon.png")));
+                                                        }
+                                                        "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/video_icon.png")));
+                                                        }
+                                                        
+                                                        // :)
+                                                        "rs" => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/rust_lang_icon.png")));
+                                                        }
+
+                                                        _ => {
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/general_icon.png")));
+                                                        }
+                                                    }
+                                                });
+
+                                                //selected file widget part
+                                                ui.label(
+                                                    RichText::from(
+                                                        item.file_name()
+                                                            .unwrap_or_default()
+                                                            .to_string_lossy(),
+                                                    )
+                                                    .size(self.font_size),
+                                                );
+    
+                                            });
+                                            ui.separator();
+
+                                            //bin icon
+                                            ui.allocate_ui(vec2(30., 30.), |ui|{
+                                                if ui.add(
+                                                    ImageButton::new(
+                                                        egui::include_image!("../../../icons/bin.png")
+                                                    )
+                                                ).clicked() {
+                                                    self.files_to_send.remove(index);
+                                                };
+                                            });
                                         });
+                                        
                                     });
-                                })
-                                .response
-                                .context_menu(|ui| {
-                                    if ui.button("Remove file").clicked() {
-                                        self.files_to_send.remove(index);
-                                    };
                                 });
                             }
-                        },
-                    )
-                });
+                        });
+                    });
                 ui.separator();
             }
             ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
@@ -425,7 +466,7 @@ impl TemplateApp {
 
                             if let Some(file) = files {
                                 //send file
-                                self.send_file(file);
+                                self.files_to_send.push(file);
                             }
                         }
                     });
