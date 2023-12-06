@@ -44,6 +44,12 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub settings_window: bool,
 
+    //thread communication for file requesting
+    #[serde(skip)]
+    pub frx: mpsc::Receiver<String>,
+    #[serde(skip)]
+    pub ftx: mpsc::Sender<String>,
+
     //main
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -111,6 +117,7 @@ impl Default for TemplateApp {
         let (tx, rx) = mpsc::channel::<String>();
         let (stx, srx) = mpsc::channel::<String>();
         let (dtx, drx) = mpsc::channel::<String>();
+        let (ftx, frx) = mpsc::channel::<String>();
         Self {
             //fontbook
             filter: Default::default(),
@@ -136,6 +143,10 @@ impl Default for TemplateApp {
 
             //child windows
             settings_window: false,
+
+            //thread communication for file requesting
+            frx,
+            ftx,
 
             //main
             emoji_mode: false,
@@ -295,6 +306,9 @@ impl Message {
             Destination: ip,
         }
     }
+    pub fn construct_file_request_msg(index : i32, password: String, author: String, ip: String) -> Message {
+        Message { MessageType: MessageType::FileRequest(FileRequest {index : index}), Password: password, Author: author, MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() }, Destination: ip }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -326,7 +340,6 @@ pub struct ServerOutput {
     pub Author: String,
     pub MessageDate: String,
 }
-
 impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
         return serde_json::to_string(self).unwrap_or_default();
@@ -389,5 +402,16 @@ impl ServerMaster {
         return ServerMaster {
             struct_list: server_output_list,
         };
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct FileServe {
+    pub bytes : Vec<u8>,
+    pub file_name: PathBuf,
+}
+impl Default for FileServe {
+    fn default() -> Self {
+        Self { bytes: Vec::new(), file_name: PathBuf::new() }
     }
 }

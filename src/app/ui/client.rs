@@ -1,3 +1,4 @@
+use chrono::Utc;
 use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
@@ -10,6 +11,7 @@ use regex::Regex;
 use rfd::FileDialog;
 use std::ffi::OsStr;
 use std::fs::{self};
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use windows_sys::w;
@@ -18,7 +20,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONSTOP};
 use std::sync::mpsc;
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{Message, ServerMaster, ServerMessageType, TemplateApp};
+use crate::app::backend::{Message, ServerMaster, ServerMessageType, TemplateApp, FileRequest, FileServe};
 use crate::app::client::{self};
 
 impl TemplateApp {
@@ -240,7 +242,18 @@ impl TemplateApp {
                                         }
                                     if let ServerMessageType::Upload(file) = &item.MessageType {
                                         if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
-                                            //Request file with index item.index
+                                            // let passw = self.client_password.clone();
+                                            // let ip = self.send_on_ip.clone();
+                                            // let author = self.login_username.clone();
+                                            // let send_on_ip = self.send_on_ip.clone();
+
+                                            // let message = Message::construct_file_request_msg(index, passw, author, send_on_ip);
+
+                                            // let thread = tokio::spawn(async move {
+                                            //     client::send_msg(message).await.unwrap()
+                                            // });
+
+                                            // let file: FileServe = serde_json::from_str(&thread.await.unwrap()).unwrap_or_default();
                                         }
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -319,7 +332,7 @@ impl TemplateApp {
                                                         "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
                                                             ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/video_icon.png")));
                                                         }
-                                                        
+
                                                         // :)
                                                         "rs" => {
                                                             ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/rust_lang_icon.png")));

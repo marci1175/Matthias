@@ -62,7 +62,6 @@ impl eframe::App for backend::TemplateApp {
 
         TODO: IMPLEMENT REPLYING
         TODO: FIX FILE DOWNLOADING
-        TODO: FIX ANIMATIONS
 
         */
 

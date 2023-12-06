@@ -26,6 +26,7 @@ use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     FileRequest as FileRequestStruct, FileUpload as FileUploadStruct, Message,
     MessageType::{FileRequest, FileUpload, Image, NormalMessage, SyncMessage},
+    FileServe,
 };
 
 use super::backend::ServerOutput;
@@ -61,7 +62,9 @@ impl ServerMessage for MessageService {
                     todo!()
                 }
                 FileRequest(msg) => {
-                    todo!()
+                    let (file_bytes, file_name) = &self.serve_file(msg.index).await;
+                    let output = serde_json::to_string(&FileServe {file_name: file_name.clone(), bytes: file_bytes.clone()}).unwrap_or_default();
+                    return Ok(Response::new(MessageResponse { message: output }));
                 }
                 FileUpload(_) => {
                     self.recive_file(req.clone()).await;
@@ -339,5 +342,9 @@ impl MessageService {
         }
 
         dbg!(error_code);
+    }
+    pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
+        let path = &self.file_paths.lock().unwrap()[index as usize];
+        (fs::read(path).unwrap_or_default(), path.clone())
     }
 }
