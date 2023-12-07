@@ -336,7 +336,7 @@ impl TemplateApp {
                                                             ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
                                                         }
                                                         "jpeg" | "jpg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "svg" | "ico" | "raw" | "heif" | "pdf" | "eps" | "ai" | "psd" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
+                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/picture_icon.png")));
                                                         }
                                                         "wav" | "mp3" | "ogg" | "flac" | "aac" | "midi" | "wma" | "aiff" | "ape" | "alac" | "amr" | "caf" | "au" | "ra" | "m4a" | "ac3" | "dts" => {
                                                             ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/sound_icon.png")));
@@ -430,41 +430,39 @@ impl TemplateApp {
                                 "../../../icons/send_msg.png"
                             )))
                             .clicked()
-                            && !(self.usr_msg.trim().is_empty()
-                                || self.usr_msg.trim_end_matches('\n').is_empty() || !self.files_to_send.is_empty())
-                            || input_keys.contains(&Keycode::Enter) && !(self.usr_msg.trim().is_empty()
-                            || self.usr_msg.trim_end_matches('\n').is_empty()) && !(input_keys.contains(&Keycode::LShift)
-                            || input_keys.contains(&Keycode::RShift))
+                            || input_keys.contains(&Keycode::Enter) && !(input_keys.contains(&Keycode::LShift) || input_keys.contains(&Keycode::RShift))
                         {
-                            let temp_msg = self.usr_msg.clone();
-                            let tx = self.tx.clone();
-                            let username = self.login_username.clone();
-                            //disable pass if its not ticked
-                            let passw = match self.req_passw {
-                                true => self.client_password.clone(),
-                                false => "".into(),
-                            };
-                            let temp_ip = self.send_on_ip.clone();
-
-                            tokio::spawn(async move {
-                                match client::send_msg(Message::construct_normal_msg(
-                                    &temp_msg, temp_ip, passw, username,
-                                ))
-                                .await
-                                {
-                                    Ok(ok) => {
-                                        match tx.send(ok) {
-                                            Ok(_) => {}
-                                            Err(err) => {
-                                                println!("{}", err);
-                                            }
-                                        };
-                                    }
-                                    Err(err) => {
-                                        println!("ln 321 {:?}", err.source());
-                                    }
+                            if !(self.usr_msg.trim().is_empty() || self.usr_msg.trim_end_matches('\n').is_empty()) {
+                                let temp_msg = self.usr_msg.clone();
+                                let tx = self.tx.clone();
+                                let username = self.login_username.clone();
+                                //disable pass if its not ticked
+                                let passw = match self.req_passw {
+                                    true => self.client_password.clone(),
+                                    false => "".into(),
                                 };
-                            });
+                                let temp_ip = self.send_on_ip.clone();
+
+                                tokio::spawn(async move {
+                                    match client::send_msg(Message::construct_normal_msg(
+                                        &temp_msg, temp_ip, passw, username,
+                                    ))
+                                    .await
+                                    {
+                                        Ok(ok) => {
+                                            match tx.send(ok) {
+                                                Ok(_) => {}
+                                                Err(err) => {
+                                                    println!("{}", err);
+                                                }
+                                            };
+                                        }
+                                        Err(err) => {
+                                            println!("ln 321 {:?}", err.source());
+                                        }
+                                    };
+                                });
+                            }
 
                             self.usr_msg.clear();
 
