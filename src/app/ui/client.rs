@@ -19,6 +19,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONSTOP};
 
 use std::sync::mpsc;
 
+use crate::app::account_manager::write_file;
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{Message, ServerMaster, ServerMessageType, TemplateApp, FileRequest, FileServe};
 use crate::app::client::{self};
@@ -62,6 +63,7 @@ impl TemplateApp {
             });
             rx
         });
+        
         match rx.try_recv() {
             Ok(msg) => {
                 //show messages
@@ -242,18 +244,28 @@ impl TemplateApp {
                                         }
                                     if let ServerMessageType::Upload(file) = &item.MessageType {
                                         if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
-                                            // let passw = self.client_password.clone();
-                                            // let ip = self.send_on_ip.clone();
-                                            // let author = self.login_username.clone();
-                                            // let send_on_ip = self.send_on_ip.clone();
+                                            //let rx = self.autosync_sender.get_or_insert_with(|| {
+                                            let passw = self.client_password.clone();
+                                            let author = self.login_username.clone();
+                                            let send_on_ip = self.send_on_ip.clone();
+                                            let sender = self.ftx.clone();
+                                            let message = Message::construct_file_request_msg(file.index, passw, author, send_on_ip);
 
-                                            // let message = Message::construct_file_request_msg(index, passw, author, send_on_ip);
-
-                                            // let thread = tokio::spawn(async move {
-                                            //     client::send_msg(message).await.unwrap()
-                                            // });
-
-                                            // let file: FileServe = serde_json::from_str(&thread.await.unwrap()).unwrap_or_default();
+                                            tokio::spawn(async move {
+                                                match client::send_msg(message).await {
+                                                    Ok(ok) => {
+                                                        match sender.send(ok) {
+                                                            Ok(_) => {}
+                                                            Err(err) => {
+                                                                println!("{}", err);
+                                                            }
+                                                        };
+                                                    },
+                                                    Err(err) => {
+                                                        println!("{err} ln 264")
+                                                    }
+                                                }
+                                            });
                                         }
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -419,7 +431,7 @@ impl TemplateApp {
                             )))
                             .clicked()
                             && !(self.usr_msg.trim().is_empty()
-                                || self.usr_msg.trim_end_matches('\n').is_empty())
+                                || self.usr_msg.trim_end_matches('\n').is_empty() || !self.files_to_send.is_empty())
                             || input_keys.contains(&Keycode::Enter) && !(self.usr_msg.trim().is_empty()
                             || self.usr_msg.trim_end_matches('\n').is_empty()) && !(input_keys.contains(&Keycode::LShift)
                             || input_keys.contains(&Keycode::RShift))
@@ -505,6 +517,7 @@ impl TemplateApp {
                     });
                 });
             });
+
             //receive server answer unconditionally
             match self.rx.try_recv() {
                 Ok(msg) => {
@@ -518,7 +531,13 @@ impl TemplateApp {
                     //println!("ln 332 {}", err);
                 }
             };
-
+            match self.frx.try_recv() {
+                Ok(msg) => {
+                    let file_serve: Result<FileServe, serde_json::Error> = serde_json::from_str(&msg);
+                    let _ = write_file(file_serve.unwrap());
+                },
+                Err(err) => {}
+            }
             ui.allocate_space(vec2(ui.available_width(), 5.));
         });
     }

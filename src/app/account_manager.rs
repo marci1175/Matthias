@@ -188,7 +188,7 @@ pub fn write_file(file_response: FileServe) -> Result<()> {
     let files = FileDialog::new()
         .set_title("Save to")
         .set_directory("/")
-        .add_filter(file_response.file_name.file_stem().unwrap().to_string_lossy().to_string(), &[file_response.file_name.file_prefix().unwrap().to_string_lossy().to_string()])
+        .add_filter(file_response.file_name.extension().unwrap().to_string_lossy().to_string(), &[file_response.file_name.extension().unwrap().to_string_lossy().to_string()])
         .save_file();
 
     if let Some(file) = files {
