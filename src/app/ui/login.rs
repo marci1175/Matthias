@@ -16,6 +16,7 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: &Vec<Keycode>,
     ) {
+        
         //windows settings
         _frame.set_window_size(vec2(500., 200.));
 

@@ -16,6 +16,7 @@ async fn main() -> eframe::Result<()> {
         icon_data: Some(
             IconData::try_from_png_bytes(&include_bytes!("../icons/main.png")[..]).unwrap(),
         ),
+        
         ..Default::default()
     };
     eframe::run_native(

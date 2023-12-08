@@ -61,7 +61,6 @@ impl eframe::App for backend::TemplateApp {
         /*devlog:
 
         TODO: IMPLEMENT REPLYING
-        TODO: FIX FILE DOWNLOADING
 
         */
 

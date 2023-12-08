@@ -289,29 +289,10 @@ impl TemplateApp {
             );
         });
 
-        Area::new("usr_msg_expand")
-            .anchor(
-                Align2::RIGHT_BOTTOM,
-                match self.usr_msg_expanded {
-                    true => vec2(-41.0, -183.8 - match self.files_to_send.is_empty() {true => 0.0, false => _frame.info().window_info.size[1] / 5.5}),
-                    false => vec2(-_frame.info().window_info.size[1] / 19.5, -10.),
-                },
-            )
-            .show(ctx, |ui| {
-                ui.allocate_ui(vec2(25., 25.), |ui| {
-                    if ui
-                        .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../icons/cross.png"
-                        )))
-                        .clicked()
-                    {
-                        self.usr_msg_expanded = !self.usr_msg_expanded;
-                    };
-                });
-            });
+        
 
         //usr_input
-        egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
+        let usr_panel = egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
             ui.allocate_space(vec2(ui.available_width(), 5.));
             if !self.files_to_send.is_empty() {
                 egui::ScrollArea::horizontal()
@@ -538,6 +519,34 @@ impl TemplateApp {
             }
             ui.allocate_space(vec2(ui.available_width(), 5.));
         });
+
+        let panel_height = match usr_panel {
+            Some(panel) => {panel.response.rect.size()[1]}
+             None => {0.}  
+        };
+
+        Area::new("usr_msg_expand")
+            .anchor(
+                Align2::RIGHT_BOTTOM,
+                match self.usr_msg_expanded {
+                    true => vec2(-41.0, (-panel_height - 10.) / 14. ),
+                    false => vec2(-41.0, -10.),
+                },
+            
+            )
+            .show(ctx, |ui| {
+                ui.allocate_ui(vec2(25., 25.), |ui| {
+                    if ui
+                        .add(egui::ImageButton::new(egui::include_image!(
+                            "../../../icons/cross.png"
+                        )))
+                        .clicked()
+                    {
+                        self.usr_msg_expanded = !self.usr_msg_expanded;
+                    };
+                });
+            });
+
     }
 
     fn send_file(&mut self, file: std::path::PathBuf) {
