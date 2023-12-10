@@ -2,7 +2,7 @@ use chrono::Utc;
 use rand::rngs::ThreadRng;
 
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fs::{File, self};
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -336,6 +336,26 @@ impl Message {
             Destination: ip,
         }
     }
+    pub fn construct_image_msg(
+        file_name: PathBuf,
+        ip: String,
+        password: String,
+        author: String,
+        replying_to: Option<usize>,
+    ) -> Message {
+        Message {
+            replying_to: replying_to,
+            //Dont execute me please :3 |
+            //                          |
+            //                          V
+            MessageType: MessageType::Image(Image { bytes: fs::read(file_name).unwrap_or_default() }),
+
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -383,6 +403,23 @@ impl ServerOutput {
                     MessageType::FileUpload(_) => todo!(),
                     MessageType::Image(_) => todo!(),
                     MessageType::NormalMessage(msg) => msg.message,
+                },
+            }),
+            Author: normal_msg.Author,
+            MessageDate: normal_msg.MessageDate,
+        }
+    }
+    pub fn convert_picture_to_servermsg(normal_msg: Message) -> ServerOutput {
+        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+        ServerOutput {
+            replying_to: normal_msg.replying_to,
+            MessageType: ServerMessageType::Image(ServerImage {
+                bytes: match normal_msg.MessageType {
+                    MessageType::SyncMessage(_) => todo!(),
+                    MessageType::FileRequest(_) => todo!(),
+                    MessageType::FileUpload(_) => todo!(),
+                    MessageType::Image(img) => img.bytes,
+                    MessageType::NormalMessage(_) => todo!(),
                 },
             }),
             Author: normal_msg.Author,

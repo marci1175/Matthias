@@ -138,6 +138,8 @@ impl TemplateApp {
                     size: self.font_size,
                 };
 
+                ui.painter().rect_filled(egui::Rect::EVERYTHING, 0., Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8));
+                
                 Area::new("drop_warning").show(ctx, |ui|{
                     ui.painter()
                         .rect(egui::Rect { min: Pos2::new(window_size[0] / 3., window_size[0] / 5. + self.how_on / 50.), max: Pos2::new(window_size[0] / 1.5, window_size[0] / 3. + self.how_on / 50.) }, 5.0, Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8), Stroke::default());
@@ -180,7 +182,7 @@ impl TemplateApp {
                                     });
                                 }
                                 let mut test: Vec<Response> = Vec::new();
-                                let mut has_been_reply_clicked = (false, 0);
+                                let mut reply_to_got_to = (false, 0);
 
                                 for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
                                     let mut i: &String = &Default::default();
@@ -209,7 +211,7 @@ impl TemplateApp {
                                                     .clicked() {
 
                                                         //implement scrolling to message
-                                                        has_been_reply_clicked = (true, replied_to);
+                                                        reply_to_got_to = (true, replied_to);
                                                         
                                                     }
                                         }
@@ -301,6 +303,9 @@ impl TemplateApp {
                                             });
                                         }
                                     }
+                                    if let ServerMessageType::Image(picture) = &item.MessageType {
+                                        ui.add(egui::widgets::Image::from_bytes("bytes://", picture.bytes.clone()));
+                                    }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                 }
                                 ).response.context_menu(|ui|{
@@ -313,8 +318,8 @@ impl TemplateApp {
                                 });
 
                                 test.push(fasz);
-                                if has_been_reply_clicked.0 {
-                                    test[has_been_reply_clicked.1].scroll_to_me(Some(Align::Center));
+                                if reply_to_got_to.0 {
+                                    test[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
                                 }
                                 };
                             });
@@ -411,6 +416,7 @@ impl TemplateApp {
                             ui.horizontal(|ui| {
                                 ui.label(RichText::from("Replying to:").size(self.font_size).weak());
                                 ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
+
                                     ServerMessageType::Image(_img) => format!("Image"),
                                     ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
 
@@ -505,9 +511,19 @@ impl TemplateApp {
 
                             self.replying_to = None;
                             self.usr_msg.clear();
-
+                            
                             for file_path in self.files_to_send.clone() {
-                                self.send_file(file_path);
+                                match file_path.extension().unwrap().to_string_lossy().as_str() {
+                                    "png" => {
+                                        self.send_picture(file_path);
+                                    }
+                                    "jpeg" => {
+                                        self.send_picture(file_path);
+                                    }
+                                    _ => {
+                                        self.send_file(file_path);
+                                    }
+                                }
                             }
 
                             //clear vectors
@@ -613,6 +629,18 @@ impl TemplateApp {
         let replying_to = self.replying_to.clone();
 
         let message = Message::construct_file_msg(file, ip, passw, author, replying_to);
+
+        tokio::spawn(async move {
+            let _ = client::send_msg(message).await;
+        });
+    }
+    fn send_picture(&mut self, file: std::path::PathBuf) {
+        let passw = self.client_password.clone();
+        let ip = self.send_on_ip.clone();
+        let author = self.login_username.clone();
+        let replying_to = self.replying_to.clone();
+
+        let message = Message::construct_image_msg(file, ip, passw, author, replying_to);
 
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;

@@ -55,10 +55,9 @@ impl ServerMessage for MessageService {
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
                 NormalMessage(msg) => self.NormalMessage(req).await,
-                SyncMessage(msg) => { /*Dont do anything we will always reply with the list of msgs*/
-                }
-                Image(msg) => {
-                    todo!()
+                SyncMessage(msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+                Image(_) => {
+                    self.ImageMessage(req).await;
                 }
                 FileRequest(msg) => {
                     let (file_bytes, file_name) = &self.serve_file(msg.index).await;
@@ -278,7 +277,16 @@ impl MessageService {
         let reply = MessageResponse { message: final_msg };
         Ok(Response::new(reply))
     }
-
+    pub async fn ImageMessage(&self, req: Message) {
+        match self.messages.lock() {
+            Ok(mut ok) => {
+                ok.push(ServerOutput::convert_picture_to_servermsg(req));
+            }
+            Err(err) => {
+                println!("{err}")
+            }
+        };
+    }
     pub async fn recive_file(&self, request: Message) {
         /*
 
