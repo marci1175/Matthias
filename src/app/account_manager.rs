@@ -184,11 +184,23 @@ pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> anyhow::Resul
     Ok(())
 }
 pub fn write_file(file_response: FileServe) -> Result<()> {
-
     let files = FileDialog::new()
         .set_title("Save to")
         .set_directory("/")
-        .add_filter(file_response.file_name.extension().unwrap().to_string_lossy().to_string(), &[file_response.file_name.extension().unwrap().to_string_lossy().to_string()])
+        .add_filter(
+            file_response
+                .file_name
+                .extension()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
+            &[file_response
+                .file_name
+                .extension()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()],
+        )
         .save_file();
 
     if let Some(file) = files {

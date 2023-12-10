@@ -2,13 +2,14 @@ use chrono::Utc;
 use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText,
-    Stroke, ImageButton, TextBuffer,
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
+    RichText, Stroke, TextBuffer,
 };
 
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
+use std::f32::consts::E;
 use std::ffi::OsStr;
 use std::fs::{self};
 use std::path::PathBuf;
@@ -21,7 +22,9 @@ use std::sync::mpsc;
 
 use crate::app::account_manager::write_file;
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{Message, ServerMaster, ServerMessageType, TemplateApp, FileRequest, FileServe};
+use crate::app::backend::{
+    FileRequest, FileServe, Message, ServerMaster, ServerMessageType, TemplateApp,
+};
 use crate::app::client::{self};
 
 impl TemplateApp {
@@ -39,6 +42,7 @@ impl TemplateApp {
                 self.send_on_ip.clone(),
                 self.client_password.clone(),
                 self.login_username.clone(),
+                None,
             );
 
             tokio::spawn(async move {
@@ -63,7 +67,7 @@ impl TemplateApp {
             });
             rx
         });
-        
+
         match rx.try_recv() {
             Ok(msg) => {
                 //show messages
@@ -175,13 +179,35 @@ impl TemplateApp {
                                         ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
                                     });
                                 }
-                                for item in self.incoming_msg.clone().struct_list {
+                                for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
                                     let mut i: &String = &Default::default();
                                     if let ServerMessageType::Normal(item) = &item.MessageType {
                                         i = &item.message;
                                     }
                                     ui.group(|ui|
                                     {
+                                        if let Some(replied_to) = item.replying_to {
+                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
+                                                self.incoming_msg.struct_list[replied_to].Author,
+                                                match &self.incoming_msg.struct_list[replied_to].MessageType {
+                                                    ServerMessageType::Image(_img) => format!("Image"),
+                                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                                    ServerMessageType::Normal(msg) => {
+                                                        let mut message_clone = msg.message.clone();
+                                                        if message_clone.clone().len() > 20 {
+                                                            message_clone.truncate(20);
+                                                            message_clone.push_str(" ...");
+                                                        }
+                                                        message_clone
+                                                },
+                                            })
+                                            ).size(self.font_size / 1.5))
+                                                .frame(false))
+                                                    .clicked() {
+                                                        //implement scrolling to message
+                                                        
+                                                    }
+                                        }
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
                                             if (i.contains('[') && i.contains(']'))
                                             && (i.contains('(') && i.contains(')'))
@@ -249,7 +275,9 @@ impl TemplateApp {
                                             let author = self.login_username.clone();
                                             let send_on_ip = self.send_on_ip.clone();
                                             let sender = self.ftx.clone();
-                                            let message = Message::construct_file_request_msg(file.index, passw, author, send_on_ip);
+                                            let replying_to = self.replying_to.clone();
+
+                                            let message = Message::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
 
                                             tokio::spawn(async move {
                                                 match client::send_msg(message).await {
@@ -272,7 +300,7 @@ impl TemplateApp {
                                 }
                                 ).response.context_menu(|ui|{
                                     if ui.button("Reply").clicked() {
-                                        //TODO: IMPLEMENT REPLYING
+                                        self.replying_to = Some(index);
                                     }
                                     if ui.button("Copy text").clicked() {
                                         ctx.copy_text(i.clone());
@@ -288,8 +316,6 @@ impl TemplateApp {
                 },
             );
         });
-
-        
 
         //usr_input
         let usr_panel = egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
@@ -346,7 +372,6 @@ impl TemplateApp {
                                                     )
                                                     .size(self.font_size),
                                                 );
-    
                                             });
                                             ui.separator();
 
@@ -361,13 +386,35 @@ impl TemplateApp {
                                                 };
                                             });
                                         });
-                                        
                                     });
                                 });
                             }
                         });
                     });
                 ui.separator();
+            }
+            if let Some(replying_to) = self.replying_to.clone() {
+                ui.horizontal(|ui| {
+                    ui.group(|ui|{
+                        ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                            //place them in one line
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::from("Replying to:").size(self.font_size).weak());
+                                ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
+                                    ServerMessageType::Image(_img) => format!("Image"),
+                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+
+                                    ServerMessageType::Normal(msg) => msg.message.clone(),
+
+                                }).size(self.font_size).strong());
+                            });
+                        });
+                    });
+                    if ui.button(RichText::from("X").size(self.font_size * 1.5).color(Color32::RED)).clicked() {
+                        self.replying_to = None;
+                    };
+                });
+                ui.allocate_space(vec2(ui.available_width(), 10.));
             }
             ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
                 ui.allocate_ui(
@@ -423,10 +470,11 @@ impl TemplateApp {
                                     false => "".into(),
                                 };
                                 let temp_ip = self.send_on_ip.clone();
+                                let replying_to = self.replying_to.clone();
 
                                 tokio::spawn(async move {
                                     match client::send_msg(Message::construct_normal_msg(
-                                        &temp_msg, temp_ip, passw, username,
+                                        &temp_msg, temp_ip, passw, username, replying_to,
                                     ))
                                     .await
                                     {
@@ -445,6 +493,7 @@ impl TemplateApp {
                                 });
                             }
 
+                            self.replying_to = None;
                             self.usr_msg.clear();
 
                             for file_path in self.files_to_send.clone() {
@@ -521,18 +570,17 @@ impl TemplateApp {
         });
 
         let panel_height = match usr_panel {
-            Some(panel) => {panel.response.rect.size()[1]}
-             None => {0.}  
+            Some(panel) => panel.response.rect.size()[1],
+            None => 0.,
         };
 
         Area::new("usr_msg_expand")
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.usr_msg_expanded {
-                    true => vec2(-41.0, (-panel_height - 10.) / 14. ),
+                    true => vec2(-41.0, (-panel_height - 10.) / 14.),
                     false => vec2(-41.0, -10.),
                 },
-            
             )
             .show(ctx, |ui| {
                 ui.allocate_ui(vec2(25., 25.), |ui| {
@@ -546,15 +594,15 @@ impl TemplateApp {
                     };
                 });
             });
-
     }
 
     fn send_file(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();
         let author = self.login_username.clone();
+        let replying_to = self.replying_to.clone();
 
-        let message = Message::construct_file_msg(file, ip, passw, author);
+        let message = Message::construct_file_msg(file, ip, passw, author, replying_to);
 
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;

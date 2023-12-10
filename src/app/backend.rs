@@ -83,6 +83,8 @@ pub struct TemplateApp {
     pub drop_file_animation: bool,
     //msg
     #[serde(skip)]
+    pub replying_to: Option<usize>,
+    #[serde(skip)]
     pub usr_msg: String,
     #[serde(skip)]
     pub incoming_msg_time: Vec<String>,
@@ -180,6 +182,7 @@ impl Default for TemplateApp {
             random_generated: false,
             //msg
             usr_msg: String::new(),
+            replying_to: None,
             incoming_msg_time: Vec::new(),
             incoming_msg: ServerMaster::default(),
             //thread communication for client
@@ -243,6 +246,7 @@ pub enum MessageType {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Message {
+    pub replying_to: Option<usize>,
     pub MessageType: MessageType,
     pub Password: String,
     pub Author: String,
@@ -259,8 +263,10 @@ impl Message {
         ip: String,
         password: String,
         author: String,
+        replying_to: Option<usize>,
     ) -> Message {
         Message {
+            replying_to: replying_to,
             MessageType: MessageType::NormalMessage(NormalMessage {
                 message: msg.trim().to_string(),
             }),
@@ -275,8 +281,10 @@ impl Message {
         ip: String,
         password: String,
         author: String,
+        replying_to: Option<usize>,
     ) -> Message {
         Message {
+            replying_to: replying_to,
             //Dont execute me please :3 |
             //                          |
             //                          V
@@ -297,8 +305,14 @@ impl Message {
             Destination: ip,
         }
     }
-    pub fn construct_sync_msg(ip: String, password: String, author: String) -> Message {
+    pub fn construct_sync_msg(
+        ip: String,
+        password: String,
+        author: String,
+        replying_to: Option<usize>,
+    ) -> Message {
         Message {
+            replying_to: replying_to,
             MessageType: MessageType::SyncMessage(SnycMessage {}),
             Password: password,
             Author: author,
@@ -306,8 +320,21 @@ impl Message {
             Destination: ip,
         }
     }
-    pub fn construct_file_request_msg(index : i32, password: String, author: String, ip: String) -> Message {
-        Message { MessageType: MessageType::FileRequest(FileRequest {index : index}), Password: password, Author: author, MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() }, Destination: ip }
+    pub fn construct_file_request_msg(
+        index: i32,
+        password: String,
+        author: String,
+        ip: String,
+        replying_to: Option<usize>,
+    ) -> Message {
+        Message {
+            replying_to: replying_to,
+            MessageType: MessageType::FileRequest(FileRequest { index: index }),
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
     }
 }
 
@@ -336,6 +363,7 @@ pub enum ServerMessageType {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
+    pub replying_to: Option<usize>,
     pub MessageType: ServerMessageType,
     pub Author: String,
     pub MessageDate: String,
@@ -347,6 +375,7 @@ impl ServerOutput {
     pub fn convert_msg_to_servermsg(normal_msg: Message) -> ServerOutput {
         //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
         ServerOutput {
+            replying_to: normal_msg.replying_to,
             MessageType: ServerMessageType::Normal(ServerNormalMessage {
                 message: match normal_msg.MessageType {
                     MessageType::SyncMessage(_) => todo!(),
@@ -363,6 +392,7 @@ impl ServerOutput {
     pub fn convert_upload_to_servermsg(normal_msg: Message, index: i32) -> ServerOutput {
         //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
         ServerOutput {
+            replying_to: normal_msg.replying_to,
             MessageType: ServerMessageType::Upload(ServerFileUpload {
                 file_name: match normal_msg.MessageType {
                     MessageType::SyncMessage(_) => todo!(),
@@ -407,11 +437,14 @@ impl ServerMaster {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct FileServe {
-    pub bytes : Vec<u8>,
+    pub bytes: Vec<u8>,
     pub file_name: PathBuf,
 }
 impl Default for FileServe {
     fn default() -> Self {
-        Self { bytes: Vec::new(), file_name: PathBuf::new() }
+        Self {
+            bytes: Vec::new(),
+            file_name: PathBuf::new(),
+        }
     }
 }
