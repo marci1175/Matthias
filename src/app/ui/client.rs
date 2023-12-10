@@ -3,7 +3,7 @@ use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
-    RichText, Stroke, TextBuffer,
+    RichText, Stroke, TextBuffer, Ui, Response,
 };
 
 use rand::Rng;
@@ -179,15 +179,18 @@ impl TemplateApp {
                                         ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
                                     });
                                 }
+                                let mut test: Vec<Response> = Vec::new();
+                                let mut has_been_reply_clicked = (false, 0);
+
                                 for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
                                     let mut i: &String = &Default::default();
                                     if let ServerMessageType::Normal(item) = &item.MessageType {
                                         i = &item.message;
                                     }
-                                    ui.group(|ui|
+                                    let fasz = ui.group(|ui|
                                     {
                                         if let Some(replied_to) = item.replying_to {
-                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
+                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
                                                 self.incoming_msg.struct_list[replied_to].Author,
                                                 match &self.incoming_msg.struct_list[replied_to].MessageType {
                                                     ServerMessageType::Image(_img) => format!("Image"),
@@ -198,14 +201,14 @@ impl TemplateApp {
                                                             message_clone.truncate(20);
                                                             message_clone.push_str(" ...");
                                                         }
-                                                        message_clone
+                                                        format!("{}", message_clone)
                                                 },
                                             })
                                             ).size(self.font_size / 1.5))
                                                 .frame(false))
                                                     .clicked() {
                                                         //implement scrolling to message
-                                                        
+                                                        has_been_reply_clicked = (true, replied_to);
                                                     }
                                         }
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
@@ -306,9 +309,14 @@ impl TemplateApp {
                                         ctx.copy_text(i.clone());
                                     };
                                 });
+
+                                test.push(fasz);
+                                if has_been_reply_clicked.0 {
+                                    test[has_been_reply_clicked.1].scroll_to_me(Some(Align::Center));
+                                }
                                 };
                             });
-
+                            
                             if !self.usr_msg_expanded {
                                 ui.allocate_space(vec2(ui.available_width(), 25.));
                             }
