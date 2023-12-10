@@ -207,8 +207,10 @@ impl TemplateApp {
                                             ).size(self.font_size / 1.5))
                                                 .frame(false))
                                                     .clicked() {
+
                                                         //implement scrolling to message
                                                         has_been_reply_clicked = (true, replied_to);
+                                                        
                                                     }
                                         }
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
