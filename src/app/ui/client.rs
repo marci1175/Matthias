@@ -304,7 +304,9 @@ impl TemplateApp {
                                         }
                                     }
                                     if let ServerMessageType::Image(picture) = &item.MessageType {
-                                        ui.add(egui::widgets::Image::from_bytes("bytes://", picture.bytes.clone()));
+                                        ui.allocate_ui(vec2(300., 300.), |ui|{
+                                            ui.add(egui::widgets::Image::from_bytes("bytes://", picture.bytes.clone()));
+                                        });
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                 }
