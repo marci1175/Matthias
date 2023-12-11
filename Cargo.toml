@@ -8,7 +8,7 @@ rust-version = "1.71"
 [dependencies]
 egui = "0.23.0"
 egui_extras = { version = "0.23", features = ["all_loaders"] }
-image = { version = "0.24", features = ["jpeg", "png"] } # Add the types you want support for
+image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
 tonic = {version = "0.7", features = ["tls"]}
 
 prost = "0.10"

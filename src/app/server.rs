@@ -54,8 +54,8 @@ impl ServerMessage for MessageService {
 
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
-                NormalMessage(msg) => self.NormalMessage(req).await,
-                SyncMessage(msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+                NormalMessage(_msg) => self.NormalMessage(req).await,
+                SyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
                 Image(_) => {
                     self.ImageMessage(req).await;
                 }

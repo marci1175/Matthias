@@ -514,12 +514,10 @@ impl TemplateApp {
                             
                             for file_path in self.files_to_send.clone() {
                                 match file_path.extension().unwrap().to_string_lossy().as_str() {
-                                    "png" => {
+                                    "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
                                         self.send_picture(file_path);
                                     }
-                                    "jpeg" => {
-                                        self.send_picture(file_path);
-                                    }
+                                    
                                     _ => {
                                         self.send_file(file_path);
                                     }
@@ -633,7 +631,9 @@ impl TemplateApp {
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;
         });
+
     }
+    
     fn send_picture(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();
@@ -645,5 +645,6 @@ impl TemplateApp {
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;
         });
+
     }
 }
