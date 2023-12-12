@@ -3,7 +3,7 @@ use device_query::Keycode;
 use egui::epaint::RectShape;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
-    RichText, Stroke, TextBuffer, Ui, Response,
+    Response, RichText, Stroke, TextBuffer, Ui,
 };
 
 use rand::Rng;
@@ -305,7 +305,7 @@ impl TemplateApp {
                                     }
                                     if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
-                                            ui.add(egui::widgets::Image::from_bytes("bytes://", picture.bytes.clone()));
+                                            ui.label(picture.index.to_string());
                                         });
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -633,9 +633,8 @@ impl TemplateApp {
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;
         });
-
     }
-    
+
     fn send_picture(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();
@@ -647,6 +646,5 @@ impl TemplateApp {
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;
         });
-
     }
 }

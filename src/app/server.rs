@@ -41,6 +41,9 @@ pub struct MessageService {
 
     //files
     pub file_paths: Mutex<Vec<PathBuf>>,
+
+    //images
+    pub image_paths: Mutex<Vec<PathBuf>>,
 }
 #[tonic::async_trait]
 impl ServerMessage for MessageService {
@@ -55,7 +58,8 @@ impl ServerMessage for MessageService {
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
                 NormalMessage(_msg) => self.NormalMessage(req).await,
-                SyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+                SyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
+                }
                 Image(_) => {
                     self.ImageMessage(req).await;
                 }
@@ -278,14 +282,59 @@ impl MessageService {
         Ok(Response::new(reply))
     }
     pub async fn ImageMessage(&self, req: Message) {
-        match self.messages.lock() {
-            Ok(mut ok) => {
-                ok.push(ServerOutput::convert_picture_to_servermsg(req));
+        if let Image(img) = &req.MessageType {
+            match env::var("APPDATA") {
+                Ok(app_data) => {
+
+                    let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
+                    
+                    match fs::File::create(format!(
+                        "{app_data}\\szeChat\\Server\\{}",
+                        self.image_paths.lock().unwrap().len()
+                    )) {
+                        Ok(mut created_file) => {
+                            if let Err(err) = created_file.write_all(&img.bytes) {
+                                println!("[{err}\n{}]", err.kind());
+                            };
+
+                            created_file.flush().unwrap();
+                            //success
+
+                            match self.messages.lock() {
+                                Ok(mut ok) => {
+                                    ok.push(ServerOutput::convert_picture_to_servermsg(
+                                        req.clone(),
+                                        self.image_paths.lock().unwrap().len() as i32,
+                                    ));
+                                }
+                                Err(err) => println!("{err}"),
+                            }
+
+                            //Only save as last step to avoid a mismatch + correct indexing :)
+                            match self.image_paths.lock() {
+                                Ok(mut ok) => {
+                                    ok.push(PathBuf::from(format!(
+                                        "{app_data}\\szeChat\\Server\\{}",
+                                        self.image_paths.lock().unwrap().len()
+                                    )));
+                                }
+                                Err(err) => {
+                                    println!("{err}")
+                                }
+                            };
+
+                        }
+                        Err(err) => {
+                            println!(" [{err} {}]", err.kind());
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("{err}")
+                }
             }
-            Err(err) => {
-                println!("{err}")
-            }
-        };
+
+        }
     }
     pub async fn recive_file(&self, request: Message) {
         /*
