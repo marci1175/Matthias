@@ -50,6 +50,12 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub ftx: mpsc::Sender<String>,
 
+    //thread communication for image requesting
+    #[serde(skip)]
+    pub irx: mpsc::Receiver<String>,
+    #[serde(skip)]
+    pub itx: mpsc::Sender<String>,
+
     //main
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -120,6 +126,7 @@ impl Default for TemplateApp {
         let (stx, srx) = mpsc::channel::<String>();
         let (dtx, drx) = mpsc::channel::<String>();
         let (ftx, frx) = mpsc::channel::<String>();
+        let (itx, irx) = mpsc::channel::<String>();
         Self {
             //fontbook
             filter: Default::default(),
@@ -149,6 +156,10 @@ impl Default for TemplateApp {
             //thread communication for file requesting
             frx,
             ftx,
+
+            //thread communication for image requesting
+            irx,
+            itx,
 
             //main
             emoji_mode: false,
@@ -209,65 +220,87 @@ impl TemplateApp {
     }
 }
 
-//Message Types
+//When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct FileUpload {
+pub struct ClientFileUpload {
     pub extension: String,
     pub name: String,
     pub bytes: Vec<u8>,
 }
 
+//Normal message
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct NormalMessage {
+pub struct ClientNormalMessage {
     pub message: String,
 }
 
+//Empty packet, as described later, only used for syncing
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct Image {
-    pub bytes: Vec<u8>,
-}
+pub struct ClientSnycMessage {/*Empty packet, only for syncing*/}
 
+//This is used by the client for requesting file
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct SnycMessage {/*Empty packet, only for syncing*/}
-
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct FileRequest {
+pub struct ClientFileRequest {
     pub index: i32,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum MessageType {
-    SyncMessage(SnycMessage),
-    FileRequest(FileRequest),
-    FileUpload(FileUpload),
-    Image(Image),
-    NormalMessage(NormalMessage),
+//This is used by the client for requesting images
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientImageRequest {
+    pub index: i32,
 }
 
+//this is used to send out images to the server TODO: IMPROVE IMAGE / FILE SENDING HANDLING BY SERVER __
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientImage {
+    pub bytes: Vec<u8>,
+}
+
+//Client outgoing message types
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct Message {
+pub enum ClientMessageType {
+    //this is when you want to display an image and you have to make a request to the server file
+    ClientImageRequest(ClientImageRequest),
+
+    ClientSyncMessage(ClientSnycMessage),
+    ClientFileRequest(ClientFileRequest),
+    ClientFileUpload(ClientFileUpload),
+
+    //this is when you are sending images to the server TODO: REMOVE THIS WHOLE POOP REF LINE 239
+    ClientImage(ClientImage),
+
+    ClientNormalMessage(ClientNormalMessage),
+}
+
+//This is what gets to be sent out by the client
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientMessage {
     pub replying_to: Option<usize>,
-    pub MessageType: MessageType,
+    pub MessageType: ClientMessageType,
     pub Password: String,
     pub Author: String,
     pub MessageDate: String,
     pub Destination: String,
 }
 
-impl Message {
+impl ClientMessage {
+    
+    //struct into string, it makes sending information easier by putting it all in a string
     pub fn struct_into_string(&self) -> String {
         return serde_json::to_string(self).unwrap_or_default();
     }
+    
+    //this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
         ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
-    ) -> Message {
-        Message {
+    ) -> ClientMessage {
+        ClientMessage {
             replying_to: replying_to,
-            MessageType: MessageType::NormalMessage(NormalMessage {
+            MessageType: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
             Password: password,
@@ -276,19 +309,21 @@ impl Message {
             Destination: ip,
         }
     }
+    
+    //this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_name: PathBuf,
         ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
-    ) -> Message {
-        Message {
+    ) -> ClientMessage {
+        ClientMessage {
             replying_to: replying_to,
             //Dont execute me please :3 |
             //                          |
             //                          V
-            MessageType: MessageType::FileUpload(FileUpload {
+            MessageType: ClientMessageType::ClientFileUpload(ClientFileUpload {
                 extension: file_name.extension().unwrap().to_str().unwrap().to_string(),
                 name: file_name
                     .file_prefix()
@@ -305,48 +340,72 @@ impl Message {
             Destination: ip,
         }
     }
+    
+    //this is used for constructing a sync msg aka sending an empty packet, so server can reply
     pub fn construct_sync_msg(
         ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
-    ) -> Message {
-        Message {
+    ) -> ClientMessage {
+        ClientMessage {
             replying_to: replying_to,
-            MessageType: MessageType::SyncMessage(SnycMessage {}),
+            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {}),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
             Destination: ip,
         }
     }
+    
+    //this is used for asking for a file
     pub fn construct_file_request_msg(
         index: i32,
         password: String,
         author: String,
         ip: String,
         replying_to: Option<usize>,
-    ) -> Message {
-        Message {
+    ) -> ClientMessage {
+        ClientMessage {
             replying_to: replying_to,
-            MessageType: MessageType::FileRequest(FileRequest { index: index }),
+            MessageType: ClientMessageType::ClientFileRequest(ClientFileRequest { index: index }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
             Destination: ip,
         }
     }
+    
+    //this is used for asking for an image
+    pub fn construct_image_request_msg(
+        index: i32,
+        password: String,
+        author: String,
+        ip: String,
+        replying_to: Option<usize>,
+    ) -> ClientMessage {
+        ClientMessage {
+            replying_to: replying_to,
+            MessageType: ClientMessageType::ClientImageRequest(ClientImageRequest { index: index }),
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
+    
+    //this is used for SENDING IMAGES SO THE SERVER CAN DECIDE IF ITS A PICTURE
     pub fn construct_image_msg(
-        file_name: PathBuf,
+        file_path: PathBuf,
         ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
-    ) -> Message {
-        Message {
+    ) -> ClientMessage {
+        ClientMessage {
             replying_to: replying_to,
-            MessageType: MessageType::Image(Image {
-                bytes: fs::read(file_name).unwrap_or_default(),
+            MessageType: ClientMessageType::ClientImage(ClientImage {
+                bytes: fs::read(file_path).unwrap_or_default(),
             }),
 
             Password: password,
@@ -355,36 +414,79 @@ impl Message {
             Destination: ip,
         }
     }
+
 }
 
+/*
+    Server. . .
+
+    Are used to convert clinet sent messages into a server message, so it can be sent back;
+    Therefor theyre smaller in size
+*/
+
+/*
+        NOTICE:
+
+
+    .... Upload : is always what the server sends back to the client (so the client knows what to ask about)
+
+    .... Reply : is always what the server send to the client after the client asked.
+
+*/
+
+
+//This is what the server sends back (pushes to message vector), when reciving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerFileUpload {
     pub file_name: String,
     pub index: i32,
 }
 
+
+//This is what the server sends back, when asked for a file (FIleRequest)
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerFileReply {
+    pub bytes: Vec<u8>,
+    pub file_name: PathBuf,
+}
+
+
+//This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerImageUpload {
+    pub index: i32,
+}
+
+
+//When client asks for the image based on the provided index, reply with the image bytes
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerImageReply {
+    pub bytes: Vec<u8>,
+    pub index: i32,
+}
+
+
+
+
+//This is what the server sends back (pushes to message vector), when reciving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerNormalMessage {
     pub message: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerImageReply {
-    pub bytes: Vec<u8>,
-}
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerImageRequest {
-    pub index: i32,
-}
-
+//This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerMessageType {
     Upload(ServerFileUpload),
     Normal(ServerNormalMessage),
-    Image(ServerImageRequest),
+
+    //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
+    Image(ServerImageUpload),
 }
 
+
+//This is one whole server msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
     pub replying_to: Option<usize>,
@@ -396,53 +498,56 @@ impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
         return serde_json::to_string(self).unwrap_or_default();
     }
-    pub fn convert_msg_to_servermsg(normal_msg: Message) -> ServerOutput {
-        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+    pub fn convert_msg_to_servermsg(normal_msg: ClientMessage) -> ServerOutput {
+        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
         ServerOutput {
             replying_to: normal_msg.replying_to,
             MessageType: ServerMessageType::Normal(ServerNormalMessage {
                 message: match normal_msg.MessageType {
-                    MessageType::SyncMessage(_) => todo!(),
-                    MessageType::FileRequest(_) => todo!(),
-                    MessageType::FileUpload(_) => todo!(),
-                    MessageType::Image(_) => todo!(),
-                    MessageType::NormalMessage(msg) => msg.message,
+                    ClientMessageType::ClientSyncMessage(_) => todo!(),
+                    ClientMessageType::ClientFileRequest(_) => todo!(),
+                    ClientMessageType::ClientFileUpload(_) => todo!(),
+                    ClientMessageType::ClientImage(_) => todo!(),
+                    ClientMessageType::ClientNormalMessage(msg) => msg.message,
+                    ClientMessageType::ClientImageRequest(_) => todo!(),
                 },
             }),
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
         }
     }
-    pub fn convert_picture_to_servermsg(normal_msg: Message, index: i32) -> ServerOutput {
-        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+    pub fn convert_picture_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
+        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
         ServerOutput {
             replying_to: normal_msg.replying_to,
-            MessageType: ServerMessageType::Image(ServerImageRequest {
+            MessageType: ServerMessageType::Image(ServerImageUpload {
                 index: match normal_msg.MessageType {
-                    MessageType::SyncMessage(_) => todo!(),
-                    MessageType::FileRequest(_) => todo!(),
-                    MessageType::FileUpload(_) => todo!(),
-                    MessageType::Image(_) => index,
-                    MessageType::NormalMessage(_) => todo!(),
+                    ClientMessageType::ClientSyncMessage(_) => todo!(),
+                    ClientMessageType::ClientFileRequest(_) => todo!(),
+                    ClientMessageType::ClientFileUpload(_) => todo!(),
+                    ClientMessageType::ClientImage(_) => index,
+                    ClientMessageType::ClientNormalMessage(_) => todo!(),
+                    ClientMessageType::ClientImageRequest(_) => todo!(),
                 },
             }),
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
         }
     }
-    pub fn convert_upload_to_servermsg(normal_msg: Message, index: i32) -> ServerOutput {
-        //Convert a client output to a server output (Message -> ServerOutput), trim some useless info
+    pub fn convert_upload_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
+        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
         ServerOutput {
             replying_to: normal_msg.replying_to,
             MessageType: ServerMessageType::Upload(ServerFileUpload {
                 file_name: match normal_msg.MessageType {
-                    MessageType::SyncMessage(_) => todo!(),
-                    MessageType::FileRequest(_) => todo!(),
-                    MessageType::FileUpload(msg) => {
+                    ClientMessageType::ClientSyncMessage(_) => todo!(),
+                    ClientMessageType::ClientFileRequest(_) => todo!(),
+                    ClientMessageType::ClientFileUpload(msg) => {
                         format!("{}.{}", msg.name, msg.extension)
                     }
-                    MessageType::Image(_) => todo!(),
-                    MessageType::NormalMessage(_) => todo!(),
+                    ClientMessageType::ClientImage(_) => todo!(),
+                    ClientMessageType::ClientNormalMessage(_) => todo!(),
+                    ClientMessageType::ClientImageRequest(_) => todo!(),
                 },
                 index: index,
             }),
@@ -452,6 +557,8 @@ impl ServerOutput {
     }
 }
 
+
+//Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
     pub struct_list: Vec<ServerOutput>,
@@ -476,16 +583,3 @@ impl ServerMaster {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct FileServe {
-    pub bytes: Vec<u8>,
-    pub file_name: PathBuf,
-}
-impl Default for FileServe {
-    fn default() -> Self {
-        Self {
-            bytes: Vec::new(),
-            file_name: PathBuf::new(),
-        }
-    }
-}

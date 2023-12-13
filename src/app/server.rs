@@ -24,8 +24,8 @@ use messages::{
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
-    FileRequest as FileRequestStruct, FileServe, FileUpload as FileUploadStruct, Message,
-    MessageType::{FileRequest, FileUpload, Image, NormalMessage, SyncMessage},
+    ServerFileReply, ClientMessage, ServerImageReply,
+    ClientMessageType::{ClientFileRequest, ClientFileUpload, ClientImage, ClientNormalMessage, ClientSyncMessage, ClientImageRequest},
 };
 
 use super::backend::ServerOutput;
@@ -51,30 +51,38 @@ impl ServerMessage for MessageService {
         &self,
         request: Request<MessageRequest>,
     ) -> Result<Response<MessageResponse>, Status> {
-        let req_result: Result<Message, serde_json::Error> =
+        let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
-        let req: Message = req_result.unwrap();
+        let req: ClientMessage = req_result.unwrap();
 
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
-                NormalMessage(_msg) => self.NormalMessage(req).await,
-                SyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
-                }
-                Image(_) => {
+                ClientNormalMessage(_msg) => self.NormalMessage(req).await,
+                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+
+                ClientImage(_) => {
                     self.ImageMessage(req).await;
                 }
-                FileRequest(msg) => {
+                ClientFileUpload(_) => {
+                    self.recive_file(req.clone()).await;
+                }
+
+
+                ClientFileRequest(msg) => {
                     let (file_bytes, file_name) = &self.serve_file(msg.index).await;
-                    let output = serde_json::to_string(&FileServe {
+                    let output = serde_json::to_string(&ServerFileReply {
                         file_name: file_name.clone(),
                         bytes: file_bytes.clone(),
                     })
                     .unwrap_or_default();
                     return Ok(Response::new(MessageResponse { message: output }));
                 }
-                FileUpload(_) => {
-                    self.recive_file(req.clone()).await;
+                ClientImageRequest(request) => {
+                    let read_file = self.serve_image(request.index).await;
+                    let output = serde_json::to_string(&ServerImageReply {bytes: read_file, index: request.index}).unwrap_or_default();
+                    return Ok(Response::new(MessageResponse { message: output }));
                 }
+
             };
 
             return self.sync_message().await;
@@ -258,7 +266,7 @@ pub async fn server_main(
 }
 
 impl MessageService {
-    pub async fn NormalMessage(&self, req: Message) {
+    pub async fn NormalMessage(&self, req: ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
                 ok.push(ServerOutput::convert_msg_to_servermsg(req));
@@ -281,62 +289,7 @@ impl MessageService {
         let reply = MessageResponse { message: final_msg };
         Ok(Response::new(reply))
     }
-    pub async fn ImageMessage(&self, req: Message) {
-        if let Image(img) = &req.MessageType {
-            match env::var("APPDATA") {
-                Ok(app_data) => {
-
-                    let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
-                    
-                    match fs::File::create(format!(
-                        "{app_data}\\szeChat\\Server\\{}",
-                        self.image_paths.lock().unwrap().len()
-                    )) {
-                        Ok(mut created_file) => {
-                            if let Err(err) = created_file.write_all(&img.bytes) {
-                                println!("[{err}\n{}]", err.kind());
-                            };
-
-                            created_file.flush().unwrap();
-                            //success
-
-                            match self.messages.lock() {
-                                Ok(mut ok) => {
-                                    ok.push(ServerOutput::convert_picture_to_servermsg(
-                                        req.clone(),
-                                        self.image_paths.lock().unwrap().len() as i32,
-                                    ));
-                                }
-                                Err(err) => println!("{err}"),
-                            }
-
-                            //Only save as last step to avoid a mismatch + correct indexing :)
-                            match self.image_paths.lock() {
-                                Ok(mut ok) => {
-                                    ok.push(PathBuf::from(format!(
-                                        "{app_data}\\szeChat\\Server\\{}",
-                                        self.image_paths.lock().unwrap().len()
-                                    )));
-                                }
-                                Err(err) => {
-                                    println!("{err}")
-                                }
-                            };
-
-                        }
-                        Err(err) => {
-                            println!(" [{err} {}]", err.kind());
-                        }
-                    }
-                }
-                Err(err) => {
-                    println!("{err}")
-                }
-            }
-
-        }
-    }
-    pub async fn recive_file(&self, request: Message) {
+    pub async fn recive_file(&self, request: ClientMessage) {
         /*
 
         error -> 0 success
@@ -346,7 +299,7 @@ impl MessageService {
         */
         let mut error_code: i32 = 0;
 
-        if let FileUpload(req) = request.clone().MessageType {
+        if let ClientFileUpload(req) = request.clone().MessageType {
             //500mb limit
             if req.bytes.len() > 500000000 {
                 error_code = -1;
@@ -406,5 +359,63 @@ impl MessageService {
     pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
         let path = &self.file_paths.lock().unwrap()[index as usize];
         (fs::read(path).unwrap_or_default(), path.clone())
+    }
+    pub async fn serve_image(&self, index: i32) -> Vec<u8> {
+        fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
+    }
+    pub async fn ImageMessage(&self, req: ClientMessage) {
+        
+        if let ClientImage(img) = &req.MessageType {
+            
+            match env::var("APPDATA") {
+                Ok(app_data) => {
+
+                    let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
+
+                    let mut image_path = self.image_paths.lock().unwrap();
+
+                    let image_path_lenght = image_path.len();
+
+                    match fs::File::create(format!(
+                        "{app_data}\\szeChat\\Server\\{}",
+                        image_path_lenght
+                    )) {
+                        Ok(mut created_file) => {
+                            if let Err(err) = created_file.write_all(&img.bytes) {
+                                println!("[{err}\n{}]", err.kind());
+                            };
+
+                            created_file.flush().unwrap();
+                            //success
+
+                            match self.messages.try_lock() {
+                                Ok(mut ok) => {
+                                    ok.push(ServerOutput::convert_picture_to_servermsg(
+                                        req.clone(),
+                                        image_path_lenght as i32,
+                                    ));
+                                }
+                                Err(err) => println!("{err}"),
+                            }
+
+                            //Only save as last step to avoid a mismatch + correct indexing :)
+                            image_path.push(PathBuf::from(format!(
+                                "{app_data}\\szeChat\\Server\\{}",
+                                image_path_lenght
+                            )));
+
+                            
+                        }
+                        Err(err) => {
+                            println!(" [{err} {}]", err.kind());
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("{err}")
+                }
+            }
+
+        }
     }
 }

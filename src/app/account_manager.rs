@@ -13,7 +13,7 @@ use std::string::FromUtf8Error;
 
 use argon2::{self, Config, Variant, Version};
 
-use super::backend::FileServe;
+use super::backend::{ServerFileReply, ServerImageReply};
 
 pub fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<String> {
     let key: &[u8] = &[42; 32];
@@ -183,7 +183,7 @@ pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> anyhow::Resul
 
     Ok(())
 }
-pub fn write_file(file_response: FileServe) -> Result<()> {
+pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     let files = FileDialog::new()
         .set_title("Save to")
         .set_directory("/")
@@ -206,6 +206,16 @@ pub fn write_file(file_response: FileServe) -> Result<()> {
     if let Some(file) = files {
         fs::write(file, file_response.bytes)?;
     }
+
+    Ok(())
+}
+pub fn write_image(file_response: ServerImageReply) -> Result<()> {
+
+    let _ = fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
+
+    let path = format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), file_response.index);
+    
+    fs::write(path, file_response.bytes)?;
 
     Ok(())
 }

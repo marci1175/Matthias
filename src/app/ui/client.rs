@@ -20,10 +20,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONSTOP};
 
 use std::sync::mpsc;
 
-use crate::app::account_manager::write_file;
+use crate::app::account_manager::{write_file, write_image};
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    FileRequest, FileServe, Message, ServerMaster, ServerMessageType, TemplateApp,
+    ServerImageReply, ServerFileReply, ClientMessage, ServerMaster, ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 
@@ -38,7 +38,7 @@ impl TemplateApp {
         let rx = self.autosync_sender.get_or_insert_with(|| {
             let (tx, rx) = mpsc::channel::<String>();
 
-            let message = Message::construct_sync_msg(
+            let message = ClientMessage::construct_sync_msg(
                 self.send_on_ip.clone(),
                 self.client_password.clone(),
                 self.login_username.clone(),
@@ -48,7 +48,6 @@ impl TemplateApp {
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
                     tokio::time::sleep(Duration::from_secs_f32(2.)).await;
-                    println!("requested sync!");
                     match client::send_msg(message.clone()).await {
                         Ok(ok) => {
                             match tx.send(ok) {
@@ -131,6 +130,7 @@ impl TemplateApp {
                 self.drop_file_animation = false;
 
             }
+
             if self.how_on >= 0. {
                 let window_size = ui.input(|reader| {reader.screen_rect().max}).to_vec2();
                 let font_id = FontId {
@@ -284,7 +284,7 @@ impl TemplateApp {
                                             let sender = self.ftx.clone();
                                             let replying_to = self.replying_to.clone();
 
-                                            let message = Message::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
+                                            let message = ClientMessage::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
 
                                             tokio::spawn(async move {
                                                 match client::send_msg(message).await {
@@ -305,7 +305,49 @@ impl TemplateApp {
                                     }
                                     if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
-                                            ui.label(picture.index.to_string());
+                                            dbg!(picture.index);
+                                            match fs::read(format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), picture.index)){
+                                                Ok(image_bytes) => {
+
+                                                    //display picture from bytes
+                                                    ui.add(egui::widgets::Image::from_bytes("bytes://", image_bytes));
+                                                
+                                                },
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                    //check if we are visible
+                                                    if !ui.is_visible() {
+                                                        return;
+                                                    }
+
+                                                    //We dont have file on our local system so we have to ask the server to provide it
+                                                    let passw = self.client_password.clone();
+                                                    let author = self.login_username.clone();
+                                                    let send_on_ip = self.send_on_ip.clone();
+                                                    let sender = self.itx.clone();
+                                                    let replying_to = self.replying_to.clone();
+
+                                                    let message = ClientMessage::construct_image_request_msg(picture.index, passw, author, send_on_ip, replying_to);
+
+                                                    tokio::spawn(async move {
+                                                        match client::send_msg(message).await {
+                                                            Ok(ok) => {
+                                                                match sender.send(ok) {
+                                                                    Ok(_) => {}
+                                                                    Err(err) => {
+                                                                        println!("{}", err);
+                                                                    }
+                                                                };
+                                                            },
+                                                            Err(err) => {
+                                                                println!("{err} ln 264")
+                                                            }
+                                                        }
+                                                    });
+
+                                                },
+                                            };
+                                            
                                         });
                                     }
                                     ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -491,7 +533,7 @@ impl TemplateApp {
                                 let replying_to = self.replying_to.clone();
 
                                 tokio::spawn(async move {
-                                    match client::send_msg(Message::construct_normal_msg(
+                                    match client::send_msg(ClientMessage::construct_normal_msg(
                                         &temp_msg, temp_ip, passw, username, replying_to,
                                     ))
                                     .await
@@ -587,12 +629,20 @@ impl TemplateApp {
             };
             match self.frx.try_recv() {
                 Ok(msg) => {
-                    let file_serve: Result<FileServe, serde_json::Error> = serde_json::from_str(&msg);
+                    let file_serve: Result<ServerFileReply, serde_json::Error> = serde_json::from_str(&msg);
                     let _ = write_file(file_serve.unwrap());
                 },
                 Err(err) => {}
             }
             ui.allocate_space(vec2(ui.available_width(), 5.));
+
+            match self.irx.try_recv() {
+                Ok(msg) => {
+                    let file_serve: Result<ServerImageReply, serde_json::Error> = serde_json::from_str(&msg);
+                    let _ = write_image(file_serve.unwrap());
+                },
+                Err(err) => {},
+            }
         });
 
         let panel_height = match usr_panel {
@@ -628,20 +678,20 @@ impl TemplateApp {
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
 
-        let message = Message::construct_file_msg(file, ip, passw, author, replying_to);
+        let message = ClientMessage::construct_file_msg(file, ip, passw, author, replying_to);
 
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;
         });
     }
-
+    
     fn send_picture(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
 
-        let message = Message::construct_image_msg(file, ip, passw, author, replying_to);
+        let message = ClientMessage::construct_image_msg(file, ip, passw, author, replying_to);
 
         tokio::spawn(async move {
             let _ = client::send_msg(message).await;

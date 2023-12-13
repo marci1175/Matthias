@@ -1,12 +1,12 @@
 use messages::{message_client::MessageClient, MessageRequest};
 
-use super::backend::Message;
+use super::backend::ClientMessage;
 pub mod messages {
     tonic::include_proto!("messages");
 }
 
 //main is for sending
-pub async fn send_msg(message: Message) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn send_msg(message: ClientMessage) -> Result<String, Box<dyn std::error::Error>> {
     let mut client: MessageClient<tonic::transport::Channel> =
         MessageClient::connect(format!("http://{}", message.Destination)).await?;
 
