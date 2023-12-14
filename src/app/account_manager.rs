@@ -83,7 +83,7 @@ pub fn login(username: String, passw: String) -> Result<PathBuf> {
             .into(),
     );
 
-    ensure!(usr_check && pwd_check, "Could not log in");
+    ensure!(usr_check && pwd_check, "Invalid Password");
     Ok(path)
 }
 pub fn register(username: String, passw: String) -> Result<()> {
