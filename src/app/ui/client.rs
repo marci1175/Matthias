@@ -303,18 +303,21 @@ impl TemplateApp {
                                             });
                                         }
                                     }
+
                                     if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
-                                            dbg!(picture.index);
+
+                                            
+                                            
                                             match fs::read(format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), picture.index)){
                                                 Ok(image_bytes) => {
-
+                                                    
                                                     //display picture from bytes
-                                                    ui.add(egui::widgets::Image::from_bytes("bytes://", image_bytes));
+                                                    ui.add(egui::widgets::Image::from_bytes(format!("bytes://{}", picture.index), image_bytes));
                                                 
                                                 },
                                                 Err(err) => {
-                                                    dbg!(err);
+
                                                     //check if we are visible
                                                     if !ui.is_visible() {
                                                         return;
