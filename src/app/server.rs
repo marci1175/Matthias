@@ -65,9 +65,9 @@ impl ServerMessage for MessageService {
 
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
+                
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
-                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
-                }
+                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
 
                 ClientImage(_) => {
                     self.ImageMessage(req).await;
@@ -267,7 +267,6 @@ pub async fn server_main(
     let messages = &btc_service.messages.lock().unwrap().to_vec();
 
     Server::builder()
-        //.tls_config(ServerTlsConfig::new().client_ca_root(Certificate::from_pem(pem)))
         .add_service(MessageServer::new(btc_service))
         .serve(addr)
         .await?;

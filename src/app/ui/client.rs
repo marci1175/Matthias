@@ -181,44 +181,46 @@ impl TemplateApp {
                                         ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
                                     });
                                 }
-                                
+
                                 let mut test: Vec<Response> = Vec::new();
                                 let mut reply_to_got_to = (false, 0);
 
                                 for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
-
+                                    
                                     let mut i: &String = &Default::default();
 
                                     if let ServerMessageType::Normal(item) = &item.MessageType {
                                         i = &item.message;
                                     }
 
-                                    let fasz = ui.group(|ui|
+                                    let message_group = ui.group(|ui|
                                     {
-                                        if let Some(replied_to) = item.replying_to {
-                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
-                                                self.incoming_msg.struct_list[replied_to].Author,
-                                                match &self.incoming_msg.struct_list[replied_to].MessageType {
-                                                    ServerMessageType::Image(_img) => format!("Image"),
-                                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                                    ServerMessageType::Normal(msg) => {
-                                                        let mut message_clone = msg.message.clone();
-                                                        if message_clone.clone().len() > 20 {
-                                                            message_clone.truncate(20);
-                                                            message_clone.push_str(" ...");
+                                        ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                                            if let Some(replied_to) = item.replying_to {
+                                                if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
+                                                    self.incoming_msg.struct_list[replied_to].Author,
+                                                    match &self.incoming_msg.struct_list[replied_to].MessageType {
+                                                        ServerMessageType::Image(_img) => format!("Image"),
+                                                        ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                                        ServerMessageType::Normal(msg) => {
+                                                            let mut message_clone = msg.message.clone();
+                                                            if message_clone.clone().len() > 20 {
+                                                                message_clone.truncate(20);
+                                                                message_clone.push_str(" ...");
+                                                            }
+                                                            format!("{}", message_clone)
+                                                    },
+                                                })
+                                                ).size(self.font_size / 1.5))
+                                                    .frame(false))
+                                                        .clicked() {
+    
+                                                            //implement scrolling to message
+                                                            reply_to_got_to = (true, replied_to);
+                                                            
                                                         }
-                                                        format!("{}", message_clone)
-                                                },
-                                            })
-                                            ).size(self.font_size / 1.5))
-                                                .frame(false))
-                                                    .clicked() {
-
-                                                        //implement scrolling to message
-                                                        reply_to_got_to = (true, replied_to);
-                                                        
-                                                    }
-                                        }
+                                            }
+                                        });
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
                                             if (i.contains('[') && i.contains(']'))
                                             && (i.contains('(') && i.contains(')'))
@@ -369,7 +371,7 @@ impl TemplateApp {
                                     });
 
                                     //this functions for the reply autoscroll
-                                    test.push(fasz);
+                                    test.push(message_group);
                                     if reply_to_got_to.0 {
                                         test[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
                                     }
@@ -561,8 +563,7 @@ impl TemplateApp {
                                 });
                             }
 
-                            self.replying_to = None;
-                            self.usr_msg.clear();
+                            
                             
                             for file_path in self.files_to_send.clone() {
                                 match file_path.extension().unwrap().to_string_lossy().as_str() {
@@ -578,6 +579,8 @@ impl TemplateApp {
 
                             //clear vectors
                             self.files_to_send.clear();
+                            self.replying_to = None;
+                            self.usr_msg.clear();
                         }
                     });
                     ui.allocate_ui(vec2(50., 50.), |ui| {
@@ -686,6 +689,8 @@ impl TemplateApp {
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
 
+        
+
         let message = ClientMessage::construct_file_msg(file, ip, passw, author, replying_to);
 
         tokio::spawn(async move {
@@ -698,6 +703,8 @@ impl TemplateApp {
         let ip = self.send_on_ip.clone();
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
+
+        dbg!(replying_to);
 
         let message = ClientMessage::construct_image_msg(file, ip, passw, author, replying_to);
 
