@@ -15,6 +15,7 @@ use self::account_manager::{
     append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
 };
 
+use self::backend::ServerMaster;
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
@@ -130,6 +131,7 @@ impl eframe::App for backend::TemplateApp {
                     };
                     if compare_passwords != self.client_password || self.send_on_ip != compare_ip {
                         self.autosync_sender = None;
+                        self.incoming_msg = ServerMaster::default();
                     }
                 } else if self.server_mode {
                 }

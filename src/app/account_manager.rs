@@ -4,6 +4,8 @@ use aes_gcm::{
     Aes256Gcm, Key,
 };
 use anyhow::{ensure, Context, Result};
+use base64::Engine;
+use base64::engine::general_purpose;
 use rfd::FileDialog;
 use std::env;
 use std::fs;
@@ -209,12 +211,17 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
 
     Ok(())
 }
-pub fn write_image(file_response: ServerImageReply) -> Result<()> {
+pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
+    //first create the main folder
     let _ = fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
 
+    //secondly create the folder labeled with the specified server ip
+    let _ = fs::create_dir(format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(&ip)));
+
     let path = format!(
-        "{}\\szeChat\\Client\\{}",
+        "{}\\szeChat\\Client\\{}\\{}",
         env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip),
         file_response.index
     );
 

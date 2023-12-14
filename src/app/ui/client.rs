@@ -1,3 +1,4 @@
+use base64::Engine;
 use chrono::Utc;
 use device_query::Keycode;
 use egui::epaint::RectShape;
@@ -5,7 +6,7 @@ use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
     Response, RichText, Stroke, TextBuffer, Ui,
 };
-
+use base64::{engine::general_purpose};
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
@@ -53,12 +54,13 @@ impl TemplateApp {
                             match tx.send(ok) {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    println!("{}", err);
+                                    println!("{} ln 57", err);
+                                    break;
                                 }
                             };
                         }
                         Err(err) => {
-                            println!("ln 197 {:?}", err.source());
+                            //println!("ln 197 {:?}", err.source());
                             break;
                         }
                     };
@@ -78,7 +80,7 @@ impl TemplateApp {
                 }
             }
             Err(_err) => {
-                //println!("{}", _err)
+                println!("{}", _err)
             }
         }
 
@@ -313,9 +315,7 @@ impl TemplateApp {
                                         if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
 
-                                            
-                                            
-                                            match fs::read(format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), picture.index)){
+                                            match fs::read(format!("{}\\szeChat\\Client\\{}\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), picture.index)){
                                                 Ok(image_bytes) => {
                                                     
                                                     //display picture from bytes
@@ -552,7 +552,7 @@ impl TemplateApp {
                                             match tx.send(ok) {
                                                 Ok(_) => {}
                                                 Err(err) => {
-                                                    println!("{}", err);
+                                                    println!("{} ln 554", err);
                                                 }
                                             };
                                         }
@@ -650,7 +650,7 @@ impl TemplateApp {
             match self.irx.try_recv() {
                 Ok(msg) => {
                     let file_serve: Result<ServerImageReply, serde_json::Error> = serde_json::from_str(&msg);
-                    let _ = write_image(file_serve.unwrap());
+                    let _ = write_image(file_serve.unwrap(), self.send_on_ip.clone());
                 },
                 Err(err) => {},
             }
@@ -688,8 +688,6 @@ impl TemplateApp {
         let ip = self.send_on_ip.clone();
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
-
-        
 
         let message = ClientMessage::construct_file_msg(file, ip, passw, author, replying_to);
 
