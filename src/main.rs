@@ -6,8 +6,6 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
-
-
     use std::fs;
 
     use eframe::IconData;

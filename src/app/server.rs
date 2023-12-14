@@ -1,6 +1,7 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
 use std::sync::Mutex;
+use rand::Rng;
 use tonic::{transport::Server, Request, Response, Status};
 
 /*
@@ -24,8 +25,12 @@ use messages::{
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
-    ServerFileReply, ClientMessage, ServerImageReply,
-    ClientMessageType::{ClientFileRequest, ClientFileUpload, ClientImage, ClientNormalMessage, ClientSyncMessage, ClientImageRequest},
+    ClientMessage,
+    ClientMessageType::{
+        ClientFileRequest, ClientFileUpload, ClientImage, ClientImageRequest, ClientNormalMessage,
+        ClientSyncMessage,
+    },
+    ServerFileReply, ServerImageReply,
 };
 
 use super::backend::ServerOutput;
@@ -40,8 +45,11 @@ pub struct MessageService {
     pub passw: String,
 
     //files
-    pub file_paths: Mutex<Vec<PathBuf>>,
-
+    pub generated_file_paths: Mutex<Vec<PathBuf>>,
+    
+    //file_names
+    pub original_file_paths: Mutex<Vec<PathBuf>>,
+    
     //images
     pub image_paths: Mutex<Vec<PathBuf>>,
 }
@@ -58,7 +66,8 @@ impl ServerMessage for MessageService {
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
-                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
+                }
 
                 ClientImage(_) => {
                     self.ImageMessage(req).await;
@@ -66,7 +75,6 @@ impl ServerMessage for MessageService {
                 ClientFileUpload(_) => {
                     self.recive_file(req.clone()).await;
                 }
-
 
                 ClientFileRequest(msg) => {
                     let (file_bytes, file_name) = &self.serve_file(msg.index).await;
@@ -79,10 +87,13 @@ impl ServerMessage for MessageService {
                 }
                 ClientImageRequest(request) => {
                     let read_file = self.serve_image(request.index).await;
-                    let output = serde_json::to_string(&ServerImageReply {bytes: read_file, index: request.index}).unwrap_or_default();
+                    let output = serde_json::to_string(&ServerImageReply {
+                        bytes: read_file,
+                        index: request.index,
+                    })
+                    .unwrap_or_default();
                     return Ok(Response::new(MessageResponse { message: output }));
                 }
-
             };
 
             return self.sync_message().await;
@@ -308,9 +319,13 @@ impl MessageService {
                     Ok(app_data) => {
                         let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
 
+                        //generat a random number to avoid file overwrites, cuz of same name files
+                        let random_generated_number = rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
+
+                        //create file, add file to its named so it can never be mixed with images
                         match fs::File::create(format!(
-                            "{app_data}\\szeChat\\Server\\{}.{}",
-                            req.name, req.extension
+                            "{app_data}\\szeChat\\Server\\{}file.{}",
+                            random_generated_number, req.extension
                         )) {
                             Ok(mut created_file) => {
                                 if let Err(err) = created_file.write_all(&req.bytes) {
@@ -320,7 +335,19 @@ impl MessageService {
                                 created_file.flush().unwrap();
                                 //success
 
-                                match self.file_paths.lock() {
+                                match self.generated_file_paths.lock() {
+                                    Ok(mut ok) => {
+                                        ok.push(PathBuf::from(format!(
+                                            "{app_data}\\szeChat\\Server\\{}file.{}",
+                                            random_generated_number, req.extension
+                                        )));
+                                    }
+                                    Err(err) => {
+                                        println!("{err}")
+                                    }
+                                };
+
+                                match self.original_file_paths.lock() {
                                     Ok(mut ok) => {
                                         ok.push(PathBuf::from(format!(
                                             "{app_data}\\szeChat\\Server\\{}.{}",
@@ -331,11 +358,12 @@ impl MessageService {
                                         println!("{err}")
                                     }
                                 };
+
                                 match self.messages.lock() {
                                     Ok(mut ok) => {
                                         ok.push(ServerOutput::convert_upload_to_servermsg(
                                             request,
-                                            self.file_paths.lock().unwrap().len() as i32 - 1,
+                                            self.original_file_paths.lock().unwrap().len() as i32 - 1,
                                         ));
                                     }
                                     Err(err) => println!("{err}"),
@@ -357,19 +385,16 @@ impl MessageService {
         dbg!(error_code);
     }
     pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
-        let path = &self.file_paths.lock().unwrap()[index as usize];
+        let path = &self.generated_file_paths.lock().unwrap()[index as usize];
         (fs::read(path).unwrap_or_default(), path.clone())
     }
     pub async fn serve_image(&self, index: i32) -> Vec<u8> {
         fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
     }
     pub async fn ImageMessage(&self, req: ClientMessage) {
-        
         if let ClientImage(img) = &req.MessageType {
-            
             match env::var("APPDATA") {
                 Ok(app_data) => {
-
                     let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
 
                     let mut image_path = self.image_paths.lock().unwrap();
@@ -403,8 +428,6 @@ impl MessageService {
                                 "{app_data}\\szeChat\\Server\\{}",
                                 image_path_lenght
                             )));
-
-                            
                         }
                         Err(err) => {
                             println!(" [{err} {}]", err.kind());
@@ -415,7 +438,6 @@ impl MessageService {
                     println!("{err}")
                 }
             }
-
         }
     }
 }

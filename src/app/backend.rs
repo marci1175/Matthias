@@ -284,12 +284,11 @@ pub struct ClientMessage {
 }
 
 impl ClientMessage {
-    
     //struct into string, it makes sending information easier by putting it all in a string
     pub fn struct_into_string(&self) -> String {
         return serde_json::to_string(self).unwrap_or_default();
     }
-    
+
     //this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
@@ -309,7 +308,7 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-    
+
     //this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_name: PathBuf,
@@ -340,7 +339,7 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-    
+
     //this is used for constructing a sync msg aka sending an empty packet, so server can reply
     pub fn construct_sync_msg(
         ip: String,
@@ -357,7 +356,7 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-    
+
     //this is used for asking for a file
     pub fn construct_file_request_msg(
         index: i32,
@@ -375,7 +374,7 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-    
+
     //this is used for asking for an image
     pub fn construct_image_request_msg(
         index: i32,
@@ -393,7 +392,7 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-    
+
     //this is used for SENDING IMAGES SO THE SERVER CAN DECIDE IF ITS A PICTURE
     pub fn construct_image_msg(
         file_path: PathBuf,
@@ -414,7 +413,6 @@ impl ClientMessage {
             Destination: ip,
         }
     }
-
 }
 
 /*
@@ -434,14 +432,12 @@ impl ClientMessage {
 
 */
 
-
 //This is what the server sends back (pushes to message vector), when reciving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerFileUpload {
     pub file_name: String,
     pub index: i32,
 }
-
 
 //This is what the server sends back, when asked for a file (FIleRequest)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -450,13 +446,11 @@ pub struct ServerFileReply {
     pub file_name: PathBuf,
 }
 
-
 //This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerImageUpload {
     pub index: i32,
 }
-
 
 //When client asks for the image based on the provided index, reply with the image bytes
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -465,15 +459,11 @@ pub struct ServerImageReply {
     pub index: i32,
 }
 
-
-
-
 //This is what the server sends back (pushes to message vector), when reciving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerNormalMessage {
     pub message: String,
 }
-
 
 //This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -484,7 +474,6 @@ pub enum ServerMessageType {
     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
     Image(ServerImageUpload),
 }
-
 
 //This is one whole server msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -557,7 +546,6 @@ impl ServerOutput {
     }
 }
 
-
 //Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
@@ -582,4 +570,3 @@ impl ServerMaster {
         };
     }
 }
-

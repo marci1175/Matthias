@@ -23,7 +23,7 @@ use std::sync::mpsc;
 use crate::app::account_manager::{write_file, write_image};
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    ServerImageReply, ServerFileReply, ClientMessage, ServerMaster, ServerMessageType, TemplateApp,
+    ClientMessage, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 
@@ -181,14 +181,18 @@ impl TemplateApp {
                                         ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
                                     });
                                 }
+                                
                                 let mut test: Vec<Response> = Vec::new();
                                 let mut reply_to_got_to = (false, 0);
 
                                 for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
+
                                     let mut i: &String = &Default::default();
+
                                     if let ServerMessageType::Normal(item) = &item.MessageType {
                                         i = &item.message;
                                     }
+
                                     let fasz = ui.group(|ui|
                                     {
                                         if let Some(replied_to) = item.replying_to {
@@ -275,36 +279,36 @@ impl TemplateApp {
                                         } else {
                                             ui.label(RichText::from(i).size(self.font_size));
                                         }
-                                    if let ServerMessageType::Upload(file) = &item.MessageType {
-                                        if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
-                                            //let rx = self.autosync_sender.get_or_insert_with(|| {
-                                            let passw = self.client_password.clone();
-                                            let author = self.login_username.clone();
-                                            let send_on_ip = self.send_on_ip.clone();
-                                            let sender = self.ftx.clone();
-                                            let replying_to = self.replying_to.clone();
+                                        if let ServerMessageType::Upload(file) = &item.MessageType {
+                                            if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
+                                                //let rx = self.autosync_sender.get_or_insert_with(|| {
+                                                let passw = self.client_password.clone();
+                                                let author = self.login_username.clone();
+                                                let send_on_ip = self.send_on_ip.clone();
+                                                let sender = self.ftx.clone();
+                                                let replying_to = self.replying_to.clone();
 
-                                            let message = ClientMessage::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
+                                                let message = ClientMessage::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
 
-                                            tokio::spawn(async move {
-                                                match client::send_msg(message).await {
-                                                    Ok(ok) => {
-                                                        match sender.send(ok) {
-                                                            Ok(_) => {}
-                                                            Err(err) => {
-                                                                println!("{}", err);
-                                                            }
-                                                        };
-                                                    },
-                                                    Err(err) => {
-                                                        println!("{err} ln 264")
+                                                tokio::spawn(async move {
+                                                    match client::send_msg(message).await {
+                                                        Ok(ok) => {
+                                                            match sender.send(ok) {
+                                                                Ok(_) => {}
+                                                                Err(err) => {
+                                                                    println!("{}", err);
+                                                                }
+                                                            };
+                                                        },
+                                                        Err(err) => {
+                                                            println!("{err} ln 264")
+                                                        }
                                                     }
-                                                }
-                                            });
+                                                });
+                                            }
                                         }
-                                    }
 
-                                    if let ServerMessageType::Image(picture) = &item.MessageType {
+                                        if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
 
                                             
@@ -353,21 +357,22 @@ impl TemplateApp {
                                             
                                         });
                                     }
-                                    ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-                                }
-                                ).response.context_menu(|ui|{
-                                    if ui.button("Reply").clicked() {
-                                        self.replying_to = Some(index);
+                                        ui.label(RichText::from(format!("{}", item.MessageDate)).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                     }
-                                    if ui.button("Copy text").clicked() {
-                                        ctx.copy_text(i.clone());
-                                    };
-                                });
+                                    ).response.context_menu(|ui|{
+                                        if ui.button("Reply").clicked() {
+                                            self.replying_to = Some(index);
+                                        }
+                                        if ui.button("Copy text").clicked() {
+                                            ctx.copy_text(i.clone());
+                                        };
+                                    });
 
-                                test.push(fasz);
-                                if reply_to_got_to.0 {
-                                    test[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
-                                }
+                                    //this functions for the reply autoscroll
+                                    test.push(fasz);
+                                    if reply_to_got_to.0 {
+                                        test[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
+                                    }
                                 };
                             });
                             
@@ -687,7 +692,7 @@ impl TemplateApp {
             let _ = client::send_msg(message).await;
         });
     }
-    
+
     fn send_picture(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();

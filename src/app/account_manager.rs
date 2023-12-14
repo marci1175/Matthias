@@ -210,11 +210,14 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     Ok(())
 }
 pub fn write_image(file_response: ServerImageReply) -> Result<()> {
-
     let _ = fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
 
-    let path = format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), file_response.index);
-    
+    let path = format!(
+        "{}\\szeChat\\Client\\{}",
+        env!("APPDATA"),
+        file_response.index
+    );
+
     fs::write(path, file_response.bytes)?;
 
     Ok(())
