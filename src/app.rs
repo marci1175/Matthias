@@ -64,7 +64,7 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-        TODO: IMPLEMENT REPLYING
+        TODO: MAKE MESSAGE WIDGET BETTER
 
         */
 

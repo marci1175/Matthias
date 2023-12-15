@@ -76,6 +76,8 @@ pub struct TemplateApp {
 
     //client main
     #[serde(skip)]
+    pub multiline_mode: bool,
+    #[serde(skip)]
     pub files_to_send: Vec<PathBuf>,
     pub usr_msg_expanded: bool,
     pub send_on_ip: String,
@@ -172,6 +174,7 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            multiline_mode: false,
             files_to_send: Vec::new(),
             how_on: 0.0,
             drop_file_animation: false,

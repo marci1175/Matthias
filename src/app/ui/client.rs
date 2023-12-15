@@ -492,7 +492,11 @@ impl TemplateApp {
                                     egui::Layout::top_down_justified(Align::Center),
                                     |ui| {
                                         ui.add_sized(
-                                            ui.available_size(),
+                                            match self.multiline_mode {
+                                                false => { vec2(ui.available_width(), self.font_size) }
+                                                true => { ui.available_size() }
+                                            },
+                                            
                                             egui::TextEdit::multiline(&mut self.usr_msg)
                                                 .hint_text(
                                                     RichText::from(format!(
