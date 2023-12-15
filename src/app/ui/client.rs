@@ -1,23 +1,16 @@
 use base64::Engine;
-use chrono::Utc;
+use base64::engine::general_purpose;
 use device_query::Keycode;
-use egui::epaint::RectShape;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
-    Response, RichText, Stroke, TextBuffer, Ui,
+    Response, RichText, Stroke, TextBuffer,
 };
-use base64::{engine::general_purpose};
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
-use std::f32::consts::E;
-use std::ffi::OsStr;
 use std::fs::{self};
-use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONSTOP};
 
 use std::sync::mpsc;
 
@@ -43,7 +36,6 @@ impl TemplateApp {
                 self.send_on_ip.clone(),
                 self.client_password.clone(),
                 self.login_username.clone(),
-                None,
             );
 
             tokio::spawn(async move {
@@ -59,7 +51,7 @@ impl TemplateApp {
                                 }
                             };
                         }
-                        Err(err) => {
+                        Err(_err) => {
                             //println!("ln 197 {:?}", err.source());
                             break;
                         }
@@ -290,9 +282,8 @@ impl TemplateApp {
                                                 let author = self.login_username.clone();
                                                 let send_on_ip = self.send_on_ip.clone();
                                                 let sender = self.ftx.clone();
-                                                let replying_to = self.replying_to.clone();
 
-                                                let message = ClientMessage::construct_file_request_msg(file.index, passw, author, send_on_ip, replying_to);
+                                                let message = ClientMessage::construct_file_request_msg(file.index, passw, author, send_on_ip);
 
                                                 tokio::spawn(async move {
                                                     match client::send_msg(message).await {
@@ -322,7 +313,7 @@ impl TemplateApp {
                                                     ui.add(egui::widgets::Image::from_bytes(format!("bytes://{}", picture.index), image_bytes));
                                                 
                                                 },
-                                                Err(err) => {
+                                                Err(_err) => {
 
                                                     //check if we are visible
                                                     if !ui.is_visible() {
@@ -334,9 +325,9 @@ impl TemplateApp {
                                                     let author = self.login_username.clone();
                                                     let send_on_ip = self.send_on_ip.clone();
                                                     let sender = self.itx.clone();
-                                                    let replying_to = self.replying_to.clone();
+                                                    
 
-                                                    let message = ClientMessage::construct_image_request_msg(picture.index, passw, author, send_on_ip, replying_to);
+                                                    let message = ClientMessage::construct_image_request_msg(picture.index, passw, author, send_on_ip);
 
                                                     tokio::spawn(async move {
                                                         match client::send_msg(message).await {
@@ -643,7 +634,7 @@ impl TemplateApp {
                     let file_serve: Result<ServerFileReply, serde_json::Error> = serde_json::from_str(&msg);
                     let _ = write_file(file_serve.unwrap());
                 },
-                Err(err) => {}
+                Err(_err) => {}
             }
             ui.allocate_space(vec2(ui.available_width(), 5.));
 
@@ -652,7 +643,7 @@ impl TemplateApp {
                     let file_serve: Result<ServerImageReply, serde_json::Error> = serde_json::from_str(&msg);
                     let _ = write_image(file_serve.unwrap(), self.send_on_ip.clone());
                 },
-                Err(err) => {},
+                Err(_err) => {},
             }
         });
 

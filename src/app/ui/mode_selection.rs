@@ -1,7 +1,7 @@
 use crate::app::backend::TemplateApp;
 
 use eframe::Frame;
-use egui::{vec2, Align, ImageButton, Layout, RichText};
+use egui::{vec2, Align, Layout, RichText};
 
 use std::sync::atomic::Ordering;
 
@@ -24,11 +24,6 @@ impl TemplateApp {
                     if ui.button("Logout").clicked() {
                         self.mode_selector = false;
                     }
-                    /*if ui.add(
-                        ImageButton::new(egui::include_image!("../../../icons/logout.png"))
-                    ).clicked() {
-                        self.mode_selector = false;
-                    } */
                 });
             });
 

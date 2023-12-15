@@ -345,10 +345,9 @@ impl ClientMessage {
         ip: String,
         password: String,
         author: String,
-        replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {}),
             Password: password,
             Author: author,
@@ -363,10 +362,9 @@ impl ClientMessage {
         password: String,
         author: String,
         ip: String,
-        replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to: None,
             MessageType: ClientMessageType::ClientFileRequest(ClientFileRequest { index: index }),
             Password: password,
             Author: author,
@@ -381,10 +379,9 @@ impl ClientMessage {
         password: String,
         author: String,
         ip: String,
-        replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to: None,
             MessageType: ClientMessageType::ClientImageRequest(ClientImageRequest { index: index }),
             Password: password,
             Author: author,
