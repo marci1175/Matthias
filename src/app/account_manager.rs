@@ -42,7 +42,6 @@ pub fn decrypt_aes256(string_to_be_decrypted: String) -> Result<String, FromUtf8
     let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
     String::from_utf8(plaintext)
 
-    //i was too lazy to err-match evrything so dont mind me do this, if this fn returns None it has an error, but dw it will eprint it wut
 }
 pub fn pass_encrypt(string_to_be_encrypted: String) -> String {
     let password = string_to_be_encrypted.as_bytes();
@@ -158,7 +157,7 @@ pub fn read_from_file(path: PathBuf) -> Result<Vec<String>> {
 
     Ok(file)
 }
-pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> anyhow::Result<()> {
+pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> Result<()> {
     //copy everything from orignal convert to vec representing lines delete line rewrite file
     let mut file = std::fs::OpenOptions::new().read(true).open(path.clone())?;
 
