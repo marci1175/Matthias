@@ -1,7 +1,7 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
-use std::sync::Mutex;
 use rand::Rng;
+use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 
 /*
@@ -46,10 +46,10 @@ pub struct MessageService {
 
     //files
     pub generated_file_paths: Mutex<Vec<PathBuf>>,
-    
+
     //file_names
     pub original_file_paths: Mutex<Vec<PathBuf>>,
-    
+
     //images
     pub image_paths: Mutex<Vec<PathBuf>>,
 }
@@ -65,9 +65,9 @@ impl ServerMessage for MessageService {
 
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
-                
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
-                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
+                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
+                }
 
                 ClientImage(_) => {
                     self.ImageMessage(req).await;
@@ -319,7 +319,8 @@ impl MessageService {
                         let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
 
                         //generat a random number to avoid file overwrites, cuz of same name files
-                        let random_generated_number = rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
+                        let random_generated_number =
+                            rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
 
                         //create file, add file to its named so it can never be mixed with images
                         match fs::File::create(format!(
@@ -362,7 +363,8 @@ impl MessageService {
                                     Ok(mut ok) => {
                                         ok.push(ServerOutput::convert_upload_to_servermsg(
                                             request,
-                                            self.original_file_paths.lock().unwrap().len() as i32 - 1,
+                                            self.original_file_paths.lock().unwrap().len() as i32
+                                                - 1,
                                         ));
                                     }
                                     Err(err) => println!("{err}"),

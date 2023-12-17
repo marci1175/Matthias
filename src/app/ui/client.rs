@@ -1,18 +1,19 @@
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use device_query::Keycode;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Id, ImageButton, Layout, Pos2,
-    Response, RichText, Stroke, TextBuffer,
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, FontSelection, Id, ImageButton,
+    Layout, Pos2, Response, RichText, Rounding, Stroke, TextBuffer,
 };
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
+use std::f32::consts::E;
 use std::fs::{self};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use crate::app::account_manager::{write_file, write_image};
 //use crate::app::account_manager::write_file;
@@ -28,6 +29,16 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: Vec<Keycode>,
     ) {
+        //set multiline mode
+        if self.usr_msg.trim().lines().count() > 1
+        || /*try to detect a new line caused by char lenght */
+            (self.usr_msg.len() as f32 * (self.font_size / 2.)) > _frame.info().window_info.size[0] / 1.4
+        {
+            self.multiline_mode = true;
+        } else {
+            self.multiline_mode = false;
+        }
+
         let should_be_running = self.autosync_should_run.clone();
         let rx = self.autosync_sender.get_or_insert_with(|| {
             let (tx, rx) = mpsc::channel::<String>();
@@ -378,304 +389,298 @@ impl TemplateApp {
         });
 
         //usr_input
-        let usr_panel = egui::TopBottomPanel::bottom("usr_input").show_animated(ctx, self.usr_msg_expanded, |ui| {
-            ui.allocate_space(vec2(ui.available_width(), 5.));
-            if !self.files_to_send.is_empty() {
-                egui::ScrollArea::horizontal()
-                    .id_source("file_to_send")
-                    .stick_to_right(true)
-                    .show(ui, |ui|{
-                        ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-                            for (index, item) in self.files_to_send.clone().iter().enumerate() {
-                                ui.group(|ui| {
-                                    ui.allocate_ui(vec2(200., 100.), |ui| {
-                                        ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
-                                            ui.with_layout(Layout::top_down(Align::Center), |ui| {
+        let usr_panel = egui::TopBottomPanel::bottom("usr_input")
+            .max_height(_frame.info().window_info.size[1] / 2.)
+            .show_animated(ctx, self.usr_msg_expanded, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 5.));
+                
+                let frame_rect = ui.max_rect().shrink(5.0);
+                let code_rect = frame_rect.shrink(10.);
 
-                                                //file icon
-                                                ui.allocate_ui(vec2(75., 75.), |ui|{
-                                                    match item.extension().unwrap().to_string_lossy().to_ascii_lowercase().as_str() {
-                                                        //file extenisons
-                                                        "exe" | "msi" | "cmd" | "com" | "inf" | "bat" | "ipa" | "osx" | "pif" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/exe_icon.png")));
-                                                        }
-                                                        "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "z" | "tgz" | "tbz2" | "txz" | "sit" | "tar.gz" | "tar.bz2" | "tar.xz" | "zipp" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
-                                                        }
-                                                        "jpeg" | "jpg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "svg" | "ico" | "raw" | "heif" | "pdf" | "eps" | "ai" | "psd" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/picture_icon.png")));
-                                                        }
-                                                        "wav" | "mp3" | "ogg" | "flac" | "aac" | "midi" | "wma" | "aiff" | "ape" | "alac" | "amr" | "caf" | "au" | "ra" | "m4a" | "ac3" | "dts" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/sound_icon.png")));
-                                                        }
-                                                        "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/video_icon.png")));
-                                                        }
+                ui.painter().rect(
+                    frame_rect,
+                    Rounding::same(5.0),
+                    Color32::BLACK,
+                    Stroke::NONE,
+                );
 
-                                                        // :)
-                                                        "rs" => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/rust_lang_icon.png")));
-                                                        }
+                let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
-                                                        _ => {
-                                                            ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/general_icon.png")));
+                let text_widget = egui::TextEdit::multiline(&mut self.usr_msg)
+                    .font(FontId { size : self.font_size, family: FontFamily::default()})
+                    .desired_width(ui.available_width())
+                    .desired_rows(0)
+                    .frame(false);
+
+                let msg_scroll = egui::ScrollArea::vertical()
+                    .id_source("usr_input")
+                    .stick_to_bottom(true)
+                    .auto_shrink([false, true])
+                    .min_scrolled_height(self.font_size * 2.)
+                    .show(&mut frame_ui, |ui| {
+                        ui.add(text_widget)
+                    });
+
+                ui.allocate_space(
+                    vec2(
+                        ui.available_width(),
+                        msg_scroll.inner.rect.height() + 15.,
+                    )
+                );
+
+                if !self.files_to_send.is_empty() {
+                    egui::ScrollArea::horizontal()
+                        .id_source("file_to_send")
+                        .stick_to_right(true)
+                        .show(ui, |ui|{
+                            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
+                                for (index, item) in self.files_to_send.clone().iter().enumerate() {
+                                    ui.group(|ui| {
+                                        ui.allocate_ui(vec2(200., 100.), |ui| {
+                                            ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
+                                                ui.with_layout(Layout::top_down(Align::Center), |ui| {
+
+                                                    //file icon
+                                                    ui.allocate_ui(vec2(75., 75.), |ui|{
+                                                        match item.extension().unwrap().to_string_lossy().to_ascii_lowercase().as_str() {
+                                                            //file extenisons
+                                                            "exe" | "msi" | "cmd" | "com" | "inf" | "bat" | "ipa" | "osx" | "pif" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/exe_icon.png")));
+                                                            }
+                                                            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "z" | "tgz" | "tbz2" | "txz" | "sit" | "tar.gz" | "tar.bz2" | "tar.xz" | "zipp" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/zip_icon.png")));
+                                                            }
+                                                            "jpeg" | "jpg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "svg" | "ico" | "raw" | "heif" | "pdf" | "eps" | "ai" | "psd" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/picture_icon.png")));
+                                                            }
+                                                            "wav" | "mp3" | "ogg" | "flac" | "aac" | "midi" | "wma" | "aiff" | "ape" | "alac" | "amr" | "caf" | "au" | "ra" | "m4a" | "ac3" | "dts" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/sound_icon.png")));
+                                                            }
+                                                            "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/video_icon.png")));
+                                                            }
+
+                                                            // :)
+                                                            "rs" => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/rust_lang_icon.png")));
+                                                            }
+
+                                                            _ => {
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../icons/file_types/general_icon.png")));
+                                                            }
                                                         }
-                                                    }
+                                                    });
+
+                                                    //selected file widget part
+                                                    ui.label(
+                                                        RichText::from(
+                                                            item.file_name()
+                                                                .unwrap_or_default()
+                                                                .to_string_lossy(),
+                                                        )
+                                                        .size(self.font_size),
+                                                    );
                                                 });
+                                                ui.separator();
 
-                                                //selected file widget part
-                                                ui.label(
-                                                    RichText::from(
-                                                        item.file_name()
-                                                            .unwrap_or_default()
-                                                            .to_string_lossy(),
-                                                    )
-                                                    .size(self.font_size),
-                                                );
-                                            });
-                                            ui.separator();
-
-                                            //bin icon
-                                            ui.allocate_ui(vec2(30., 30.), |ui|{
-                                                if ui.add(
-                                                    ImageButton::new(
-                                                        egui::include_image!("../../../icons/bin.png")
-                                                    )
-                                                ).clicked() {
-                                                    self.files_to_send.remove(index);
-                                                };
+                                                //bin icon
+                                                ui.allocate_ui(vec2(30., 30.), |ui|{
+                                                    if ui.add(
+                                                        ImageButton::new(
+                                                            egui::include_image!("../../../icons/bin.png")
+                                                        )
+                                                    ).clicked() {
+                                                        self.files_to_send.remove(index);
+                                                    };
+                                                });
                                             });
                                         });
                                     });
+                                }
+                            });
+                        });
+                    ui.separator();
+                }
+                if let Some(replying_to) = self.replying_to.clone() {
+                    ui.horizontal(|ui| {
+                        ui.group(|ui|{
+                            ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                                //place them in one line
+                                ui.horizontal(|ui| {
+                                    ui.label(RichText::from("Replying to:").size(self.font_size).weak());
+                                    ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
+
+                                        ServerMessageType::Image(_img) => format!("Image"),
+                                        ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+
+                                        ServerMessageType::Normal(msg) => msg.message.clone(),
+
+                                    }).size(self.font_size).strong());
                                 });
-                            }
-                        });
-                    });
-                ui.separator();
-            }
-            if let Some(replying_to) = self.replying_to.clone() {
-                ui.horizontal(|ui| {
-                    ui.group(|ui|{
-                        ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                            //place them in one line
-                            ui.horizontal(|ui| {
-                                ui.label(RichText::from("Replying to:").size(self.font_size).weak());
-                                ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
-
-                                    ServerMessageType::Image(_img) => format!("Image"),
-                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-
-                                    ServerMessageType::Normal(msg) => msg.message.clone(),
-
-                                }).size(self.font_size).strong());
                             });
                         });
+                        if ui.button(RichText::from("X").size(self.font_size * 1.5).color(Color32::RED)).clicked() {
+                            self.replying_to = None;
+                        };
                     });
-                    if ui.button(RichText::from("X").size(self.font_size * 1.5).color(Color32::RED)).clicked() {
-                        self.replying_to = None;
-                    };
-                });
-                ui.allocate_space(vec2(ui.available_width(), 10.));
-            }
-            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-                ui.allocate_ui(
-                    vec2(
-                        ui.available_width() - 100.,
-                        _frame.info().window_info.size[1] / 5.,
-                    ),
-                    |ui| {
-                        egui::ScrollArea::vertical()
-                            .id_source("usr_input")
-                            .stick_to_bottom(true)
-                            .show(ui, |ui| {
-                                ui.with_layout(
-                                    egui::Layout::top_down_justified(Align::Center),
-                                    |ui| {
-                                        ui.add_sized(
-                                            match self.multiline_mode {
-                                                false => { vec2(ui.available_width(), self.font_size) }
-                                                true => { ui.available_size() }
-                                            },
-                                            
-                                            egui::TextEdit::multiline(&mut self.usr_msg)
-                                                .hint_text(
-                                                    RichText::from(format!(
-                                                        "Message : {}",
-                                                        self.send_on_ip
-                                                    ))
-                                                    .size(self.font_size),
-                                                )
-                                                .font(FontId::new(
-                                                    self.font_size,
-                                                    FontFamily::default(),
-                                                )),
-                                        );
-                                    },
-                                );
-                            });
-                    },
-                );
-
-                ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                    ui.allocate_ui(vec2(50., 50.), |ui| {
-                        if ui
-                            .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../../../icons/send_msg.png"
-                            )))
-                            .clicked()
-                            || input_keys.contains(&Keycode::Enter) && !(input_keys.contains(&Keycode::LShift) || input_keys.contains(&Keycode::RShift))
-                        {
-                            if !(self.usr_msg.trim().is_empty() || self.usr_msg.trim_end_matches('\n').is_empty()) {
-                                let temp_msg = self.usr_msg.clone();
-                                let tx = self.tx.clone();
-                                let username = self.login_username.clone();
-                                //disable pass if its not ticked
-                                let passw = match self.req_passw {
-                                    true => self.client_password.clone(),
-                                    false => "".into(),
-                                };
-                                let temp_ip = self.send_on_ip.clone();
-                                let replying_to = self.replying_to.clone();
-
-                                tokio::spawn(async move {
-                                    match client::send_msg(ClientMessage::construct_normal_msg(
-                                        &temp_msg, temp_ip, passw, username, replying_to,
-                                    ))
-                                    .await
-                                    {
-                                        Ok(ok) => {
-                                            match tx.send(ok) {
-                                                Ok(_) => {}
-                                                Err(err) => {
-                                                    println!("{} ln 554", err);
-                                                }
-                                            };
-                                        }
-                                        Err(err) => {
-                                            println!("ln 321 {:?}", err.source());
-                                        }
+                    ui.allocate_space(vec2(ui.available_width(), 10.));
+                }
+                
+            
+                Area::new("msg_action_tray")
+                    .anchor(Align2::RIGHT_BOTTOM, vec2(-30., -msg_scroll.content_size.y / 2. - 2.))
+                    .show(ctx, |ui|{
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
+                            if ui
+                                .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                    "../../../icons/send_msg.png"
+                                )))
+                                .clicked()
+                                || input_keys.contains(&Keycode::Enter) && !(input_keys.contains(&Keycode::LShift) || input_keys.contains(&Keycode::RShift))
+                            {
+                                if !(self.usr_msg.trim().is_empty() || self.usr_msg.trim_end_matches('\n').is_empty()) {
+                                    let temp_msg = self.usr_msg.clone();
+                                    let tx = self.tx.clone();
+                                    let username = self.login_username.clone();
+                                    //disable pass if its not ticked
+                                    let passw = match self.req_passw {
+                                        true => self.client_password.clone(),
+                                        false => "".into(),
                                     };
-                                });
-                            }
-
-                            
-                            
-                            for file_path in self.files_to_send.clone() {
-                                match file_path.extension().unwrap().to_string_lossy().as_str() {
-                                    "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
-                                        self.send_picture(file_path);
-                                    }
-                                    
-                                    _ => {
-                                        self.send_file(file_path);
+                                    let temp_ip = self.send_on_ip.clone();
+                                    let replying_to = self.replying_to.clone();
+                                    tokio::spawn(async move {
+                                        match client::send_msg(ClientMessage::construct_normal_msg(
+                                            &temp_msg, temp_ip, passw, username, replying_to,
+                                        ))
+                                        .await
+                                        {
+                                            Ok(ok) => {
+                                                match tx.send(ok) {
+                                                    Ok(_) => {}
+                                                    Err(err) => {
+                                                        println!("{} ln 554", err);
+                                                    }
+                                                };
+                                            }
+                                            Err(err) => {
+                                                println!("ln 321 {:?}", err.source());
+                                            }
+                                        };
+                                    });
+                                }                          
+                                for file_path in self.files_to_send.clone() {
+                                    match file_path.extension().unwrap().to_string_lossy().as_str() {
+                                        "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
+                                            self.send_picture(file_path);
+                                        }
+                                        _ => {
+                                            self.send_file(file_path);
+                                        }
                                     }
                                 }
+                                //clear vectors
+                                self.files_to_send.clear();
+                                self.replying_to = None;
+                                self.usr_msg.clear();
                             }
-
-                            //clear vectors
-                            self.files_to_send.clear();
-                            self.replying_to = None;
-                            self.usr_msg.clear();
-                        }
+                        });
+                        ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
+                            if ui
+                                .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                    "../../../icons/add_file.png"
+                                )))
+                                .on_hover_text("Send files")
+                                .clicked()
+                            {
+                                let files = FileDialog::new()
+                                    .set_title("Pick a file")
+                                    .set_directory("/")
+                                    .pick_file();
+                                if let Some(file) = files {
+                                    //send file
+                                    self.files_to_send.push(file);
+                                }
+                            }
+                        });
+                        ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
+                            let button =
+                                ui.add(Button::new(RichText::from(&self.random_emoji).size(self.font_size * 1.2)));
+                            if button.clicked() {
+                                self.emoji_mode = !self.emoji_mode;
+                            };
+                            if button.hovered() {
+                                if !self.random_generated {
+                                    let random_number =
+                                        self.rand_eng.gen_range(0..=self.emoji.len() - 1);
+                                    self.random_emoji = self.emoji[random_number].clone();
+                                    self.random_generated = true;
+                                }
+                            } else {
+                                //check if button has been unhovered, reset variable
+                                self.random_generated = false;
+                            }
+                        });
                     });
-                    ui.allocate_ui(vec2(50., 50.), |ui| {
+                    });
+
+                //receive server answer unconditionally
+                match self.rx.try_recv() {
+                    Ok(msg) => {
+                        let incoming_struct: Result<ServerMaster, serde_json::Error> =
+                            serde_json::from_str(&msg);
+                        if let Ok(ok) = incoming_struct {
+                            self.incoming_msg = ok;
+                        }
+                    }
+                    Err(_err) => {
+                        //println!("ln 332 {}", err);
+                    }
+                };
+                match self.frx.try_recv() {
+                    Ok(msg) => {
+                        let file_serve: Result<ServerFileReply, serde_json::Error> = serde_json::from_str(&msg);
+                        let _ = write_file(file_serve.unwrap());
+                    },
+                    Err(_err) => {}
+                }
+                ui.allocate_space(vec2(ui.available_width(), 5.));
+
+                match self.irx.try_recv() {
+                    Ok(msg) => {
+                        let file_serve: Result<ServerImageReply, serde_json::Error> = serde_json::from_str(&msg);
+                        let _ = write_image(file_serve.unwrap(), self.send_on_ip.clone());
+                    },
+                    Err(_err) => {},
+                }
+            });
+
+            let panel_height = match usr_panel {
+                Some(panel) => panel.response.rect.size()[1],
+                None => 0.,
+            };
+
+            Area::new("usr_msg_expand")
+                .anchor(
+                    Align2::RIGHT_BOTTOM,
+                    match self.usr_msg_expanded {
+                        true => vec2(-41.0, (-panel_height - 10.) / 14.),
+                        false => vec2(-41.0, -10.),
+                    },
+                )
+                .show(ctx, |ui| {
+                    ui.allocate_ui(vec2(25., 25.), |ui| {
                         if ui
-                            .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../../../icons/add_file.png"
+                            .add(egui::ImageButton::new(egui::include_image!(
+                                "../../../icons/cross.png"
                             )))
-                            .on_hover_text("Send files")
                             .clicked()
                         {
-                            let files = FileDialog::new()
-                                .set_title("Pick a file")
-                                .set_directory("/")
-                                .pick_file();
-
-                            if let Some(file) = files {
-                                //send file
-                                self.files_to_send.push(file);
-                            }
-                        }
-                    });
-                    ui.allocate_ui(vec2(37., 37.), |ui| {
-                        let button =
-                            ui.add(Button::new(RichText::from(&self.random_emoji).size(45.)));
-
-                        if button.clicked() {
-                            self.emoji_mode = !self.emoji_mode;
+                            self.usr_msg_expanded = !self.usr_msg_expanded;
                         };
-
-                        if button.hovered() {
-                            if !self.random_generated {
-                                let random_number =
-                                    self.rand_eng.gen_range(0..=self.emoji.len() - 1);
-                                self.random_emoji = self.emoji[random_number].clone();
-                                self.random_generated = true;
-                            }
-                        } else {
-                            //check if button has been unhovered, reset variable
-                            self.random_generated = false;
-                        }
                     });
                 });
-            });
-
-            //receive server answer unconditionally
-            match self.rx.try_recv() {
-                Ok(msg) => {
-                    let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                        serde_json::from_str(&msg);
-                    if let Ok(ok) = incoming_struct {
-                        self.incoming_msg = ok;
-                    }
-                }
-                Err(_err) => {
-                    //println!("ln 332 {}", err);
-                }
-            };
-            match self.frx.try_recv() {
-                Ok(msg) => {
-                    let file_serve: Result<ServerFileReply, serde_json::Error> = serde_json::from_str(&msg);
-                    let _ = write_file(file_serve.unwrap());
-                },
-                Err(_err) => {}
-            }
-            ui.allocate_space(vec2(ui.available_width(), 5.));
-
-            match self.irx.try_recv() {
-                Ok(msg) => {
-                    let file_serve: Result<ServerImageReply, serde_json::Error> = serde_json::from_str(&msg);
-                    let _ = write_image(file_serve.unwrap(), self.send_on_ip.clone());
-                },
-                Err(_err) => {},
-            }
-        });
-
-        let panel_height = match usr_panel {
-            Some(panel) => panel.response.rect.size()[1],
-            None => 0.,
-        };
-
-        Area::new("usr_msg_expand")
-            .anchor(
-                Align2::RIGHT_BOTTOM,
-                match self.usr_msg_expanded {
-                    true => vec2(-41.0, (-panel_height - 10.) / 14.),
-                    false => vec2(-41.0, -10.),
-                },
-            )
-            .show(ctx, |ui| {
-                ui.allocate_ui(vec2(25., 25.), |ui| {
-                    if ui
-                        .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../icons/cross.png"
-                        )))
-                        .clicked()
-                    {
-                        self.usr_msg_expanded = !self.usr_msg_expanded;
-                    };
-                });
-            });
     }
 
     fn send_file(&mut self, file: std::path::PathBuf) {

@@ -6,7 +6,6 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
-
     use eframe::IconData;
 
     env_logger::init();
@@ -17,7 +16,7 @@ async fn main() -> eframe::Result<()> {
         icon_data: Some(
             IconData::try_from_png_bytes(&include_bytes!("../icons/main.png")[..]).unwrap(),
         ),
-        
+
         ..Default::default()
     };
     eframe::run_native(

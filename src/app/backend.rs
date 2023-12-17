@@ -344,11 +344,7 @@ impl ClientMessage {
     }
 
     //this is used for constructing a sync msg aka sending an empty packet, so server can reply
-    pub fn construct_sync_msg(
-        ip: String,
-        password: String,
-        author: String,
-    ) -> ClientMessage {
+    pub fn construct_sync_msg(ip: String, password: String, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {}),

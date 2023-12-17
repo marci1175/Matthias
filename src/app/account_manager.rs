@@ -4,8 +4,8 @@ use aes_gcm::{
     Aes256Gcm, Key,
 };
 use anyhow::{ensure, Context, Result};
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use rfd::FileDialog;
 use std::env;
 use std::fs;
@@ -41,7 +41,6 @@ pub fn decrypt_aes256(string_to_be_decrypted: String) -> Result<String, FromUtf8
 
     let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
     String::from_utf8(plaintext)
-
 }
 pub fn pass_encrypt(string_to_be_encrypted: String) -> String {
     let password = string_to_be_encrypted.as_bytes();
@@ -215,7 +214,11 @@ pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
     let _ = fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
 
     //secondly create the folder labeled with the specified server ip
-    let _ = fs::create_dir(format!("{}\\szeChat\\Client\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(&ip)));
+    let _ = fs::create_dir(format!(
+        "{}\\szeChat\\Client\\{}",
+        env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
+    ));
 
     let path = format!(
         "{}\\szeChat\\Client\\{}\\{}",
