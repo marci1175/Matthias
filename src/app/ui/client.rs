@@ -10,6 +10,7 @@ use regex::Regex;
 use rfd::FileDialog;
 use std::f32::consts::E;
 use std::fs::{self};
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -311,7 +312,13 @@ impl TemplateApp {
                                                 Ok(image_bytes) => {
                                                     
                                                     //display picture from bytes
-                                                    ui.add(egui::widgets::Image::from_bytes(format!("bytes://{}", picture.index), image_bytes));
+                                                    ui.add(egui::widgets::Image::from_bytes(format!("bytes://{}", picture.index), image_bytes.clone())).context_menu(|ui|{
+                                                        if ui.button("Save").clicked() {
+                                                            //always name the file ".png"
+                                                            let image_save = ServerFileReply {bytes: image_bytes, file_name: PathBuf::from(".png")};
+                                                            let _ = write_file(image_save);
+                                                        }
+                                                    });
                                                 
                                                 },
                                                 Err(_err) => {
