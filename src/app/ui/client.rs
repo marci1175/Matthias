@@ -166,16 +166,7 @@ impl TemplateApp {
             }
 
             //Messages go here
-            ui.allocate_ui(
-                match self.usr_msg_expanded {
-                    true => vec2(
-                        ui.available_width(),
-                        ui.available_height() - (_frame.info().window_info.size[1] / 5. + 10.),
-                    ),
-                    false => vec2(ui.available_width(), ui.available_height()),
-                },
-                |ui| {
-                    egui::ScrollArea::vertical()
+            egui::ScrollArea::vertical()
                         .id_source("msg_area")
                         .stick_to_bottom(true)
                         .auto_shrink([false, true])
@@ -187,7 +178,7 @@ impl TemplateApp {
                                     });
                                 }
 
-                                let mut test: Vec<Response> = Vec::new();
+                                let mut message_instance: Vec<Response> = Vec::new();
                                 let mut reply_to_got_to = (false, 0);
 
                                 for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
@@ -200,32 +191,33 @@ impl TemplateApp {
 
                                     let message_group = ui.group(|ui|
                                     {
-                                        ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                                            if let Some(replied_to) = item.replying_to {
+                                        if let Some(replied_to) = item.replying_to {
+                                            ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
-                                                    self.incoming_msg.struct_list[replied_to].Author,
-                                                    match &self.incoming_msg.struct_list[replied_to].MessageType {
-                                                        ServerMessageType::Image(_img) => format!("Image"),
-                                                        ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                                        ServerMessageType::Normal(msg) => {
-                                                            let mut message_clone = msg.message.clone();
-                                                            if message_clone.clone().len() > 20 {
-                                                                message_clone.truncate(20);
-                                                                message_clone.push_str(" ...");
-                                                            }
-                                                            format!("{}", message_clone)
-                                                    },
-                                                })
-                                                ).size(self.font_size / 1.5))
-                                                    .frame(false))
-                                                        .clicked() {
-    
-                                                            //implement scrolling to message
-                                                            reply_to_got_to = (true, replied_to);
-                                                            
+                                                self.incoming_msg.struct_list[replied_to].Author,
+                                                match &self.incoming_msg.struct_list[replied_to].MessageType {
+                                                    ServerMessageType::Image(_img) => format!("Image"),
+                                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                                    ServerMessageType::Normal(msg) => {
+                                                        let mut message_clone = msg.message.clone();
+                                                        if message_clone.clone().len() > 20 {
+                                                            message_clone.truncate(20);
+                                                            message_clone.push_str(" ...");
                                                         }
-                                            }
-                                        });
+                                                        format!("{}", message_clone)
+                                                },
+                                            })
+                                            ).size(self.font_size / 1.5))
+                                                .frame(false))
+                                                    .clicked() {
+
+                                                        //implement scrolling to message
+                                                        reply_to_got_to = (true, replied_to);
+                                                        
+                                                    }
+                                            });
+                                        }
+                                        
                                         ui.label(RichText::from(format!("{}", item.Author)).size(self.font_size / 1.3).color(Color32::WHITE));
                                             if (i.contains('[') && i.contains(']'))
                                             && (i.contains('(') && i.contains(')'))
@@ -288,7 +280,6 @@ impl TemplateApp {
                                         }
                                         if let ServerMessageType::Upload(file) = &item.MessageType {
                                             if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
-                                                //let rx = self.autosync_sender.get_or_insert_with(|| {
                                                 let passw = self.client_password.clone();
                                                 let author = self.login_username.clone();
                                                 let send_on_ip = self.send_on_ip.clone();
@@ -313,7 +304,6 @@ impl TemplateApp {
                                                 });
                                             }
                                         }
-
                                         if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
 
@@ -373,9 +363,9 @@ impl TemplateApp {
                                     });
 
                                     //this functions for the reply autoscroll
-                                    test.push(message_group);
+                                    message_instance.push(message_group);
                                     if reply_to_got_to.0 {
-                                        test[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
+                                        message_instance[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
                                     }
                                 };
                             });
@@ -384,8 +374,6 @@ impl TemplateApp {
                                 ui.allocate_space(vec2(ui.available_width(), 25.));
                             }
                         });
-                },
-            );
         });
 
         //usr_input
@@ -589,8 +577,9 @@ impl TemplateApp {
                     Err(_err) => {}
                 }
             });
-        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, !self.files_to_send.is_empty(), |ui|{
+        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, !self.files_to_send.is_empty() || self.replying_to.is_some(), |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));
+
                 egui::ScrollArea::horizontal()
                         .id_source("file_to_send")
                         .stick_to_right(true)
@@ -660,8 +649,13 @@ impl TemplateApp {
                                     });
                                 }
                             });
-                        });
+                });
+                    
                 if let Some(replying_to) = self.replying_to.clone() {
+                    if !self.files_to_send.is_empty() {
+                        ui.separator();
+                    }
+
                     ui.horizontal(|ui| {
                         ui.group(|ui|{
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
@@ -685,7 +679,9 @@ impl TemplateApp {
                     });
                     
                 }  
-                ui.allocate_space(vec2(ui.available_width(), 10.));   
+
+            ui.allocate_space(vec2(ui.available_width(), 10.));   
+
             });
 
         let panel_height = match usr_panel {
