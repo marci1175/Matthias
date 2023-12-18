@@ -75,6 +75,8 @@ pub struct TemplateApp {
     pub opened_account: Option<File>,
 
     //client main
+    pub scroll_widget_rect: egui::Rect,
+    pub text_widget_offset: f32,
     #[serde(skip)]
     pub multiline_mode: bool,
     #[serde(skip)]
@@ -164,6 +166,8 @@ impl Default for TemplateApp {
             itx,
 
             //main
+            scroll_widget_rect: egui::Rect::NAN,
+            text_widget_offset: 0.0,
             emoji_mode: false,
             keymap: Input::default(),
             bookmark_mode: false,
