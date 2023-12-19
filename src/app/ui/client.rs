@@ -167,7 +167,8 @@ impl TemplateApp {
             }
 
             //Messages go here
-            egui::ScrollArea::vertical()
+            ui.allocate_ui(vec2(ui.available_width(), ui.available_height() - self.scroll_widget_rect.height() + 10.), |ui|{
+                egui::ScrollArea::vertical()
                         .id_source("msg_area")
                         .stick_to_bottom(true)
                         .auto_shrink([false, true])
@@ -381,6 +382,7 @@ impl TemplateApp {
                                 ui.allocate_space(vec2(ui.available_width(), 25.));
                             }
                         });
+            });
         });
 
         //usr_input
@@ -417,6 +419,8 @@ impl TemplateApp {
                     .auto_shrink([false, true])
                     .min_scrolled_height(self.font_size * 2.)
                     .show(&mut frame_ui, |ui| ui.add(text_widget));
+
+                self.scroll_widget_rect = msg_scroll.inner_rect;
 
                 ui.allocate_space(vec2(
                     ui.available_width(),
