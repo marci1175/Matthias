@@ -6,6 +6,10 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
+    //Ensure main folders are existing
+    let _ = std::fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
+    let _ = std::fs::create_dir(format!("{}\\szeChat\\Server", env!("APPDATA")));
+
     use eframe::IconData;
 
     env_logger::init();

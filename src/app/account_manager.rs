@@ -15,7 +15,7 @@ use std::string::FromUtf8Error;
 
 use argon2::{self, Config, Variant, Version};
 
-use super::backend::{ServerFileReply, ServerImageReply};
+use super::backend::{ServerFileReply, ServerImageReply, ServerAudioReply};
 
 pub fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<String> {
     let key: &[u8] = &[42; 32];
@@ -210,9 +210,6 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     Ok(())
 }
 pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
-    //first create the main folder
-    let _ = fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
-
     //secondly create the folder labeled with the specified server ip
     let _ = fs::create_dir(format!(
         "{}\\szeChat\\Client\\{}",
@@ -220,8 +217,40 @@ pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
         general_purpose::URL_SAFE_NO_PAD.encode(&ip)
     ));
 
+    let _ = fs::create_dir(format!(
+        "{}\\szeChat\\Client\\{}\\Images",
+        env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
+    ));
+
     let path = format!(
         "{}\\szeChat\\Client\\{}\\{}",
+        env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip),
+        file_response.index
+    );
+
+    fs::write(path, file_response.bytes)?;
+
+    Ok(())
+}
+
+pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
+    //secondly create the folder labeled with the specified server ip
+    let _ = fs::create_dir(format!(
+        "{}\\szeChat\\Client\\{}",
+        env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
+    ));
+
+    let _ = fs::create_dir(format!(
+        "{}\\szeChat\\Client\\{}\\Audios",
+        env!("APPDATA"),
+        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
+    ));
+
+    let path = format!(
+        "{}\\szeChat\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(&ip),
         file_response.index

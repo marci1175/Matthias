@@ -56,6 +56,16 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub itx: mpsc::Sender<String>,
 
+    //thread communication for audio recording
+    #[serde(skip)]
+    pub atx: Option<mpsc::Sender<bool>>,
+
+    //thread communication for audio ! SAVING !
+    #[serde(skip)]
+    pub audio_save_rx: mpsc::Receiver<String>,
+    #[serde(skip)]
+    pub audio_save_tx: mpsc::Sender<String>,
+
     //main
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -131,6 +141,7 @@ impl Default for TemplateApp {
         let (dtx, drx) = mpsc::channel::<String>();
         let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
+        let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
             //fontbook
             filter: Default::default(),
@@ -164,6 +175,13 @@ impl Default for TemplateApp {
             //thread communication for image requesting
             irx,
             itx,
+
+            //thread communication for audio recording
+            atx: None,
+
+            //thread communication for audio saving
+            audio_save_rx,
+            audio_save_tx,
 
             //main
             scroll_widget_rect: egui::Rect::NAN,
@@ -259,8 +277,19 @@ pub struct ClientImageRequest {
 
 //this is used to send out images to the server TODO: IMPROVE IMAGE / FILE SENDING HANDLING BY SERVER __
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientImage {
+pub struct ClientImageUpload {
     pub bytes: Vec<u8>,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientAudioUpload {
+    pub bytes: Vec<u8>,
+    pub name: Option<String>,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientAudioRequest {
+    pub index: i32,
 }
 
 //Client outgoing message types
@@ -268,15 +297,20 @@ pub struct ClientImage {
 pub enum ClientMessageType {
     //this is when you want to display an image and you have to make a request to the server file
     ClientImageRequest(ClientImageRequest),
-
-    ClientSyncMessage(ClientSnycMessage),
     ClientFileRequest(ClientFileRequest),
+    ClientAudioRequest(ClientAudioRequest),
+
+    ClientAudioUpload(ClientAudioUpload),
+    //this is when you are sending files to the server
     ClientFileUpload(ClientFileUpload),
-
     //this is when you are sending images to the server TODO: REMOVE THIS WHOLE POOP REF LINE 239
-    ClientImage(ClientImage),
+    ClientImageUpload(ClientImageUpload),
 
+    //Normal msg
     ClientNormalMessage(ClientNormalMessage),
+
+    //Used for syncing with client and server
+    ClientSyncMessage(ClientSnycMessage),
 }
 
 //This is what gets to be sent out by the client
@@ -393,6 +427,23 @@ impl ClientMessage {
         }
     }
 
+    //this is used for asking for an image
+    pub fn construct_audio_request_msg(
+        index: i32,
+        password: String,
+        author: String,
+        ip: String,
+    ) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            MessageType: ClientMessageType::ClientAudioRequest(ClientAudioRequest { index: index }),
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
+
     //this is used for SENDING IMAGES SO THE SERVER CAN DECIDE IF ITS A PICTURE
     pub fn construct_image_msg(
         file_path: PathBuf,
@@ -403,8 +454,39 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: replying_to,
-            MessageType: ClientMessageType::ClientImage(ClientImage {
+            MessageType: ClientMessageType::ClientImageUpload(ClientImageUpload {
                 bytes: fs::read(file_path).unwrap_or_default(),
+            }),
+
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
+    }
+
+    pub fn construct_audio_msg(
+        file_name: PathBuf,
+        ip: String,
+        password: String,
+        author: String,
+        replying_to: Option<usize>,
+    ) -> ClientMessage {
+        ClientMessage {
+            replying_to: replying_to,
+            //Dont execute me please :3 |
+            //                          |
+            //                          V
+            MessageType: ClientMessageType::ClientAudioUpload(ClientAudioUpload {
+                name: Some(
+                    file_name
+                        .file_prefix()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                ),
+                bytes: std::fs::read(file_name).unwrap_or_default(),
             }),
 
             Password: password,
@@ -465,6 +547,20 @@ pub struct ServerNormalMessage {
     pub message: String,
 }
 
+//REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerAudioUpload {
+    pub index: i32,
+    pub file_name: String,
+}
+
+//When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerAudioReply {
+    pub bytes: Vec<u8>,
+    pub index: i32,
+    pub file_name: String,
+}
 //This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerMessageType {
@@ -473,6 +569,7 @@ pub enum ServerMessageType {
 
     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
     Image(ServerImageUpload),
+    Audio(ServerAudioUpload),
 }
 
 //This is one whole server msg (packet), which gets bundled when sending ServerMain
@@ -487,6 +584,27 @@ impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
         return serde_json::to_string(self).unwrap_or_default();
     }
+    pub fn convert_audio_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
+        ServerOutput {
+            replying_to: normal_msg.replying_to,
+            MessageType: ServerMessageType::Audio(ServerAudioUpload {
+                file_name: match normal_msg.MessageType {
+                    ClientMessageType::ClientSyncMessage(_) => todo!(),
+                    ClientMessageType::ClientFileRequest(_) => todo!(),
+                    ClientMessageType::ClientFileUpload(_) => todo!(),
+                    ClientMessageType::ClientImageUpload(_) => todo!(),
+                    ClientMessageType::ClientNormalMessage(_) => todo!(),
+                    ClientMessageType::ClientImageRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioUpload(req) => req.name.unwrap_or_default(),
+                },
+                index: index,
+            }),
+            Author: normal_msg.Author,
+            MessageDate: normal_msg.MessageDate,
+        }
+    }
+
     pub fn convert_msg_to_servermsg(normal_msg: ClientMessage) -> ServerOutput {
         //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
         ServerOutput {
@@ -496,9 +614,11 @@ impl ServerOutput {
                     ClientMessageType::ClientSyncMessage(_) => todo!(),
                     ClientMessageType::ClientFileRequest(_) => todo!(),
                     ClientMessageType::ClientFileUpload(_) => todo!(),
-                    ClientMessageType::ClientImage(_) => todo!(),
+                    ClientMessageType::ClientImageUpload(_) => todo!(),
                     ClientMessageType::ClientNormalMessage(msg) => msg.message,
                     ClientMessageType::ClientImageRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioUpload(_) => todo!(),
                 },
             }),
             Author: normal_msg.Author,
@@ -514,9 +634,11 @@ impl ServerOutput {
                     ClientMessageType::ClientSyncMessage(_) => todo!(),
                     ClientMessageType::ClientFileRequest(_) => todo!(),
                     ClientMessageType::ClientFileUpload(_) => todo!(),
-                    ClientMessageType::ClientImage(_) => index,
+                    ClientMessageType::ClientImageUpload(_) => index,
                     ClientMessageType::ClientNormalMessage(_) => todo!(),
                     ClientMessageType::ClientImageRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioUpload(_) => todo!(),
                 },
             }),
             Author: normal_msg.Author,
@@ -534,9 +656,11 @@ impl ServerOutput {
                     ClientMessageType::ClientFileUpload(msg) => {
                         format!("{}.{}", msg.name, msg.extension)
                     }
-                    ClientMessageType::ClientImage(_) => todo!(),
+                    ClientMessageType::ClientImageUpload(_) => todo!(),
                     ClientMessageType::ClientNormalMessage(_) => todo!(),
                     ClientMessageType::ClientImageRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioRequest(_) => todo!(),
+                    ClientMessageType::ClientAudioUpload(_) => todo!(),
                 },
                 index: index,
             }),

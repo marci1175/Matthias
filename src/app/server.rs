@@ -27,13 +27,13 @@ use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientMessage,
     ClientMessageType::{
-        ClientFileRequest, ClientFileUpload, ClientImage, ClientImageRequest, ClientNormalMessage,
-        ClientSyncMessage,
+        ClientAudioRequest, ClientAudioUpload, ClientFileRequest, ClientFileUpload,
+        ClientImageRequest, ClientImageUpload, ClientNormalMessage, ClientSyncMessage,
     },
     ServerFileReply, ServerImageReply,
 };
 
-use super::backend::ServerOutput;
+use super::backend::{ServerOutput, ServerAudioReply};
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -52,6 +52,12 @@ pub struct MessageService {
 
     //images
     pub image_paths: Mutex<Vec<PathBuf>>,
+
+    //audio list
+    pub audio_list: Mutex<Vec<PathBuf>>,
+
+    //audio name list
+    pub audio_names: Mutex<Vec<Option<String>>>,
 }
 #[tonic::async_trait]
 impl ServerMessage for MessageService {
@@ -69,8 +75,11 @@ impl ServerMessage for MessageService {
                 ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
                 }
 
-                ClientImage(_) => {
-                    self.ImageMessage(req).await;
+                ClientAudioUpload(_) => {
+                    self.recive_audio(req).await;
+                }
+                ClientImageUpload(_) => {
+                    self.recive_image(req).await;
                 }
                 ClientFileUpload(_) => {
                     self.recive_file(req.clone()).await;
@@ -90,6 +99,16 @@ impl ServerMessage for MessageService {
                     let output = serde_json::to_string(&ServerImageReply {
                         bytes: read_file,
                         index: request.index,
+                    })
+                    .unwrap_or_default();
+                    return Ok(Response::new(MessageResponse { message: output }));
+                }
+                ClientAudioRequest(request) => {
+                    let (file_bytes, file_name) = self.serve_audio(request.index).await;
+                    let output = serde_json::to_string(&ServerAudioReply {
+                        bytes: file_bytes,
+                        index: request.index,
+                        file_name: file_name.unwrap_or_default(),
                     })
                     .unwrap_or_default();
                     return Ok(Response::new(MessageResponse { message: output }));
@@ -316,8 +335,6 @@ impl MessageService {
             } else {
                 match env::var("APPDATA") {
                     Ok(app_data) => {
-                        let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
-
                         //generat a random number to avoid file overwrites, cuz of same name files
                         let random_generated_number =
                             rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
@@ -392,12 +409,10 @@ impl MessageService {
     pub async fn serve_image(&self, index: i32) -> Vec<u8> {
         fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
     }
-    pub async fn ImageMessage(&self, req: ClientMessage) {
-        if let ClientImage(img) = &req.MessageType {
+    pub async fn recive_image(&self, req: ClientMessage) {
+        if let ClientImageUpload(img) = &req.MessageType {
             match env::var("APPDATA") {
                 Ok(app_data) => {
-                    let _create_dir = fs::create_dir(format!("{}\\szeChat\\Server", app_data));
-
                     let mut image_path = self.image_paths.lock().unwrap();
 
                     let image_path_lenght = image_path.len();
@@ -440,5 +455,57 @@ impl MessageService {
                 }
             }
         }
+    }
+    pub async fn recive_audio(&self, req: ClientMessage) {
+        if let ClientAudioUpload(audio) = &req.MessageType {
+            let mut audio_paths = self.audio_list.lock().unwrap();
+            
+            let audio_paths_lenght = audio_paths.len();
+
+            match fs::File::create(format!(
+                "{}\\szeChat\\Server\\{}",
+                env!("APPDATA"),
+                audio_paths_lenght
+            )) {
+                Ok(mut created_file) => {
+                    if let Err(err) = created_file.write_all(&audio.bytes) {
+                        println!("[{err}\n{}]", err.kind());
+                    };
+
+                    created_file.flush().unwrap();
+                    //success
+
+                    match self.messages.try_lock() {
+                        Ok(mut ok) => {
+                            ok.push(ServerOutput::convert_audio_to_servermsg(
+                                req.clone(),
+                                audio_paths_lenght as i32,
+                            ));
+                        }
+                        Err(err) => println!("{err}"),
+                    }
+
+                    //Only save as last step to avoid a mismatch + correct indexing :)
+                    audio_paths.push(PathBuf::from(format!(
+                        "{}\\szeChat\\Server\\{}",
+                        env!("APPDATA"),
+                        audio_paths_lenght
+                    )));
+
+                    //consequently save the audio_recording's name
+                    match self.audio_names.try_lock() {
+                        Ok(mut vec) => vec.push(audio.name.clone()),
+                        Err(err) => println!("{err}"),
+                    }
+
+                }
+                Err(err) => {
+                    println!(" [{err} {}]", err.kind());
+                }
+            }
+        }
+    }
+    pub async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
+        (fs::read(&self.audio_list.lock().unwrap()[index as usize]).unwrap_or_default(), self.audio_names.lock().unwrap()[index as usize].clone())
     }
 }

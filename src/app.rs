@@ -5,6 +5,7 @@ use std::fs::{self};
 mod account_manager;
 pub mod backend;
 
+mod audio_recording;
 mod client;
 mod input;
 mod networking;

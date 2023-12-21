@@ -16,10 +16,11 @@ use std::time::Duration;
 
 use std::sync::{mpsc, Arc};
 
-use crate::app::account_manager::{write_file, write_image};
+use crate::app::account_manager::{write_file, write_image, write_audio};
+use crate::app::audio_recording::audio_recroding_test;
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    ClientMessage, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp,
+    ClientMessage, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp, ServerAudioReply,
 };
 use crate::app::client::{self};
 
@@ -84,7 +85,7 @@ impl TemplateApp {
                 }
             }
             Err(_err) => {
-                println!("{}", _err)
+                //println!("{}", _err)
             }
         }
 
@@ -198,6 +199,7 @@ impl TemplateApp {
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
                                                 self.incoming_msg.struct_list[replied_to].Author,
                                                 match &self.incoming_msg.struct_list[replied_to].MessageType {
+                                                    ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                     ServerMessageType::Image(_img) => format!("Image"),
                                                     ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
                                                     ServerMessageType::Normal(msg) => {
@@ -280,6 +282,54 @@ impl TemplateApp {
                                         } else {
                                             ui.label(RichText::from(i).size(self.font_size));
                                         }
+                                        if let ServerMessageType::Audio(audio) = &item.MessageType {
+                                            ui.allocate_ui(vec2(300., 150.), |ui|{
+                                                match PathBuf::from(format!("{}\\szeChat\\Client\\{}\\Audios\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), audio.index)).exists() {
+                                                    true => {
+                                                        //if we already have the sound file :::
+
+                                                        ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
+                                                            ui.button("Play");
+                                                        });
+                                                    
+                                                    },
+                                                    false => {
+                                                        //check if we already have sound file
+    
+                                                        //check if we are visible
+                                                        if !ui.is_visible() {
+                                                            return;
+                                                        }
+    
+                                                        //We dont have file on our local system so we have to ask the server to provide it
+                                                        let passw = self.client_password.clone();
+                                                        let author = self.login_username.clone();
+                                                        let send_on_ip = self.send_on_ip.clone();
+                                                        let sender = self.audio_save_tx.clone();
+                                                        
+    
+                                                        let message = ClientMessage::construct_audio_request_msg(audio.index, passw, author, send_on_ip);
+    
+                                                        tokio::spawn(async move {
+                                                            match client::send_msg(message).await {
+                                                                Ok(ok) => {
+                                                                    match sender.send(ok) {
+                                                                        Ok(_) => {}
+                                                                        Err(err) => {
+                                                                            println!("{}", err);
+                                                                        }
+                                                                    };
+                                                                },
+                                                                Err(err) => {
+                                                                    println!("{err} ln 264")
+                                                                }
+                                                            }
+                                                        });
+    
+                                                    },
+                                                };
+                                            });
+                                        }
                                         if let ServerMessageType::Upload(file) = &item.MessageType {
                                             if ui.button(RichText::from(format!("{}", file.file_name)).size(self.font_size)).clicked() {
                                                 let passw = self.client_password.clone();
@@ -309,7 +359,7 @@ impl TemplateApp {
                                         if let ServerMessageType::Image(picture) = &item.MessageType {
                                         ui.allocate_ui(vec2(300., 300.), |ui|{
 
-                                            match fs::read(format!("{}\\szeChat\\Client\\{}\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), picture.index)){
+                                            match fs::read(format!("{}\\szeChat\\Client\\{}\\Images\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), picture.index)){
                                                 Ok(image_bytes) => {
                                                     
                                                     //display picture from bytes
@@ -486,20 +536,27 @@ impl TemplateApp {
                                             });
                                         }
                                         for file_path in self.files_to_send.clone() {
-                                            match file_path
-                                                .extension()
-                                                .unwrap()
-                                                .to_string_lossy()
-                                                .as_str()
-                                            {
-                                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
-                                                    self.send_picture(file_path);
-                                                }
-                                                _ => {
-                                                    self.send_file(file_path);
+                                            //Check for no user fuckery
+                                            if file_path.exists() {
+                                                match file_path
+                                                    .extension()
+                                                    .unwrap()
+                                                    .to_string_lossy()
+                                                    .as_str()
+                                                {
+                                                    "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
+                                                        self.send_picture(file_path);
+                                                    }
+                                                    "wav" => {
+                                                        self.send_audio(file_path);
+                                                    }
+                                                    _ => {
+                                                        self.send_file(file_path);
+                                                    }
                                                 }
                                             }
                                         }
+
                                         //clear vectors
                                         self.files_to_send.clear();
                                         self.replying_to = None;
@@ -551,6 +608,41 @@ impl TemplateApp {
                                     }
                                 },
                             );
+                            ui.allocate_ui(
+                                vec2(self.font_size * 1.5, self.font_size * 1.5),
+                                |ui| {
+                                    if let Some(atx) = self.atx.clone() {
+                                        if ui.button("Stop").clicked() {
+                                            //Just send something, it doesnt really matter
+                                            atx.send(false).unwrap();
+
+                                            //Path to voice recording created by audio_recording.rs
+                                            let path = PathBuf::from(format!(
+                                                "{}\\szeChat\\Client\\voice_record.wav",
+                                                env!("APPDATA")
+                                            ));
+
+                                            if path.exists() {
+                                                self.send_audio(path.clone());
+                                            }
+
+                                            //Destroy state
+                                            self.atx = None;
+                                            if let Err(err) = fs::remove_file(path) {
+                                                eprintln!("{err}")
+                                            };
+                                        }
+                                    } else {
+                                        if ui.button("Record").clicked() {
+                                            let (tx, rx) = mpsc::channel::<bool>();
+
+                                            self.atx = Some(tx);
+
+                                            audio_recroding_test(rx);
+                                        }
+                                    }
+                                },
+                            );
                         });
                     });
 
@@ -577,7 +669,6 @@ impl TemplateApp {
                     }
                     Err(_err) => {}
                 }
-                ui.allocate_space(vec2(ui.available_width(), 5.));
 
                 match self.irx.try_recv() {
                     Ok(msg) => {
@@ -587,6 +678,17 @@ impl TemplateApp {
                     }
                     Err(_err) => {}
                 }
+
+                match self.audio_save_rx.try_recv() {
+                    Ok(msg) => {
+                        let file_serve: Result<ServerAudioReply, serde_json::Error> =
+                            serde_json::from_str(&msg);
+                        let _ = write_audio(file_serve.unwrap(), self.send_on_ip.clone());
+                    }
+                    Err(_err) => {}
+                }
+
+                ui.allocate_space(vec2(ui.available_width(), 5.));
             });
         egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, !self.files_to_send.is_empty() || self.replying_to.is_some(), |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));
@@ -674,7 +776,8 @@ impl TemplateApp {
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::from("Replying to:").size(self.font_size).weak());
                                     ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
-    
+                                        
+                                        ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                         ServerMessageType::Image(_img) => format!("Image"),
                                         ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
     
@@ -722,6 +825,19 @@ impl TemplateApp {
             });
     }
 
+    fn send_audio(&mut self, file: std::path::PathBuf) {
+        let passw = self.client_password.clone();
+        let ip = self.send_on_ip.clone();
+        let author = self.login_username.clone();
+        let replying_to = self.replying_to.clone();
+
+        let message = ClientMessage::construct_audio_msg(file, ip, passw, author, replying_to);
+
+        tokio::spawn(async move {
+            let _ = client::send_msg(message).await;
+        });
+    }
+
     fn send_file(&mut self, file: std::path::PathBuf) {
         let passw = self.client_password.clone();
         let ip = self.send_on_ip.clone();
@@ -740,8 +856,6 @@ impl TemplateApp {
         let ip = self.send_on_ip.clone();
         let author = self.login_username.clone();
         let replying_to = self.replying_to.clone();
-
-        dbg!(replying_to);
 
         let message = ClientMessage::construct_image_msg(file, ip, passw, author, replying_to);
 
