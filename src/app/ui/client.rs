@@ -289,6 +289,7 @@ impl TemplateApp {
                                                         //if we already have the sound file :::
 
                                                         ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
+                                                            ui.label(&audio.file_name);
                                                             ui.button("Play");
                                                         });
                                                     
@@ -547,7 +548,7 @@ impl TemplateApp {
                                                     "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
                                                         self.send_picture(file_path);
                                                     }
-                                                    "wav" => {
+                                                    "wav" | "mp3" | "m4a" => {
                                                         self.send_audio(file_path);
                                                     }
                                                     _ => {
