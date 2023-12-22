@@ -4,6 +4,11 @@ use rand::rngs::ThreadRng;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 
+use egui::{Layout, RichText};
+use rfd::FileDialog;
+use rodio::source::{Amplify, SineWave, Source, TakeDuration};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc};
@@ -13,6 +18,10 @@ use crate::app::input::Input;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
+    //audio playback
+    #[serde(skip)]
+    pub audio_playback: AudioPlayback,
+
     //fontbook
     pub filter: String,
     pub named_chars: BTreeMap<egui::FontFamily, BTreeMap<char, String>>,
@@ -143,6 +152,9 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
+            //audio playback
+            audio_playback: AudioPlayback::default(),
+
             //fontbook
             filter: Default::default(),
             named_chars: Default::default(),
@@ -692,5 +704,25 @@ impl ServerMaster {
         return ServerMaster {
             struct_list: server_output_list,
         };
+    }
+}
+
+//Struct for audio playback
+pub struct AudioPlayback {
+    pub stream: OutputStream,
+    pub stream_handle: OutputStreamHandle,
+    pub sink: Option<Sink>,
+    pub src: Option<SineWave>,
+}
+
+impl Default for AudioPlayback {
+    fn default() -> Self {
+        let (stream, stream_handle) = OutputStream::try_default().unwrap();
+        Self {
+            stream,
+            stream_handle,
+            sink: None,
+            src: None,
+        }
     }
 }

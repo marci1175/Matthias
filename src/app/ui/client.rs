@@ -8,19 +8,22 @@ use egui::{
 use rand::Rng;
 use regex::Regex;
 use rfd::FileDialog;
+use rodio::source::{Amplify, SineWave, Source, TakeDuration};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::f32::consts::E;
 use std::fs::{self};
-use std::path::PathBuf;
+use std::io::BufReader;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
-
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
+use std::{fs::File, path::PathBuf};
 
-use crate::app::account_manager::{write_file, write_image, write_audio};
+use crate::app::account_manager::{write_audio, write_file, write_image};
 use crate::app::audio_recording::audio_recroding_test;
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    ClientMessage, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp, ServerAudioReply,
+    ClientMessage, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster,
+    ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 
@@ -289,9 +292,39 @@ impl TemplateApp {
                                                         //if we already have the sound file :::
 
                                                         ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
-                                                            ui.label(&audio.file_name);
-                                                            ui.button("Play");
+                                                            if ui.button("Play").clicked() {
+
+                                                                let file = BufReader::new(File::open(PathBuf::from(format!("{}\\szeChat\\Client\\{}\\Audios\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), audio.index))).unwrap());
+                           
+                                                                let source = Decoder::new(file).unwrap();
+                                                                
+                                                                //let _play = self.stream_handle.play_raw(source.convert_samples());
+                                                                
+                                                                //set ui
+                                                                
+                                                                self.audio_playback.sink = Some(Sink::try_new(&self.audio_playback.stream_handle).unwrap());
+
+                                                                self.audio_playback.sink.as_mut().unwrap().append(source);
+
+                                                            };
                                                         });
+
+                                                        ui.label(&audio.file_name);
+
+                                                        if let Some(Sink) = self.audio_playback.sink.as_mut() {
+                            
+                                                            let pause = ui.button("Pause");
+                                                            if pause.clicked() {
+                                                                Sink.pause();
+                                                                
+                                                            }
+                                                            let unpause = ui.button("Unpause");
+                                                            if unpause.clicked() {
+                                                                Sink.play();
+                                                                
+                                                                
+                                                            }
+                                                        }
                                                     
                                                     },
                                                     false => {
@@ -619,7 +652,7 @@ impl TemplateApp {
 
                                             //Path to voice recording created by audio_recording.rs
                                             let path = PathBuf::from(format!(
-                                                "{}\\szeChat\\Client\\voice_record.wav",
+                                                "{}\\szeChat\\Client\\voice_record.mp3",
                                                 env!("APPDATA")
                                             ));
 

@@ -33,7 +33,7 @@ use crate::app::backend::{
     ServerFileReply, ServerImageReply,
 };
 
-use super::backend::{ServerOutput, ServerAudioReply};
+use super::backend::{ServerAudioReply, ServerOutput};
 
 pub mod messages {
     tonic::include_proto!("messages");
@@ -459,7 +459,7 @@ impl MessageService {
     pub async fn recive_audio(&self, req: ClientMessage) {
         if let ClientAudioUpload(audio) = &req.MessageType {
             let mut audio_paths = self.audio_list.lock().unwrap();
-            
+
             let audio_paths_lenght = audio_paths.len();
 
             match fs::File::create(format!(
@@ -497,7 +497,6 @@ impl MessageService {
                         Ok(mut vec) => vec.push(audio.name.clone()),
                         Err(err) => println!("{err}"),
                     }
-
                 }
                 Err(err) => {
                     println!(" [{err} {}]", err.kind());
@@ -506,6 +505,9 @@ impl MessageService {
         }
     }
     pub async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
-        (fs::read(&self.audio_list.lock().unwrap()[index as usize]).unwrap_or_default(), self.audio_names.lock().unwrap()[index as usize].clone())
+        (
+            fs::read(&self.audio_list.lock().unwrap()[index as usize]).unwrap_or_default(),
+            self.audio_names.lock().unwrap()[index as usize].clone(),
+        )
     }
 }

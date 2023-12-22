@@ -47,6 +47,8 @@ base64 = "0.21.5"
 cpal = "0.15.2"
 hound = "3.5.1"
 arg = "0.4.1"
+rodio = {version = "0.17.3", features = ["wav", "mp3", "flac"]}
+claxon = "0.4.3"
 
 
 [dependencies.windows-sys]

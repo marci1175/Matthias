@@ -15,7 +15,7 @@ use std::string::FromUtf8Error;
 
 use argon2::{self, Config, Variant, Version};
 
-use super::backend::{ServerFileReply, ServerImageReply, ServerAudioReply};
+use super::backend::{ServerAudioReply, ServerFileReply, ServerImageReply};
 
 pub fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<String> {
     let key: &[u8] = &[42; 32];
