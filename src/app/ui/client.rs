@@ -291,22 +291,39 @@ impl TemplateApp {
                                                     true => {
                                                         //if we already have the sound file :::
 
-                                                        ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
-                                                            if ui.button("Play").clicked() {
+                                                        ui.with_layout(Layout::top_down(Align::Center), |ui|{
+                                                            match self.audio_playback.sink.as_mut() {
+                                                                Some(sink) => {
+                                                                    match sink.is_paused() {
+                                                                        true => {
+                                                                            if ui.button("Play").clicked() {
+                                                                                sink.play();
+                                                                            };
+                                                                        },
+                                                                        false => {
+                                                                            if ui.button("Stop").clicked() {
+                                                                                sink.pause()
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                None => {
+                                                                    if ui.button("Play").clicked() {
+                                                                        let file = BufReader::new(File::open(PathBuf::from(format!("{}\\szeChat\\Client\\{}\\Audios\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), audio.index))).unwrap());
+                                
+                                                                        let source = Decoder::new(file).unwrap();
+                                                                        
+                                                                        self.audio_playback.sink = Some(Sink::try_new(&self.audio_playback.stream_handle).unwrap());
 
-                                                                let file = BufReader::new(File::open(PathBuf::from(format!("{}\\szeChat\\Client\\{}\\Audios\\{}", env!("APPDATA"), general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()), audio.index))).unwrap());
-                           
-                                                                let source = Decoder::new(file).unwrap();
-                                                                
-                                                                //let _play = self.stream_handle.play_raw(source.convert_samples());
-                                                                
-                                                                //set ui
-                                                                
-                                                                self.audio_playback.sink = Some(Sink::try_new(&self.audio_playback.stream_handle).unwrap());
+                                                                        let sink = self.audio_playback.sink.as_mut().unwrap();
 
-                                                                self.audio_playback.sink.as_mut().unwrap().append(source);
+                                                                        sink.append(source);
 
-                                                            };
+                                                                        sink.play();
+                                                                    };
+                                                                }
+                                                            }
+                                                            
                                                         });
 
                                                         ui.label(&audio.file_name);
@@ -318,12 +335,7 @@ impl TemplateApp {
                                                                 Sink.pause();
                                                                 
                                                             }
-                                                            let unpause = ui.button("Unpause");
-                                                            if unpause.clicked() {
-                                                                Sink.play();
-                                                                
-                                                                
-                                                            }
+                                                            
                                                         }
                                                     
                                                     },
@@ -331,7 +343,7 @@ impl TemplateApp {
                                                         //check if we already have sound file
     
                                                         //check if we are visible
-                                                        if !ui.is_visible() {
+                                                        if !ui.is_visible() || !self.requests.audio {
                                                             return;
                                                         }
     
@@ -344,7 +356,7 @@ impl TemplateApp {
     
                                                         let message = ClientMessage::construct_audio_request_msg(audio.index, passw, author, send_on_ip);
     
-                                                        tokio::spawn(async move {
+                                                        self.requests.audio = tokio::spawn(async move {
                                                             match client::send_msg(message).await {
                                                                 Ok(ok) => {
                                                                     match sender.send(ok) {
@@ -358,7 +370,7 @@ impl TemplateApp {
                                                                     println!("{err} ln 264")
                                                                 }
                                                             }
-                                                        });
+                                                        }).is_finished();
     
                                                     },
                                                 };
@@ -409,7 +421,7 @@ impl TemplateApp {
                                                 Err(_err) => {
 
                                                     //check if we are visible
-                                                    if !ui.is_visible() {
+                                                    if !ui.is_visible() || !self.requests.image {
                                                         return;
                                                     }
 
@@ -422,7 +434,7 @@ impl TemplateApp {
 
                                                     let message = ClientMessage::construct_image_request_msg(picture.index, passw, author, send_on_ip);
 
-                                                    tokio::spawn(async move {
+                                                    self.requests.image = tokio::spawn(async move {
                                                         match client::send_msg(message).await {
                                                             Ok(ok) => {
                                                                 match sender.send(ok) {
@@ -436,7 +448,7 @@ impl TemplateApp {
                                                                 println!("{err} ln 264")
                                                             }
                                                         }
-                                                    });
+                                                    }).is_finished();
 
                                                 },
                                             };

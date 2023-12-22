@@ -18,6 +18,10 @@ use crate::app::input::Input;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
+    //request tracking
+    #[serde(skip)]
+    pub requests: RequestList,
+
     //audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
@@ -152,6 +156,9 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
+            //request tracking
+            requests: RequestList::default(),
+
             //audio playback
             audio_playback: AudioPlayback::default(),
 
@@ -724,5 +731,17 @@ impl Default for AudioPlayback {
             sink: None,
             src: None,
         }
+    }
+}
+
+//Request list to keep track of performance, one request per file
+#[derive(Debug, Clone, Copy)]
+pub struct RequestList {
+    pub audio: bool,
+    pub image: bool,
+}
+impl Default for RequestList {
+    fn default() -> Self {
+        Self { audio: true, image: true }
     }
 }
