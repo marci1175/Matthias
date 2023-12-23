@@ -9,7 +9,7 @@ async fn main() -> eframe::Result<()> {
     //Ensure all temporary folders are deleted
     let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
     let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));
-    
+
     //Ensure main folders are existing
     let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
     let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));

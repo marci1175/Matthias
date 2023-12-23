@@ -1,5 +1,5 @@
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use egui::{vec2, Align, Layout, RichText};
 
 use std::fs::{self};
@@ -46,7 +46,8 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.keymap.clone());
-        self.send_on_ip_base64_encoded = general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
+        self.send_on_ip_base64_encoded =
+            general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
 
         /*
 
@@ -198,5 +199,4 @@ impl eframe::App for backend::TemplateApp {
                 };
             });
     }
-
 }

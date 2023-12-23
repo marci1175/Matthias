@@ -47,7 +47,10 @@ impl TemplateApp {
                     }
                     Err(_err) => {
                         //create decoy file, to manually create a race condition
-                        if let Err(err) = std::fs::write(path, "This is a placeholder file, this will get overwritten (hopefully)"){
+                        if let Err(err) = std::fs::write(
+                            path,
+                            "This is a placeholder file, this will get overwritten (hopefully)",
+                        ) {
                             println!("Error when creating a decoy: {err}");
                             return;
                         };
