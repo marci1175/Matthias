@@ -23,14 +23,13 @@ impl TemplateApp {
         let _ = fs::create_dir_all(PathBuf::from(format!("{}{}{}{}",env!("APPDATA"), "\\szeChat\\Client\\", self.send_on_ip_base64_encoded, "\\Audios")));
 
         if let ServerMessageType::Audio(audio) = &item.MessageType {
+            let path = PathBuf::from(format!(
+                "{}\\szeChat\\Client\\{}\\Audios\\{}",
+                env!("APPDATA"),
+                self.send_on_ip_base64_encoded,
+                audio.index
+            ));
             ui.allocate_ui(vec2(300., 150.), |ui| {
-                let path = PathBuf::from(format!(
-                    "{}\\szeChat\\Client\\{}\\Audios\\{}",
-                    env!("APPDATA"),
-                    self.send_on_ip_base64_encoded,
-                    audio.index
-                ));
-
                 match path.exists()
                 {
                     true => {

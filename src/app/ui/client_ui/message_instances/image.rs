@@ -20,13 +20,14 @@ impl TemplateApp {
         ui: &mut egui::Ui,
     ) {
         if let ServerMessageType::Image(picture) = &item.MessageType {
+            let path = PathBuf::from(format!(
+                "{}\\szeChat\\Client\\{}\\Images\\{}",
+                env!("APPDATA"),
+                self.send_on_ip_base64_encoded,
+                picture.index
+            ));
             ui.allocate_ui(vec2(300., 300.), |ui| {
-                match fs::read(format!(
-                    "{}\\szeChat\\Client\\{}\\Images\\{}",
-                    env!("APPDATA"),
-                    self.send_on_ip_base64_encoded,
-                    picture.index
-                )) {
+                match fs::read(path.clone()) {
                     Ok(image_bytes) => {
                         //display picture from bytes
                         ui.add(egui::widgets::Image::from_bytes(
@@ -45,8 +46,14 @@ impl TemplateApp {
                         });
                     }
                     Err(_err) => {
+                        //create decoy file, to manually create a race condition
+                        if let Err(err) = std::fs::write(path, "This is a placeholder file, this will get overwritten (hopefully)"){
+                            println!("Error when creating a decoy: {err}");
+                            return;
+                        };
+
                         //check if we are visible
-                        if !ui.is_visible() || !self.requests.image {
+                        if !ui.is_visible() {
                             return;
                         }
 
