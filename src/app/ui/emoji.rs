@@ -165,7 +165,7 @@ impl backend::TemplateApp {
         egui::Window::new("Emoji")
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.label(format!("Click to paste"));
+                ui.label("Click to paste".to_string());
 
                 let filter = &self.filter;
                 let named_chars = self

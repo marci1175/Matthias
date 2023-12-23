@@ -4,11 +4,9 @@ use rand::rngs::ThreadRng;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 
-use egui::{Layout, RichText};
-use rfd::FileDialog;
-use rodio::source::{Amplify, SineWave, Source, TakeDuration};
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
-use std::io::BufReader;
+use rodio::source::SineWave;
+use rodio::{OutputStream, OutputStreamHandle, Sink};
+
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc};
@@ -346,7 +344,7 @@ pub struct ClientMessage {
 impl ClientMessage {
     //struct into string, it makes sending information easier by putting it all in a string
     pub fn struct_into_string(&self) -> String {
-        return serde_json::to_string(self).unwrap_or_default();
+        serde_json::to_string(self).unwrap_or_default()
     }
 
     //this is used when sending a normal message
@@ -358,7 +356,7 @@ impl ClientMessage {
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to,
             MessageType: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
@@ -378,7 +376,7 @@ impl ClientMessage {
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to,
             //Dont execute me please :3 |
             //                          |
             //                          V
@@ -421,7 +419,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientFileRequest(ClientFileRequest { index: index }),
+            MessageType: ClientMessageType::ClientFileRequest(ClientFileRequest { index }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -438,7 +436,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientImageRequest(ClientImageRequest { index: index }),
+            MessageType: ClientMessageType::ClientImageRequest(ClientImageRequest { index }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -455,7 +453,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientAudioRequest(ClientAudioRequest { index: index }),
+            MessageType: ClientMessageType::ClientAudioRequest(ClientAudioRequest { index }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -472,7 +470,7 @@ impl ClientMessage {
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to,
             MessageType: ClientMessageType::ClientImageUpload(ClientImageUpload {
                 bytes: fs::read(file_path).unwrap_or_default(),
             }),
@@ -492,7 +490,7 @@ impl ClientMessage {
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
-            replying_to: replying_to,
+            replying_to,
             //Dont execute me please :3 |
             //                          |
             //                          V
@@ -601,7 +599,7 @@ pub struct ServerOutput {
 }
 impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
-        return serde_json::to_string(self).unwrap_or_default();
+        serde_json::to_string(self).unwrap_or_default()
     }
     pub fn convert_audio_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
         ServerOutput {
@@ -617,7 +615,7 @@ impl ServerOutput {
                     ClientMessageType::ClientAudioRequest(_) => todo!(),
                     ClientMessageType::ClientAudioUpload(req) => req.name.unwrap_or_default(),
                 },
-                index: index,
+                index,
             }),
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
@@ -681,7 +679,7 @@ impl ServerOutput {
                     ClientMessageType::ClientAudioRequest(_) => todo!(),
                     ClientMessageType::ClientAudioUpload(_) => todo!(),
                 },
-                index: index,
+                index,
             }),
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
@@ -690,27 +688,21 @@ impl ServerOutput {
 }
 
 //Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s)
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
     pub struct_list: Vec<ServerOutput>,
 }
-impl Default for ServerMaster {
-    fn default() -> Self {
-        Self {
-            struct_list: Vec::new(),
-        }
-    }
-}
+
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
-        return serde_json::to_string(self).unwrap_or_default();
+        serde_json::to_string(self).unwrap_or_default()
     }
     pub fn convert_vec_serverout_into_server_master(
         server_output_list: Vec<ServerOutput>,
     ) -> ServerMaster {
-        return ServerMaster {
+        ServerMaster {
             struct_list: server_output_list,
-        };
+        }
     }
 }
 
@@ -742,6 +734,9 @@ pub struct RequestList {
 }
 impl Default for RequestList {
     fn default() -> Self {
-        Self { audio: true, image: true }
+        Self {
+            audio: true,
+            image: true,
+        }
     }
 }

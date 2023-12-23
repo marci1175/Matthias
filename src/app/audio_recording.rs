@@ -3,7 +3,7 @@
 //! The input data is recorded to "$CARGO_MANIFEST_DIR/recorded.wav".
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, FromSample, Sample};
+use cpal::{FromSample, Sample};
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::mpsc;

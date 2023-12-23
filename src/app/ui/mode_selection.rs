@@ -17,7 +17,7 @@ impl TemplateApp {
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     ui.label(RichText::from("Welcome,").weak().size(20.));
                     ui.label(
-                        RichText::from(format!("{}", self.login_username))
+                        RichText::from(self.login_username.to_string())
                             .strong()
                             .size(20.),
                     );
