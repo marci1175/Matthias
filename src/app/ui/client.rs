@@ -226,6 +226,7 @@ impl TemplateApp {
                     serde_json::from_str(&msg);
                 if let Ok(ok) = incoming_struct {
                     self.incoming_msg = ok;
+                    //Maintain folders if someone not careful enough deletes them
                 }
             }
             Err(_err) => {

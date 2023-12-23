@@ -24,7 +24,7 @@ impl TemplateApp {
                 match fs::read(format!(
                     "{}\\szeChat\\Client\\{}\\Images\\{}",
                     env!("APPDATA"),
-                    general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()),
+                    self.send_on_ip_base64_encoded,
                     picture.index
                 )) {
                     Ok(image_bytes) => {

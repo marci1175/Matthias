@@ -6,9 +6,13 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
+    //Ensure all temporary folders are deleted
+    let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
+    let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));
+    
     //Ensure main folders are existing
-    let _ = std::fs::create_dir(format!("{}\\szeChat\\Client", env!("APPDATA")));
-    let _ = std::fs::create_dir(format!("{}\\szeChat\\Server", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));
 
     use eframe::IconData;
 

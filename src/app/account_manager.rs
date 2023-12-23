@@ -90,7 +90,7 @@ pub fn register(username: String, passw: String) -> Result<()> {
     let app_data = env::var("APPDATA")?;
 
     //always atleast try to make the folder
-    let _ = fs::create_dir(format!("{app_data}\\szeChat"));
+    let _ = fs::create_dir_all(format!("{app_data}\\szeChat"));
 
     let user_path = PathBuf::from(format!("{app_data}\\szeChat\\{username}.szch"));
 
@@ -211,17 +211,6 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
 }
 pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
-    let _ = fs::create_dir(format!(
-        "{}\\szeChat\\Client\\{}",
-        env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
-    ));
-
-    let _ = fs::create_dir(format!(
-        "{}\\szeChat\\Client\\{}\\Images",
-        env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
-    ));
 
     let path = format!(
         "{}\\szeChat\\Client\\{}\\{}",
@@ -237,18 +226,6 @@ pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
 
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
-    let _ = fs::create_dir(format!(
-        "{}\\szeChat\\Client\\{}",
-        env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
-    ));
-
-    let _ = fs::create_dir(format!(
-        "{}\\szeChat\\Client\\{}\\Audios",
-        env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip)
-    ));
-
     let path = format!(
         "{}\\szeChat\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),

@@ -104,6 +104,7 @@ pub struct TemplateApp {
     pub files_to_send: Vec<PathBuf>,
     pub usr_msg_expanded: bool,
     pub send_on_ip: String,
+    pub send_on_ip_base64_encoded: String,
     pub req_passw: bool,
     pub client_password: String,
 
@@ -219,6 +220,7 @@ impl Default for TemplateApp {
             drop_file_animation: false,
             usr_msg_expanded: false,
             send_on_ip: String::new(),
+            send_on_ip_base64_encoded: String::new(),
             req_passw: false,
             client_password: String::new(),
             //font
@@ -712,6 +714,8 @@ pub struct AudioPlayback {
     pub stream_handle: OutputStreamHandle,
     pub sink: Option<Sink>,
     pub src: Option<SineWave>,
+    pub volume: f32,
+    pub speed: f32,
 }
 
 impl Default for AudioPlayback {
@@ -722,6 +726,8 @@ impl Default for AudioPlayback {
             stream_handle,
             sink: None,
             src: None,
+            volume: 1.,
+            speed: 1.,
         }
     }
 }

@@ -11,7 +11,7 @@ use std::{fs::File, path::PathBuf};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ClientMessage, ServerMessageType, TemplateApp};
-
+use std::fs;
 use crate::app::client::{self};
 impl TemplateApp {
     pub fn audio_message_instance(
@@ -19,15 +19,19 @@ impl TemplateApp {
         item: &crate::app::backend::ServerOutput,
         ui: &mut egui::Ui,
     ) {
+        //Create folder for audios for later problem avoidance
+        let _ = fs::create_dir_all(PathBuf::from(format!("{}{}{}{}",env!("APPDATA"), "\\szeChat\\Client\\", self.send_on_ip_base64_encoded, "\\Audios")));
+
         if let ServerMessageType::Audio(audio) = &item.MessageType {
             ui.allocate_ui(vec2(300., 150.), |ui| {
-                match PathBuf::from(format!(
+                let path = PathBuf::from(format!(
                     "{}\\szeChat\\Client\\{}\\Audios\\{}",
                     env!("APPDATA"),
-                    general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone()),
+                    self.send_on_ip_base64_encoded,
                     audio.index
-                ))
-                .exists()
+                ));
+
+                match path.exists()
                 {
                     true => {
                         //if we already have the sound file :::
@@ -76,20 +80,31 @@ impl TemplateApp {
                             }
                         });
 
-                        ui.label(&audio.file_name);
-
-                        if let Some(Sink) = self.audio_playback.sink.as_mut() {
-                            let pause = ui.button("Pause");
-                            if pause.clicked() {
-                                Sink.pause();
-                            }
+                        //Set properties of audio stream, when there is one
+                        if let Some(sink) = self.audio_playback.sink.as_mut() {
+                            //Set volume
+                            sink.set_volume(self.audio_playback.volume);
+                        
+                            sink.set_speed(self.audio_playback.speed);
                         }
+
+                        ui.label(&audio.file_name);
+                        //Audio volume
+                        ui.label("Volume");
+                        ui.add(egui::Slider::new(&mut self.audio_playback.volume, 0.1..=10.).step_by(0.1));
+                        //Audio speed
+                        ui.label("Speed");
+                        ui.add(egui::Slider::new(&mut self.audio_playback.speed, 0.1..=10.).step_by(0.1));
                     }
                     false => {
-                        //check if we already have sound file
+                        //create decoy file, to manually create a race condition
+                        if let Err(err) = std::fs::write(path, "This is a placeholder file, this will get overwritten (hopefully)"){
+                            println!("Error when creating a decoy: {err}");
+                            return;
+                        };
 
                         //check if we are visible
-                        if !ui.is_visible() || !self.requests.audio {
+                        if !ui.is_visible() {
                             return;
                         }
 

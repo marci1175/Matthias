@@ -83,7 +83,7 @@ impl TemplateApp {
                     if !self.files_to_send.is_empty() {
                         ui.separator();
                     }
-
+                   
                     ui.horizontal(|ui| {
                         ui.group(|ui|{
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
