@@ -1,7 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ServerMessageType, TemplateApp};
+use crate::app::backend::{ServerMessageType, TemplateApp, AudioSettings};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -16,6 +16,8 @@ impl TemplateApp {
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
                         ui.allocate_ui(ui.available_size(), |ui| {
+
+                            //Display welcome message if self.send_on_ip is empty
                             if self.send_on_ip.is_empty() {
                                 ui.with_layout(Layout::centered_and_justified(egui::Direction::TopDown), |ui|{
                                     ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
@@ -24,6 +26,16 @@ impl TemplateApp {
 
                             let mut message_instance: Vec<Response> = Vec::new();
                             let mut reply_to_got_to = (false, 0);
+
+
+                            //Allocate places manually for the audio playback (sink_list), but only allocate what we need
+                            for num in 0..(self.incoming_msg.struct_list.len() - self.audio_playback.sink_list.len()) {
+                                self.audio_playback.sink_list.push(None);
+
+                                //Define defaults, for speed and volume based on the same logic as above ^
+                                self.audio_playback.settings_list.push(AudioSettings::default());
+                            }
+                            
 
                             for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
                         
@@ -69,12 +81,12 @@ impl TemplateApp {
                                     //IMPORTANT: Each of these functions have logic inside them for displaying
                                     self.markdown_text_display(i, ui);
 
-                                    self.audio_message_instance(item, ui);
+                                    self.audio_message_instance(item, ui, index);
                             
                                     self.file_message_instance(item, ui);
                             
-                                    self.image_message_instance(item, ui);
-                            
+                                    self.image_message_instance(item, ui, ctx);
+                                    
                                     //Display Message date
                                     ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                 }
@@ -86,7 +98,7 @@ impl TemplateApp {
                                         ctx.copy_text(i.clone());
                                     };
                                 });
-
+                                
                                 //this functions for the reply autoscroll
                                 message_instance.push(message_group);
                                 if reply_to_got_to.0 {

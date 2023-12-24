@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![warn(clippy::all, rust_2018_idioms)]
 #![feature(path_file_prefix)]
+#![feature(cursor_remaining)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
 #[cfg(not(target_arch = "wasm32"))]

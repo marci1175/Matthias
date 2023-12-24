@@ -135,7 +135,7 @@ impl TemplateApp {
                     Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
                 );
 
-                Area::new("drop_warning").show(ctx, |ui| {
+                Area::new("warning_overlay").show(ctx, |ui| {
                     ui.painter().rect(
                         egui::Rect {
                             min: Pos2::new(
@@ -161,7 +161,7 @@ impl TemplateApp {
                 });
             }
             self.how_on = ctx.animate_value_with_time(
-                Id::from("drop_warning"),
+                Id::from("warning_overlay"),
                 match self.drop_file_animation {
                     true => 255.,
                     false => 0.,

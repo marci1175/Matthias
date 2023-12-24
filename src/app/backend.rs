@@ -3,6 +3,7 @@ use rand::rngs::ThreadRng;
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
+use std::io::Cursor;
 
 use rodio::source::SineWave;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -16,10 +17,6 @@ use crate::app::input::Input;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
-    //request tracking
-    #[serde(skip)]
-    pub requests: RequestList,
-
     //audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
@@ -96,6 +93,8 @@ pub struct TemplateApp {
     pub opened_account: Option<File>,
 
     //client main
+    #[serde(skip)]
+    pub image_overlay: bool,
     pub scroll_widget_rect: egui::Rect,
     pub text_widget_offset: f32,
     #[serde(skip)]
@@ -155,9 +154,6 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-            //request tracking
-            requests: RequestList::default(),
-
             //audio playback
             audio_playback: AudioPlayback::default(),
 
@@ -214,6 +210,7 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            image_overlay: false,
             multiline_mode: false,
             files_to_send: Vec::new(),
             how_on: 0.0,
@@ -708,14 +705,16 @@ impl ServerMaster {
     }
 }
 
+ /*
+  Client backend
+ */
+
 //Struct for audio playback
 pub struct AudioPlayback {
     pub stream: OutputStream,
     pub stream_handle: OutputStreamHandle,
-    pub sink: Option<Sink>,
-    pub src: Option<SineWave>,
-    pub volume: f32,
-    pub speed: f32,
+    pub sink_list: Vec<Option<Sink>>,
+    pub settings_list: Vec<AudioSettings>,
 }
 
 impl Default for AudioPlayback {
@@ -724,25 +723,22 @@ impl Default for AudioPlayback {
         Self {
             stream,
             stream_handle,
-            sink: None,
-            src: None,
-            volume: 1.,
-            speed: 1.,
+            sink_list: Vec::new(),
+            settings_list: Vec::new(),
         }
     }
 }
 
-//Request list to keep track of performance, one request per file
-#[derive(Debug, Clone, Copy)]
-pub struct RequestList {
-    pub audio: bool,
-    pub image: bool,
+//This is used by the audio player, this is where you can set the speed of the sink
+pub struct AudioSettings {
+    pub volume: f32,
+    pub speed: f32,
+    pub cursor: Option<Cursor<Vec<u8>>>,
+    pub cursor_offset: u64,
 }
-impl Default for RequestList {
+impl Default for AudioSettings {
     fn default() -> Self {
-        Self {
-            audio: true,
-            image: true,
-        }
+            Self { volume: 0.8, speed: 1., cursor: None, cursor_offset: 0 }
+        
     }
 }
