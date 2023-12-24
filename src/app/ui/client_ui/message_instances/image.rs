@@ -84,7 +84,12 @@ impl TemplateApp {
                     }
                     Err(_err) => {
                         //create decoy file, to manually create a race condition
-                        let _ = fs::create_dir_all(path.clone());
+                        let _ = fs::create_dir_all(PathBuf::from(format!(
+                            "{}\\szeChat\\Client\\{}\\Images",
+                            env!("APPDATA"),
+                            self.send_on_ip_base64_encoded,
+                        )));
+
                         if let Err(err) = std::fs::write(
                             path,
                             "This is a placeholder file, this will get overwritten (hopefully)",

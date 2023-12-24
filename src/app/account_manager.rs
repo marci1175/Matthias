@@ -213,7 +213,7 @@ pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
 
     let path = format!(
-        "{}\\szeChat\\Client\\{}\\{}",
+        "{}\\szeChat\\Client\\{}\\Images\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(&ip),
         file_response.index
