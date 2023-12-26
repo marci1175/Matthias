@@ -1,7 +1,7 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 
-use egui::{vec2, Color32, Area, Align2, Context};
+use egui::{vec2, Color32, Area, Align2, Context, LayerId, Id};
 
 use std::fs::{self};
 
@@ -21,12 +21,12 @@ impl TemplateApp {
         image_bytes: Vec<u8>,
         picture: &ServerImageUpload
     ) {
-        ui.painter().rect_filled(
-            egui::Rect::EVERYTHING,
-            0.,
-            Color32::from_rgba_premultiplied(0, 0, 0, 255),
-        );
-        Area::new("image_overlay").movable(false).anchor(Align2::CENTER_CENTER, vec2(0., 0.)).show(&ctx, |ui|{
+        // ui.painter().with_layer_id(LayerId { order: egui::Order::Foreground, id: Id::new("image_overlay")}).rect_filled(
+        //     egui::Rect::EVERYTHING,
+        //     0.,
+        //     Color32::from_rgba_premultiplied(0, 0, 0, 180),
+        // );
+        if Area::new("image_overlay").movable(false).anchor(Align2::CENTER_CENTER, vec2(0., 0.)).show(&ctx, |ui|{
             ui.add(egui::widgets::Image::from_bytes(
                 format!("bytes://{}", picture.index),
                 image_bytes.clone(),
@@ -40,10 +40,10 @@ impl TemplateApp {
                     let _ = write_file(image_save);
                 }
             });
-        });
-        ctx.input(|reader| { if reader.pointer.any_click() {
+        }).response.clicked_elsewhere() {
             self.image_overlay = false;
-        } });
+        };
+        
     }
     pub fn image_message_instance(
         &mut self,
@@ -62,11 +62,12 @@ impl TemplateApp {
                 match fs::read(&path) {
                     Ok(image_bytes) => {
                         //display picture from bytes
-                        if ui.add(egui::widgets::Image::from_bytes(
+                        let image_widget = ui.add(egui::widgets::Image::from_bytes(
                             format!("bytes://{}", picture.index),
                             image_bytes.clone(),
-                        ))
-                        .context_menu(|ui| {
+                        ));
+
+                        image_widget.context_menu(|ui| {
                             if ui.button("Save").clicked() {
                                 //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
                                 let image_save = ServerFileReply {
@@ -75,9 +76,11 @@ impl TemplateApp {
                                 };
                                 let _ = write_file(image_save);
                             }
-                        }).clicked() {
-                            self.image_overlay = true;
-                        };
+                            if ui.button("Expand").clicked() {
+                                self.image_overlay = true;
+                            }
+                        });
+
                         if self.image_overlay {
                             self.image_overlay_draw(ui, ctx, image_bytes, picture);
                         }

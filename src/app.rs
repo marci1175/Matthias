@@ -48,7 +48,7 @@ impl eframe::App for backend::TemplateApp {
         let input_keys = keymap(self.keymap.clone());
         self.send_on_ip_base64_encoded =
             general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
-
+            
         /*
 
             :: custom font ::
