@@ -59,7 +59,7 @@ impl TemplateApp {
                 picture.index
             ));
             ui.allocate_ui(vec2(300., 300.), |ui| {
-                match fs::read(path.clone()) {
+                match fs::read(&path) {
                     Ok(image_bytes) => {
                         //display picture from bytes
                         if ui.add(egui::widgets::Image::from_bytes(
@@ -68,10 +68,10 @@ impl TemplateApp {
                         ))
                         .context_menu(|ui| {
                             if ui.button("Save").clicked() {
-                                //always name the file ".png"
+                                //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
                                 let image_save = ServerFileReply {
                                     bytes: image_bytes.clone(),
-                                    file_name: PathBuf::from(".png"),
+                                    file_name: PathBuf::from("image.png"),
                                 };
                                 let _ = write_file(image_save);
                             }
@@ -97,7 +97,7 @@ impl TemplateApp {
                             println!("Error when creating a decoy: {err}");
                             return;
                         };
-
+                        
                         //check if we are visible
                         if !ui.is_visible() {
                             return;
@@ -115,7 +115,7 @@ impl TemplateApp {
                             author,
                             send_on_ip,
                         );
-
+                        
                         tokio::spawn(async move {
                             match client::send_msg(message).await {
                                 Ok(ok) => {

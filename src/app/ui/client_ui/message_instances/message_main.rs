@@ -29,7 +29,7 @@ impl TemplateApp {
 
 
                             //Allocate places manually for the audio playback (sink_list), but only allocate what we need
-                            for num in 0..(self.incoming_msg.struct_list.len() - self.audio_playback.sink_list.len()) {
+                            for _ in 0..(self.incoming_msg.struct_list.len() - self.audio_playback.sink_list.len()) {
                                 self.audio_playback.sink_list.push(None);
 
                                 //Define defaults, for speed and volume based on the same logic as above ^

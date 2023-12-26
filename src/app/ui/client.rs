@@ -247,7 +247,11 @@ impl TemplateApp {
             Ok(msg) => {
                 let file_serve: Result<ServerImageReply, serde_json::Error> =
                     serde_json::from_str(&msg);
-                let _ = write_image(file_serve.unwrap(), self.send_on_ip.clone());
+
+                let _ = write_image(file_serve.as_ref().unwrap(), self.send_on_ip.clone());
+
+                //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder 
+                ctx.forget_image(&format!("bytes://{}", file_serve.unwrap().index));
             }
             Err(_err) => {}
         }

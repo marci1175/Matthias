@@ -209,7 +209,7 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
 
     Ok(())
 }
-pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
+pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
 
     let path = format!(
@@ -219,7 +219,7 @@ pub fn write_image(file_response: ServerImageReply, ip: String) -> Result<()> {
         file_response.index
     );
 
-    fs::write(path, file_response.bytes)?;
+    fs::write(path, &file_response.bytes)?;
 
     Ok(())
 }
