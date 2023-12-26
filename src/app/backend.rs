@@ -93,6 +93,8 @@ pub struct TemplateApp {
     pub opened_account: Option<File>,
 
     //client main
+    pub send_on_port: String,
+    pub send_on_address: String,
     #[serde(skip)]
     pub invalid_password: bool,
     #[serde(skip)]
@@ -212,6 +214,8 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            send_on_port: String::new(),
+            send_on_address: String::new(),
             invalid_password: false,
             image_overlay: false,
             multiline_mode: false,

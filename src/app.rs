@@ -122,7 +122,13 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.text_edit_singleline(&mut self.send_on_ip);
+                            //Make connecting to an ip more user friendly
+                        ui.add(egui::TextEdit::singleline(&mut self.send_on_address).hint_text("Address"));
+                        ui.add(egui::TextEdit::singleline(&mut self.send_on_port).hint_text("Port"));
+
+                        //format two text inputs, so because im too lazy
+                        self.send_on_ip = format!("[{}]:{}", self.send_on_address, self.send_on_port);
+
                             ui.allocate_ui(vec2(25., 25.), |ui| {
                                 if ui
                                     .add(egui::widgets::ImageButton::new(egui::include_image!(
@@ -155,8 +161,7 @@ impl eframe::App for backend::TemplateApp {
         egui::Window::new("Bookmarks")
             .open(&mut self.bookmark_mode)
             .show(ctx, |ui| {
-                ui.text_edit_singleline(&mut self.send_on_ip);
-
+                
                 if ui.button("Save ip address").clicked() {
                     match append_to_file(self.opened_account_path.clone(), self.send_on_ip.clone())
                     {

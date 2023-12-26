@@ -235,6 +235,10 @@ impl TemplateApp {
                     Err(_error) => {
                         //Funny server response check, this must match what server replies when inv passw
                         if msg == "Invalid Password!" {
+                            //Reset messages
+                            self.incoming_msg = ServerMaster::default();
+
+                            //Set bools etc.
                             self.invalid_password = true;
                             self.settings_window = true;
                         }

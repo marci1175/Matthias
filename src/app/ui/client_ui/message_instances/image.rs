@@ -47,11 +47,13 @@ impl TemplateApp {
         });
         Area::new("image_overlay_exit")
             .movable(false)
-            .anchor(Align2::LEFT_TOP, vec2(30., 50.))
+            .anchor(Align2::RIGHT_TOP, vec2(30., 50.))
             .show(ctx, |ui|{
-                if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../icons/cross.png"))).clicked() {
-                    self.image_overlay = false;
-                }
+                ui.allocate_ui(vec2(75., 75.), |ui| {
+                    if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../icons/cross.png"))).clicked() {
+                        self.image_overlay = false;
+                    }
+                })
             });
         
     }
