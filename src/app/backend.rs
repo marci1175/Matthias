@@ -94,6 +94,8 @@ pub struct TemplateApp {
 
     //client main
     #[serde(skip)]
+    pub invalid_password: bool,
+    #[serde(skip)]
     pub image_overlay: bool,
     pub scroll_widget_rect: egui::Rect,
     pub text_widget_offset: f32,
@@ -210,6 +212,7 @@ impl Default for TemplateApp {
             opened_account_path: PathBuf::default(),
 
             //client main
+            invalid_password: false,
             image_overlay: false,
             multiline_mode: false,
             files_to_send: Vec::new(),
@@ -577,15 +580,18 @@ pub struct ServerAudioReply {
     pub index: i32,
     pub file_name: String,
 }
+
 //This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerMessageType {
+
     Upload(ServerFileUpload),
     Normal(ServerNormalMessage),
 
     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
     Image(ServerImageUpload),
     Audio(ServerAudioUpload),
+
 }
 
 //This is one whole server msg (packet), which gets bundled when sending ServerMain

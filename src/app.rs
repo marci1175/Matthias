@@ -1,6 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Layout, RichText};
+use egui::{vec2, Align, Layout, RichText, Color32};
 
 use std::fs::{self};
 use std::path::PathBuf;
@@ -68,9 +68,15 @@ impl eframe::App for backend::TemplateApp {
 
         */
 
+        /* NOTES:
+
+            - file_tray_main.rs contains reply_tray
+
+        */
+
         /*devlog:
 
-        TODO: MAKE MESSAGE WIDGET BETTER
+            TODO: fix for audio playback
 
         */
 
@@ -138,6 +144,9 @@ impl eframe::App for backend::TemplateApp {
                     if compare_passwords != self.client_password || self.send_on_ip != compare_ip {
                         self.autosync_sender = None;
                         self.incoming_msg = ServerMaster::default();
+                    }
+                    if self.invalid_password {
+                        ui.label(RichText::from("Invalid Password!").color(Color32::RED));
                     }
                 } else if self.server_mode {
                 }

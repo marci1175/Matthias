@@ -1,5 +1,8 @@
 use device_query::Keycode;
-use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke};
+use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke, LayerId};
+use image::Frame;
+use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
+use windows_sys::w;
 
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
@@ -119,63 +122,63 @@ impl TemplateApp {
 
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
+            //Drop file warning
             self.drop_file_animation =
-                ui.input(|input| !input.raw.clone().hovered_files.is_empty());
+                    ui.input(|input| !input.raw.clone().hovered_files.is_empty());
+                if self.how_on >= 0. {
+                    let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
+                    let font_id = FontId {
+                        family: FontFamily::default(),
+                        size: self.font_size,
+                    };
 
-            if self.how_on >= 0. {
-                let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
-                let font_id = FontId {
-                    family: FontFamily::default(),
-                    size: self.font_size,
-                };
+                    ui.painter().rect_filled(
+                        egui::Rect::EVERYTHING,
+                        0.,
+                        Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
+                    );
 
-                ui.painter().rect_filled(
-                    egui::Rect::EVERYTHING,
-                    0.,
-                    Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
+                    Area::new("warning_overlay").show(ctx, |ui| {
+                        ui.painter().rect(
+                            egui::Rect {
+                                min: Pos2::new(
+                                    window_size[0] / 3.,
+                                    window_size[0] / 5. + self.how_on / 50.,
+                                ),
+                                max: Pos2::new(
+                                    window_size[0] / 1.5,
+                                    window_size[0] / 3. + self.how_on / 50.,
+                                ),
+                            },
+                            5.0,
+                            Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8),
+                            Stroke::default(),
+                        );
+                        ui.painter().text(
+                            Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.),
+                            Align2([Align::Center, Align::Center]),
+                            "Drop to upload",
+                            font_id,
+                            Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8),
+                        );
+                    });
+                }
+                self.how_on = ctx.animate_value_with_time(
+                    Id::from("warning_overlay"),
+                    match self.drop_file_animation {
+                        true => 255.,
+                        false => 0.,
+                    },
+                    0.4,
                 );
 
-                Area::new("warning_overlay").show(ctx, |ui| {
-                    ui.painter().rect(
-                        egui::Rect {
-                            min: Pos2::new(
-                                window_size[0] / 3.,
-                                window_size[0] / 5. + self.how_on / 50.,
-                            ),
-                            max: Pos2::new(
-                                window_size[0] / 1.5,
-                                window_size[0] / 3. + self.how_on / 50.,
-                            ),
-                        },
-                        5.0,
-                        Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8),
-                        Stroke::default(),
-                    );
-                    ui.painter().text(
-                        Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.),
-                        Align2([Align::Center, Align::Center]),
-                        "Drop to upload",
-                        font_id,
-                        Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8),
-                    );
-                });
-            }
-            self.how_on = ctx.animate_value_with_time(
-                Id::from("warning_overlay"),
-                match self.drop_file_animation {
-                    true => 255.,
-                    false => 0.,
-                },
-                0.4,
-            );
+                let dropped_files = ui.input(|reader| reader.raw.clone().dropped_files);
+                if !dropped_files.is_empty() {
+                    let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
 
-            let dropped_files = ui.input(|reader| reader.raw.clone().dropped_files);
-            if !dropped_files.is_empty() {
-                let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
-
-                self.files_to_send.push(dropped_file_path);
-            }
-
+                    self.files_to_send.push(dropped_file_path);
+                }
+                
             //Messages go here
             self.client_ui_message_main(ui, ctx);
         });
@@ -224,9 +227,18 @@ impl TemplateApp {
             Ok(msg) => {
                 let incoming_struct: Result<ServerMaster, serde_json::Error> =
                     serde_json::from_str(&msg);
-                if let Ok(ok) = incoming_struct {
-                    self.incoming_msg = ok;
-                    //Maintain folders if someone not careful enough deletes them
+                match incoming_struct {
+                    Ok(ok) => {
+                        self.invalid_password = false;
+                        self.incoming_msg = ok;
+                    }
+                    Err(_error) => {
+                        //Funny server response check, this must match what server replies when inv passw
+                        if msg == "Invalid Password!" {
+                            self.invalid_password = true;
+                            self.settings_window = true;
+                        }
+                    }
                 }
             }
             Err(_err) => {

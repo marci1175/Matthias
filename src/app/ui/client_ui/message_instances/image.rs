@@ -1,7 +1,7 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 
-use egui::{vec2, Color32, Area, Align2, Context, LayerId, Id};
+use egui::{vec2, Color32, Area, Align2, Context, LayerId, Id, RichText, Sense};
 
 use std::fs::{self};
 
@@ -21,28 +21,38 @@ impl TemplateApp {
         image_bytes: Vec<u8>,
         picture: &ServerImageUpload
     ) {
-        // ui.painter().with_layer_id(LayerId { order: egui::Order::Foreground, id: Id::new("image_overlay")}).rect_filled(
-        //     egui::Rect::EVERYTHING,
-        //     0.,
-        //     Color32::from_rgba_premultiplied(0, 0, 0, 180),
-        // );
-        if Area::new("image_overlay").movable(false).anchor(Align2::CENTER_CENTER, vec2(0., 0.)).show(&ctx, |ui|{
-            ui.add(egui::widgets::Image::from_bytes(
-                format!("bytes://{}", picture.index),
-                image_bytes.clone(),
-            ))/*Add the same context menu as before*/.context_menu(|ui| {
-                if ui.button("Save").clicked() {
-                    //always name the file ".png"
-                    let image_save = ServerFileReply {
-                        bytes: image_bytes.clone(),
-                        file_name: PathBuf::from(".png"),
-                    };
-                    let _ = write_file(image_save);
+        //Image overlay
+        ui.painter().rect_filled(
+            egui::Rect::EVERYTHING,
+            0.,
+            Color32::from_rgba_premultiplied(0, 0, 0, 180),
+        );
+
+        Area::new("image_overlay").movable(false).anchor(Align2::CENTER_CENTER, vec2(0., 0.)).show(&ctx, |ui|{
+            ui.allocate_ui(vec2(ui.available_width() / 1.3, ui.available_height() / 1.3), |ui|{
+                ui.add(egui::widgets::Image::from_bytes(
+                    format!("bytes://{}", picture.index),
+                    image_bytes.clone(),
+                ))/*Add the same context menu as before*/.context_menu(|ui| {
+                    if ui.button("Save").clicked() {
+                        //always name the file ".png"
+                        let image_save = ServerFileReply {
+                            bytes: image_bytes.clone(),
+                            file_name: PathBuf::from(".png"),
+                        };
+                        let _ = write_file(image_save);
+                    }
+                });
+            });
+        });
+        Area::new("image_overlay_exit")
+            .movable(false)
+            .anchor(Align2::LEFT_TOP, vec2(30., 50.))
+            .show(ctx, |ui|{
+                if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../icons/cross.png"))).clicked() {
+                    self.image_overlay = false;
                 }
             });
-        }).response.clicked_elsewhere() {
-            self.image_overlay = false;
-        };
         
     }
     pub fn image_message_instance(
@@ -67,6 +77,10 @@ impl TemplateApp {
                             image_bytes.clone(),
                         ));
 
+                        if image_widget.interact(Sense::click()).clicked() {
+                            self.image_overlay = true;
+                        }
+
                         image_widget.context_menu(|ui| {
                             if ui.button("Save").clicked() {
                                 //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
@@ -75,9 +89,6 @@ impl TemplateApp {
                                     file_name: PathBuf::from("image.png"),
                                 };
                                 let _ = write_file(image_save);
-                            }
-                            if ui.button("Expand").clicked() {
-                                self.image_overlay = true;
                             }
                         });
 

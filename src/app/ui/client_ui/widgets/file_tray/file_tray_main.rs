@@ -5,9 +5,8 @@ use crate::app::backend::{ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn file_tray(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, !self.files_to_send.is_empty() || self.replying_to.is_some(), |ui|{
+        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.files_to_send.is_empty() || self.replying_to.is_some()) && self.usr_msg_expanded, |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));
-
                 egui::ScrollArea::horizontal()
                         .id_source("file_to_send")
                         .stick_to_right(true)
@@ -102,14 +101,14 @@ impl TemplateApp {
                                 });
                             });
                         });
-                        if ui.button(RichText::from("X").size(self.font_size * 1.5).color(Color32::RED)).clicked() {
+                        if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
                             self.replying_to = None;
-                        };
+                        }
                     });
             
                 }  
 
-            ui.allocate_space(vec2(ui.available_width(), 10.));   
+                ui.allocate_space(vec2(ui.available_width(), 10.));   
 
             });
     }

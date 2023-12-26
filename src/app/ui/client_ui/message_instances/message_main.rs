@@ -27,6 +27,12 @@ impl TemplateApp {
                             let mut message_instance: Vec<Response> = Vec::new();
                             let mut reply_to_got_to = (false, 0);
 
+                            //Check if sink_list is bigger than messages, to avoid crashing
+                            if self.audio_playback.sink_list.len() > self.incoming_msg.struct_list.len() {
+                                for _ in 0..(self.audio_playback.sink_list.len() as i32 - self.incoming_msg.struct_list.len() as i32).abs() {
+                                    self.audio_playback.sink_list.remove(self.audio_playback.sink_list.len() - 1);
+                                }
+                            }
 
                             //Allocate places manually for the audio playback (sink_list), but only allocate what we need
                             for _ in 0..(self.incoming_msg.struct_list.len() - self.audio_playback.sink_list.len()) {
