@@ -105,9 +105,14 @@ impl TemplateApp {
                     if self.ipv4_mode {
                         ui.label(RichText::from("Public ipV4 address : ").size(20.));
                         ui.text_edit_singleline(&mut pub_ip[1].trim().to_string());
+
+                        ui.label("Server address");
+                        ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[1],self.open_on_port));
                     } else {
                         ui.label(RichText::from("Public ipV6 address : ").size(20.));
                         ui.text_edit_singleline(&mut pub_ip[0].trim().to_string());
+                        ui.label("Server address");
+                        ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[0],self.open_on_port));
                     }
                     if self.server_req_password && !self.server_password.is_empty() {
                         ui.label(RichText::from(format!(
@@ -117,6 +122,8 @@ impl TemplateApp {
                     }
                     ui.label(RichText::from("Port").size(15.).strong());
                     ui.label(RichText::from(self.open_on_port.clone()).size(15.));
+
+                    
                 }
             });
         });

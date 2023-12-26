@@ -47,9 +47,9 @@ impl TemplateApp {
         });
         Area::new("image_overlay_exit")
             .movable(false)
-            .anchor(Align2::RIGHT_TOP, vec2(30., 50.))
+            .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
             .show(ctx, |ui|{
-                ui.allocate_ui(vec2(75., 75.), |ui| {
+                ui.allocate_ui(vec2(25., 25.), |ui| {
                     if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../icons/cross.png"))).clicked() {
                         self.image_overlay = false;
                     }
