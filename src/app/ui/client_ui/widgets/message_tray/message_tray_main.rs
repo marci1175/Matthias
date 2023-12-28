@@ -184,7 +184,7 @@ impl TemplateApp {
         });
         ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
             if let Some(atx) = self.atx.clone() {
-                if ui.button("Stop").clicked() {
+                if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png")).tint(Color32::RED)).clicked() {
                     //Just send something, it doesnt really matter
                     atx.send(false).unwrap();
 
@@ -204,7 +204,7 @@ impl TemplateApp {
                         eprintln!("{err}")
                     };
                 }
-            } else if ui.button("Record").clicked() {
+            } else if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png"))).clicked() {
                 let (tx, rx) = mpsc::channel::<bool>();
 
                 self.atx = Some(tx);
