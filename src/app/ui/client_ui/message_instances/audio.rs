@@ -2,9 +2,9 @@ use egui::{vec2, Align, Layout};
 
 use rodio::{Decoder, Sink};
 
-use std::io::{BufReader, Cursor};
+use std::io::Cursor;
 
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ClientMessage, ServerMessageType, TemplateApp};
@@ -50,7 +50,9 @@ impl TemplateApp {
                                     }
                                     false => {
                                         if ui.button("Stop").clicked() {
-                                            sink.pause()
+                                            sink.clear();
+                                            //Reset value
+                                            self.audio_playback.sink_list[current_index_in_message_list] = None;
                                         }
                                     }
                                 },

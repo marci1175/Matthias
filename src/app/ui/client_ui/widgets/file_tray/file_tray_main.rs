@@ -1,4 +1,4 @@
-use egui::{vec2, Align, Color32, ImageButton, Layout, RichText, TextBuffer};
+use egui::{vec2, Align, ImageButton, Layout, RichText};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ServerMessageType, TemplateApp};

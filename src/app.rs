@@ -3,7 +3,6 @@ use base64::Engine;
 use egui::{vec2, Align, Layout, RichText, Color32};
 
 use std::fs::{self};
-use std::path::PathBuf;
 
 mod account_manager;
 pub mod backend;
@@ -19,7 +18,7 @@ use self::account_manager::{
     append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
 };
 
-use self::backend::{ServerMaster, TemplateApp};
+use self::backend::ServerMaster;
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {

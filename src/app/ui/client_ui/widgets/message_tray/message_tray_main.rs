@@ -1,7 +1,7 @@
 use device_query::Keycode;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Layout, RichText, Rounding,
-    Stroke, TextBuffer,
+    Stroke,
 };
 use rand::Rng;
 
@@ -129,7 +129,7 @@ impl TemplateApp {
                         self.send_file(file_path);
                     }
                 }
-                
+
                 //clear temp files
                 let _ = fs::remove_file(concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav"));
 

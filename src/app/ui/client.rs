@@ -1,8 +1,5 @@
 use device_query::Keycode;
-use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke, LayerId};
-use image::Frame;
-use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
-use windows_sys::w;
+use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke};
 
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
@@ -10,7 +7,6 @@ use std::time::Duration;
 
 use crate::app::account_manager::{write_audio, write_file, write_image};
 
-//use crate::app::account_manager::write_file;
 use crate::app::backend::{
     ClientMessage, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster, TemplateApp,
 };

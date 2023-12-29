@@ -2,10 +2,9 @@ use chrono::Utc;
 use rand::rngs::ThreadRng;
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Cursor;
 
-use rodio::source::SineWave;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use std::path::PathBuf;

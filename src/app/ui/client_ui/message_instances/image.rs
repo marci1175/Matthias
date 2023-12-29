@@ -1,7 +1,4 @@
-use base64::engine::general_purpose;
-use base64::Engine;
-
-use egui::{vec2, Color32, Area, Align2, Context, LayerId, Id, RichText, Sense};
+use egui::{vec2, Color32, Area, Align2, Context, Sense};
 
 use std::fs::{self};
 

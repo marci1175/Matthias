@@ -77,7 +77,7 @@ impl ServerMessage for MessageService {
                 ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
 
                 ClientFileRequestType(request_type) => {
-                    return self.handle_request(req.clone(), request_type).await;
+                    return self.handle_request(request_type).await;
                 },
 
                 ClientFileUpload(upload_type) => {
@@ -474,7 +474,7 @@ impl MessageService {
         )
     }
 
-    pub async fn handle_request(&self, req: ClientMessage, request_type: &ClientRequestTypeStruct) -> Result<Response<MessageResponse>, Status> {
+    pub async fn handle_request(&self, request_type: &ClientRequestTypeStruct) -> Result<Response<MessageResponse>, Status> {
         match request_type {
             ClientRequestTypeStruct::ClientImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
