@@ -35,7 +35,7 @@ impl Default for Opt {
     }
 }
 
-pub fn audio_recroding_test(receiver: mpsc::Receiver<bool>) {
+pub fn audio_recroding(receiver: mpsc::Receiver<bool>) {
     std::thread::spawn(move || {
         let opt = Opt::default();
 

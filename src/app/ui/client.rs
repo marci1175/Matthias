@@ -19,17 +19,6 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: Vec<Keycode>,
     ) {
-        //set multiline mode
-        //IMPORTANT: unused
-        if self.usr_msg.trim().lines().count() > 1
-        || /*try to detect a new line caused by char lenght */
-            (self.usr_msg.len() as f32 * (self.font_size / 2.)) > _frame.info().window_info.size[0] / 1.4
-        {
-            self.multiline_mode = true;
-        } else {
-            self.multiline_mode = false;
-        }
-
         let should_be_running = self.autosync_should_run.clone();
         let rx = self.autosync_sender.get_or_insert_with(|| {
             let (tx, rx) = mpsc::channel::<String>();
@@ -276,5 +265,6 @@ impl TemplateApp {
             }
             Err(_err) => {}
         }
+        ctx.request_repaint();
     }
 }

@@ -7,7 +7,6 @@ use std::fs::{self};
 mod account_manager;
 pub mod backend;
 
-mod audio_recording;
 mod client;
 mod input;
 mod networking;
@@ -45,8 +44,8 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.keymap.clone());
-        self.send_on_ip_base64_encoded =
-            general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
+
+        
 
         /*
 

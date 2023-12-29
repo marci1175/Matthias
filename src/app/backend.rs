@@ -3,19 +3,20 @@ use rand::rngs::ThreadRng;
 
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::Cursor;
-
+use std::io;
+use std::io::{Read, Seek, SeekFrom};
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 
 use crate::app::input::Input;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
+
     //audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
@@ -25,20 +26,34 @@ pub struct TemplateApp {
     pub named_chars: BTreeMap<egui::FontFamily, BTreeMap<char, String>>,
 
     //login page
+    
+    //the string entered to the username field on the login page
     pub login_username: String,
+
     #[serde(skip)]
+    //the string entered to the password field on the login page, dont save this one... obviously :)
     pub login_password: String,
+    
     //server main
+    
+    //DEPRICATED, ipv4 mode
     pub ipv4_mode: bool,
+
+    //SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
     #[serde(skip)]
     pub server_has_started: bool,
+
+    //Public ip address, checked by pinging external website
     #[serde(skip)]
     pub public_ip: String,
+    
     //server settings
     pub server_req_password: bool,
 
+    //What is the server's password set to
     pub server_password: String,
 
+    //Which port is the server open on
     pub open_on_port: String,
 
     //thread communication for server
@@ -73,77 +88,130 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub audio_save_tx: mpsc::Sender<String>,
 
-    //main
+    /*
+        main
+    */
+
+    //Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
+
+    //This struct is used for keymapping, TODO: just switch to ctx.input
     #[serde(skip)]
     pub keymap: Input,
+
+    //Checks if bookmark mode is turned on
     #[serde(skip)]
     pub bookmark_mode: bool,
+
+    //Client mode main switch
     #[serde(skip)]
     pub client_mode: bool,
+
+    //Server mode main switch
     #[serde(skip)]
     pub server_mode: bool,
+    
+    //Mode selector mode main switch
     #[serde(skip)]
     pub mode_selector: bool,
+
+    //Opened account's file pathbuf
     #[serde(skip)]
     pub opened_account_path: PathBuf,
-    #[serde(skip)]
-    pub opened_account: Option<File>,
 
-    //client main
+    /*
+        client main
+    */
+    
+    //this doesnt really matter if we save or no so whatever
+    #[serde(skip)]
+    pub should_scroll_to_reply: bool,
+
+    //Selected port on sending
     pub send_on_port: String,
+
+    //Selected ip address (without port as seen above)
     pub send_on_address: String,
+
+    //This is used when the client entered a false password to connect with to the server
     #[serde(skip)]
     pub invalid_password: bool,
+
+    //This is set to on when an image is enlarged
     #[serde(skip)]
     pub image_overlay: bool,
+
+    //Scroll widget rect, text editor's rect
     pub scroll_widget_rect: egui::Rect,
+
+    //This decides how wide the text editor should be, ensure it doesnt overlap with "msg_action_tray" (the action buttons :) )
     pub text_widget_offset: f32,
-    #[serde(skip)]
-    pub multiline_mode: bool,
+
+    //A vector of all the added files to the buffer, these are the PathBufs which get read, then their bytes get sent
     #[serde(skip)]
     pub files_to_send: Vec<PathBuf>,
+
+    //This checks if the text editor is open or not
     pub usr_msg_expanded: bool,
+
+    //This is the full address of the destionation a message is supposed to be sent to
     pub send_on_ip: String,
+
     pub send_on_ip_base64_encoded: String,
     pub req_passw: bool,
     pub client_password: String,
 
     //font
     pub font_size: f32,
+
+    //This gem of a variable is used to contain animation's state
     pub how_on: f32,
+
+    //This checks if a file is dragged above szeChat, so it knows when to display the cool animation 8)
     #[serde(skip)]
     pub drop_file_animation: bool,
-    //msg
+
+    //Message Settings
     #[serde(skip)]
     pub replying_to: Option<usize>,
+    
+    //Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
     pub usr_msg: String,
-    #[serde(skip)]
-    pub incoming_msg_time: Vec<String>,
+    
+    //Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
     pub incoming_msg: ServerMaster,
+
     //emoji fasz
     pub random_emoji: String,
     pub emoji: Vec<String>,
+    
+    //Random engine
     #[serde(skip)]
     pub rand_eng: ThreadRng,
+    
+    //Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
+
     //thread communication for client
     #[serde(skip)]
     pub rx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub tx: mpsc::Sender<String>,
+    
     //data sync
     #[serde(skip)]
     pub drx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub dtx: mpsc::Sender<String>,
-    #[serde(skip)]
-    pub has_init: bool,
+    
+    //Server - client syncing thread
     #[serde(skip)]
     pub autosync_sender: Option<mpsc::Receiver<String>>,
+    
+    //Server - client sync worker should run
     #[serde(skip)]
     pub autosync_should_run: Arc<AtomicBool>,
 }
@@ -209,15 +277,14 @@ impl Default for TemplateApp {
             client_mode: false,
             server_mode: false,
             mode_selector: false,
-            opened_account: None,
             opened_account_path: PathBuf::default(),
 
             //client main
+            should_scroll_to_reply: false,
             send_on_port: String::new(),
             send_on_address: String::new(),
             invalid_password: false,
             image_overlay: false,
-            multiline_mode: false,
             files_to_send: Vec::new(),
             how_on: 0.0,
             drop_file_animation: false,
@@ -244,7 +311,6 @@ impl Default for TemplateApp {
             //msg
             usr_msg: String::new(),
             replying_to: None,
-            incoming_msg_time: Vec::new(),
             incoming_msg: ServerMaster::default(),
 
             //thread communication for client
@@ -254,7 +320,6 @@ impl Default for TemplateApp {
             //data sync
             drx,
             dtx,
-            has_init: false,
             autosync_sender: None,
             autosync_should_run: Arc::new(AtomicBool::new(true)),
         }
@@ -678,20 +743,47 @@ impl Default for AudioPlayback {
     }
 }
 
-//This is used by the audio player, this is where you can set the speed of the sink
+//This is used by the audio player, this is where you can set the speed and volume etc
 pub struct AudioSettings {
     pub volume: f32,
     pub speed: f32,
-    pub cursor: Option<Cursor<Vec<u8>>>,
+    pub cursor: PlaybackCursor,
     pub cursor_offset: u64,
 }
+
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
             volume: 0.8,
             speed: 1.,
-            cursor: None,
+            cursor: PlaybackCursor::new([0].to_vec()),
             cursor_offset: 0,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct PlaybackCursor {
+    pub cursor: Arc<Mutex<io::Cursor<Vec<u8>>>>,
+}
+
+impl PlaybackCursor {
+    pub fn new(data: Vec<u8>) -> Self {
+        let cursor = Arc::new(Mutex::new(io::Cursor::new(data)));
+        PlaybackCursor { cursor }
+    }
+}
+
+impl Read for PlaybackCursor {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut cursor = self.cursor.lock().unwrap();
+        cursor.read(buf)
+    }
+}
+
+impl Seek for PlaybackCursor {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let mut cursor = self.cursor.lock().unwrap();
+        cursor.seek(pos)
     }
 }

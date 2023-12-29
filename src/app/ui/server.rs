@@ -53,7 +53,14 @@ impl TemplateApp {
                         //to be implemented for later msg showing to server mode
                         let _temp_tx = self.stx.clone();
 
-                        let server_pw = self.server_password.clone();
+                        let server_pw = match self.server_req_password {
+                            true => {
+                                self.server_password.clone()
+                            }
+                            false => {
+                                "".to_string()
+                            }
+                        };
                         let ip_v4 = self.ipv4_mode;
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {

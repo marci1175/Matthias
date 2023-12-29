@@ -1,13 +1,11 @@
+use base64::Engine;
+use base64::engine::general_purpose;
 use egui::{vec2, Align, Layout};
-
 use rodio::{Decoder, Sink};
-
-use std::io::Cursor;
-
 use std::path::PathBuf;
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ClientMessage, ServerMessageType, TemplateApp};
+use crate::app::backend::{ClientMessage, ServerMessageType, TemplateApp, PlaybackCursor};
 use crate::app::client::{self};
 use std::fs;
 impl TemplateApp {
@@ -17,6 +15,9 @@ impl TemplateApp {
         ui: &mut egui::Ui,
         current_index_in_message_list: usize,
     ) {
+        self.send_on_ip_base64_encoded =
+            general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
+            
         //Create folder for audios for later problem avoidance
         let _ = fs::create_dir_all(PathBuf::from(format!(
             "{}{}{}{}",
@@ -49,6 +50,9 @@ impl TemplateApp {
                                         };
                                     }
                                     false => {
+                                        //ui.label(format!("{:?}", self.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap().remaining_slice().len()));
+                                        //let cursor = self.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
+                                        
                                         if ui.button("Stop").clicked() {
                                             sink.clear();
                                             //Reset value
@@ -58,6 +62,8 @@ impl TemplateApp {
                                 },
                                 None => {
                                     if ui.button("Play").clicked() {
+                                        self.send_on_ip_base64_encoded =
+                                            general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
                                         let file = PathBuf::from(format!(
                                             "{}\\szeChat\\Client\\{}\\Audios\\{}",
                                             env!("APPDATA"),
@@ -65,25 +71,30 @@ impl TemplateApp {
                                             audio.index
                                         ));
 
-                                        let cursor = Some(Cursor::new(
-                                            fs::read(file).unwrap_or_default(),
-                                        ));
-
-                                        let source = Decoder::new(cursor.unwrap() /*We can assume its always Some because we just set it to some above (lol)*/).unwrap();
+                                        let file_stream_to_be_read = fs::read(file).unwrap_or_default();
                                         
-                                        // self.audio_playback.settings_list[current_index_in_message_list].cursor = cursor;
+                                        self.audio_playback.settings_list[current_index_in_message_list].cursor = PlaybackCursor::new(file_stream_to_be_read);
                                         
                                         self.audio_playback.sink_list
                                             [current_index_in_message_list] = Some(
                                             Sink::try_new(&self.audio_playback.stream_handle)
                                                 .unwrap(),
                                         );
-
+                                        
                                         let sink = self.audio_playback.sink_list
                                             [current_index_in_message_list]
                                             .as_mut()
                                             .unwrap();
 
+                                        let source = Decoder::new(self.audio_playback.settings_list[current_index_in_message_list].cursor.clone() /*We can assume its always Some because we just set it to some above (lol)*/)
+                                            .unwrap_or_else(|e| {
+                                                dbg!(&e);
+                                                eprintln!("{}", e);
+
+                                                //Return an empty decoder to avoid panicing
+                                                Decoder::new(PlaybackCursor::new(vec![0])).unwrap()
+                                            });
+                                        
                                         sink.append(source);
 
                                         sink.play();
@@ -107,26 +118,28 @@ impl TemplateApp {
                                     .speed,
                             );
                         }
-                        // let pos = self.audio_playback.settings_list[current_index_in_message_list].cursor_offset;
-                        // if let Some(cursor) = self.audio_playback.settings_list[current_index_in_message_list].cursor.as_mut() {
-                        //     cursor.set_position(pos);
-                        //     let range = self.audio_playback.settings_list
-                        //     [current_index_in_message_list]
-                        //     .cursor.clone().unwrap().position() + self.audio_playback.settings_list
-                        //     [current_index_in_message_list]
-                        //     .cursor.clone().unwrap().remaining_slice().len() as u64;
-                        //     //Cursor
-                        //     ui.add(
-                        //         egui::Slider::new(
-                        //             &mut self.audio_playback.settings_list
-                        //                 [current_index_in_message_list]
-                        //                 .cursor_offset,
-                        //             0..=range,
-                        //         )
-                        //         .text("Volume")
-                        //         .step_by(1.)
-                        //     );
-                        // }
+                        /*
+                        let pos = self.audio_playback.settings_list[current_index_in_message_list].cursor_offset;
+                        if let Some(cursor) = self.audio_playback.settings_list[current_index_in_message_list].cursor.as_mut() {
+                            cursor.set_position(pos);
+                            let range = self.audio_playback.settings_list
+                            [current_index_in_message_list]
+                            .cursor.clone().unwrap().position() + self.audio_playback.settings_list
+                            [current_index_in_message_list]
+                            .cursor.clone().unwrap().remaining_slice().len() as u64;
+                            //Cursor
+                            ui.add(
+                                egui::Slider::new(
+                                    &mut self.audio_playback.settings_list
+                                        [current_index_in_message_list]
+                                        .cursor_offset,
+                                    0..=range,
+                                )
+                                .text("Volume")
+                                .step_by(1.)
+                            );
+                        }
+                        */
 
                         ui.label(&audio.file_name);
                         //Audio volume
