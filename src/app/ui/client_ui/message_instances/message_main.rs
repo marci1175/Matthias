@@ -1,7 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ServerMessageType, TemplateApp, AudioSettings};
+use crate::app::backend::{AudioSettings, ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn client_ui_message_main(

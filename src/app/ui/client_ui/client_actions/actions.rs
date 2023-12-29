@@ -3,7 +3,6 @@ use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 
 impl TemplateApp {
-    
     /*
 
         ::  DEPRICATED FUNCTIONS ::

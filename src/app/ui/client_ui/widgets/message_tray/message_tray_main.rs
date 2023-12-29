@@ -131,7 +131,8 @@ impl TemplateApp {
                 }
 
                 //clear temp files
-                let _ = fs::remove_file(concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav"));
+                let _ =
+                    fs::remove_file(concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav"));
 
                 //clear vectors
                 self.files_to_send.clear();
@@ -177,7 +178,15 @@ impl TemplateApp {
         });
         ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
             if let Some(atx) = self.atx.clone() {
-                if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png")).tint(Color32::RED)).clicked() {
+                if ui
+                    .add(
+                        egui::ImageButton::new(egui::include_image!(
+                            "../../../../../../icons/record.png"
+                        ))
+                        .tint(Color32::RED),
+                    )
+                    .clicked()
+                {
                     ui.label(RichText::from("Recording").size(self.font_size / 2.));
                     //Just send something, it doesnt really matter
                     atx.send(false).unwrap();
@@ -195,7 +204,12 @@ impl TemplateApp {
                     //Destroy state
                     self.atx = None;
                 }
-            } else if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png"))).clicked() {
+            } else if ui
+                .add(egui::ImageButton::new(egui::include_image!(
+                    "../../../../../../icons/record.png"
+                )))
+                .clicked()
+            {
                 let (tx, rx) = mpsc::channel::<bool>();
 
                 self.atx = Some(tx);

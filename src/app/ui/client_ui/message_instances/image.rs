@@ -1,4 +1,4 @@
-use egui::{vec2, Color32, Area, Align2, Context, Sense};
+use egui::{vec2, Align2, Area, Color32, Context, Sense};
 
 use std::fs::{self};
 
@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use crate::app::account_manager::write_file;
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ClientMessage, ServerFileReply, ServerMessageType, TemplateApp, ServerImageUpload};
+use crate::app::backend::{
+    ClientMessage, ServerFileReply, ServerImageUpload, ServerMessageType, TemplateApp,
+};
 use crate::app::client;
 
 impl TemplateApp {
@@ -16,7 +18,7 @@ impl TemplateApp {
         ui: &mut egui::Ui,
         ctx: &Context,
         image_bytes: Vec<u8>,
-        picture: &ServerImageUpload
+        picture: &ServerImageUpload,
     ) {
         //Image overlay
         ui.painter().rect_filled(
@@ -25,40 +27,51 @@ impl TemplateApp {
             Color32::from_rgba_premultiplied(0, 0, 0, 180),
         );
 
-        Area::new("image_overlay").movable(false).anchor(Align2::CENTER_CENTER, vec2(0., 0.)).show(&ctx, |ui|{
-            ui.allocate_ui(vec2(ui.available_width() / 1.3, ui.available_height() / 1.3), |ui|{
-                ui.add(egui::widgets::Image::from_bytes(
-                    format!("bytes://{}", picture.index),
-                    image_bytes.clone(),
-                ))/*Add the same context menu as before*/.context_menu(|ui| {
-                    if ui.button("Save").clicked() {
-                        //always name the file ".png"
-                        let image_save = ServerFileReply {
-                            bytes: image_bytes.clone(),
-                            file_name: PathBuf::from(".png"),
-                        };
-                        let _ = write_file(image_save);
-                    }
-                });
+        Area::new("image_overlay")
+            .movable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
+            .show(&ctx, |ui| {
+                ui.allocate_ui(
+                    vec2(ui.available_width() / 1.3, ui.available_height() / 1.3),
+                    |ui| {
+                        ui.add(egui::widgets::Image::from_bytes(
+                            format!("bytes://{}", picture.index),
+                            image_bytes.clone(),
+                        )) /*Add the same context menu as before*/
+                        .context_menu(|ui| {
+                            if ui.button("Save").clicked() {
+                                //always name the file ".png"
+                                let image_save = ServerFileReply {
+                                    bytes: image_bytes.clone(),
+                                    file_name: PathBuf::from(".png"),
+                                };
+                                let _ = write_file(image_save);
+                            }
+                        });
+                    },
+                );
             });
-        });
         Area::new("image_overlay_exit")
             .movable(false)
             .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
-            .show(ctx, |ui|{
+            .show(ctx, |ui| {
                 ui.allocate_ui(vec2(25., 25.), |ui| {
-                    if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../icons/cross.png"))).clicked() {
+                    if ui
+                        .add(egui::ImageButton::new(egui::include_image!(
+                            "../../../../../icons/cross.png"
+                        )))
+                        .clicked()
+                    {
                         self.image_overlay = false;
                     }
                 })
             });
-        
     }
     pub fn image_message_instance(
         &mut self,
         item: &crate::app::backend::ServerOutput,
         ui: &mut egui::Ui,
-        ctx: &Context
+        ctx: &Context,
     ) {
         if let ServerMessageType::Image(picture) = &item.MessageType {
             let path = PathBuf::from(format!(
@@ -110,7 +123,7 @@ impl TemplateApp {
                             println!("Error when creating a decoy: {err}");
                             return;
                         };
-                        
+
                         //check if we are visible
                         if !ui.is_visible() {
                             return;
@@ -128,7 +141,7 @@ impl TemplateApp {
                             author,
                             send_on_ip,
                         );
-                        
+
                         tokio::spawn(async move {
                             match client::send_msg(message).await {
                                 Ok(ok) => {

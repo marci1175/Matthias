@@ -120,61 +120,61 @@ impl TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             //Drop file warning
             self.drop_file_animation =
-                    ui.input(|input| !input.raw.clone().hovered_files.is_empty());
-                if self.how_on >= 0. {
-                    let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
-                    let font_id = FontId {
-                        family: FontFamily::default(),
-                        size: self.font_size,
-                    };
+                ui.input(|input| !input.raw.clone().hovered_files.is_empty());
+            if self.how_on >= 0. {
+                let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
+                let font_id = FontId {
+                    family: FontFamily::default(),
+                    size: self.font_size,
+                };
 
-                    ui.painter().rect_filled(
-                        egui::Rect::EVERYTHING,
-                        0.,
-                        Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
-                    );
-
-                    Area::new("warning_overlay").show(ctx, |ui| {
-                        ui.painter().rect(
-                            egui::Rect {
-                                min: Pos2::new(
-                                    window_size[0] / 3.,
-                                    window_size[0] / 5. + self.how_on / 50.,
-                                ),
-                                max: Pos2::new(
-                                    window_size[0] / 1.5,
-                                    window_size[0] / 3. + self.how_on / 50.,
-                                ),
-                            },
-                            5.0,
-                            Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8),
-                            Stroke::default(),
-                        );
-                        ui.painter().text(
-                            Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.),
-                            Align2([Align::Center, Align::Center]),
-                            "Drop to upload",
-                            font_id,
-                            Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8),
-                        );
-                    });
-                }
-                self.how_on = ctx.animate_value_with_time(
-                    Id::from("warning_overlay"),
-                    match self.drop_file_animation {
-                        true => 255.,
-                        false => 0.,
-                    },
-                    0.4,
+                ui.painter().rect_filled(
+                    egui::Rect::EVERYTHING,
+                    0.,
+                    Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
                 );
 
-                let dropped_files = ui.input(|reader| reader.raw.clone().dropped_files);
-                if !dropped_files.is_empty() {
-                    let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
+                Area::new("warning_overlay").show(ctx, |ui| {
+                    ui.painter().rect(
+                        egui::Rect {
+                            min: Pos2::new(
+                                window_size[0] / 3.,
+                                window_size[0] / 5. + self.how_on / 50.,
+                            ),
+                            max: Pos2::new(
+                                window_size[0] / 1.5,
+                                window_size[0] / 3. + self.how_on / 50.,
+                            ),
+                        },
+                        5.0,
+                        Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8),
+                        Stroke::default(),
+                    );
+                    ui.painter().text(
+                        Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.),
+                        Align2([Align::Center, Align::Center]),
+                        "Drop to upload",
+                        font_id,
+                        Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8),
+                    );
+                });
+            }
+            self.how_on = ctx.animate_value_with_time(
+                Id::from("warning_overlay"),
+                match self.drop_file_animation {
+                    true => 255.,
+                    false => 0.,
+                },
+                0.4,
+            );
 
-                    self.files_to_send.push(dropped_file_path);
-                }
-                
+            let dropped_files = ui.input(|reader| reader.raw.clone().dropped_files);
+            if !dropped_files.is_empty() {
+                let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
+
+                self.files_to_send.push(dropped_file_path);
+            }
+
             //Messages go here
             self.client_ui_message_main(ui, ctx);
         });
@@ -262,7 +262,7 @@ impl TemplateApp {
 
                 let _ = write_image(file_serve.as_ref().unwrap(), self.send_on_ip.clone());
 
-                //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder 
+                //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder
                 ctx.forget_image(&format!("bytes://{}", file_serve.unwrap().index));
             }
             Err(_err) => {}

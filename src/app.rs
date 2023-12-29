@@ -1,6 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Layout, RichText, Color32};
+use egui::{vec2, Align, Color32, Layout, RichText};
 
 use std::fs::{self};
 
@@ -47,7 +47,7 @@ impl eframe::App for backend::TemplateApp {
         let input_keys = keymap(self.keymap.clone());
         self.send_on_ip_base64_encoded =
             general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
-            
+
         /*
 
             :: custom font ::
@@ -121,12 +121,12 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        //Make connecting to an ip more user friendly
-                        // ui.add(egui::TextEdit::singleline(&mut self.send_on_address).hint_text("Address"));
-                        // ui.add(egui::TextEdit::singleline(&mut self.send_on_port).hint_text("Port"));
+                            //Make connecting to an ip more user friendly
+                            // ui.add(egui::TextEdit::singleline(&mut self.send_on_address).hint_text("Address"));
+                            // ui.add(egui::TextEdit::singleline(&mut self.send_on_port).hint_text("Port"));
 
-                        // //format two text inputs, so because im too lazy
-                        // self.send_on_ip = format!("[{}]:{}", self.send_on_address, self.send_on_port);
+                            // //format two text inputs, so because im too lazy
+                            // self.send_on_ip = format!("[{}]:{}", self.send_on_address, self.send_on_port);
                             ui.text_edit_singleline(&mut self.send_on_ip);
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
@@ -161,7 +161,6 @@ impl eframe::App for backend::TemplateApp {
         egui::Window::new("Bookmarks")
             .open(&mut self.bookmark_mode)
             .show(ctx, |ui| {
-                
                 if ui.button("Save ip address").clicked() {
                     match append_to_file(self.opened_account_path.clone(), self.send_on_ip.clone())
                     {
