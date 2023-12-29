@@ -54,12 +54,8 @@ impl TemplateApp {
                         let _temp_tx = self.stx.clone();
 
                         let server_pw = match self.server_req_password {
-                            true => {
-                                self.server_password.clone()
-                            }
-                            false => {
-                                "".to_string()
-                            }
+                            true => self.server_password.clone(),
+                            false => "".to_string(),
                         };
                         let ip_v4 = self.ipv4_mode;
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {

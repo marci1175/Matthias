@@ -1,11 +1,11 @@
 use chrono::Utc;
 use rand::rngs::ThreadRng;
 
+use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -16,26 +16,28 @@ use crate::app::input::Input;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
-
-    //audio playback
-    #[serde(skip)]
-    pub audio_playback: AudioPlayback,
-
+    /*
+        Font
+    */
     //fontbook
     pub filter: String,
     pub named_chars: BTreeMap<egui::FontFamily, BTreeMap<char, String>>,
+    //font
+    pub font_size: f32,
 
-    //login page
-    
+    /*
+    login page
+    */
     //the string entered to the username field on the login page
     pub login_username: String,
 
     #[serde(skip)]
     //the string entered to the password field on the login page, dont save this one... obviously :)
     pub login_password: String,
-    
-    //server main
-    
+
+    /*
+        server main
+    */
     //DEPRICATED, ipv4 mode
     pub ipv4_mode: bool,
 
@@ -46,7 +48,7 @@ pub struct TemplateApp {
     //Public ip address, checked by pinging external website
     #[serde(skip)]
     pub public_ip: String,
-    
+
     //server settings
     pub server_req_password: bool,
 
@@ -91,7 +93,6 @@ pub struct TemplateApp {
     /*
         main
     */
-
     //Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -111,7 +112,7 @@ pub struct TemplateApp {
     //Server mode main switch
     #[serde(skip)]
     pub server_mode: bool,
-    
+
     //Mode selector mode main switch
     #[serde(skip)]
     pub mode_selector: bool,
@@ -123,7 +124,10 @@ pub struct TemplateApp {
     /*
         client main
     */
-    
+    //audio playback
+    #[serde(skip)]
+    pub audio_playback: AudioPlayback,
+
     //this doesnt really matter if we save or no so whatever
     #[serde(skip)]
     pub should_scroll_to_reply: bool,
@@ -162,9 +166,6 @@ pub struct TemplateApp {
     pub req_passw: bool,
     pub client_password: String,
 
-    //font
-    pub font_size: f32,
-
     //This gem of a variable is used to contain animation's state
     pub how_on: f32,
 
@@ -175,11 +176,11 @@ pub struct TemplateApp {
     //Message Settings
     #[serde(skip)]
     pub replying_to: Option<usize>,
-    
+
     //Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
     pub usr_msg: String,
-    
+
     //Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
     pub incoming_msg: ServerMaster,
@@ -187,11 +188,11 @@ pub struct TemplateApp {
     //emoji fasz
     pub random_emoji: String,
     pub emoji: Vec<String>,
-    
+
     //Random engine
     #[serde(skip)]
     pub rand_eng: ThreadRng,
-    
+
     //Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
 
@@ -200,17 +201,17 @@ pub struct TemplateApp {
     pub rx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub tx: mpsc::Sender<String>,
-    
+
     //data sync
     #[serde(skip)]
     pub drx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub dtx: mpsc::Sender<String>,
-    
+
     //Server - client syncing thread
     #[serde(skip)]
     pub autosync_sender: Option<mpsc::Receiver<String>>,
-    
+
     //Server - client sync worker should run
     #[serde(skip)]
     pub autosync_should_run: Arc<AtomicBool>,
@@ -700,12 +701,11 @@ impl ServerOutput {
     }
 }
 
-//Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s)
+//Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
     pub struct_list: Vec<ServerOutput>,
 }
-
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
@@ -730,7 +730,6 @@ pub struct AudioPlayback {
     pub sink_list: Vec<Option<Sink>>,
     pub settings_list: Vec<AudioSettings>,
 }
-
 impl Default for AudioPlayback {
     fn default() -> Self {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
@@ -751,6 +750,7 @@ pub struct AudioSettings {
     pub cursor_offset: u64,
 }
 
+//Initialize default values
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
@@ -762,11 +762,19 @@ impl Default for AudioSettings {
     }
 }
 
+/*
+Maunally create a struct which implements the following traits:
+                                                            Read
+                                                            Seek
+
+So it can be used as a Arc<Mutex<()>>
+*/
 #[derive(Clone)]
 pub struct PlaybackCursor {
     pub cursor: Arc<Mutex<io::Cursor<Vec<u8>>>>,
 }
 
+//Impl new so It can probe a file (in vec<u8> format)
 impl PlaybackCursor {
     pub fn new(data: Vec<u8>) -> Self {
         let cursor = Arc::new(Mutex::new(io::Cursor::new(data)));
@@ -774,6 +782,7 @@ impl PlaybackCursor {
     }
 }
 
+//Implement the Read trait
 impl Read for PlaybackCursor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut cursor = self.cursor.lock().unwrap();
@@ -781,6 +790,7 @@ impl Read for PlaybackCursor {
     }
 }
 
+//Implement the Seek trait
 impl Seek for PlaybackCursor {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut cursor = self.cursor.lock().unwrap();

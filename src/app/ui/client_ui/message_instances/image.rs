@@ -1,5 +1,5 @@
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use egui::{vec2, Align2, Area, Color32, Context, Sense};
 
 use std::fs::{self};
@@ -75,7 +75,6 @@ impl TemplateApp {
         ui: &mut egui::Ui,
         ctx: &Context,
     ) {
-        
         if let ServerMessageType::Image(picture) = &item.MessageType {
             self.send_on_ip_base64_encoded =
                 general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());

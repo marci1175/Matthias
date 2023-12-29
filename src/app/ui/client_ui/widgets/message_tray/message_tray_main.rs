@@ -1,7 +1,7 @@
 use device_query::Keycode;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Layout, RichText, Rounding,
-    Stroke, Key,
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, RichText,
+    Rounding, Stroke,
 };
 use rand::Rng;
 
@@ -12,7 +12,6 @@ use std::fs::{self};
 use std::path::PathBuf;
 
 use std::sync::mpsc;
-
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ClientMessage, TemplateApp};
@@ -74,7 +73,7 @@ impl TemplateApp {
             })
     }
 
-    fn buttons(&mut self, ui: &mut egui::Ui, input_keys: Vec<Keycode>, ctx: &egui::Context) {    
+    fn buttons(&mut self, ui: &mut egui::Ui, input_keys: Vec<Keycode>, ctx: &egui::Context) {
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
                 if ui
@@ -129,11 +128,13 @@ impl TemplateApp {
                             self.send_file(file_path);
                         }
                     }
-    
+
                     //clear temp files
-                    let _ =
-                        fs::remove_file(concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav"));
-    
+                    let _ = fs::remove_file(concat!(
+                        env!("APPDATA"),
+                        "/szeChat/Client/voice_record.wav"
+                    ));
+
                     //clear vectors
                     self.files_to_send.clear();
                     self.replying_to = None;
@@ -190,17 +191,17 @@ impl TemplateApp {
                         ui.label(RichText::from("Recording").size(self.font_size / 2.));
                         //Just send something, it doesnt really matter
                         atx.send(false).unwrap();
-    
+
                         //Path to voice recording created by audio_recording.rs
                         let path = PathBuf::from(format!(
                             "{}\\szeChat\\Client\\voice_record.wav",
                             env!("APPDATA")
                         ));
-    
+
                         if path.exists() {
                             self.files_to_send.push(path);
                         }
-    
+
                         //Destroy state
                         self.atx = None;
                     }
@@ -211,9 +212,9 @@ impl TemplateApp {
                     .clicked()
                 {
                     let (tx, rx) = mpsc::channel::<bool>();
-    
+
                     self.atx = Some(tx);
-    
+
                     audio_recroding(rx);
                 }
             });

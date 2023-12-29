@@ -1,11 +1,11 @@
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use egui::{vec2, Align, Layout};
 use rodio::{Decoder, Sink};
 use std::path::PathBuf;
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ClientMessage, ServerMessageType, TemplateApp, PlaybackCursor};
+use crate::app::backend::{ClientMessage, PlaybackCursor, ServerMessageType, TemplateApp};
 use crate::app::client::{self};
 use std::fs;
 impl TemplateApp {
@@ -17,7 +17,7 @@ impl TemplateApp {
     ) {
         self.send_on_ip_base64_encoded =
             general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
-            
+
         //Create folder for audios for later problem avoidance
         let _ = fs::create_dir_all(PathBuf::from(format!(
             "{}{}{}{}",

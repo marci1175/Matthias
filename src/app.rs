@@ -45,8 +45,6 @@ impl eframe::App for backend::TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.keymap.clone());
 
-        
-
         /*
 
             :: custom font ::
