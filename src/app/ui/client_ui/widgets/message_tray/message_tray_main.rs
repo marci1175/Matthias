@@ -126,19 +126,12 @@ impl TemplateApp {
                 for file_path in self.files_to_send.clone() {
                     //Check for no user fuckery
                     if file_path.exists() {
-                        match file_path.extension().unwrap().to_string_lossy().as_str() {
-                            "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
-                                self.send_picture(file_path);
-                            }
-                            "wav" | "mp3" | "m4a" => {
-                                self.send_audio(file_path);
-                            }
-                            _ => {
-                                self.send_file(file_path);
-                            }
-                        }
+                        self.send_file(file_path);
                     }
                 }
+                
+                //clear temp files
+                let _ = fs::remove_file(concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav"));
 
                 //clear vectors
                 self.files_to_send.clear();
@@ -185,24 +178,22 @@ impl TemplateApp {
         ui.allocate_ui(vec2(self.font_size * 1.5, self.font_size * 1.5), |ui| {
             if let Some(atx) = self.atx.clone() {
                 if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png")).tint(Color32::RED)).clicked() {
+                    ui.label(RichText::from("Recording").size(self.font_size / 2.));
                     //Just send something, it doesnt really matter
                     atx.send(false).unwrap();
 
                     //Path to voice recording created by audio_recording.rs
                     let path = PathBuf::from(format!(
-                        "{}\\szeChat\\Client\\voice_record.mp3",
+                        "{}\\szeChat\\Client\\voice_record.wav",
                         env!("APPDATA")
                     ));
 
                     if path.exists() {
-                        self.send_audio(path.clone());
+                        self.files_to_send.push(path);
                     }
 
                     //Destroy state
                     self.atx = None;
-                    if let Err(err) = fs::remove_file(path) {
-                        eprintln!("{err}")
-                    };
                 }
             } else if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/record.png"))).clicked() {
                 let (tx, rx) = mpsc::channel::<bool>();

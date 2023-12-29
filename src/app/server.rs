@@ -27,10 +27,10 @@ use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientMessage,
     ClientMessageType::{
-        ClientAudioRequest, ClientAudioUpload, ClientFileRequest, ClientFileUpload,
-        ClientImageRequest, ClientImageUpload, ClientNormalMessage, ClientSyncMessage,
+        ClientFileRequestType, ClientNormalMessage, ClientSyncMessage, ClientFileUpload
     },
     ServerFileReply, ServerImageReply,
+    ClientFileUpload as ClientFileUploadStruct, ClientFileRequestType as ClientRequestTypeStruct
 };
 
 use super::backend::{ServerAudioReply, ServerOutput};
@@ -71,48 +71,19 @@ impl ServerMessage for MessageService {
 
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
+
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
-                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
-                }
 
-                ClientAudioUpload(_) => {
-                    self.recive_audio(req).await;
-                }
-                ClientImageUpload(_) => {
-                    self.recive_image(req).await;
-                }
-                ClientFileUpload(_) => {
-                    self.recive_file(req.clone()).await;
-                }
+                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/}
 
-                ClientFileRequest(msg) => {
-                    let (file_bytes, file_name) = &self.serve_file(msg.index).await;
-                    let output = serde_json::to_string(&ServerFileReply {
-                        file_name: file_name.clone(),
-                        bytes: file_bytes.clone(),
-                    })
-                    .unwrap_or_default();
-                    return Ok(Response::new(MessageResponse { message: output }));
-                }
-                ClientImageRequest(request) => {
-                    let read_file = self.serve_image(request.index).await;
-                    let output = serde_json::to_string(&ServerImageReply {
-                        bytes: read_file,
-                        index: request.index,
-                    })
-                    .unwrap_or_default();
-                    return Ok(Response::new(MessageResponse { message: output }));
-                }
-                ClientAudioRequest(request) => {
-                    let (file_bytes, file_name) = self.serve_audio(request.index).await;
-                    let output = serde_json::to_string(&ServerAudioReply {
-                        bytes: file_bytes,
-                        index: request.index,
-                        file_name: file_name.unwrap_or_default(),
-                    })
-                    .unwrap_or_default();
-                    return Ok(Response::new(MessageResponse { message: output }));
-                }
+                ClientFileRequestType(request_type) => {
+                    return self.handle_request(req.clone(), request_type).await;
+                },
+
+                ClientFileUpload(upload_type) => {
+                    self.handle_upload(req.clone(), upload_type).await;
+                },
+
             };
 
             return self.sync_message().await;
@@ -318,135 +289,77 @@ impl MessageService {
         let reply = MessageResponse { message: final_msg };
         Ok(Response::new(reply))
     }
-    pub async fn recive_file(&self, request: ClientMessage) {
+    pub async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
         /*
 
+            DEPRICATED
+        
         error -> 0 success
         error -> 1 Server : failed to get APPDATA arg
         error -> 2 Server : failed to create file
 
         */
-        let mut error_code: i32 = 0;
-
-        if let ClientFileUpload(req) = request.clone().MessageType {
-            //500mb limit
-            if req.bytes.len() > 500000000 {
-                error_code = -1;
-            } else {
-                match env::var("APPDATA") {
-                    Ok(app_data) => {
-                        //generat a random number to avoid file overwrites, cuz of same name files
-                        let random_generated_number =
-                            rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
-
-                        //create file, add file to its named so it can never be mixed with images
-                        match fs::File::create(format!(
-                            "{app_data}\\szeChat\\Server\\{}file.{}",
-                            random_generated_number, req.extension
-                        )) {
-                            Ok(mut created_file) => {
-                                if let Err(err) = created_file.write_all(&req.bytes) {
-                                    println!("[{err}\n{}]", err.kind());
-                                };
-
-                                created_file.flush().unwrap();
-                                //success
-
-                                match self.generated_file_paths.lock() {
-                                    Ok(mut ok) => {
-                                        ok.push(PathBuf::from(format!(
-                                            "{app_data}\\szeChat\\Server\\{}file.{}",
-                                            random_generated_number, req.extension
-                                        )));
-                                    }
-                                    Err(err) => {
-                                        println!("{err}")
-                                    }
-                                };
-
-                                match self.original_file_paths.lock() {
-                                    Ok(mut ok) => {
-                                        ok.push(PathBuf::from(format!(
-                                            "{app_data}\\szeChat\\Server\\{}.{}",
-                                            req.name, req.extension
-                                        )));
-                                    }
-                                    Err(err) => {
-                                        println!("{err}")
-                                    }
-                                };
-
-                                match self.messages.lock() {
-                                    Ok(mut ok) => {
-                                        ok.push(ServerOutput::convert_upload_to_servermsg(
-                                            request,
-                                            self.original_file_paths.lock().unwrap().len() as i32
-                                                - 1,
-                                        ));
-                                    }
-                                    Err(err) => println!("{err}"),
-                                }
-                            }
-                            Err(err) => {
-                                println!(" [{err}\n{}]", err.kind());
-                                error_code = 2;
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        println!("{err}")
-                    }
-                }
-            }
-        }
-
-        dbg!(error_code);
-    }
-    pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
-        let path = &self.generated_file_paths.lock().unwrap()[index as usize];
-        (fs::read(path).unwrap_or_default(), path.clone())
-    }
-    pub async fn serve_image(&self, index: i32) -> Vec<u8> {
-        fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
-    }
-    pub async fn recive_image(&self, req: ClientMessage) {
-        if let ClientImageUpload(img) = &req.MessageType {
+        
+        //500mb limit
+        if req.bytes.len() > 500000000 {
+            //Dont allow the upload
+        } else {
             match env::var("APPDATA") {
                 Ok(app_data) => {
-                    let mut image_path = self.image_paths.lock().unwrap();
+                    //generat a random number to avoid file overwrites, cuz of same name files
+                    let random_generated_number =
+                        rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
 
-                    let image_path_lenght = image_path.len();
-
+                    //create file, add file to its named so it can never be mixed with images
                     match fs::File::create(format!(
-                        "{app_data}\\szeChat\\Server\\{}",
-                        image_path_lenght
+                        "{app_data}\\szeChat\\Server\\{}file.{}",
+                        random_generated_number, req.extension.clone().unwrap_or_default()
                     )) {
                         Ok(mut created_file) => {
-                            if let Err(err) = created_file.write_all(&img.bytes) {
+                            if let Err(err) = created_file.write_all(&req.bytes) {
                                 println!("[{err}\n{}]", err.kind());
                             };
 
                             created_file.flush().unwrap();
                             //success
 
-                            match self.messages.try_lock() {
+                            match self.generated_file_paths.lock() {
                                 Ok(mut ok) => {
-                                    ok.push(ServerOutput::convert_picture_to_servermsg(
-                                        req.clone(),
-                                        image_path_lenght as i32,
+                                    ok.push(PathBuf::from(format!(
+                                        "{app_data}\\szeChat\\Server\\{}file.{}",
+                                        random_generated_number, req.extension.clone().unwrap_or_default()
+                                    )));
+                                }
+                                Err(err) => {
+                                    println!("{err}")
+                                }
+                            };
+
+                            match self.original_file_paths.lock() {
+                                Ok(mut ok) => {
+                                    ok.push(PathBuf::from(format!(
+                                        "{app_data}\\szeChat\\Server\\{}.{}",
+                                        req.name.clone().unwrap_or_default(), req.extension.clone().unwrap_or_default()
+                                    )));
+                                }
+                                Err(err) => {
+                                    println!("{err}")
+                                }
+                            };
+
+                            match self.messages.lock() {
+                                Ok(mut ok) => {
+                                    ok.push(ServerOutput::convert_upload_to_servermsg(
+                                        request,
+                                        self.original_file_paths.lock().unwrap().len() as i32
+                                            - 1,
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
                             }
-
-                            //Only save as last step to avoid a mismatch + correct indexing :)
-                            image_path.push(PathBuf::from(format!(
-                                "{app_data}\\szeChat\\Server\\{}",
-                                image_path_lenght
-                            )));
                         }
                         Err(err) => {
-                            println!(" [{err} {}]", err.kind());
+                            println!(" [{err}\n{}]", err.kind());
                         }
                     }
                 }
@@ -456,9 +369,60 @@ impl MessageService {
             }
         }
     }
-    pub async fn recive_audio(&self, req: ClientMessage) {
-        if let ClientAudioUpload(audio) = &req.MessageType {
-            let mut audio_paths = self.audio_list.lock().unwrap();
+    pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
+        let path = &self.generated_file_paths.lock().unwrap()[index as usize];
+        (fs::read(path).unwrap_or_default(), path.clone())
+    }
+    pub async fn serve_image(&self, index: i32) -> Vec<u8> {
+        fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
+    }
+    pub async fn recive_image(&self, req: ClientMessage, img : &ClientFileUploadStruct) {
+        match env::var("APPDATA") {
+            Ok(app_data) => {
+                let mut image_path = self.image_paths.lock().unwrap();
+
+                let image_path_lenght = image_path.len();
+
+                match fs::File::create(format!(
+                    "{app_data}\\szeChat\\Server\\{}",
+                    image_path_lenght
+                )) {
+                    Ok(mut created_file) => {
+                        if let Err(err) = created_file.write_all(&img.bytes) {
+                            println!("[{err}\n{}]", err.kind());
+                        };
+
+                        created_file.flush().unwrap();
+                        //success
+
+                        match self.messages.try_lock() {
+                            Ok(mut ok) => {
+                                ok.push(ServerOutput::convert_picture_to_servermsg(
+                                    req.clone(),
+                                    image_path_lenght as i32,
+                                ));
+                            }
+                            Err(err) => println!("{err}"),
+                        }
+
+                        //Only save as last step to avoid a mismatch + correct indexing :)
+                        image_path.push(PathBuf::from(format!(
+                            "{app_data}\\szeChat\\Server\\{}",
+                            image_path_lenght
+                        )));
+                    }
+                    Err(err) => {
+                        println!(" [{err} {}]", err.kind());
+                    }
+                }
+            }
+            Err(err) => {
+                println!("{err}")
+            }
+        }
+    }
+    pub async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct) {
+        let mut audio_paths = self.audio_list.lock().unwrap();
 
             let audio_paths_lenght = audio_paths.len();
 
@@ -502,7 +466,6 @@ impl MessageService {
                     println!(" [{err} {}]", err.kind());
                 }
             }
-        }
     }
     pub async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
         (
@@ -510,4 +473,51 @@ impl MessageService {
             self.audio_names.lock().unwrap()[index as usize].clone(),
         )
     }
+
+    pub async fn handle_request(&self, req: ClientMessage, request_type: &ClientRequestTypeStruct) -> Result<Response<MessageResponse>, Status> {
+        match request_type {
+            ClientRequestTypeStruct::ClientImageRequest(img_request) => {
+                let read_file = self.serve_image(img_request.index).await;
+
+                let output = serde_json::to_string(&ServerImageReply {
+                    bytes: read_file,
+                    index: img_request.index,
+                }).unwrap_or_default();
+
+                return Ok(Response::new(MessageResponse { message: output }));
+            },
+            ClientRequestTypeStruct::ClientFileRequest(file_request) => {
+                let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
+
+                let output = serde_json::to_string(&ServerFileReply {
+                    file_name: file_name.clone(),
+                    bytes: file_bytes.clone(),
+                }).unwrap_or_default();
+
+                return Ok(Response::new(MessageResponse { message: output }));
+            },
+            ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
+                let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
+
+                let output = serde_json::to_string(&ServerAudioReply {
+                    bytes: file_bytes,
+                    index: audio_request.index,
+                    file_name: file_name.unwrap_or_default(),
+                }).unwrap_or_default();
+
+                return Ok(Response::new(MessageResponse { message: output }));
+            },
+        } 
+    }
+
+    pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
+        //Pattern match on upload tpye so we know how to handle the specific request
+        match upload_type.extension.clone().unwrap_or_default().as_str() {
+            "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,
+            "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
+            //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY
+            _ => self.recive_file(req, upload_type).await,
+        }
+    }
+    
 }

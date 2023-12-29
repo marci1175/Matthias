@@ -92,7 +92,7 @@ impl TemplateApp {
                                 + &ipv6_get().unwrap_or_else(|_| {
                                     "Couldnt connect to the internet".to_string()
                                 });
-                            tx.send(combined_ips)
+                            tx.send(combined_ips.trim().to_owned())
                         });
                         match self.drx.recv() {
                             Ok(ok) => self.public_ip = ok,
