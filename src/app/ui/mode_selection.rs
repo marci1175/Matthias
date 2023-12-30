@@ -7,8 +7,6 @@ use std::sync::atomic::Ordering;
 
 impl TemplateApp {
     pub fn state_mode_selection(&mut self, _frame: &mut Frame, ctx: &egui::Context) {
-        //main
-
         //window settings
         _frame.set_window_size(vec2(700., 300.));
 

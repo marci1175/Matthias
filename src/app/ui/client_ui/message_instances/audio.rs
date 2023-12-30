@@ -86,18 +86,20 @@ impl TemplateApp {
                                             .as_mut()
                                             .unwrap();
 
-                                        let source = Decoder::new(self.audio_playback.settings_list[current_index_in_message_list].cursor.clone() /*We can assume its always Some because we just set it to some above (lol)*/)
-                                            .unwrap_or_else(|e| {
-                                                dbg!(&e);
-                                                eprintln!("{}", e);
-
-                                                //Return an empty decoder to avoid panicing
-                                                Decoder::new(PlaybackCursor::new(vec![0])).unwrap()
-                                            });
+                                        let source = Decoder::new(self.audio_playback.settings_list[current_index_in_message_list].cursor.clone() /*We can assume its always Some because we just set it to some above (lol)*/);
                                         
-                                        sink.append(source);
+                                        match source {
+                                            Ok(source) => {
 
-                                        sink.play();
+                                                sink.append(source);
+                                                sink.play();
+
+                                            }
+                                            Err(err) => {
+                                                dbg!(err);
+                                            }
+                                        }
+
                                     };
                                 }
                             }

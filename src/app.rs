@@ -1,5 +1,3 @@
-use base64::engine::general_purpose;
-use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
 
 use std::fs::{self};

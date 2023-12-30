@@ -4457,7 +4457,7 @@ dependencies = [
  "tonic-build 0.7.2",
  "unicode_names2",
  "wasm-bindgen-futures",
- "windows-sys 0.45.0",
+ "windows-sys 0.52.0",
  "winres",
 ]
 

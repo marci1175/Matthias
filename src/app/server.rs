@@ -488,7 +488,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                return Ok(Response::new(MessageResponse { message: output }));
+                Ok(Response::new(MessageResponse { message: output }))
             }
             ClientRequestTypeStruct::ClientFileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
@@ -499,7 +499,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                return Ok(Response::new(MessageResponse { message: output }));
+                Ok(Response::new(MessageResponse { message: output }))
             }
             ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
@@ -511,7 +511,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                return Ok(Response::new(MessageResponse { message: output }));
+                Ok(Response::new(MessageResponse { message: output }))
             }
         }
     }

@@ -32,7 +32,7 @@ impl TemplateApp {
         Area::new("image_overlay")
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
-            .show(&ctx, |ui| {
+            .show(ctx, |ui| {
                 ui.allocate_ui(
                     vec2(ui.available_width() / 1.3, ui.available_height() / 1.3),
                     |ui| {

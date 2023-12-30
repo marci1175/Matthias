@@ -162,7 +162,8 @@ pub fn special_char_name(chr: char) -> Option<&'static str> {
 
 impl backend::TemplateApp {
     pub fn window_emoji(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Emoji")
+        egui::Window::new("Character set")
+            .open(&mut self.emoji_mode)
             .collapsible(false)
             .show(ctx, |ui| {
                 ui.label("Click to paste".to_string());

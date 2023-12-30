@@ -30,6 +30,8 @@ pub fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<S
 
     Ok(ciphertext)
 }
+
+#[inline]
 pub fn decrypt_aes256(string_to_be_decrypted: String) -> Result<String, FromUtf8Error> {
     let ciphertext = hex::decode(string_to_be_decrypted).unwrap();
     let key: &[u8] = &[42; 32];
@@ -42,6 +44,8 @@ pub fn decrypt_aes256(string_to_be_decrypted: String) -> Result<String, FromUtf8
     let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
     String::from_utf8(plaintext)
 }
+
+#[inline]
 pub fn pass_encrypt(string_to_be_encrypted: String) -> String {
     let password = string_to_be_encrypted.as_bytes();
     let salt = b"c1eaa94ec38ab7aa16e9c41d029256d3e423f01defb0a2760b27117ad513ccd2";
@@ -58,9 +62,12 @@ pub fn pass_encrypt(string_to_be_encrypted: String) -> String {
 
     argon2::hash_encoded(password, salt, &config).unwrap()
 }
+
+#[inline]
 pub fn pass_hash_match(to_be_verified: String, file_ln: String) -> bool {
     argon2::verify_encoded(&file_ln, to_be_verified.as_bytes()).unwrap()
 }
+
 pub fn login(username: String, passw: String) -> Result<PathBuf> {
     let app_data = env::var("APPDATA")?;
 
@@ -86,6 +93,7 @@ pub fn login(username: String, passw: String) -> Result<PathBuf> {
     ensure!(usr_check && pwd_check, "Invalid Password");
     Ok(path)
 }
+
 pub fn register(username: String, passw: String) -> Result<()> {
     let app_data = env::var("APPDATA")?;
 
@@ -109,6 +117,7 @@ pub fn register(username: String, passw: String) -> Result<()> {
 
     Ok(())
 }
+
 pub fn append_to_file(path: PathBuf, write: String) -> Result<()> {
     let mut file = std::fs::OpenOptions::new()
         .create(false)
@@ -128,6 +137,7 @@ pub fn append_to_file(path: PathBuf, write: String) -> Result<()> {
         )),
     }
 }
+
 pub fn decrypt_lines_from_vec(mut file_ln: Vec<String>) -> Result<Vec<String>> {
     //remove pass and user
     file_ln.remove(0);
@@ -148,6 +158,7 @@ pub fn decrypt_lines_from_vec(mut file_ln: Vec<String>) -> Result<Vec<String>> {
 
     Ok(output_vec)
 }
+
 pub fn read_from_file(path: PathBuf) -> Result<Vec<String>> {
     let file: Vec<String> = fs::read_to_string(path)?
         .lines()
@@ -156,6 +167,7 @@ pub fn read_from_file(path: PathBuf) -> Result<Vec<String>> {
 
     Ok(file)
 }
+
 pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> Result<()> {
     //copy everything from orignal convert to vec representing lines delete line rewrite file
     let mut file = std::fs::OpenOptions::new().read(true).open(path.clone())?;
@@ -183,6 +195,7 @@ pub fn delete_line_from_file(line_number: usize, path: PathBuf) -> Result<()> {
 
     Ok(())
 }
+
 pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     let files = FileDialog::new()
         .set_title("Save to")
@@ -209,13 +222,15 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
 
     Ok(())
 }
+
+#[inline]
 pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
 
     let path = format!(
         "{}\\szeChat\\Client\\{}\\Images\\{}",
         env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip),
+        general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
     );
 
@@ -224,12 +239,13 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     Ok(())
 }
 
+#[inline]
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
     let path = format!(
         "{}\\szeChat\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(&ip),
+        general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
     );
 
