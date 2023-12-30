@@ -3,10 +3,8 @@ use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
-
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, Mutex};
@@ -604,16 +602,35 @@ pub struct ServerAudioReply {
     pub file_name: String,
 }
 
+use strum::{EnumDiscriminants, EnumMessage};
+use strum_macros::{EnumIter, EnumString};
+
 //This is what server replies can be
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumString, EnumMessage))]
 pub enum ServerMessageType {
+    #[strum_discriminants(strum(message = "Upload"))]
     Upload(ServerFileUpload),
+    #[strum_discriminants(strum(message = "Normal"))]
     Normal(ServerNormalMessage),
 
     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
+    #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
+    #[strum_discriminants(strum(message = "Audio"))]
     Audio(ServerAudioUpload),
 }
+
+// #[derive(Debug, EnumDiscriminants)]
+// #[strum_discriminants(derive(EnumIter))]
+// pub enum ServerMessageTypeR {
+//     Upload(ServerFileUpload),
+//     Normal(ServerNormalMessage),
+
+//     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
+//     Image(ServerImageUpload),
+//     Audio(ServerAudioUpload),
+// }
 
 //This is one whole server msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -627,78 +644,68 @@ impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
-    pub fn convert_audio_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
+
+    pub fn convert_type_to_servermsg(
+        normal_msg: ClientMessage,
+        index: i32,
+        //Automaticly generated enum by strum
+        upload_type: ServerMessageTypeDiscriminants,
+    ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
-            MessageType: ServerMessageType::Audio(ServerAudioUpload {
-                file_name: match normal_msg.MessageType {
-                    ClientMessageType::ClientSyncMessage(_) => todo!(),
-                    ClientMessageType::ClientFileUpload(upload) => upload.name.unwrap_or_default(),
-                    ClientMessageType::ClientNormalMessage(_) => todo!(),
-                    ClientMessageType::ClientFileRequestType(_) => todo!(),
+            MessageType: 
+                match normal_msg.MessageType {
+                    ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
+                    ClientMessageType::ClientFileUpload(upload) => {
+                        match upload_type {
+                            ServerMessageTypeDiscriminants::Upload => {
+                                ServerMessageType::Upload(
+                                    ServerFileUpload {
+                                        file_name: format!(
+                                            "{}.{}",
+                                            upload.name.unwrap_or_default(),
+                                            upload.extension.unwrap_or_default()
+                                        ),
+                                        index: index,
+                                    }
+                                )
+                            },
+                            ServerMessageTypeDiscriminants::Normal => unreachable!(),
+                            ServerMessageTypeDiscriminants::Image => {
+                                ServerMessageType::Image(
+                                    ServerImageUpload {
+                                        index: index,
+                                    }
+                                )
+                            },
+                            ServerMessageTypeDiscriminants::Audio => {
+                                ServerMessageType::Audio(
+                                    ServerAudioUpload { 
+                                        index: index, 
+                                        file_name: format!(
+                                            "{}.{}",
+                                            upload.name.unwrap_or_default(),
+                                            upload.extension.unwrap_or_default()
+                                        ),
+                                    }
+                                )
+                            },
+                        }
+                    },
+                    ClientMessageType::ClientNormalMessage(message) => {
+                        ServerMessageType::Normal(
+                            ServerNormalMessage {
+                                message: message.message,
+                            }
+                        )
+                    },
+                    ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
                 },
-                index,
-            }),
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
         }
     }
 
-    pub fn convert_msg_to_servermsg(normal_msg: ClientMessage) -> ServerOutput {
-        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
-        ServerOutput {
-            replying_to: normal_msg.replying_to,
-            MessageType: ServerMessageType::Normal(ServerNormalMessage {
-                message: match normal_msg.MessageType {
-                    ClientMessageType::ClientSyncMessage(_) => todo!(),
-                    ClientMessageType::ClientFileUpload(_) => todo!(),
-                    ClientMessageType::ClientNormalMessage(msg) => msg.message,
-                    ClientMessageType::ClientFileRequestType(_) => todo!(),
-                },
-            }),
-            Author: normal_msg.Author,
-            MessageDate: normal_msg.MessageDate,
-        }
-    }
-    pub fn convert_picture_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
-        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
-        ServerOutput {
-            replying_to: normal_msg.replying_to,
-            MessageType: ServerMessageType::Image(ServerImageUpload {
-                index: match normal_msg.MessageType {
-                    ClientMessageType::ClientSyncMessage(_) => todo!(),
-                    ClientMessageType::ClientFileUpload(_upload) => index,
-                    ClientMessageType::ClientNormalMessage(_) => todo!(),
-                    ClientMessageType::ClientFileRequestType(_) => todo!(),
-                },
-            }),
-            Author: normal_msg.Author,
-            MessageDate: normal_msg.MessageDate,
-        }
-    }
-    pub fn convert_upload_to_servermsg(normal_msg: ClientMessage, index: i32) -> ServerOutput {
-        //Convert a client output to a server output (ClientMessage -> ServerOutput), trim some useless info
-        ServerOutput {
-            replying_to: normal_msg.replying_to,
-            MessageType: ServerMessageType::Upload(ServerFileUpload {
-                file_name: match normal_msg.MessageType {
-                    ClientMessageType::ClientSyncMessage(_) => todo!(),
-                    ClientMessageType::ClientFileUpload(msg) => {
-                        format!(
-                            "{}.{}",
-                            msg.name.unwrap_or_default(),
-                            msg.extension.unwrap_or_default()
-                        )
-                    }
-                    ClientMessageType::ClientNormalMessage(_) => todo!(),
-                    ClientMessageType::ClientFileRequestType(_) => todo!(),
-                },
-                index,
-            }),
-            Author: normal_msg.Author,
-            MessageDate: normal_msg.MessageDate,
-        }
-    }
 }
 
 //Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients

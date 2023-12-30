@@ -49,6 +49,8 @@ hound = "3.5.1"
 arg = "0.4.1"
 rodio = {version = "0.17.3", features = ["wav", "mp3", "flac"]}
 claxon = "0.4.3"
+strum = {version = "0.25.0", features = ["derive"]}
+strum_macros = "0.25.3"
 
 
 [dependencies.windows-sys]

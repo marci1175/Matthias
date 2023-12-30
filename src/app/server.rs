@@ -3,7 +3,7 @@ use std::{env, fs, io::Write, path::PathBuf};
 use rand::Rng;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
-
+use super::backend::ServerMessageTypeDiscriminants::{Normal, Image, Audio, Upload};
 /*
 use std::{io, time::Duration};
 use clap::Parser;
@@ -268,7 +268,7 @@ impl MessageService {
     pub async fn NormalMessage(&self, req: ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
-                ok.push(ServerOutput::convert_msg_to_servermsg(req));
+                ok.push(ServerOutput::convert_type_to_servermsg(req, -1, Normal));
             }
             Err(err) => {
                 println!("{err}")
@@ -350,9 +350,10 @@ impl MessageService {
 
                             match self.messages.lock() {
                                 Ok(mut ok) => {
-                                    ok.push(ServerOutput::convert_upload_to_servermsg(
+                                    ok.push(ServerOutput::convert_type_to_servermsg(
                                         request,
                                         self.original_file_paths.lock().unwrap().len() as i32 - 1,
+                                        Upload
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
@@ -397,9 +398,10 @@ impl MessageService {
 
                         match self.messages.try_lock() {
                             Ok(mut ok) => {
-                                ok.push(ServerOutput::convert_picture_to_servermsg(
+                                ok.push(ServerOutput::convert_type_to_servermsg(
                                     req.clone(),
                                     image_path_lenght as i32,
+                                    Image
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -441,9 +443,10 @@ impl MessageService {
 
                 match self.messages.try_lock() {
                     Ok(mut ok) => {
-                        ok.push(ServerOutput::convert_audio_to_servermsg(
+                        ok.push(ServerOutput::convert_type_to_servermsg(
                             req.clone(),
                             audio_paths_lenght as i32,
+                            Audio,
                         ));
                     }
                     Err(err) => println!("{err}"),
