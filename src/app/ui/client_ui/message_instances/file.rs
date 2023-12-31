@@ -15,9 +15,9 @@ impl TemplateApp {
                 .button(RichText::from(file.file_name.to_string()).size(self.font_size))
                 .clicked()
             {
-                let passw = self.client_password.clone();
+                let passw = self.client_ui.client_password.clone();
                 let author = self.login_username.clone();
-                let send_on_ip = self.send_on_ip.clone();
+                let send_on_ip = self.client_ui.send_on_ip.clone();
                 let sender = self.ftx.clone();
 
                 let message = ClientMessage::construct_file_request_msg(

@@ -21,7 +21,7 @@ impl TemplateApp {
                             .size(20.),
                     );
                     if ui.button("Logout").clicked() {
-                        self.mode_selector = false;
+                        self.main.mode_selector = false;
                     }
                 });
             });
@@ -37,7 +37,7 @@ impl TemplateApp {
                             .on_hover_text("Enter Client mode")
                             .clicked()
                         {
-                            self.client_mode = true;
+                            self.main.client_mode = true;
                             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(
                                 1300., 800.,
                             )));
@@ -56,7 +56,7 @@ impl TemplateApp {
                             .on_hover_text("Enter Server mode")
                             .clicked()
                         {
-                            self.server_mode = true;
+                            self.main.server_mode = true;
 
                             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(
                                 1000., 900.,

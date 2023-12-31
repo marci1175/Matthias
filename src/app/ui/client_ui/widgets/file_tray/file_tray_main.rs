@@ -5,14 +5,14 @@ use crate::app::backend::{ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn file_tray(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.files_to_send.is_empty() || self.replying_to.is_some()) && self.usr_msg_expanded, |ui|{
+        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.client_ui.files_to_send.is_empty() || self.client_ui.replying_to.is_some()) && self.client_ui.usr_msg_expanded, |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));
                 egui::ScrollArea::horizontal()
                         .id_source("file_to_send")
                         .stick_to_right(true)
                         .show(ui, |ui|{
                             ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
-                                for (index, item) in self.files_to_send.clone().iter().enumerate() {
+                                for (index, item) in self.client_ui.files_to_send.clone().iter().enumerate() {
                                     ui.group(|ui| {
                                         ui.allocate_ui(vec2(200., 100.), |ui| {
                                             ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
@@ -63,7 +63,7 @@ impl TemplateApp {
                                                             egui::include_image!("../../../../../../icons/bin.png")
                                                         )
                                                     ).clicked() {
-                                                        self.files_to_send.remove(index);
+                                                        self.client_ui.files_to_send.remove(index);
                                                     };
                                                 });
                                             });
@@ -72,8 +72,8 @@ impl TemplateApp {
                                 }
                             });
                 });
-                if let Some(replying_to) = self.replying_to {
-                    if !self.files_to_send.is_empty() {
+                if let Some(replying_to) = self.client_ui.replying_to {
+                    if !self.client_ui.files_to_send.is_empty() {
                         ui.separator();
                     }
                     ui.horizontal(|ui| {
@@ -81,7 +81,7 @@ impl TemplateApp {
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                 //place them in one line
                                 //Selected message
-                                let selected_message = &self.incoming_msg.struct_list[replying_to];
+                                let selected_message = &self.client_ui.incoming_msg.struct_list[replying_to];
                                 ui.horizontal(|ui| {
                                     //Replying to "{author}:"
                                     ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
@@ -95,7 +95,7 @@ impl TemplateApp {
                             });
                         });
                         if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
-                            self.replying_to = None;
+                            self.client_ui.replying_to = None;
                         }
                     });
                 }

@@ -33,13 +33,13 @@ impl TemplateApp {
 
         let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
-        let text_widget = egui::TextEdit::multiline(&mut self.usr_msg)
+        let text_widget = egui::TextEdit::multiline(&mut self.client_ui.usr_msg)
             .font(FontId {
                 size: self.font_size,
                 family: FontFamily::default(),
             })
-            .hint_text(format!("Message to: {}", self.send_on_ip))
-            .desired_width(ui.available_width() - self.text_widget_offset * 1.3)
+            .hint_text(format!("Message to: {}", self.client_ui.send_on_ip))
+            .desired_width(ui.available_width() - self.client_ui.text_widget_offset * 1.3)
             .desired_rows(0)
             .frame(false);
 
@@ -50,7 +50,7 @@ impl TemplateApp {
             .min_scrolled_height(self.font_size * 2.)
             .show(&mut frame_ui, |ui| ui.add(text_widget));
 
-        self.scroll_widget_rect = msg_scroll.inner_rect;
+        self.client_ui.scroll_widget_rect = msg_scroll.inner_rect;
 
         ui.allocate_space(vec2(
             ui.available_width(),
@@ -81,19 +81,19 @@ impl TemplateApp {
                             && !(input_keys.contains(&Keycode::LShift)
                                 || input_keys.contains(&Keycode::RShift))
                     {
-                        if !(self.usr_msg.trim().is_empty()
-                            || self.usr_msg.trim_end_matches('\n').is_empty())
+                        if !(self.client_ui.usr_msg.trim().is_empty()
+                            || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
                         {
-                            let temp_msg = self.usr_msg.clone();
+                            let temp_msg = self.client_ui.usr_msg.clone();
                             let tx = self.tx.clone();
                             let username = self.login_username.clone();
                             //disable pass if its not ticked
-                            let passw = match self.req_passw {
-                                true => self.client_password.clone(),
+                            let passw = match self.client_ui.req_passw {
+                                true => self.client_ui.client_password.clone(),
                                 false => "".into(),
                             };
-                            let temp_ip = self.send_on_ip.clone();
-                            let replying_to = self.replying_to;
+                            let temp_ip = self.client_ui.send_on_ip.clone();
+                            let replying_to = self.client_ui.replying_to;
                             tokio::spawn(async move {
                                 match client::send_msg(ClientMessage::construct_normal_msg(
                                     &temp_msg,
@@ -118,7 +118,7 @@ impl TemplateApp {
                                 };
                             });
                         }
-                        for file_path in self.files_to_send.clone() {
+                        for file_path in self.client_ui.files_to_send.clone() {
                             //Check for no user fuckery
                             if file_path.exists() {
                                 self.send_file(file_path);
@@ -126,9 +126,9 @@ impl TemplateApp {
                         }
 
                         //clear vectors
-                        self.files_to_send.clear();
-                        self.replying_to = None;
-                        self.usr_msg.clear();
+                        self.client_ui.files_to_send.clear();
+                        self.client_ui.replying_to = None;
+                        self.client_ui.usr_msg.clear();
                     }
                 }
                 //add file button
@@ -146,29 +146,29 @@ impl TemplateApp {
                             .pick_file();
                         if let Some(file) = files {
                             //send file
-                            self.files_to_send.push(file);
+                            self.client_ui.files_to_send.push(file);
                         }
                     }
                 }
                 //Emoji button
                 {
                     let button = ui.add(Button::new(
-                        RichText::from(&self.random_emoji).size(self.font_size * 1.2),
+                        RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
                     ));
 
                     if button.clicked() {
-                        self.emoji_mode = !self.emoji_mode;
+                        self.main.emoji_mode = !self.main.emoji_mode;
                     };
 
                     if button.hovered() {
-                        if !self.random_generated {
-                            let random_number = self.rand_eng.gen_range(0..=self.emoji.len() - 1);
-                            self.random_emoji = self.emoji[random_number].clone();
-                            self.random_generated = true;
+                        if !self.client_ui.random_generated {
+                            let random_number = self.client_ui.rand_eng.gen_range(0..=self.client_ui.emoji.len() - 1);
+                            self.client_ui.random_emoji = self.client_ui.emoji[random_number].clone();
+                            self.client_ui.random_generated = true;
                         }
                     } else {
                         //check if button has been unhovered, reset variable
-                        self.random_generated = false;
+                        self.client_ui.random_generated = false;
                     }
                 }
                 //Record button

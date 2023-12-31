@@ -37,10 +37,10 @@ impl TemplateApp {
                     || input_keys.contains(&Keycode::Enter)
                         && !(self.login_password.is_empty() && self.login_username.is_empty())
                 {
-                    self.mode_selector =
+                    self.main.mode_selector =
                         match login(self.login_username.clone(), self.login_password.clone()) {
                             Ok(ok) => {
-                                self.opened_account_path = ok;
+                                self.main.opened_account_path = ok;
                                 true
                             }
                             Err(err) => {

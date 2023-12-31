@@ -40,7 +40,7 @@ impl TemplateApp {
                             self.autosync_should_run.store(false, Ordering::Relaxed);
                             self.autosync_sender = None;
 
-                            self.client_mode = false;
+                            self.main.client_mode = false;
                         };
                     })
                     .response
@@ -64,9 +64,9 @@ impl TemplateApp {
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
             //Drop file warning
-            self.drop_file_animation =
+            self.client_ui.drop_file_animation =
                 ui.input(|input| !input.raw.clone().hovered_files.is_empty());
-            if self.how_on >= 0. {
+            if self.client_ui.how_on >= 0. {
                 let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
                 let font_id = FontId {
                     family: FontFamily::default(),
@@ -76,7 +76,7 @@ impl TemplateApp {
                 ui.painter().rect_filled(
                     egui::Rect::EVERYTHING,
                     0.,
-                    Color32::from_rgba_premultiplied(0, 0, 0, (self.how_on / 3.) as u8),
+                    Color32::from_rgba_premultiplied(0, 0, 0, (self.client_ui.how_on / 3.) as u8),
                 );
 
                 Area::new("warning_overlay").show(ctx, |ui| {
@@ -84,29 +84,29 @@ impl TemplateApp {
                         egui::Rect {
                             min: Pos2::new(
                                 window_size[0] / 3.,
-                                window_size[0] / 5. + self.how_on / 50.,
+                                window_size[0] / 5. + self.client_ui.how_on / 50.,
                             ),
                             max: Pos2::new(
                                 window_size[0] / 1.5,
-                                window_size[0] / 3. + self.how_on / 50.,
+                                window_size[0] / 3. + self.client_ui.how_on / 50.,
                             ),
                         },
                         5.0,
-                        Color32::from_rgba_unmultiplied(0, 0, 0, self.how_on as u8 / 8),
+                        Color32::from_rgba_unmultiplied(0, 0, 0, self.client_ui.how_on as u8 / 8),
                         Stroke::default(),
                     );
                     ui.painter().text(
-                        Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.how_on / 50.),
+                        Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.client_ui.how_on / 50.),
                         Align2([Align::Center, Align::Center]),
                         "Drop to upload",
                         font_id,
-                        Color32::from_rgba_unmultiplied(255, 255, 255, self.how_on as u8),
+                        Color32::from_rgba_unmultiplied(255, 255, 255, self.client_ui.how_on as u8),
                     );
                 });
             }
-            self.how_on = ctx.animate_value_with_time(
+            self.client_ui.how_on = ctx.animate_value_with_time(
                 Id::from("warning_overlay"),
-                match self.drop_file_animation {
+                match self.client_ui.drop_file_animation {
                     true => 255.,
                     false => 0.,
                 },
@@ -117,7 +117,7 @@ impl TemplateApp {
             if !dropped_files.is_empty() {
                 let dropped_file_path = dropped_files[0].path.clone().unwrap_or_default();
 
-                self.files_to_send.push(dropped_file_path);
+                self.client_ui.files_to_send.push(dropped_file_path);
             }
 
             //Messages go here
@@ -127,10 +127,10 @@ impl TemplateApp {
         //usr_input
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
             .max_height(ctx.used_size().y / 2.)
-            .show_animated(ctx, self.usr_msg_expanded, |ui| {
+            .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
                 let msg_tray = self.message_tray(ui, ctx, input_keys);
 
-                self.text_widget_offset = msg_tray.response.rect.width();
+                self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
             });
@@ -145,7 +145,7 @@ impl TemplateApp {
         Area::new("usr_msg_expand")
             .anchor(
                 Align2::RIGHT_BOTTOM,
-                match self.usr_msg_expanded {
+                match self.client_ui.usr_msg_expanded {
                     true => vec2(-41.0, (-panel_height - 10.) / 14.),
                     false => vec2(-41.0, -10.),
                 },
@@ -158,7 +158,7 @@ impl TemplateApp {
                         )))
                         .clicked()
                     {
-                        self.usr_msg_expanded = !self.usr_msg_expanded;
+                        self.client_ui.usr_msg_expanded = !self.client_ui.usr_msg_expanded;
                     };
                 });
             });
@@ -170,17 +170,17 @@ impl TemplateApp {
                     serde_json::from_str(&msg);
                 match incoming_struct {
                     Ok(ok) => {
-                        self.invalid_password = false;
-                        self.incoming_msg = ok;
+                        self.client_ui.invalid_password = false;
+                        self.client_ui.incoming_msg = ok;
                     }
                     Err(_error) => {
                         //Funny server response check, this must match what server replies when inv passw
                         if msg == "Invalid Password!" {
                             //Reset messages
-                            self.incoming_msg = ServerMaster::default();
+                            self.client_ui.incoming_msg = ServerMaster::default();
 
                             //Set bools etc.
-                            self.invalid_password = true;
+                            self.client_ui.invalid_password = true;
                             self.settings_window = true;
                         }
                     }
@@ -205,7 +205,7 @@ impl TemplateApp {
                 let file_serve: Result<ServerImageReply, serde_json::Error> =
                     serde_json::from_str(&msg);
 
-                let _ = write_image(file_serve.as_ref().unwrap(), self.send_on_ip.clone());
+                let _ = write_image(file_serve.as_ref().unwrap(), self.client_ui.send_on_ip.clone());
 
                 //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder
                 ctx.forget_image(&format!("bytes://{}", file_serve.unwrap().index));
@@ -217,7 +217,7 @@ impl TemplateApp {
             Ok(msg) => {
                 let file_serve: Result<ServerAudioReply, serde_json::Error> =
                     serde_json::from_str(&msg);
-                let _ = write_audio(file_serve.unwrap(), self.send_on_ip.clone());
+                let _ = write_audio(file_serve.unwrap(), self.client_ui.send_on_ip.clone());
             }
             Err(_err) => {}
         }
@@ -230,8 +230,8 @@ impl TemplateApp {
             let (tx, rx) = mpsc::channel::<String>();
 
             let message = ClientMessage::construct_sync_msg(
-                self.send_on_ip.clone(),
-                self.client_password.clone(),
+                self.client_ui.send_on_ip.clone(),
+                self.client_ui.client_password.clone(),
                 self.login_username.clone(),
             );
 
@@ -267,7 +267,7 @@ impl TemplateApp {
                 let incoming_struct: Result<ServerMaster, serde_json::Error> =
                     serde_json::from_str(&msg);
                 if let Ok(ok) = incoming_struct {
-                    self.incoming_msg = ok;
+                    self.client_ui.incoming_msg = ok;
                 }
             }
             Err(_err) => {

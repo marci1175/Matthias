@@ -64,7 +64,7 @@ impl TemplateApp {
                         )))
                         .clicked()
                     {
-                        self.image_overlay = false;
+                        self.client_ui.image_overlay = false;
                     }
                 })
             });
@@ -76,13 +76,13 @@ impl TemplateApp {
         ctx: &Context,
     ) {
         if let ServerMessageType::Image(picture) = &item.MessageType {
-            self.send_on_ip_base64_encoded =
-                general_purpose::URL_SAFE_NO_PAD.encode(self.send_on_ip.clone());
+            self.client_ui.send_on_ip_base64_encoded =
+                general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
 
             let path = PathBuf::from(format!(
                 "{}\\szeChat\\Client\\{}\\Images\\{}",
                 env!("APPDATA"),
-                self.send_on_ip_base64_encoded,
+                self.client_ui.send_on_ip_base64_encoded,
                 picture.index
             ));
             ui.allocate_ui(vec2(300., 300.), |ui| {
@@ -95,7 +95,7 @@ impl TemplateApp {
                         ));
 
                         if image_widget.interact(Sense::click()).clicked() {
-                            self.image_overlay = true;
+                            self.client_ui.image_overlay = true;
                         }
 
                         image_widget.context_menu(|ui| {
@@ -109,7 +109,7 @@ impl TemplateApp {
                             }
                         });
 
-                        if self.image_overlay {
+                        if self.client_ui.image_overlay {
                             self.image_overlay_draw(ui, ctx, image_bytes, picture);
                         }
                     }
@@ -118,7 +118,7 @@ impl TemplateApp {
                         let _ = fs::create_dir_all(PathBuf::from(format!(
                             "{}\\szeChat\\Client\\{}\\Images",
                             env!("APPDATA"),
-                            self.send_on_ip_base64_encoded,
+                            self.client_ui.send_on_ip_base64_encoded,
                         )));
 
                         if let Err(err) = std::fs::write(
@@ -135,9 +135,9 @@ impl TemplateApp {
                         }
 
                         //We dont have file on our local system so we have to ask the server to provide it
-                        let passw = self.client_password.clone();
+                        let passw = self.client_ui.client_password.clone();
                         let author = self.login_username.clone();
-                        let send_on_ip = self.send_on_ip.clone();
+                        let send_on_ip = self.client_ui.send_on_ip.clone();
                         let sender = self.itx.clone();
 
                         let message = ClientMessage::construct_image_request_msg(

@@ -242,13 +242,9 @@ struct Options {
 pub async fn server_main(
     port: String,
     password: String,
-    ip_v4: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
     //apad().await;
-    let mut addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;
-    if !ip_v4 {
-        addr = format!("[::]:{}", port).parse()?;
-    }
+    let addr = format!("[::]:{}", port).parse()?;
 
     let msg_service = MessageService {
         passw: password,

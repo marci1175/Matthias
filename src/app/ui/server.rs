@@ -32,7 +32,7 @@ impl TemplateApp {
                         )))
                         .clicked()
                     {
-                        self.server_mode = false;
+                        self.main.server_mode = false;
                     };
                 })
                 .response
@@ -60,11 +60,10 @@ impl TemplateApp {
                             true => self.server_password.clone(),
                             false => "".to_string(),
                         };
-                        let ip_v4 = self.ipv4_mode;
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw, ip_v4)
+                                    match server::server_main(port.to_string(), server_pw)
                                         .await
                                     {
                                         Ok(_temp_stuff) => {}
@@ -77,7 +76,7 @@ impl TemplateApp {
                             }
                             Err(_) => {
                                 unsafe {
-                                    MessageBoxW(0, w!("Error"), w!("Enter a valid port!"), 0);
+                                    MessageBoxW(0, w!("Enter a valid port!"), w!("Error"), 0);
                                 }
                                 false
                             }
@@ -107,31 +106,31 @@ impl TemplateApp {
                             }
                         }
                     }
+                    //ipv4 server mode
+                    // ui.label(RichText::from("Public ipV4 address : ").size(20.));
+                    // ui.text_edit_singleline(&mut pub_ip[1].trim().to_string());
+                    // ui.label("Server address");
+                    // ui.text_edit_singleline(&mut format!(
+                    //     "[{}]:{}",
+                    //     pub_ip[1], self.open_on_port
+                    // ));
+                    
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
-                    if self.ipv4_mode {
-                        ui.label(RichText::from("Public ipV4 address : ").size(20.));
-                        ui.text_edit_singleline(&mut pub_ip[1].trim().to_string());
+                    ui.label(RichText::from("Public ipV6 address : ").size(20.));
+                    ui.text_edit_singleline(&mut pub_ip[0].trim().to_string());
+                    ui.label("Server address");
+                    ui.text_edit_singleline(&mut format!(
+                        "[{}]:{}",
+                        pub_ip[0], self.open_on_port
+                    ));
 
-                        ui.label("Server address");
-                        ui.text_edit_singleline(&mut format!(
-                            "[{}]:{}",
-                            pub_ip[1], self.open_on_port
-                        ));
-                    } else {
-                        ui.label(RichText::from("Public ipV6 address : ").size(20.));
-                        ui.text_edit_singleline(&mut pub_ip[0].trim().to_string());
-                        ui.label("Server address");
-                        ui.text_edit_singleline(&mut format!(
-                            "[{}]:{}",
-                            pub_ip[0], self.open_on_port
-                        ));
-                    }
                     if self.server_req_password && !self.server_password.is_empty() {
                         ui.label(RichText::from(format!(
                             "Password : {}",
                             self.server_password
                         )));
                     }
+                        
                     ui.label(RichText::from("Port").size(15.).strong());
                     ui.label(RichText::from(self.open_on_port.clone()).size(15.));
                 }

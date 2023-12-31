@@ -36,8 +36,6 @@ pub struct TemplateApp {
     /*
         server main
     */
-    ///DEPRICATED, ipv4 mode
-    pub ipv4_mode: bool,
 
     ///SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
     #[serde(skip)]
@@ -91,37 +89,124 @@ pub struct TemplateApp {
     /*
         main
     */
-    ///Checks if the emoji tray is on
-    #[serde(skip)]
-    pub emoji_mode: bool,
-
-    ///This struct is used for keymapping, TODO: just switch to ctx.input
-    #[serde(skip)]
-    pub keymap: Input,
-
-    ///Checks if bookmark mode is turned on
-    #[serde(skip)]
-    pub bookmark_mode: bool,
-
-    ///Client mode main switch
-    #[serde(skip)]
-    pub client_mode: bool,
-
-    ///Server mode main switch
-    #[serde(skip)]
-    pub server_mode: bool,
-
-    ///Mode selector mode main switch
-    #[serde(skip)]
-    pub mode_selector: bool,
-
-    ///Opened account's file pathbuf
-    #[serde(skip)]
-    pub opened_account_path: PathBuf,
+    pub main: Main,
 
     /*
         client main
     */
+    pub client_ui: Client,
+
+    ///thread communication for client
+    #[serde(skip)]
+    pub rx: mpsc::Receiver<String>,
+    #[serde(skip)]
+    pub tx: mpsc::Sender<String>,
+
+    ///data sync
+    #[serde(skip)]
+    pub drx: mpsc::Receiver<String>,
+    #[serde(skip)]
+    pub dtx: mpsc::Sender<String>,
+
+    ///Server - client syncing thread
+    #[serde(skip)]
+    pub autosync_sender: Option<mpsc::Receiver<String>>,
+
+    ///Server - client sync worker should run
+    #[serde(skip)]
+    pub autosync_should_run: Arc<AtomicBool>,
+}
+
+impl Default for TemplateApp {
+    fn default() -> Self {
+        let (tx, rx) = mpsc::channel::<String>();
+        let (stx, srx) = mpsc::channel::<String>();
+        let (dtx, drx) = mpsc::channel::<String>();
+        let (ftx, frx) = mpsc::channel::<String>();
+        let (itx, irx) = mpsc::channel::<String>();
+        let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
+        Self {
+
+            //fontbook
+            filter: Default::default(),
+            named_chars: Default::default(),
+
+            //login page
+            login_username: String::new(),
+            login_password: String::new(),
+
+            //server_main
+            server_has_started: false,
+            public_ip: String::new(),
+
+            //server settings
+            server_req_password: false,
+            server_password: String::default(),
+            open_on_port: String::default(),
+
+            //thread communication for server
+            srx,
+            stx,
+
+            //child windows
+            settings_window: false,
+
+            //thread communication for file requesting
+            frx,
+            ftx,
+
+            //thread communication for image requesting
+            irx,
+            itx,
+
+            //thread communication for audio recording
+            atx: None,
+
+            //thread communication for audio saving
+            audio_save_rx,
+            audio_save_tx,
+
+            //main
+            main: Main::default(),
+            
+
+            //client main
+            client_ui: Client::default(),
+
+            //font
+            font_size: 20.,
+
+            //emoji button
+            //thread communication for client
+            rx,
+            tx,
+
+            //data sync
+            drx,
+            dtx,
+            autosync_sender: None,
+            autosync_should_run: Arc::new(AtomicBool::new(true)),
+            
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl TemplateApp {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        if let Some(storage) = cc.storage {
+            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        }
+
+        Default::default()
+    }
+}
+
+/*Children structs*/
+///Children struct
+/// Client Ui
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct Client {
     ///audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
@@ -197,93 +282,15 @@ pub struct TemplateApp {
 
     ///Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
-
-    ///thread communication for client
-    #[serde(skip)]
-    pub rx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub tx: mpsc::Sender<String>,
-
-    ///data sync
-    #[serde(skip)]
-    pub drx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub dtx: mpsc::Sender<String>,
-
-    ///Server - client syncing thread
-    #[serde(skip)]
-    pub autosync_sender: Option<mpsc::Receiver<String>>,
-
-    ///Server - client sync worker should run
-    #[serde(skip)]
-    pub autosync_should_run: Arc<AtomicBool>,
 }
-
-impl Default for TemplateApp {
+impl Default for Client {
     fn default() -> Self {
-        let (tx, rx) = mpsc::channel::<String>();
-        let (stx, srx) = mpsc::channel::<String>();
-        let (dtx, drx) = mpsc::channel::<String>();
-        let (ftx, frx) = mpsc::channel::<String>();
-        let (itx, irx) = mpsc::channel::<String>();
-        let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
             //audio playback
             audio_playback: AudioPlayback::default(),
 
-            //fontbook
-            filter: Default::default(),
-            named_chars: Default::default(),
-
-            //login page
-            login_username: String::new(),
-            login_password: String::new(),
-
-            //server_main
-            ipv4_mode: true,
-            server_has_started: false,
-            public_ip: String::new(),
-
-            //server settings
-            server_req_password: false,
-            server_password: String::default(),
-            open_on_port: String::default(),
-
-            //thread communication for server
-            srx,
-            stx,
-
-            //child windows
-            settings_window: false,
-
-            //thread communication for file requesting
-            frx,
-            ftx,
-
-            //thread communication for image requesting
-            irx,
-            itx,
-
-            //thread communication for audio recording
-            atx: None,
-
-            //thread communication for audio saving
-            audio_save_rx,
-            audio_save_tx,
-
-            //main
             scroll_widget_rect: egui::Rect::NAN,
-
             text_widget_offset: 0.0,
-            emoji_mode: false,
-            keymap: Input::default(),
-            bookmark_mode: false,
-            client_mode: false,
-            server_mode: false,
-            mode_selector: false,
-            opened_account_path: PathBuf::default(),
-
-            //client main
             scroll_to_message_index: None,
             scroll_to_message: None,
             send_on_port: String::new(),
@@ -298,11 +305,6 @@ impl Default for TemplateApp {
             send_on_ip_base64_encoded: String::new(),
             req_passw: false,
             client_password: String::new(),
-
-            //font
-            font_size: 20.,
-
-            //emoji button
             emoji: vec![
                 "😐", "😍", "😉", "😈", "😇", "😆", "😅", "😄", "😃", "😂", "😁", "😀",
             ]
@@ -317,31 +319,54 @@ impl Default for TemplateApp {
             usr_msg: String::new(),
             replying_to: None,
             incoming_msg: ServerMaster::default(),
-
-            //thread communication for client
-            rx,
-            tx,
-
-            //data sync
-            drx,
-            dtx,
-            autosync_sender: None,
-            autosync_should_run: Arc::new(AtomicBool::new(true)),
         }
     }
 }
 
-#[allow(dead_code)]
-impl TemplateApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
+///Main, Global stuff
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct Main {
+    ///Checks if the emoji tray is on
+    #[serde(skip)]
+    pub emoji_mode: bool,
 
-        Default::default()
+    ///This struct is used for keymapping, TODO: just switch to ctx.input
+    #[serde(skip)]
+    pub keymap: Input,
+
+    ///Checks if bookmark mode is turned on
+    #[serde(skip)]
+    pub bookmark_mode: bool,
+
+    ///Client mode main switch
+    #[serde(skip)]
+    pub client_mode: bool,
+
+    ///Server mode main switch
+    #[serde(skip)]
+    pub server_mode: bool,
+
+    ///Mode selector mode main switch
+    #[serde(skip)]
+    pub mode_selector: bool,
+
+    ///Opened account's file pathbuf
+    #[serde(skip)]
+    pub opened_account_path: PathBuf,
+}
+impl Default for Main {
+    fn default() -> Self {
+        Self {
+            emoji_mode: false,
+            keymap: Input::default(),
+            bookmark_mode: false,
+            client_mode: false,
+            server_mode: false,
+            mode_selector: false,
+            opened_account_path: PathBuf::default(),
+        }
     }
 }
-
 ///When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileUpload {
