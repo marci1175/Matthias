@@ -1,7 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{AudioSettings, ServerMessageType, TemplateApp};
+use crate::app::backend::{AudioSettings, ServerMessageType, TemplateApp, ScrollToMessage};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -12,9 +12,19 @@ impl TemplateApp {
         ui.allocate_ui(vec2(ui.available_width(), ui.available_height() - self.scroll_widget_rect.height() + 10.), |ui|{
             egui::ScrollArea::vertical()
                     .id_source("msg_area")
-                    .stick_to_bottom(true)
+                    .stick_to_bottom(self.scroll_to_message.is_none())
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
+
+                        //Scroll to reply logic
+                        if let Some(scroll_to_instance) = &self.scroll_to_message {
+                            scroll_to_instance.messages[scroll_to_instance.index].scroll_to_me(Some(Align::Center));
+                            
+                            //Destroy instance
+                            self.scroll_to_message = None;
+                            self.scroll_to_message_index = None;
+                        }
+
                         ui.allocate_ui(ui.available_size(), |ui| {
 
                             //Display welcome message if self.send_on_ip is empty
@@ -23,9 +33,6 @@ impl TemplateApp {
                                     ui.label(RichText::from("To start chatting go to settings and set the IP to the server you want to connect to!").size(self.font_size).color(Color32::LIGHT_BLUE));
                                 });
                             }
-
-                            let mut message_instance: Vec<Response> = Vec::new();
-                            let mut reply_to_got_to = (false, 0);
 
                             //Check if sink_list is bigger than messages, to avoid crashing
                             if self.audio_playback.sink_list.len() > self.incoming_msg.struct_list.len() {
@@ -42,6 +49,7 @@ impl TemplateApp {
                                 self.audio_playback.settings_list.push(AudioSettings::default());
                             }
                             
+                            let mut message_instances: Vec<Response> = Vec::new();
 
                             for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
                         
@@ -75,7 +83,7 @@ impl TemplateApp {
                                                 .clicked() {
 
                                                     //implement scrolling to message
-                                                    reply_to_got_to = (true, replied_to);
+                                                    self.scroll_to_message_index = Some(replied_to);
                                             
                                                 }
                                         });
@@ -105,12 +113,15 @@ impl TemplateApp {
                                     };
                                 });
                                 
+
                                 //this functions for the reply autoscroll
-                                message_instance.push(message_group);
-                                if reply_to_got_to.0 {
-                                    message_instance[reply_to_got_to.1].scroll_to_me(Some(Align::Center));
-                                }
+                                message_instances.push(message_group);
+                                
+
                             };
+                            if let Some(scroll_to_reply) = self.scroll_to_message_index {
+                                self.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
+                            }
                         });
                 
                         if !self.usr_msg_expanded {

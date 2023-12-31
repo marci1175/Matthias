@@ -1,4 +1,5 @@
 use chrono::Utc;
+use egui::{InnerResponse, Align};
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -17,72 +18,72 @@ pub struct TemplateApp {
     /*
         Font
     */
-    //fontbook
+    ///fontbook
     pub filter: String,
     pub named_chars: BTreeMap<egui::FontFamily, BTreeMap<char, String>>,
-    //font
+    ///font
     pub font_size: f32,
 
     /*
     login page
     */
-    //the string entered to the username field on the login page
+    ///the string entered to the username field on the login page
     pub login_username: String,
 
     #[serde(skip)]
-    //the string entered to the password field on the login page, dont save this one... obviously :)
+    ///the string entered to the password field on the login page, dont save this one... obviously :)
     pub login_password: String,
 
     /*
         server main
     */
-    //DEPRICATED, ipv4 mode
+    ///DEPRICATED, ipv4 mode
     pub ipv4_mode: bool,
 
-    //SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
+    ///SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
     #[serde(skip)]
     pub server_has_started: bool,
 
-    //Public ip address, checked by pinging external website
+    ///Public ip address, checked by pinging external website
     #[serde(skip)]
     pub public_ip: String,
 
-    //server settings
+    ///server settings
     pub server_req_password: bool,
 
-    //What is the server's password set to
+    ///What is the server's password set to
     pub server_password: String,
 
-    //Which port is the server open on
+    ///Which port is the server open on
     pub open_on_port: String,
 
-    //thread communication for server
+    ///thread communication for server
     #[serde(skip)]
     pub srx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub stx: mpsc::Sender<String>,
 
-    //child windows
+    ///child windows
     #[serde(skip)]
     pub settings_window: bool,
 
-    //thread communication for file requesting
+    ///thread communication for file requesting
     #[serde(skip)]
     pub frx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub ftx: mpsc::Sender<String>,
 
-    //thread communication for image requesting
+    ///thread communication for image requesting
     #[serde(skip)]
     pub irx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub itx: mpsc::Sender<String>,
 
-    //thread communication for audio recording
+    ///thread communication for audio recording
     #[serde(skip)]
     pub atx: Option<mpsc::Sender<bool>>,
 
-    //thread communication for audio ! SAVING !
+    ///thread communication for audio ! SAVING !
     #[serde(skip)]
     pub audio_save_rx: mpsc::Receiver<String>,
     #[serde(skip)]
@@ -91,126 +92,130 @@ pub struct TemplateApp {
     /*
         main
     */
-    //Checks if the emoji tray is on
+    ///Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
 
-    //This struct is used for keymapping, TODO: just switch to ctx.input
+    ///This struct is used for keymapping, TODO: just switch to ctx.input
     #[serde(skip)]
     pub keymap: Input,
 
-    //Checks if bookmark mode is turned on
+    ///Checks if bookmark mode is turned on
     #[serde(skip)]
     pub bookmark_mode: bool,
 
-    //Client mode main switch
+    ///Client mode main switch
     #[serde(skip)]
     pub client_mode: bool,
 
-    //Server mode main switch
+    ///Server mode main switch
     #[serde(skip)]
     pub server_mode: bool,
 
-    //Mode selector mode main switch
+    ///Mode selector mode main switch
     #[serde(skip)]
     pub mode_selector: bool,
 
-    //Opened account's file pathbuf
+    ///Opened account's file pathbuf
     #[serde(skip)]
     pub opened_account_path: PathBuf,
 
     /*
         client main
     */
-    //audio playback
+    ///audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
 
-    //this doesnt really matter if we save or no so whatever
+    ///this doesnt really matter if we save or no so whatever, implements scrolling to message element
     #[serde(skip)]
-    pub should_scroll_to_reply: bool,
+    pub scroll_to_message: Option<ScrollToMessage>,
 
-    //Selected port on sending
+    ///index of the reply the user clicked on
+    #[serde(skip)]
+    pub scroll_to_message_index: Option<usize>,
+
+    ///Selected port on sending
     pub send_on_port: String,
 
-    //Selected ip address (without port as seen above)
+    ///Selected ip address (without port as seen above)
     pub send_on_address: String,
 
-    //This is used when the client entered a false password to connect with to the server
+    ///This is used when the client entered a false password to connect with to the server
     #[serde(skip)]
     pub invalid_password: bool,
 
-    //This is set to on when an image is enlarged
+    ///This is set to on when an image is enlarged
     #[serde(skip)]
     pub image_overlay: bool,
 
-    //Scroll widget rect, text editor's rect
+    ///Scroll widget rect, text editor's rect
     pub scroll_widget_rect: egui::Rect,
 
-    //This decides how wide the text editor should be, ensure it doesnt overlap with "msg_action_tray" (the action buttons :) )
+    ///This decides how wide the text editor should be, ensure it doesnt overlap with "msg_action_tray" (the action buttons :) )
     pub text_widget_offset: f32,
 
-    //A vector of all the added files to the buffer, these are the PathBufs which get read, then their bytes get sent
+    ///A vector of all the added files to the buffer, these are the PathBufs which get read, then their bytes get sent
     #[serde(skip)]
     pub files_to_send: Vec<PathBuf>,
 
-    //This checks if the text editor is open or not
+    ///This checks if the text editor is open or not
     pub usr_msg_expanded: bool,
 
-    //This is the full address of the destionation a message is supposed to be sent to
+    ///This is the full address of the destionation a message is supposed to be sent to
     pub send_on_ip: String,
 
     pub send_on_ip_base64_encoded: String,
     pub req_passw: bool,
     pub client_password: String,
 
-    //This gem of a variable is used to contain animation's state
+    ///This gem of a variable is used to contain animation's state
     pub how_on: f32,
 
-    //This checks if a file is dragged above szeChat, so it knows when to display the cool animation 8)
+    ///This checks if a file is dragged above szeChat, so it knows when to display the cool animation 8)
     #[serde(skip)]
     pub drop_file_animation: bool,
 
-    //Message Settings
+    ////This indexes the user's selected messages for replying
     #[serde(skip)]
     pub replying_to: Option<usize>,
 
-    //Input (Múlt idő) user's message, this is what gets modified in the text editor
+    ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
     pub usr_msg: String,
 
-    //Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
+    ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
     pub incoming_msg: ServerMaster,
 
-    //emoji fasz
+    ///emoji fasz
     pub random_emoji: String,
     pub emoji: Vec<String>,
 
-    //Random engine
+    ///Random engine
     #[serde(skip)]
     pub rand_eng: ThreadRng,
 
-    //Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
+    ///Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
 
-    //thread communication for client
+    ///thread communication for client
     #[serde(skip)]
     pub rx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub tx: mpsc::Sender<String>,
 
-    //data sync
+    ///data sync
     #[serde(skip)]
     pub drx: mpsc::Receiver<String>,
     #[serde(skip)]
     pub dtx: mpsc::Sender<String>,
 
-    //Server - client syncing thread
+    ///Server - client syncing thread
     #[serde(skip)]
     pub autosync_sender: Option<mpsc::Receiver<String>>,
 
-    //Server - client sync worker should run
+    ///Server - client sync worker should run
     #[serde(skip)]
     pub autosync_should_run: Arc<AtomicBool>,
 }
@@ -224,50 +229,50 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-            //audio playback
+            ///audio playback
             audio_playback: AudioPlayback::default(),
 
-            //fontbook
+            ///fontbook
             filter: Default::default(),
             named_chars: Default::default(),
 
-            //login page
+            ///login page
             login_username: String::new(),
             login_password: String::new(),
 
-            //server_main
+            ///server_main
             ipv4_mode: true,
             server_has_started: false,
             public_ip: String::new(),
 
-            //server settings
+            ///server settings
             server_req_password: false,
             server_password: String::default(),
             open_on_port: String::default(),
 
-            //thread communication for server
+            ///thread communication for server
             srx,
             stx,
 
-            //child windows
+            ///child windows
             settings_window: false,
 
-            //thread communication for file requesting
+            ///thread communication for file requesting
             frx,
             ftx,
 
-            //thread communication for image requesting
+            ///thread communication for image requesting
             irx,
             itx,
 
-            //thread communication for audio recording
+            ///thread communication for audio recording
             atx: None,
 
-            //thread communication for audio saving
+            ///thread communication for audio saving
             audio_save_rx,
             audio_save_tx,
 
-            //main
+            ///main
             scroll_widget_rect: egui::Rect::NAN,
             text_widget_offset: 0.0,
             emoji_mode: false,
@@ -278,8 +283,9 @@ impl Default for TemplateApp {
             mode_selector: false,
             opened_account_path: PathBuf::default(),
 
-            //client main
-            should_scroll_to_reply: false,
+            ///client main
+            scroll_to_message_index: None,
+            scroll_to_message: None,
             send_on_port: String::new(),
             send_on_address: String::new(),
             invalid_password: false,
@@ -293,10 +299,10 @@ impl Default for TemplateApp {
             req_passw: false,
             client_password: String::new(),
 
-            //font
+            ///font
             font_size: 20.,
 
-            //emoji button
+            ///emoji button
             emoji: vec![
                 "😐", "😍", "😉", "😈", "😇", "😆", "😅", "😄", "😃", "😂", "😁", "😀",
             ]
@@ -307,16 +313,16 @@ impl Default for TemplateApp {
             rand_eng: rand::thread_rng(),
             random_generated: false,
 
-            //msg
+            ///msg
             usr_msg: String::new(),
             replying_to: None,
             incoming_msg: ServerMaster::default(),
 
-            //thread communication for client
+            ///thread communication for client
             rx,
             tx,
 
-            //data sync
+            ///data sync
             drx,
             dtx,
             autosync_sender: None,
@@ -336,7 +342,7 @@ impl TemplateApp {
     }
 }
 
-//When the client is uploading a file, this packet gets sent
+///When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileUpload {
     pub extension: Option<String>,
@@ -344,29 +350,29 @@ pub struct ClientFileUpload {
     pub bytes: Vec<u8>,
 }
 
-//Normal message
+///Normal message
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientNormalMessage {
     pub message: String,
 }
 
-//Empty packet, as described later, only used for syncing
+///Empty packet, as described later, only used for syncing
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientSnycMessage {/*Empty packet, only for syncing*/}
 
-//This is used by the client for requesting file
+///This is used by the client for requesting file
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileRequest {
     pub index: i32,
 }
 
-//This is used by the client for requesting images
+///This is used by the client for requesting images
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientImageRequest {
     pub index: i32,
 }
 
-//Client requests audio file in server
+///Client requests audio file in server
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientAudioRequest {
     pub index: i32,
@@ -374,27 +380,27 @@ pub struct ClientAudioRequest {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientFileRequestType {
-    //this is when you want to display an image and you have to make a request to the server file
+    ///this is when you want to display an image and you have to make a request to the server file
     ClientImageRequest(ClientImageRequest),
     ClientFileRequest(ClientFileRequest),
     ClientAudioRequest(ClientAudioRequest),
 }
 
-//Client outgoing message types
+///Client outgoing message types
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientMessageType {
     ClientFileRequestType(ClientFileRequestType),
 
     ClientFileUpload(ClientFileUpload),
 
-    //Normal msg
+    ///Normal msg
     ClientNormalMessage(ClientNormalMessage),
 
-    //Used for syncing with client and server
+    ///Used for syncing with client and server
     ClientSyncMessage(ClientSnycMessage),
 }
 
-//This is what gets to be sent out by the client
+///This is what gets to be sent out by the client
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientMessage {
     pub replying_to: Option<usize>,
@@ -406,12 +412,12 @@ pub struct ClientMessage {
 }
 
 impl ClientMessage {
-    //struct into string, it makes sending information easier by putting it all in a string
+    ///struct into string, it makes sending information easier by putting it all in a string
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    //this is used when sending a normal message
+    ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
         ip: String,
@@ -431,7 +437,7 @@ impl ClientMessage {
         }
     }
 
-    //this is used when you want to send a file, this contains name, bytes
+    ///this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_name: PathBuf,
         ip: String,
@@ -441,9 +447,9 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to,
-            //Dont execute me please :3 |
-            //                          |
-            //                          V
+            ///Dont execute me please :3 |
+            ///                          |
+            ///                          V
             MessageType: ClientMessageType::ClientFileUpload(ClientFileUpload {
                 extension: Some(file_name.extension().unwrap().to_str().unwrap().to_string()),
                 name: Some(
@@ -464,7 +470,7 @@ impl ClientMessage {
         }
     }
 
-    //this is used for constructing a sync msg aka sending an empty packet, so server can reply
+    ///this is used for constructing a sync msg aka sending an empty packet, so server can reply
     pub fn construct_sync_msg(ip: String, password: String, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -476,7 +482,7 @@ impl ClientMessage {
         }
     }
 
-    //this is used for asking for a file
+    ///this is used for asking for a file
     pub fn construct_file_request_msg(
         index: i32,
         password: String,
@@ -495,7 +501,7 @@ impl ClientMessage {
         }
     }
 
-    //this is used for asking for an image
+    ///this is used for asking for an image
     pub fn construct_image_request_msg(
         index: i32,
         password: String,
@@ -514,7 +520,7 @@ impl ClientMessage {
         }
     }
 
-    //this is used for asking for an image
+    ///this is used for asking for an image
     pub fn construct_audio_request_msg(
         index: i32,
         password: String,
@@ -554,47 +560,47 @@ impl ClientMessage {
 
 */
 
-//This is what the server sends back (pushes to message vector), when reciving a file
+///This is what the server sends back (pushes to message vector), when reciving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerFileUpload {
     pub file_name: String,
     pub index: i32,
 }
 
-//This is what the server sends back, when asked for a file (FIleRequest)
+///This is what the server sends back, when asked for a file (FIleRequest)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerFileReply {
     pub bytes: Vec<u8>,
     pub file_name: PathBuf,
 }
 
-//This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
+///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerImageUpload {
     pub index: i32,
 }
 
-//When client asks for the image based on the provided index, reply with the image bytes
+///When client asks for the image based on the provided index, reply with the image bytes
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerImageReply {
     pub bytes: Vec<u8>,
     pub index: i32,
 }
 
-//This is what the server sends back (pushes to message vector), when reciving a normal message
+///This is what the server sends back (pushes to message vector), when reciving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerNormalMessage {
     pub message: String,
 }
 
-//REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
+///REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerAudioUpload {
     pub index: i32,
     pub file_name: String,
 }
 
-//When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
+///When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerAudioReply {
     pub bytes: Vec<u8>,
@@ -605,7 +611,7 @@ pub struct ServerAudioReply {
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::{EnumIter, EnumString};
 
-//This is what server replies can be
+///This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumString, EnumMessage))]
 pub enum ServerMessageType {
@@ -614,7 +620,7 @@ pub enum ServerMessageType {
     #[strum_discriminants(strum(message = "Normal"))]
     Normal(ServerNormalMessage),
 
-    //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
+    ///Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
     #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
     #[strum_discriminants(strum(message = "Audio"))]
@@ -626,12 +632,11 @@ pub enum ServerMessageType {
 // pub enum ServerMessageTypeR {
 //     Upload(ServerFileUpload),
 //     Normal(ServerNormalMessage),
-
 //     Image(ServerImageUpload),
 //     Audio(ServerAudioUpload),
 // }
 
-//This is one whole server msg (packet), which gets bundled when sending ServerMain
+///This is one whole server msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
     pub replying_to: Option<usize>,
@@ -707,7 +712,7 @@ impl ServerOutput {
 
 }
 
-//Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
+///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
     pub struct_list: Vec<ServerOutput>,
@@ -729,7 +734,7 @@ impl ServerMaster {
  Client backend
 */
 
-//Struct for audio playback
+///Struct for audio playback
 pub struct AudioPlayback {
     pub stream: OutputStream,
     pub stream_handle: OutputStreamHandle,
@@ -748,7 +753,7 @@ impl Default for AudioPlayback {
     }
 }
 
-//This is used by the audio player, this is where you can set the speed and volume etc
+///This is used by the audio player, this is where you can set the speed and volume etc
 pub struct AudioSettings {
     pub volume: f32,
     pub speed: f32,
@@ -756,7 +761,7 @@ pub struct AudioSettings {
     pub cursor_offset: u64,
 }
 
-//Initialize default values
+///Initialize default values
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
@@ -780,7 +785,7 @@ pub struct PlaybackCursor {
     pub cursor: Arc<Mutex<io::Cursor<Vec<u8>>>>,
 }
 
-//Impl new so It can probe a file (in vec<u8> format)
+///Impl new so It can probe a file (in vec<u8> format)
 impl PlaybackCursor {
     pub fn new(data: Vec<u8>) -> Self {
         let cursor = Arc::new(Mutex::new(io::Cursor::new(data)));
@@ -788,7 +793,7 @@ impl PlaybackCursor {
     }
 }
 
-//Implement the Read trait
+///Implement the Read trait
 impl Read for PlaybackCursor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut cursor = self.cursor.lock().unwrap();
@@ -796,10 +801,21 @@ impl Read for PlaybackCursor {
     }
 }
 
-//Implement the Seek trait
+///Implement the Seek trait
 impl Seek for PlaybackCursor {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut cursor = self.cursor.lock().unwrap();
         cursor.seek(pos)
+    }
+}
+
+pub struct ScrollToMessage {
+    pub messages: Vec<egui::Response>,
+    pub index: usize,
+}
+
+impl ScrollToMessage {
+    pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage {
+        ScrollToMessage { messages , index }
     }
 }
