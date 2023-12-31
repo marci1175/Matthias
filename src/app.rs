@@ -1,5 +1,5 @@
-use egui::{vec2, Align, Color32, Layout, RichText, ViewportCommand, IconData};
 use egui::Context;
+use egui::{vec2, Align, Color32, IconData, Layout, RichText, ViewportCommand};
 use std::convert::Infallible;
 use std::fs::{self};
 use std::sync::Arc;
@@ -24,7 +24,7 @@ impl eframe::App for backend::TemplateApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
-    
+
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         //clean up after server, client
         match std::env::var("APPDATA") {
@@ -38,7 +38,6 @@ impl eframe::App for backend::TemplateApp {
             }
             Err(err) => println!("{err}"),
         }
-        
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

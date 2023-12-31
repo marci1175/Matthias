@@ -1,9 +1,9 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
+use super::backend::ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload};
 use rand::Rng;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
-use super::backend::ServerMessageTypeDiscriminants::{Normal, Image, Audio, Upload};
 /*
 use std::{io, time::Duration};
 use clap::Parser;
@@ -256,7 +256,7 @@ pub async fn server_main(
     };
 
     let messages = &msg_service.messages.lock().unwrap().to_vec();
-    
+
     Server::builder()
         .add_service(MessageServer::new(msg_service))
         .serve(addr)
@@ -355,7 +355,7 @@ impl MessageService {
                                     ok.push(ServerOutput::convert_type_to_servermsg(
                                         request,
                                         self.original_file_paths.lock().unwrap().len() as i32 - 1,
-                                        Upload
+                                        Upload,
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
@@ -403,7 +403,7 @@ impl MessageService {
                                 ok.push(ServerOutput::convert_type_to_servermsg(
                                     req.clone(),
                                     image_path_lenght as i32,
-                                    Image
+                                    Image,
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -429,7 +429,7 @@ impl MessageService {
         let mut audio_paths = self.audio_list.lock().unwrap();
 
         let audio_paths_lenght = audio_paths.len();
-        
+
         match fs::File::create(format!(
             "{}\\szeChat\\Server\\{}",
             env!("APPDATA"),

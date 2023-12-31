@@ -52,7 +52,6 @@ impl TemplateApp {
                                     false => {
                                         //ui.label(format!("{:?}", self.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap().remaining_slice().len()));
                                         //let cursor = self.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
-                                        
                                         if ui.button("Stop").clicked() {
                                             sink.clear();
                                             //Reset value
@@ -72,22 +71,18 @@ impl TemplateApp {
                                         ));
 
                                         let file_stream_to_be_read = fs::read(file).unwrap_or_default();
-                                        
                                         self.audio_playback.settings_list[current_index_in_message_list].cursor = PlaybackCursor::new(file_stream_to_be_read);
-                                        
                                         self.audio_playback.sink_list
                                             [current_index_in_message_list] = Some(
                                             Sink::try_new(&self.audio_playback.stream_handle)
                                                 .unwrap(),
                                         );
-                                        
                                         let sink = self.audio_playback.sink_list
                                             [current_index_in_message_list]
                                             .as_mut()
                                             .unwrap();
 
                                         let source = Decoder::new(self.audio_playback.settings_list[current_index_in_message_list].cursor.clone() /*We can assume its always Some because we just set it to some above (lol)*/);
-                                        
                                         match source {
                                             Ok(source) => {
 
@@ -166,7 +161,6 @@ impl TemplateApp {
                             .text("Speed")
                             .step_by(0.05),
                         );
-                        
                     }
                     false => {
                         //create decoy file, to manually create a race condition

@@ -1,3 +1,6 @@
+use crate::app::backend::{ClientMessage, TemplateApp};
+use crate::app::client::{self};
+use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use device_query::Keycode;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, RichText,
@@ -8,9 +11,6 @@ use rfd::FileDialog;
 use std::fs::{self};
 use std::path::PathBuf;
 use std::sync::mpsc;
-use crate::app::backend::{ClientMessage, TemplateApp};
-use crate::app::client::{self};
-use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 
 impl TemplateApp {
     pub fn message_tray(

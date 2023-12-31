@@ -10,7 +10,7 @@ impl TemplateApp {
         //window settings
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(700., 300.)));
         ctx.send_viewport_cmd(ViewportCommand::Resizable(false));
-        
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.allocate_ui(vec2(ui.available_width(), 20.), |ui| {
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
@@ -38,7 +38,9 @@ impl TemplateApp {
                             .clicked()
                         {
                             self.client_mode = true;
-                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(1300., 800.)));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(
+                                1300., 800.,
+                            )));
                             self.autosync_should_run.store(true, Ordering::Relaxed);
                         };
                     },
@@ -56,7 +58,9 @@ impl TemplateApp {
                         {
                             self.server_mode = true;
 
-                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(1000., 900.)));
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(
+                                1000., 900.,
+                            )));
                         };
                     },
                 );

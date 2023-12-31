@@ -657,7 +657,7 @@ impl ServerOutput {
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
-            MessageType: 
+            MessageType:
                 match normal_msg.MessageType {
                     ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
                     ClientMessageType::ClientFileUpload(upload) => {
@@ -684,8 +684,8 @@ impl ServerOutput {
                             },
                             ServerMessageTypeDiscriminants::Audio => {
                                 ServerMessageType::Audio(
-                                    ServerAudioUpload { 
-                                        index: index, 
+                                    ServerAudioUpload {
+                                        index: index,
                                         file_name: format!(
                                             "{}.{}",
                                             upload.name.unwrap_or_default(),
@@ -709,7 +709,6 @@ impl ServerOutput {
             MessageDate: normal_msg.MessageDate,
         }
     }
-
 }
 
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
@@ -816,6 +815,6 @@ pub struct ScrollToMessage {
 
 impl ScrollToMessage {
     pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage {
-        ScrollToMessage { messages , index }
+        ScrollToMessage { messages, index }
     }
 }

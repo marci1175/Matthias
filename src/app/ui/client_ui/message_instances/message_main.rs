@@ -1,7 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{AudioSettings, ServerMessageType, TemplateApp, ScrollToMessage};
+use crate::app::backend::{AudioSettings, ScrollToMessage, ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -19,7 +19,6 @@ impl TemplateApp {
                         //Scroll to reply logic
                         if let Some(scroll_to_instance) = &self.scroll_to_message {
                             scroll_to_instance.messages[scroll_to_instance.index].scroll_to_me(Some(Align::Center));
-                            
                             //Destroy instance
                             self.scroll_to_message = None;
                             self.scroll_to_message_index = None;
@@ -48,11 +47,9 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.audio_playback.settings_list.push(AudioSettings::default());
                             }
-                            
                             let mut message_instances: Vec<Response> = Vec::new();
 
                             for (index, item) in self.incoming_msg.clone().struct_list.iter().enumerate() {
-                        
                                 let mut i: &String = &Default::default();
 
                                 if let ServerMessageType::Normal(item) = &item.MessageType {
@@ -84,23 +81,17 @@ impl TemplateApp {
 
                                                     //implement scrolling to message
                                                     self.scroll_to_message_index = Some(replied_to);
-                                            
                                                 }
                                         });
                                     }
-                            
                                     //Display author
                                     ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                            
                                     //IMPORTANT: Each of these functions have logic inside them for displaying
                                     self.markdown_text_display(i, ui);
 
                                     self.audio_message_instance(item, ui, index);
-                            
                                     self.file_message_instance(item, ui);
-                            
                                     self.image_message_instance(item, ui, ctx);
-                                    
                                     //Display Message date
                                     ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
                                 }
@@ -112,18 +103,15 @@ impl TemplateApp {
                                         ctx.copy_text(i.clone());
                                     };
                                 });
-                                
 
                                 //this functions for the reply autoscroll
                                 message_instances.push(message_group);
-                                
 
                             };
                             if let Some(scroll_to_reply) = self.scroll_to_message_index {
                                 self.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
                             }
                         });
-                
                         if !self.usr_msg_expanded {
                             ui.allocate_space(vec2(ui.available_width(), 25.));
                         }

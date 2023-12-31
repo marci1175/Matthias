@@ -60,7 +60,7 @@ impl TemplateApp {
                 ui.allocate_space(vec2(ui.available_width(), 5.));
             },
         );
-        
+
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
             //Drop file warning

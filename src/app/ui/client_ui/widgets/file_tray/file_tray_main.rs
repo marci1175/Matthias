@@ -1,4 +1,4 @@
-use egui::{vec2, Align, ImageButton, Layout, RichText, Color32};
+use egui::{vec2, Align, Color32, ImageButton, Layout, RichText};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ServerMessageType, TemplateApp};
@@ -17,7 +17,6 @@ impl TemplateApp {
                                         ui.allocate_ui(vec2(200., 100.), |ui| {
                                             ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
                                                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
-    
                                                     //file icon
                                                     ui.allocate_ui(vec2(75., 75.), |ui|{
                                                         match item.extension().unwrap().to_string_lossy().to_ascii_lowercase().as_str() {
@@ -37,18 +36,15 @@ impl TemplateApp {
                                                             "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
                                                                 ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/video_icon.png")));
                                                             }
-    
                                                             // :)
                                                             "rs" => {
                                                                 ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/rust_lang_icon.png")));
                                                             }
-    
                                                             _ => {
                                                                 ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/general_icon.png")));
                                                             }
                                                         }
                                                     });
-    
                                                     //selected file widget part
                                                     ui.label(
                                                         RichText::from(
@@ -60,7 +56,6 @@ impl TemplateApp {
                                                     );
                                                 });
                                                 ui.separator();
-    
                                                 //bin icon
                                                 ui.allocate_ui(vec2(30., 30.), |ui|{
                                                     if ui.add(
@@ -77,12 +72,10 @@ impl TemplateApp {
                                 }
                             });
                 });
-            
                 if let Some(replying_to) = self.replying_to {
                     if !self.files_to_send.is_empty() {
                         ui.separator();
                     }
-                   
                     ui.horizontal(|ui| {
                         ui.group(|ui|{
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
@@ -93,13 +86,10 @@ impl TemplateApp {
                                     //Replying to "{author}:"
                                     ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
                                     ui.label(RichText::from(match &selected_message.MessageType {
-                                
                                         ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                         ServerMessageType::Image(_img) => "Image".to_string(),
                                         ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-    
                                         ServerMessageType::Normal(msg) => msg.message.clone(),
-    
                                     }).size(self.font_size).strong());
                                 });
                             });
@@ -108,11 +98,8 @@ impl TemplateApp {
                             self.replying_to = None;
                         }
                     });
-            
-                }  
-
-                ui.allocate_space(vec2(ui.available_width(), 10.));   
-
+                }
+                ui.allocate_space(vec2(ui.available_width(), 10.));
             });
     }
 }

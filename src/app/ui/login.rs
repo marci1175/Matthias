@@ -16,14 +16,17 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: &Vec<Keycode>,
     ) {
-        
         //windows settings
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(500., 200.)));
         ctx.send_viewport_cmd(ViewportCommand::Resizable(false));
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                ui.label(RichText::from("széChat").strong().size(25.)).on_hover_text(RichText::from(format!("Build date: {}", include_str!("../../../build_info.szechat_build"))));
+                ui.label(RichText::from("széChat").strong().size(25.))
+                    .on_hover_text(RichText::from(format!(
+                        "Build date: {}",
+                        include_str!("../../../build_info.szechat_build")
+                    )));
                 ui.label("Username");
                 ui.text_edit_singleline(&mut self.login_username);
                 ui.label("Password");
@@ -80,8 +83,6 @@ impl TemplateApp {
                         }
                     };
                 };
-                
-                
             });
         });
     }
