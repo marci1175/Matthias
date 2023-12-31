@@ -23,7 +23,7 @@ impl TemplateApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                ui.label(RichText::from("széChat").strong().size(25.));
+                ui.label(RichText::from("széChat").strong().size(25.)).on_hover_text(RichText::from(format!("Build date: {}", include_str!("../../../build_info.szechat_build"))));
                 ui.label("Username");
                 ui.text_edit_singleline(&mut self.login_username);
                 ui.label("Password");
@@ -80,6 +80,8 @@ impl TemplateApp {
                         }
                     };
                 };
+                
+                
             });
         });
     }
