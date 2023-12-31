@@ -19,6 +19,9 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: Vec<Keycode>,
     ) {
+        //Window settings
+        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+
         //Server - Client syncing
         self.client_sync(ctx);
 
@@ -123,7 +126,7 @@ impl TemplateApp {
 
         //usr_input
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
-            .max_height(_frame.info().window_info.size[1] / 2.)
+            .max_height(ctx.used_size().y / 2.)
             .show_animated(ctx, self.usr_msg_expanded, |ui| {
                 let msg_tray = self.message_tray(ui, ctx, input_keys);
 

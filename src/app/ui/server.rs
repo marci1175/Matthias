@@ -1,4 +1,4 @@
-use egui::{vec2, Align, Layout, RichText};
+use egui::{vec2, Align, Layout, RichText, ViewportCommand};
 
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
@@ -9,6 +9,9 @@ use crate::app::server;
 
 impl TemplateApp {
     pub fn state_server(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
+        //Window settings
+        ctx.send_viewport_cmd(ViewportCommand::Resizable(true));
+
         //settings
         egui::TopBottomPanel::top("srvr_settings").show(ctx, |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {

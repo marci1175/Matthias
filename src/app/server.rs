@@ -61,6 +61,7 @@ pub struct MessageService {
 }
 #[tonic::async_trait]
 impl ServerMessage for MessageService {
+    #[inline]
     async fn message_main(
         &self,
         request: Request<MessageRequest>,
@@ -248,15 +249,16 @@ pub async fn server_main(
     if !ip_v4 {
         addr = format!("[::]:{}", port).parse()?;
     }
-    let btc_service = MessageService {
+
+    let msg_service = MessageService {
         passw: password,
         ..Default::default()
     };
 
-    let messages = &btc_service.messages.lock().unwrap().to_vec();
-
+    let messages = &msg_service.messages.lock().unwrap().to_vec();
+    
     Server::builder()
-        .add_service(MessageServer::new(btc_service))
+        .add_service(MessageServer::new(msg_service))
         .serve(addr)
         .await?;
 
@@ -427,7 +429,7 @@ impl MessageService {
         let mut audio_paths = self.audio_list.lock().unwrap();
 
         let audio_paths_lenght = audio_paths.len();
-
+        
         match fs::File::create(format!(
             "{}\\szeChat\\Server\\{}",
             env!("APPDATA"),
@@ -477,6 +479,7 @@ impl MessageService {
         )
     }
 
+    #[inline]
     pub async fn handle_request(
         &self,
         request_type: &ClientRequestTypeStruct,

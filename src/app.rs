@@ -1,6 +1,8 @@
-use egui::{vec2, Align, Color32, Layout, RichText};
-
+use egui::{vec2, Align, Color32, Layout, RichText, ViewportCommand, IconData};
+use egui::Context;
+use std::convert::Infallible;
 use std::fs::{self};
+use std::sync::Arc;
 
 mod account_manager;
 pub mod backend;
@@ -22,8 +24,8 @@ impl eframe::App for backend::TemplateApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
-
-    fn on_close_event(&mut self) -> bool {
+    
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         //clean up after server, client
         match std::env::var("APPDATA") {
             Ok(app_data) => {
@@ -36,30 +38,15 @@ impl eframe::App for backend::TemplateApp {
             }
             Err(err) => println!("{err}"),
         }
-
-        true
+        
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.keymap.clone());
-
         /*
-
-            :: custom font ::
-
-        let mut custom_font = FontDefinitions::default();
-
-        custom_font.font_data.insert("consola".to_owned(), FontData::from_static(include_bytes!("C:\\Windows\\fonts\\arial.ttf")));
-
-        custom_font.families.get_mut(&FontFamily::Proportional).unwrap()
-            .insert(0, "consola".to_owned());
-
-        // Put my font as last fallback for monospace:
-        custom_font.families.get_mut(&FontFamily::Monospace).unwrap()
-            .push("consola".to_owned());
-
-        ctx.set_fonts(custom_font);
-
+        ctx.send_viewport_cmd(ViewportCommand::Icon(Some(
+            Arc::new(IconData { rgba: include_bytes!("../icons/main.png").to_vec(), width: 1024, height: 1024 })
+        )));
         */
 
         /* NOTES:
