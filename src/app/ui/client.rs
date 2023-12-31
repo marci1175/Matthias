@@ -19,55 +19,8 @@ impl TemplateApp {
         ctx: &egui::Context,
         input_keys: Vec<Keycode>,
     ) {
-        let should_be_running = self.autosync_should_run.clone();
-        let rx = self.autosync_sender.get_or_insert_with(|| {
-            let (tx, rx) = mpsc::channel::<String>();
-
-            let message = ClientMessage::construct_sync_msg(
-                self.send_on_ip.clone(),
-                self.client_password.clone(),
-                self.login_username.clone(),
-            );
-
-            tokio::spawn(async move {
-                while should_be_running.load(Ordering::Relaxed) {
-                    tokio::time::sleep(Duration::from_secs_f32(2.)).await;
-                    //This is where the messages get recieved
-                    match client::send_msg(message.clone()).await {
-                        Ok(ok) => {
-                            match tx.send(ok) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    println!("{} ln 57", err);
-                                    break;
-                                }
-                            };
-                        }
-                        Err(_err) => {
-                            //println!("ln 197 {:?}", err.source());
-                            break;
-                        }
-                    };
-                }
-            });
-            rx
-        });
-
-        //Get sent to the channel to be displayed
-        match rx.try_recv() {
-            Ok(msg) => {
-                //show messages
-                ctx.request_repaint();
-                let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                    serde_json::from_str(&msg);
-                if let Ok(ok) = incoming_struct {
-                    self.incoming_msg = ok;
-                }
-            }
-            Err(_err) => {
-                //println!("{}", _err)
-            }
-        }
+        //Server - Client syncing
+        self.client_sync(ctx);
 
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "setting_area").show(
             ctx,
@@ -266,5 +219,57 @@ impl TemplateApp {
             Err(_err) => {}
         }
         ctx.request_repaint();
+    }
+
+    fn client_sync(&mut self, ctx: &egui::Context) {
+        let should_be_running = self.autosync_should_run.clone();
+        let rx = self.autosync_sender.get_or_insert_with(|| {
+            let (tx, rx) = mpsc::channel::<String>();
+
+            let message = ClientMessage::construct_sync_msg(
+                self.send_on_ip.clone(),
+                self.client_password.clone(),
+                self.login_username.clone(),
+            );
+
+            tokio::spawn(async move {
+                while should_be_running.load(Ordering::Relaxed) {
+                    tokio::time::sleep(Duration::from_secs_f32(2.)).await;
+                    //This is where the messages get recieved
+                    match client::send_msg(message.clone()).await {
+                        Ok(ok) => {
+                            match tx.send(ok) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    println!("{} ln 57", err);
+                                    break;
+                                }
+                            };
+                        }
+                        Err(_err) => {
+                            //println!("ln 197 {:?}", err.source());
+                            break;
+                        }
+                    };
+                }
+            });
+            rx
+        });
+
+        //Get sent to the channel to be displayed
+        match rx.try_recv() {
+            Ok(msg) => {
+                //show messages
+                ctx.request_repaint();
+                let incoming_struct: Result<ServerMaster, serde_json::Error> =
+                    serde_json::from_str(&msg);
+                if let Ok(ok) = incoming_struct {
+                    self.incoming_msg = ok;
+                }
+            }
+            Err(_err) => {
+                //println!("{}", _err)
+            }
+        }
     }
 }

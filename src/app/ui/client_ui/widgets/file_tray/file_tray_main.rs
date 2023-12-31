@@ -1,4 +1,4 @@
-use egui::{vec2, Align, ImageButton, Layout, RichText};
+use egui::{vec2, Align, ImageButton, Layout, RichText, Color32};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{ServerMessageType, TemplateApp};
@@ -87,9 +87,12 @@ impl TemplateApp {
                         ui.group(|ui|{
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                 //place them in one line
+                                //Selected message
+                                let selected_message = &self.incoming_msg.struct_list[replying_to];
                                 ui.horizontal(|ui| {
-                                    ui.label(RichText::from("Replying to:").size(self.font_size).weak());
-                                    ui.label(RichText::from(match &self.incoming_msg.struct_list[replying_to].MessageType {
+                                    //Replying to "{author}:"
+                                    ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
+                                    ui.label(RichText::from(match &selected_message.MessageType {
                                 
                                         ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                         ServerMessageType::Image(_img) => "Image".to_string(),

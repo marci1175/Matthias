@@ -4,16 +4,10 @@ use egui::{
     Rounding, Stroke,
 };
 use rand::Rng;
-
 use rfd::FileDialog;
-
 use std::fs::{self};
-
 use std::path::PathBuf;
-
 use std::sync::mpsc;
-
-//use crate::app::account_manager::write_file;
 use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;

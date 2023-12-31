@@ -63,7 +63,7 @@ impl TemplateApp {
                                 {
                                     if let Some(replied_to) = item.replying_to {
                                         ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("Replying to: {}: {}",
+                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
                                             self.incoming_msg.struct_list[replied_to].Author,
                                             match &self.incoming_msg.struct_list[replied_to].MessageType {
                                                 ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),

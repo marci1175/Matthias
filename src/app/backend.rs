@@ -1,5 +1,4 @@
 use chrono::Utc;
-use egui::{InnerResponse, Align};
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -229,51 +228,52 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-            ///audio playback
+            //audio playback
             audio_playback: AudioPlayback::default(),
 
-            ///fontbook
+            //fontbook
             filter: Default::default(),
             named_chars: Default::default(),
 
-            ///login page
+            //login page
             login_username: String::new(),
             login_password: String::new(),
 
-            ///server_main
+            //server_main
             ipv4_mode: true,
             server_has_started: false,
             public_ip: String::new(),
 
-            ///server settings
+            //server settings
             server_req_password: false,
             server_password: String::default(),
             open_on_port: String::default(),
 
-            ///thread communication for server
+            //thread communication for server
             srx,
             stx,
 
-            ///child windows
+            //child windows
             settings_window: false,
 
-            ///thread communication for file requesting
+            //thread communication for file requesting
             frx,
             ftx,
 
-            ///thread communication for image requesting
+            //thread communication for image requesting
             irx,
             itx,
 
-            ///thread communication for audio recording
+            //thread communication for audio recording
             atx: None,
 
-            ///thread communication for audio saving
+            //thread communication for audio saving
             audio_save_rx,
             audio_save_tx,
 
-            ///main
+            //main
             scroll_widget_rect: egui::Rect::NAN,
+
             text_widget_offset: 0.0,
             emoji_mode: false,
             keymap: Input::default(),
@@ -283,7 +283,7 @@ impl Default for TemplateApp {
             mode_selector: false,
             opened_account_path: PathBuf::default(),
 
-            ///client main
+            //client main
             scroll_to_message_index: None,
             scroll_to_message: None,
             send_on_port: String::new(),
@@ -299,10 +299,10 @@ impl Default for TemplateApp {
             req_passw: false,
             client_password: String::new(),
 
-            ///font
+            //font
             font_size: 20.,
 
-            ///emoji button
+            //emoji button
             emoji: vec![
                 "😐", "😍", "😉", "😈", "😇", "😆", "😅", "😄", "😃", "😂", "😁", "😀",
             ]
@@ -313,16 +313,16 @@ impl Default for TemplateApp {
             rand_eng: rand::thread_rng(),
             random_generated: false,
 
-            ///msg
+            //msg
             usr_msg: String::new(),
             replying_to: None,
             incoming_msg: ServerMaster::default(),
 
-            ///thread communication for client
+            //thread communication for client
             rx,
             tx,
 
-            ///data sync
+            //data sync
             drx,
             dtx,
             autosync_sender: None,
@@ -447,9 +447,9 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to,
-            ///Dont execute me please :3 |
-            ///                          |
-            ///                          V
+            //Dont execute me please :3 |
+            //                          |
+            //                          V
             MessageType: ClientMessageType::ClientFileUpload(ClientFileUpload {
                 extension: Some(file_name.extension().unwrap().to_str().unwrap().to_string()),
                 name: Some(
@@ -609,7 +609,7 @@ pub struct ServerAudioReply {
 }
 
 use strum::{EnumDiscriminants, EnumMessage};
-use strum_macros::{EnumIter, EnumString};
+use strum_macros::EnumString;
 
 ///This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants)]
