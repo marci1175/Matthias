@@ -71,6 +71,7 @@ impl eframe::App for backend::TemplateApp {
         /*devlog:
 
             TODO: fix for audio playback
+            TODO: put groups of relating info from TemplateApp into smaller structs
 
         */
 

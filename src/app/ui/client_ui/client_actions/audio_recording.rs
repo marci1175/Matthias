@@ -1,6 +1,6 @@
 //! Records a WAV file (roughly 3 seconds long) using the default input device and config.
 //!
-//! The input data is recorded to "$CARGO_MANIFEST_DIR/recorded.wav".
+//! The input data is recorded to "$APPDATA/szeChat/Client/(base64) - self.send_on_ip/recorded.wav".
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample};

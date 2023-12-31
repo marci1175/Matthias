@@ -17,7 +17,6 @@ use std::sync::mpsc;
 use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
-use crate::app::ui::client_ui::message_instances;
 
 impl TemplateApp {
     pub fn message_tray(

@@ -627,7 +627,6 @@ pub enum ServerMessageType {
 //     Upload(ServerFileUpload),
 //     Normal(ServerNormalMessage),
 
-//     //Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
 //     Image(ServerImageUpload),
 //     Audio(ServerAudioUpload),
 // }
