@@ -256,7 +256,7 @@ pub struct Client {
     ///This gem of a variable is used to contain animation's state
     pub how_on: f32,
 
-    ///This checks if a file is dragged above szeChat, so it knows when to display the cool animation 8)
+    ///This checks if a file is dragged above Matthias, so it knows when to display the cool animation 8)
     #[serde(skip)]
     pub drop_file_animation: bool,
 

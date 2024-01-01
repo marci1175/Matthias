@@ -80,7 +80,7 @@ impl TemplateApp {
                 general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
 
             let path = PathBuf::from(format!(
-                "{}\\szeChat\\Client\\{}\\Images\\{}",
+                "{}\\Matthias\\Client\\{}\\Images\\{}",
                 env!("APPDATA"),
                 self.client_ui.send_on_ip_base64_encoded,
                 picture.index
@@ -116,7 +116,7 @@ impl TemplateApp {
                     Err(_err) => {
                         //create decoy file, to manually create a race condition
                         let _ = fs::create_dir_all(PathBuf::from(format!(
-                            "{}\\szeChat\\Client\\{}\\Images",
+                            "{}\\Matthias\\Client\\{}\\Images",
                             env!("APPDATA"),
                             self.client_ui.send_on_ip_base64_encoded,
                         )));

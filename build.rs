@@ -9,9 +9,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     tonic_build::compile_protos("proto/messages.proto")?;
 
-    //This will always make build_info.szechat_build update, regardless if it has been compiled (because of cargo test)
+    //This will always make build_info.matthias_build update, regardless if it has been compiled (because of cargo test)
     let date = Utc::now().format("%Y.%m.%d. %H:%M");
-    if let Err(err) = fs::write("build_info.szechat_build", date.to_string()) {
+    if let Err(err) = fs::write("build_info.matthias_build", date.to_string()) {
         println!("{err}")
     };
 

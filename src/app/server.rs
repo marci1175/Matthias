@@ -308,7 +308,7 @@ impl MessageService {
 
                     //create file, add file to its named so it can never be mixed with images
                     match fs::File::create(format!(
-                        "{app_data}\\szeChat\\Server\\{}file.{}",
+                        "{app_data}\\Matthias\\Server\\{}file.{}",
                         random_generated_number,
                         req.extension.clone().unwrap_or_default()
                     )) {
@@ -323,7 +323,7 @@ impl MessageService {
                             match self.generated_file_paths.lock() {
                                 Ok(mut ok) => {
                                     ok.push(PathBuf::from(format!(
-                                        "{app_data}\\szeChat\\Server\\{}file.{}",
+                                        "{app_data}\\Matthias\\Server\\{}file.{}",
                                         random_generated_number,
                                         req.extension.clone().unwrap_or_default()
                                     )));
@@ -336,7 +336,7 @@ impl MessageService {
                             match self.original_file_paths.lock() {
                                 Ok(mut ok) => {
                                     ok.push(PathBuf::from(format!(
-                                        "{app_data}\\szeChat\\Server\\{}.{}",
+                                        "{app_data}\\Matthias\\Server\\{}.{}",
                                         req.name.clone().unwrap_or_default(),
                                         req.extension.clone().unwrap_or_default()
                                     )));
@@ -383,7 +383,7 @@ impl MessageService {
                 let image_path_lenght = image_path.len();
 
                 match fs::File::create(format!(
-                    "{app_data}\\szeChat\\Server\\{}",
+                    "{app_data}\\Matthias\\Server\\{}",
                     image_path_lenght
                 )) {
                     Ok(mut created_file) => {
@@ -407,7 +407,7 @@ impl MessageService {
 
                         //Only save as last step to avoid a mismatch + correct indexing :)
                         image_path.push(PathBuf::from(format!(
-                            "{app_data}\\szeChat\\Server\\{}",
+                            "{app_data}\\Matthias\\Server\\{}",
                             image_path_lenght
                         )));
                     }
@@ -427,7 +427,7 @@ impl MessageService {
         let audio_paths_lenght = audio_paths.len();
 
         match fs::File::create(format!(
-            "{}\\szeChat\\Server\\{}",
+            "{}\\Matthias\\Server\\{}",
             env!("APPDATA"),
             audio_paths_lenght
         )) {
@@ -452,7 +452,7 @@ impl MessageService {
 
                 //Only save as last step to avoid a mismatch + correct indexing :)
                 audio_paths.push(PathBuf::from(format!(
-                    "{}\\szeChat\\Server\\{}",
+                    "{}\\Matthias\\Server\\{}",
                     env!("APPDATA"),
                     audio_paths_lenght
                 )));

@@ -22,14 +22,14 @@ impl TemplateApp {
         let _ = fs::create_dir_all(PathBuf::from(format!(
             "{}{}{}{}",
             env!("APPDATA"),
-            "\\szeChat\\Client\\",
+            "\\Matthias\\Client\\",
             self.client_ui.send_on_ip_base64_encoded,
             "\\Audios"
         )));
 
         if let ServerMessageType::Audio(audio) = &item.MessageType {
             let path = PathBuf::from(format!(
-                "{}\\szeChat\\Client\\{}\\Audios\\{}",
+                "{}\\Matthias\\Client\\{}\\Audios\\{}",
                 env!("APPDATA"),
                 self.client_ui.send_on_ip_base64_encoded,
                 audio.index
@@ -64,7 +64,7 @@ impl TemplateApp {
                                         self.client_ui.send_on_ip_base64_encoded =
                                             general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
                                         let file = PathBuf::from(format!(
-                                            "{}\\szeChat\\Client\\{}\\Audios\\{}",
+                                            "{}\\Matthias\\Client\\{}\\Audios\\{}",
                                             env!("APPDATA"),
                                             self.client_ui.send_on_ip_base64_encoded,
                                             audio.index

@@ -190,7 +190,7 @@ impl TemplateApp {
 
                                 //Path to voice recording created by audio_recording.rs
                                 let path = PathBuf::from(format!(
-                                    "{}\\szeChat\\Client\\voice_record.wav",
+                                    "{}\\Matthias\\Client\\voice_record.wav",
                                     env!("APPDATA")
                                 ));
 
@@ -201,7 +201,7 @@ impl TemplateApp {
                                 //clear temp files
                                 let _ = fs::remove_file(concat!(
                                     env!("APPDATA"),
-                                    "/szeChat/Client/voice_record.wav"
+                                    "\\Matthias\\Client\\voice_record.wav"
                                 ));
 
                                 //Destroy state

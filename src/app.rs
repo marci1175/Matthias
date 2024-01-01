@@ -27,10 +27,10 @@ impl eframe::App for backend::TemplateApp {
         //clean up after server, client
         match std::env::var("APPDATA") {
             Ok(app_data) => {
-                if let Err(err) = fs::remove_dir_all(format!("{}\\szeChat\\Server", app_data)) {
+                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
                     println!("{err}");
                 };
-                if let Err(err) = fs::remove_dir_all(format!("{}\\szeChat\\Client", app_data)) {
+                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
                     println!("{err}");
                 };
             }

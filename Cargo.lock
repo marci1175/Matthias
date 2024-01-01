@@ -3,6 +3,53 @@
 version = 3
 
 [[package]]
+name = "Matthias"
+version = "4.0.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "arg",
+ "base64 0.21.5",
+ "chrono",
+ "clap",
+ "clap_derive",
+ "claxon",
+ "cpal",
+ "device_query",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "env_logger",
+ "hex",
+ "hound",
+ "image",
+ "instant-acme",
+ "log",
+ "mpsc",
+ "parse-macros",
+ "prost 0.10.4",
+ "rand",
+ "rcgen",
+ "regex",
+ "reqwest",
+ "rfd",
+ "rodio",
+ "rust-argon2",
+ "serde",
+ "serde_json",
+ "strum",
+ "strum_macros",
+ "tokio",
+ "tonic",
+ "tonic-build 0.10.2",
+ "tonic-build 0.7.2",
+ "unicode_names2",
+ "wasm-bindgen-futures",
+ "windows-sys 0.52.0",
+ "winres",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4457,53 +4504,6 @@ dependencies = [
  "pkg-config",
  "toml 0.8.8",
  "version-compare",
-]
-
-[[package]]
-name = "szeChat"
-version = "4.0.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "arg",
- "base64 0.21.5",
- "chrono",
- "clap",
- "clap_derive",
- "claxon",
- "cpal",
- "device_query",
- "eframe",
- "egui",
- "egui_extras",
- "env_logger",
- "hex",
- "hound",
- "image",
- "instant-acme",
- "log",
- "mpsc",
- "parse-macros",
- "prost 0.10.4",
- "rand",
- "rcgen",
- "regex",
- "reqwest",
- "rfd",
- "rodio",
- "rust-argon2",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
- "tokio",
- "tonic",
- "tonic-build 0.10.2",
- "tonic-build 0.7.2",
- "unicode_names2",
- "wasm-bindgen-futures",
- "windows-sys 0.52.0",
- "winres",
 ]
 
 [[package]]

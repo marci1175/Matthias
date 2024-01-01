@@ -8,12 +8,12 @@ mod app;
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
     //Ensure all temporary folders are deleted
-    let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
-    let _ = std::fs::remove_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));
+    let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
+    let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
 
     //Ensure main folders are existing
-    let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Client", env!("APPDATA")));
-    let _ = std::fs::create_dir_all(format!("{}\\szeChat\\Server", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
 
     env_logger::init();
 
@@ -22,9 +22,9 @@ async fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "széChat",
+        "Matthias",
         native_options,
-        Box::new(|cc| Box::new(szeChat::app::backend::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(Matthias::app::backend::TemplateApp::new(cc))),
     )
 }
 

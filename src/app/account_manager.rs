@@ -71,7 +71,7 @@ pub fn pass_hash_match(to_be_verified: String, file_ln: String) -> bool {
 pub fn login(username: String, passw: String) -> Result<PathBuf> {
     let app_data = env::var("APPDATA")?;
 
-    let path = PathBuf::from(format!("{app_data}\\szeChat\\{username}.szch"));
+    let path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
 
     let file_contents = fs::read_to_string(&path)?;
 
@@ -80,13 +80,13 @@ pub fn login(username: String, passw: String) -> Result<PathBuf> {
     let usr_check = username
         == file_lines
             .next()
-            .context("Corrupted szeChat file at username")?;
+            .context("Corrupted Matthias file at username")?;
 
     let pwd_check = pass_hash_match(
         passw,
         file_lines
             .next()
-            .context("Corrupted szeChat file at password")?
+            .context("Corrupted Matthias file at password")?
             .into(),
     );
 
@@ -98,9 +98,9 @@ pub fn register(username: String, passw: String) -> Result<()> {
     let app_data = env::var("APPDATA")?;
 
     //always atleast try to make the folder
-    let _ = fs::create_dir_all(format!("{app_data}\\szeChat"));
+    let _ = fs::create_dir_all(format!("{app_data}\\Matthias"));
 
-    let user_path = PathBuf::from(format!("{app_data}\\szeChat\\{username}.szch"));
+    let user_path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
 
     //user check
     if std::fs::metadata(&user_path).is_ok() {
@@ -228,7 +228,7 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
 
     let path = format!(
-        "{}\\szeChat\\Client\\{}\\Images\\{}",
+        "{}\\Matthias\\Client\\{}\\Images\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
@@ -243,7 +243,7 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
     let path = format!(
-        "{}\\szeChat\\Client\\{}\\Audios\\{}",
+        "{}\\Matthias\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
