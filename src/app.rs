@@ -40,13 +40,15 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.main.keymap.clone());
+        
+        if self.main.setup.is_none() {
+            
+            ctx.send_viewport_cmd(ViewportCommand::Icon(Some(
+                Arc::new(IconData { rgba: image::load_from_memory(include_bytes!("../icons/main.png")).unwrap().to_rgba8().to_vec(), width: 1024, height: 1024 })
+            )));
 
-        
-        ctx.send_viewport_cmd(ViewportCommand::Icon(Some(
-            Arc::new(IconData { rgba: image::load_from_memory(include_bytes!("../icons/main.png")).unwrap().to_rgba8().to_vec(), width: 1024, height: 1024 })
-        )));
-        
-        
+            self.main.setup = Some(());
+        }
 
         /* NOTES:
 

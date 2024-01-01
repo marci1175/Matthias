@@ -58,7 +58,7 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>) {
         println!("Default input config: {:?}", config);
 
         // The WAV file we're recording to.
-        const PATH: &str = concat!(env!("APPDATA"), "/szeChat/Client/voice_record.wav");
+        const PATH: &str = concat!(env!("APPDATA"), "/Matthias/Client/voice_record.wav");
 
         let spec = wav_spec_from_config(&config);
 

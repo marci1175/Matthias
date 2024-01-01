@@ -326,6 +326,10 @@ impl Default for Client {
 ///Main, Global stuff
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Main {
+    ///Checks if windwos needs to be set up
+    #[serde(skip)]
+    pub setup: Option<()>,
+
     ///Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -357,6 +361,7 @@ pub struct Main {
 impl Default for Main {
     fn default() -> Self {
         Self {
+            setup: None,
             emoji_mode: false,
             keymap: Input::default(),
             bookmark_mode: false,
