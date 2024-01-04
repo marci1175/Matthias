@@ -11,6 +11,7 @@ use rfd::FileDialog;
 use std::fs::{self};
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::time::Duration;
 
 impl TemplateApp {
     pub fn message_tray(
@@ -162,8 +163,12 @@ impl TemplateApp {
 
                     if button.hovered() {
                         if !self.client_ui.random_generated {
-                            let random_number = self.client_ui.rand_eng.gen_range(0..=self.client_ui.emoji.len() - 1);
-                            self.client_ui.random_emoji = self.client_ui.emoji[random_number].clone();
+                            let random_number = self
+                                .client_ui
+                                .rand_eng
+                                .gen_range(0..=self.client_ui.emoji.len() - 1);
+                            self.client_ui.random_emoji =
+                                self.client_ui.emoji[random_number].clone();
                             self.client_ui.random_generated = true;
                         }
                     } else {
@@ -188,21 +193,20 @@ impl TemplateApp {
                                 //Just send something, it doesnt really matter
                                 atx.send(false).unwrap();
 
-                                //Path to voice recording created by audio_recording.rs
-                                let path = PathBuf::from(format!(
-                                    "{}\\Matthias\\Client\\voice_record.wav",
-                                    env!("APPDATA")
-                                ));
+                                //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
+                                let mut should_send = (false, PathBuf::new());
+                                match self.audio_file.try_lock() {
+                                    Ok(ok) => {
+                                        should_send = (true, ok.to_path_buf());
+                                    }
+                                    Err(error) => println!("{error}"),
+                                };
 
-                                if path.exists() {
-                                    self.send_file(path.clone());
+                                if should_send.0 {
+                                    self.send_file(should_send.1.clone());
+                                    //clear temp files
+                                    let _ = fs::remove_file(should_send.1);
                                 }
-
-                                //clear temp files
-                                let _ = fs::remove_file(concat!(
-                                    env!("APPDATA"),
-                                    "\\Matthias\\Client\\voice_record.wav"
-                                ));
 
                                 //Destroy state
                                 self.atx = None;
@@ -218,7 +222,7 @@ impl TemplateApp {
 
                         self.atx = Some(tx);
 
-                        audio_recroding(rx);
+                        audio_recroding(rx, self.audio_file.lock().unwrap().to_path_buf());
                     }
                 }
             });

@@ -47,6 +47,7 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
+                            
                             let mut message_instances: Vec<Response> = Vec::new();
 
                             for (index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
@@ -56,67 +57,78 @@ impl TemplateApp {
                                     i = &item.message;
                                 }
 
-                                let message_group = ui.group(|ui|
-                                {
-                                    if let Some(replied_to) = item.replying_to {
-                                        ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                                            if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
-                                            self.client_ui.incoming_msg.struct_list[replied_to].Author,
-                                            match &self.client_ui.incoming_msg.struct_list[replied_to].MessageType {
-                                                ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
-                                                ServerMessageType::Image(_img) => "Image".to_string(),
-                                                ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                                ServerMessageType::Normal(msg) => {
-                                                    let mut message_clone = msg.message.clone();
-                                                    if message_clone.clone().len() > 20 {
-                                                        message_clone.truncate(20);
-                                                        message_clone.push_str(" ...");
-                                                    }
-                                                    message_clone.to_string()
-                                            },
-                                        })
-                                        ).size(self.font_size / 1.5))
-                                            .frame(false))
-                                                .clicked() {
-
-                                                    //implement scrolling to message
-                                                    self.client_ui.scroll_to_message_index = Some(replied_to);
-                                                }
-                                        });
+                                //Reply hovering from inside
+                                if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
+                                    if scroll_to_instance.index == index {
+                                        
                                     }
-                                    //Display author
-                                    ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                    //IMPORTANT: Each of these functions have logic inside them for displaying
-                                    self.markdown_text_display(i, ui);
-
-                                    self.audio_message_instance(item, ui, index);
-                                    self.file_message_instance(item, ui);
-                                    self.image_message_instance(item, ui, ctx);
-                                    //Display Message date
-                                    ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-
-                                    ui.allocate_ui(vec2(30., 30.), |ui|{
-                                        if ui.add(
-                                            egui::widgets::ImageButton::new(
-                                                egui::include_image!("../../../../../icons/reaction_emoji.png")
-                                                )
-                                            ).clicked()
-                                        {
-                                            
-                                        };
-                                    });
-
                                 }
-                                ).response.context_menu(|ui|{
-                                    if ui.button("Reply").clicked() {
-                                        self.client_ui.replying_to = Some(index);
-                                    }
-                                    if ui.button("Copy text").clicked() {
-                                        ctx.copy_text(i.clone());
-                                    };
-                                });
 
-                                //this functions for the reply autoscroll
+                                let message_group = ui.group(|ui|
+                                    {
+                                        if let Some(replied_to) = item.replying_to {
+                                            ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                                                if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
+                                                self.client_ui.incoming_msg.struct_list[replied_to].Author,
+                                                match &self.client_ui.incoming_msg.struct_list[replied_to].MessageType {
+                                                    ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
+                                                    ServerMessageType::Image(_img) => "Image".to_string(),
+                                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                                    ServerMessageType::Normal(msg) => {
+                                                        let mut message_clone = msg.message.clone();
+                                                        if message_clone.clone().len() > 20 {
+                                                            message_clone.truncate(20);
+                                                            message_clone.push_str(" ...");
+                                                        }
+                                                        message_clone.to_string()
+                                                },
+                                            })
+                                            ).size(self.font_size / 1.5))
+                                                .frame(false))
+                                                    .clicked() {
+    
+                                                        //implement scrolling to message
+                                                        self.client_ui.scroll_to_message_index = Some(replied_to);
+                                                    }
+                                            });
+                                        }
+                                        
+                                        //Display author
+                                        ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                        //IMPORTANT: Each of these functions have logic inside them for displaying
+                                        self.markdown_text_display(i, ui);
+    
+                                        self.audio_message_instance(item, ui, index);
+                                        self.file_message_instance(item, ui);
+                                        self.image_message_instance(item, ui, ctx);
+                                        //Display Message date
+                                        ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
+    
+                                        // ui.allocate_ui(vec2(ui.available_width(), 30.), |ui|{
+                                        //     if self.client_ui.emoji_tray_is_hovered {
+                                        //         if ui.add(
+                                        //             egui::widgets::ImageButton::new(
+                                        //                 egui::include_image!("../../../../../icons/reaction_emoji.png")
+                                        //                 ).frame(false)
+                                        //             ).clicked()
+                                        //         {
+                                        //         };
+                                        //     }
+                                        //     else {
+                                        //         ui.allocate_space(ui.available_size());
+                                        //     } 
+                                        // });
+    
+                                    }
+                                    ).response.context_menu(|ui|{
+                                        if ui.button("Reply").clicked() {
+                                            self.client_ui.replying_to = Some(index);
+                                        }
+                                        if ui.button("Copy text").clicked() {
+                                            ctx.copy_text(i.clone());
+                                        };
+                                });
+                                
                                 message_instances.push(message_group);
 
                             };
@@ -124,7 +136,7 @@ impl TemplateApp {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
                             }
                         });
-                        if !self.client_ui.usr_msg_expanded {
+                        if self.client_ui.usr_msg_expanded {
                             ui.allocate_space(vec2(ui.available_width(), 25.));
                         }
                     });

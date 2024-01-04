@@ -96,7 +96,10 @@ impl TemplateApp {
                         Stroke::default(),
                     );
                     ui.painter().text(
-                        Pos2::new(window_size[0] / 2., window_size[0] / 4. + self.client_ui.how_on / 50.),
+                        Pos2::new(
+                            window_size[0] / 2.,
+                            window_size[0] / 4. + self.client_ui.how_on / 50.,
+                        ),
                         Align2([Align::Center, Align::Center]),
                         "Drop to upload",
                         font_id,
@@ -205,7 +208,10 @@ impl TemplateApp {
                 let file_serve: Result<ServerImageReply, serde_json::Error> =
                     serde_json::from_str(&msg);
 
-                let _ = write_image(file_serve.as_ref().unwrap(), self.client_ui.send_on_ip.clone());
+                let _ = write_image(
+                    file_serve.as_ref().unwrap(),
+                    self.client_ui.send_on_ip.clone(),
+                );
 
                 //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder
                 ctx.forget_image(&format!("bytes://{}", file_serve.unwrap().index));

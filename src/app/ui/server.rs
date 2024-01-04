@@ -63,9 +63,7 @@ impl TemplateApp {
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw)
-                                        .await
-                                    {
+                                    match server::server_main(port.to_string(), server_pw).await {
                                         Ok(_temp_stuff) => {}
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
@@ -114,15 +112,12 @@ impl TemplateApp {
                     //     "[{}]:{}",
                     //     pub_ip[1], self.open_on_port
                     // ));
-                    
+
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
                     ui.label(RichText::from("Public ipV6 address : ").size(20.));
                     ui.text_edit_singleline(&mut pub_ip[0].trim().to_string());
                     ui.label("Server address");
-                    ui.text_edit_singleline(&mut format!(
-                        "[{}]:{}",
-                        pub_ip[0], self.open_on_port
-                    ));
+                    ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[0], self.open_on_port));
 
                     if self.server_req_password && !self.server_password.is_empty() {
                         ui.label(RichText::from(format!(
@@ -130,7 +125,7 @@ impl TemplateApp {
                             self.server_password
                         )));
                     }
-                        
+
                     ui.label(RichText::from("Port").size(15.).strong());
                     ui.label(RichText::from(self.open_on_port.clone()).size(15.));
                 }

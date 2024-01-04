@@ -1,6 +1,5 @@
-use egui::{vec2, Align, Color32, IconData, Layout, RichText, ViewportCommand};
+use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
-use std::sync::Arc;
 
 mod account_manager;
 pub mod backend;
@@ -40,15 +39,6 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.main.keymap.clone());
-        
-        if self.main.setup.is_none() {
-            
-            ctx.send_viewport_cmd(ViewportCommand::Icon(Some(
-                Arc::new(IconData { rgba: image::load_from_memory(include_bytes!("../icons/main.png")).unwrap().to_rgba8().to_vec(), width: 1024, height: 1024 })
-            )));
-
-            self.main.setup = Some(());
-        }
 
         /* NOTES:
 
@@ -131,7 +121,9 @@ impl eframe::App for backend::TemplateApp {
                     if self.client_ui.req_passw {
                         ui.text_edit_singleline(&mut self.client_ui.client_password);
                     };
-                    if compare_passwords != self.client_ui.client_password || self.client_ui.send_on_ip != compare_ip {
+                    if compare_passwords != self.client_ui.client_password
+                        || self.client_ui.send_on_ip != compare_ip
+                    {
                         self.autosync_sender = None;
                         self.client_ui.incoming_msg = ServerMaster::default();
                     }
@@ -146,8 +138,10 @@ impl eframe::App for backend::TemplateApp {
             .open(&mut self.main.bookmark_mode)
             .show(ctx, |ui| {
                 if ui.button("Save ip address").clicked() {
-                    match append_to_file(self.main.opened_account_path.clone(), self.client_ui.send_on_ip.clone())
-                    {
+                    match append_to_file(
+                        self.main.opened_account_path.clone(),
+                        self.client_ui.send_on_ip.clone(),
+                    ) {
                         Ok(_ok) => {}
                         Err(err) => eprintln!("{err}"),
                     };

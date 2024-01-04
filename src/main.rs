@@ -8,6 +8,8 @@ mod app;
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
     //Ensure all temporary folders are deleted
+
+    use egui::ViewportBuilder;
     let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
     let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
 
@@ -18,6 +20,17 @@ async fn main() -> eframe::Result<()> {
     env_logger::init();
 
     let native_options = eframe::NativeOptions {
+        viewport: ViewportBuilder {
+            icon: Some(std::sync::Arc::new(egui::IconData {
+                rgba: image::load_from_memory(include_bytes!("../icons/main.png"))
+                    .unwrap()
+                    .to_rgba8()
+                    .to_vec(),
+                width: 1024,
+                height: 1024,
+            })),
+            ..Default::default()
+        },
         ..Default::default()
     };
 

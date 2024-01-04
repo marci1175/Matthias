@@ -1,4 +1,5 @@
 use chrono::Utc;
+use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -36,7 +37,6 @@ pub struct TemplateApp {
     /*
         server main
     */
-
     ///SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
     #[serde(skip)]
     pub server_has_started: bool,
@@ -115,6 +115,9 @@ pub struct TemplateApp {
     ///Server - client sync worker should run
     #[serde(skip)]
     pub autosync_should_run: Arc<AtomicBool>,
+
+    #[serde(skip)]
+    pub audio_file: Arc<Mutex<PathBuf>>,
 }
 
 impl Default for TemplateApp {
@@ -126,7 +129,10 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-
+            audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
+                "{}\\Matthias\\Client\\voice_record.wav",
+                env!("APPDATA")
+            )))),
             //fontbook
             filter: Default::default(),
             named_chars: Default::default(),
@@ -168,7 +174,6 @@ impl Default for TemplateApp {
 
             //main
             main: Main::default(),
-            
 
             //client main
             client_ui: Client::default(),
@@ -186,7 +191,6 @@ impl Default for TemplateApp {
             dtx,
             autosync_sender: None,
             autosync_should_run: Arc::new(AtomicBool::new(true)),
-            
         }
     }
 }
@@ -207,6 +211,14 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    ///Message highlighting function
+    #[serde(skip)]
+    pub message_highlight_color: Color32,
+
+    ///emoji tray is hovered
+    #[serde(skip)]
+    pub emoji_tray_is_hovered: bool,
+
     ///audio playback
     #[serde(skip)]
     pub audio_playback: AudioPlayback,
@@ -286,9 +298,10 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            message_highlight_color: Color32::WHITE,
             //audio playback
             audio_playback: AudioPlayback::default(),
-
+            emoji_tray_is_hovered: false,
             scroll_widget_rect: egui::Rect::NAN,
             text_widget_offset: 0.0,
             scroll_to_message_index: None,
@@ -469,7 +482,7 @@ impl ClientMessage {
 
     ///this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
-        file_name: PathBuf,
+        file_path: PathBuf,
         ip: String,
         password: String,
         author: String,
@@ -481,16 +494,16 @@ impl ClientMessage {
             //                          |
             //                          V
             MessageType: ClientMessageType::ClientFileUpload(ClientFileUpload {
-                extension: Some(file_name.extension().unwrap().to_str().unwrap().to_string()),
+                extension: Some(file_path.extension().unwrap().to_str().unwrap().to_string()),
                 name: Some(
-                    file_name
+                    file_path
                         .file_prefix()
                         .unwrap()
                         .to_str()
                         .unwrap()
                         .to_string(),
                 ),
-                bytes: std::fs::read(file_name).unwrap_or_default(),
+                bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
 
             Password: password,

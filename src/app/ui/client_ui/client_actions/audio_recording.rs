@@ -4,8 +4,10 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample};
+use hound::WavWriter;
 use std::fs::File;
 use std::io::BufWriter;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
@@ -35,7 +37,7 @@ impl Default for Opt {
     }
 }
 
-pub fn audio_recroding(receiver: mpsc::Receiver<bool>) {
+pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: PathBuf) {
     std::thread::spawn(move || {
         let opt = Opt::default();
 
@@ -58,9 +60,10 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>) {
         println!("Default input config: {:?}", config);
 
         // The WAV file we're recording to.
-        const PATH: &str = concat!(env!("APPDATA"), "/Matthias/Client/voice_record.wav");
 
         let spec = wav_spec_from_config(&config);
+
+        let PATH = PATH.to_string_lossy().to_string();
 
         let writer = hound::WavWriter::create(PATH, spec)?;
 
@@ -111,9 +114,9 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>) {
         stream.play()?;
 
         //Block until further notice by user
-        receiver.recv().unwrap();
+        receiver.recv()?;
 
-        println!("Stop recording, channel updated!");
+        println!("Stop recording, channel updated! Move file");
 
         Ok(())
     });

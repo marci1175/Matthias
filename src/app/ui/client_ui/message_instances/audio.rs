@@ -115,6 +115,7 @@ impl TemplateApp {
                                     .speed,
                             );
                         }
+                        
                         /*
                         let pos = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor_offset;
                         if let Some(cursor) = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.as_mut() {
@@ -145,7 +146,7 @@ impl TemplateApp {
                                 &mut self.client_ui.audio_playback.settings_list
                                     [current_index_in_message_list]
                                     .volume,
-                                0.1..=5.,
+                                0.0..=5.,
                             )
                             .text("Volume")
                             .step_by(0.05),
