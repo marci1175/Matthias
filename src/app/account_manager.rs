@@ -95,6 +95,10 @@ pub fn login(username: String, passw: String) -> Result<PathBuf> {
 }
 
 pub fn register(username: String, passw: String) -> Result<()> {
+    if username.contains(" ") || username.contains("@") || username.contains(" "){
+        return Err(anyhow::Error::msg("Cant use special characters in name"));
+    }
+
     let app_data = env::var("APPDATA")?;
 
     //always atleast try to make the folder
