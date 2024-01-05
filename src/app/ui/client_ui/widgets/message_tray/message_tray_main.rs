@@ -9,9 +9,7 @@ use egui::{
 use rand::Rng;
 use rfd::FileDialog;
 use std::fs::{self};
-use std::path::PathBuf;
 use std::sync::mpsc;
-use std::time::Duration;
 
 impl TemplateApp {
     pub fn message_tray(

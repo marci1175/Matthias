@@ -3,7 +3,6 @@ use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
