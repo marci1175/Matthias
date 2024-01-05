@@ -340,6 +340,7 @@ impl Default for Client {
 
 ///Main, Global stuff
 #[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Default)]
 pub struct Main {
     ///Checks if windwos needs to be set up
     #[serde(skip)]
@@ -373,20 +374,7 @@ pub struct Main {
     #[serde(skip)]
     pub opened_account_path: PathBuf,
 }
-impl Default for Main {
-    fn default() -> Self {
-        Self {
-            setup: None,
-            emoji_mode: false,
-            keymap: Input::default(),
-            bookmark_mode: false,
-            client_mode: false,
-            server_mode: false,
-            mode_selector: false,
-            opened_account_path: PathBuf::default(),
-        }
-    }
-}
+
 ///When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileUpload {
@@ -715,7 +703,7 @@ impl ServerOutput {
                                             upload.name.unwrap_or_default(),
                                             upload.extension.unwrap_or_default()
                                         ),
-                                        index: index,
+                                        index,
                                     }
                                 )
                             },
@@ -723,14 +711,14 @@ impl ServerOutput {
                             ServerMessageTypeDiscriminants::Image => {
                                 ServerMessageType::Image(
                                     ServerImageUpload {
-                                        index: index,
+                                        index,
                                     }
                                 )
                             },
                             ServerMessageTypeDiscriminants::Audio => {
                                 ServerMessageType::Audio(
                                     ServerAudioUpload {
-                                        index: index,
+                                        index,
                                         file_name: format!(
                                             "{}.{}",
                                             upload.name.unwrap_or_default(),
