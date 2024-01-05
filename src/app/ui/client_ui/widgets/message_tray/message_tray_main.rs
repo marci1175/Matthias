@@ -194,23 +194,20 @@ impl TemplateApp {
                                 atx.send(false).unwrap();
 
                                 //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
-                                let mut should_send = (false, PathBuf::new());
-                                match self.audio_file.try_lock() {
+                                match self.audio_file.clone().try_lock() {
                                     Ok(ok) => {
-                                        should_send = (true, ok.to_path_buf());
+
+                                        self.send_file(ok.to_path_buf());
+
+                                        let _ = fs::remove_file(ok.to_path_buf());
                                     }
                                     Err(error) => println!("{error}"),
                                 };
 
-                                if should_send.0 {
-                                    self.send_file(should_send.1.clone());
-                                    //clear temp files
-                                    let _ = fs::remove_file(should_send.1);
-                                }
-
                                 //Destroy state
                                 self.atx = None;
                             }
+                            
                         });
                     } else if ui
                         .add(egui::ImageButton::new(egui::include_image!(
@@ -222,7 +219,7 @@ impl TemplateApp {
 
                         self.atx = Some(tx);
 
-                        audio_recroding(rx, self.audio_file.lock().unwrap().to_path_buf());
+                        audio_recroding(rx, self.audio_file.clone());
                     }
                 }
             });

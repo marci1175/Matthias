@@ -4,7 +4,6 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample};
-use hound::WavWriter;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
@@ -37,7 +36,7 @@ impl Default for Opt {
     }
 }
 
-pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: PathBuf) {
+pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: Arc<Mutex<PathBuf>>) {
     std::thread::spawn(move || {
         let opt = Opt::default();
 
@@ -52,25 +51,22 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: PathBuf) {
         }
         .expect("failed to find input device");
 
-        println!("Input device: {}", device.name()?);
 
         let config = device
             .default_input_config()
             .expect("Failed to get default input config");
-        println!("Default input config: {:?}", config);
 
         // The WAV file we're recording to.
 
         let spec = wav_spec_from_config(&config);
 
-        let PATH = PATH.to_string_lossy().to_string();
-
+        let PATH = PATH.lock().unwrap().to_string_lossy().to_string().clone();
+        
         let writer = hound::WavWriter::create(PATH, spec)?;
 
         let writer = Arc::new(Mutex::new(Some(writer)));
 
         // A flag to indicate that recording is in progress.
-        println!("Begin recording...");
 
         // Run the input stream on a separate thread.
         let writer_2 = writer.clone();
@@ -115,8 +111,6 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: PathBuf) {
 
         //Block until further notice by user
         receiver.recv()?;
-
-        println!("Stop recording, channel updated! Move file");
 
         Ok(())
     });

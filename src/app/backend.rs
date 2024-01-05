@@ -3,6 +3,7 @@ use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
@@ -129,10 +130,12 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-            audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
+            audio_file: 
+                Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_record.wav",
                 env!("APPDATA")
             )))),
+
             //fontbook
             filter: Default::default(),
             named_chars: Default::default(),
