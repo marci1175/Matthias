@@ -213,6 +213,13 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+
+    
+    pub emoji_reaction_tray_rect: egui::Rect,
+
+    #[serde(skip)]
+    pub emoji_reaction_should_open: bool,
+
     ///Message highlighting function
     #[serde(skip)]
     pub message_highlight_color: Color32,
@@ -220,6 +227,10 @@ pub struct Client {
     ///emoji tray is hovered
     #[serde(skip)]
     pub emoji_tray_is_hovered: bool,
+
+    #[serde(skip)]
+    pub message_group_is_hovered: bool,
+
 
     ///audio playback
     #[serde(skip)]
@@ -265,6 +276,8 @@ pub struct Client {
 
     pub send_on_ip_base64_encoded: String,
     pub req_passw: bool,
+
+    ///The password the user has entered for server auth
     pub client_password: String,
 
     ///This gem of a variable is used to contain animation's state
@@ -300,6 +313,9 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            message_group_is_hovered: false,
+            emoji_reaction_tray_rect: egui::Rect::NOTHING,
+            emoji_reaction_should_open: false,
             message_highlight_color: Color32::WHITE,
             //audio playback
             audio_playback: AudioPlayback::default(),
@@ -411,6 +427,12 @@ pub struct ClientAudioRequest {
     pub index: i32,
 }
 
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientReaction {
+    pub char: char,
+    pub message_index: usize,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientFileRequestType {
     ///this is when you want to display an image and you have to make a request to the server file
@@ -431,6 +453,8 @@ pub enum ClientMessageType {
 
     ///Used for syncing with client and server
     ClientSyncMessage(ClientSnycMessage),
+
+    ClientReaction(ClientReaction),
 }
 
 ///This is what gets to be sent out by the client
@@ -501,6 +525,18 @@ impl ClientMessage {
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
             Destination: ip,
         }
+    }
+
+    pub fn construct_reaction_msg(
+        char: char,
+        index: usize,
+        author: String,
+        password: String,
+        ip: String,
+    ) -> ClientMessage {
+        ClientMessage { replying_to: None, MessageType: ClientMessageType::ClientReaction(
+            ClientReaction { char: char, message_index: index }
+        ), Password: password, Author: author, MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() }, Destination: ip }
     }
 
     ///this is used for constructing a sync msg aka sending an empty packet, so server can reply
@@ -669,6 +705,18 @@ pub enum ServerMessageType {
 //     Audio(ServerAudioUpload),
 // }
 
+///This struct contains all the reactions of one message
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+pub struct MessageReaction {
+    pub message_reactions: Vec<Reaction>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct Reaction {
+    pub char: char,
+    pub times: i64,
+}
+
 ///This is one whole server msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
@@ -676,6 +724,7 @@ pub struct ServerOutput {
     pub MessageType: ServerMessageType,
     pub Author: String,
     pub MessageDate: String,
+    pub reactions: MessageReaction,
 }
 impl ServerOutput {
     pub fn struct_into_string(&self) -> String {
@@ -687,6 +736,7 @@ impl ServerOutput {
         index: i32,
         //Automaticly generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
+        reactions: MessageReaction,
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
@@ -737,9 +787,11 @@ impl ServerOutput {
                         )
                     },
                     ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
+                    ClientMessageType::ClientReaction(_) => todo!(),
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
+            reactions: reactions,
         }
     }
 }

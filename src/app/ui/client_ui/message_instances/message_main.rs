@@ -1,7 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{AudioSettings, ScrollToMessage, ServerMessageType, TemplateApp};
+use crate::app::{backend::{AudioSettings, ScrollToMessage, ServerMessageType, TemplateApp, ClientMessage}, client};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -58,11 +58,10 @@ impl TemplateApp {
                                 }
 
                                 //Reply hovering from inside
-                                if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
-                                    if scroll_to_instance.index == index {
-                                        
-                                    }
-                                }
+                                // if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
+                                //     if scroll_to_instance.index == index {
+                                //     }
+                                // }
 
                                 let message_group = ui.group(|ui|
                                     {
@@ -95,32 +94,103 @@ impl TemplateApp {
                                         
                                         //Display author
                                         ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
                                         self.markdown_text_display(i, ui);
     
                                         self.audio_message_instance(item, ui, index);
                                         self.file_message_instance(item, ui);
                                         self.image_message_instance(item, ui, ctx);
+
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
     
                                         // ui.allocate_ui(vec2(ui.available_width(), 30.), |ui|{
-                                        //     if self.client_ui.emoji_tray_is_hovered {
-                                        //         if ui.add(
-                                        //             egui::widgets::ImageButton::new(
-                                        //                 egui::include_image!("../../../../../icons/reaction_emoji.png")
-                                        //                 ).frame(false)
-                                        //             ).clicked()
-                                        //         {
-                                        //         };
+                                        //     if self.client_ui.message_group_is_hovered {
+                                        //         ui.allocate_ui(vec2(20., 20.), |ui|{
+                                        //             let emoji_button = ui.add(
+                                        //                 egui::widgets::ImageButton::new(
+                                        //                     egui::include_image!("../../../../../icons/reaction_emoji.png")
+                                        //                 ).tint(Color32::GRAY).frame(false)
+                                        //             );
+                                        //             if self.client_ui.emoji_tray_is_hovered ||(self.client_ui.emoji_reaction_should_open && self.client_ui.message_group_is_hovered) {
+                                        //                 self.client_ui.emoji_tray_is_hovered = self.emoji_reaction_instance(ctx, ui, self.client_ui.emoji_reaction_tray_rect).response.hovered();
+                                        //             }
+                                        //             self.client_ui.emoji_reaction_tray_rect = emoji_button.rect;
+                                        //             if emoji_button.clicked() {
+                                        //                 self.client_ui.emoji_reaction_should_open = !self.client_ui.emoji_reaction_should_open;
+                                        //             }
+                                        //         });
+                                        //     } else {
+                                        //         ui.allocate_space(vec2(1., 20.));
                                         //     }
-                                        //     else {
-                                        //         ui.allocate_space(ui.available_size());
-                                        //     } 
                                         // });
-    
+                                            
+                                        for item in &item.reactions.message_reactions {
+                                            ui.horizontal(|ui|{
+
+                                                ui.group(|ui| {
+                                                    ui.label(RichText::from(item.char.to_string()).size(self.font_size * 1.3))
+                                                });
+
+                                                ui.label(RichText::from(item.times.to_string()).size(self.font_size));
+                                                
+                                            });
+                                        }
                                     }
                                     ).response.context_menu(|ui|{
+                                        ui.menu_button("React", |ui| {
+                                            let filter = &self.filter;
+                                            let named_chars = self.named_chars
+                                                .entry(egui::FontFamily::Monospace)
+                                                .or_insert_with(|| TemplateApp::available_characters(ui, egui::FontFamily::Monospace));
+
+                                            ui.allocate_ui(vec2(300., 300.), |ui|{
+                                                egui::ScrollArea::vertical().show(ui, |ui| {
+                                                    ui.horizontal_wrapped(|ui| {
+                                                        ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
+
+                                                        for (&chr, name) in named_chars {
+                                                            if filter.is_empty()
+                                                                || name.contains(filter)
+                                                                || *filter == chr.to_string()
+                                                            {
+                                                                let button = egui::Button::new(
+                                                                    egui::RichText::new(chr.to_string()).font(egui::FontId {
+                                                                        size: self.font_size,
+                                                                        family: egui::FontFamily::Proportional,
+                                                                    }),
+                                                                )
+                                                                .frame(false);
+                                                            
+                                                                if ui.add(button).clicked() {
+                                                                    let message = ClientMessage::construct_reaction_msg(
+                                                                        chr, index, self.login_username.clone(), match self.client_ui.req_passw {
+                                                                            true => self.client_ui.client_password.clone(),
+                                                                            false => "".into(),
+                                                                        }, self.client_ui.send_on_ip.clone(),
+                                                                    );
+
+                                                                    tokio::spawn(async move {
+                                                                        match client::send_msg(message).await {
+                                                                            Ok(ok) => {
+                                                                                // dbg!(ok);
+                                                                            },
+                                                                            Err(err) => println!("{err}"),
+                                                                        };
+                                                                    });
+                                                                }
+                                                            }
+                                                        }
+                                                    });
+                                                });
+                                            });
+                                        });
+
+                                        
+
+                                        
+
                                         if ui.button("Reply").clicked() {
                                             self.client_ui.replying_to = Some(index);
                                         }
@@ -128,7 +198,11 @@ impl TemplateApp {
                                             ctx.copy_text(i.clone());
                                         };
                                 });
+
                                 
+
+                                self.client_ui.message_group_is_hovered = message_group.hovered();
+
                                 message_instances.push(message_group);
 
                             };

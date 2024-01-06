@@ -1,6 +1,6 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
-use super::backend::ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload};
+use super::backend::{ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}, MessageReaction, Reaction};
 use rand::Rng;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
@@ -26,9 +26,9 @@ use messages::{
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
-    ClientMessage,
+    ClientMessage, ClientReaction as ClientReactionStruct,
     ClientMessageType::{
-        ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientSyncMessage,
+        ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientSyncMessage, ClientReaction
     },
     ServerFileReply, ServerImageReply,
 };
@@ -69,7 +69,6 @@ impl ServerMessage for MessageService {
         let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
         let req: ClientMessage = req_result.unwrap();
-
         if &req.Password == self.passw.trim() {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
@@ -83,6 +82,10 @@ impl ServerMessage for MessageService {
 
                 ClientFileUpload(upload_type) => {
                     self.handle_upload(req.clone(), upload_type).await;
+                }
+
+                ClientReaction(reaction) => {
+                    self.handle_reaction(reaction).await;
                 }
             };
 
@@ -266,7 +269,7 @@ impl MessageService {
     pub async fn NormalMessage(&self, req: ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
-                ok.push(ServerOutput::convert_type_to_servermsg(req, -1, Normal));
+                ok.push(ServerOutput::convert_type_to_servermsg(req, -1, Normal, MessageReaction::default()));
             }
             Err(err) => {
                 println!("{err}")
@@ -352,6 +355,7 @@ impl MessageService {
                                         request,
                                         self.original_file_paths.lock().unwrap().len() as i32 - 1,
                                         Upload,
+                                        MessageReaction::default()
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
@@ -400,6 +404,7 @@ impl MessageService {
                                     req.clone(),
                                     image_path_lenght as i32,
                                     Image,
+                                    MessageReaction::default()
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -445,6 +450,7 @@ impl MessageService {
                             req.clone(),
                             audio_paths_lenght as i32,
                             Audio,
+                            MessageReaction::default()
                         ));
                     }
                     Err(err) => println!("{err}"),
@@ -525,6 +531,35 @@ impl MessageService {
             "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY
             _ => self.recive_file(req, upload_type).await,
+        }
+    }
+
+    pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
+        
+        match &mut self.messages.try_lock() {
+            Ok(message_vec) => {
+                for (index, item) in message_vec[reaction.message_index].clone().reactions.message_reactions.iter().enumerate() {
+                    
+                    //Check if it has already been reacted before
+                    if item.char == reaction.char {
+                        message_vec[reaction.message_index].reactions.message_reactions[index].times += 1;
+                    }
+                    else {
+                        message_vec[reaction.message_index].reactions.message_reactions.push(
+                            Reaction { char: reaction.char, times: 0 }
+                        )
+                    }
+
+                }
+
+                //First reaction
+                if message_vec[reaction.message_index].clone().reactions.message_reactions.is_empty() {
+                    message_vec[reaction.message_index].reactions.message_reactions.push(
+                        Reaction { char: reaction.char, times: 0 }
+                    )
+                }
+            },
+            Err(err) => println!("{err}"),
         }
     }
 }
