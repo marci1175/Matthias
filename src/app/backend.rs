@@ -129,8 +129,7 @@ impl Default for TemplateApp {
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
         Self {
-            audio_file: 
-                Arc::new(Mutex::new(PathBuf::from(format!(
+            audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_record.wav",
                 env!("APPDATA")
             )))),
@@ -213,8 +212,6 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
-
-    
     pub emoji_reaction_tray_rect: egui::Rect,
 
     #[serde(skip)]
@@ -230,7 +227,6 @@ pub struct Client {
 
     #[serde(skip)]
     pub message_group_is_hovered: bool,
-
 
     ///audio playback
     #[serde(skip)]
@@ -355,8 +351,7 @@ impl Default for Client {
 }
 
 ///Main, Global stuff
-#[derive(serde::Deserialize, serde::Serialize)]
-#[derive(Default)]
+#[derive(serde::Deserialize, serde::Serialize, Default)]
 pub struct Main {
     ///Checks if windwos needs to be set up
     #[serde(skip)]
@@ -534,9 +529,17 @@ impl ClientMessage {
         password: String,
         ip: String,
     ) -> ClientMessage {
-        ClientMessage { replying_to: None, MessageType: ClientMessageType::ClientReaction(
-            ClientReaction { char: char, message_index: index }
-        ), Password: password, Author: author, MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() }, Destination: ip }
+        ClientMessage {
+            replying_to: None,
+            MessageType: ClientMessageType::ClientReaction(ClientReaction {
+                char,
+                message_index: index,
+            }),
+            Password: password,
+            Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            Destination: ip,
+        }
     }
 
     ///this is used for constructing a sync msg aka sending an empty packet, so server can reply
@@ -791,7 +794,7 @@ impl ServerOutput {
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
-            reactions: reactions,
+            reactions,
         }
     }
 }

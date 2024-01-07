@@ -51,7 +51,6 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: Arc<Mutex<PathBuf>>
         }
         .expect("failed to find input device");
 
-
         let config = device
             .default_input_config()
             .expect("Failed to get default input config");
@@ -61,7 +60,7 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: Arc<Mutex<PathBuf>>
         let spec = wav_spec_from_config(&config);
 
         let PATH = PATH.lock().unwrap().to_string_lossy().to_string().clone();
-        
+
         let writer = hound::WavWriter::create(PATH, spec)?;
 
         let writer = Arc::new(Mutex::new(Some(writer)));

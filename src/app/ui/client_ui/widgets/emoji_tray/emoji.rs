@@ -173,7 +173,7 @@ impl backend::TemplateApp {
                 .collect()
         })
     }
-    
+
     pub fn window_emoji(&mut self, ctx: &egui::Context) {
         egui::Window::new("Character set")
             .open(&mut self.main.emoji_mode)

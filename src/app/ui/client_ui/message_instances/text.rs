@@ -1,4 +1,4 @@
-use egui::{RichText, Color32};
+use egui::{Color32, RichText};
 
 use regex::Regex;
 
@@ -7,7 +7,6 @@ use crate::app::backend::TemplateApp;
 
 impl TemplateApp {
     pub fn markdown_text_display(&mut self, i: &String, ui: &mut egui::Ui) {
-        
         if (i.contains('[') && i.contains(']')) && (i.contains('(') && i.contains(')')) {
             let re = Regex::new(r"\[(?P<link_text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
             let mut captures: Vec<String> = Vec::new();
@@ -29,10 +28,14 @@ impl TemplateApp {
                     }
                 });
             }
-        } else if let Some(index) = i.find("@") {
+        } else if let Some(index) = i.find('@') {
             let result = i[index + 1..].split_whitespace().collect::<Vec<&str>>()[0];
             if self.login_username == result {
-                ui.label(RichText::from(i).size(self.font_size).color(Color32::YELLOW));
+                ui.label(
+                    RichText::from(i)
+                        .size(self.font_size)
+                        .color(Color32::YELLOW),
+                );
             }
         } else if i.contains('#') && i.rmatches('#').count() <= 5 {
             let split_lines = i.rsplit_once('#').unwrap();

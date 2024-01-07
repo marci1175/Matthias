@@ -1,7 +1,10 @@
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::{backend::{AudioSettings, ScrollToMessage, ServerMessageType, TemplateApp, ClientMessage}, client};
+use crate::app::{
+    backend::{AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp},
+    client,
+};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -47,7 +50,6 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
-                            
                             let mut message_instances: Vec<Response> = Vec::new();
 
                             for (index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
@@ -85,26 +87,22 @@ impl TemplateApp {
                                             ).size(self.font_size / 1.5))
                                                 .frame(false))
                                                     .clicked() {
-    
                                                         //implement scrolling to message
                                                         self.client_ui.scroll_to_message_index = Some(replied_to);
                                                     }
                                             });
                                         }
-                                        
                                         //Display author
                                         ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
                                         self.markdown_text_display(i, ui);
-    
                                         self.audio_message_instance(item, ui, index);
                                         self.file_message_instance(item, ui);
                                         self.image_message_instance(item, ui, ctx);
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-    
                                         // ui.allocate_ui(vec2(ui.available_width(), 30.), |ui|{
                                         //     if self.client_ui.message_group_is_hovered {
                                         //         ui.allocate_ui(vec2(20., 20.), |ui|{
@@ -125,7 +123,6 @@ impl TemplateApp {
                                         //         ui.allocate_space(vec2(1., 20.));
                                         //     }
                                         // });
-                                            
                                         for item in &item.reactions.message_reactions {
                                             ui.horizontal(|ui|{
 
@@ -134,7 +131,6 @@ impl TemplateApp {
                                                 });
 
                                                 ui.label(RichText::from(item.times.to_string()).size(self.font_size));
-                                                
                                             });
                                         }
                                     }
@@ -162,7 +158,6 @@ impl TemplateApp {
                                                                     }),
                                                                 )
                                                                 .frame(false);
-                                                            
                                                                 if ui.add(button).clicked() {
                                                                     let message = ClientMessage::construct_reaction_msg(
                                                                         chr, index, self.login_username.clone(), match self.client_ui.req_passw {
@@ -185,10 +180,6 @@ impl TemplateApp {
                                             });
                                         });
 
-                                        
-
-                                        
-
                                         if ui.button("Reply").clicked() {
                                             self.client_ui.replying_to = Some(index);
                                         }
@@ -196,8 +187,6 @@ impl TemplateApp {
                                             ctx.copy_text(i.clone());
                                         };
                                 });
-
-                                
 
                                 self.client_ui.message_group_is_hovered = message_group.hovered();
 

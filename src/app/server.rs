@@ -1,6 +1,9 @@
 use std::{env, fs, io::Write, path::PathBuf};
 
-use super::backend::{ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}, MessageReaction, Reaction};
+use super::backend::{
+    MessageReaction, Reaction,
+    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+};
 use rand::Rng;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
@@ -26,11 +29,12 @@ use messages::{
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
-    ClientMessage, ClientReaction as ClientReactionStruct,
+    ClientMessage,
     ClientMessageType::{
-        ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientSyncMessage, ClientReaction
+        ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientReaction,
+        ClientSyncMessage,
     },
-    ServerFileReply, ServerImageReply,
+    ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
 
 use super::backend::{ServerAudioReply, ServerOutput};
@@ -269,7 +273,12 @@ impl MessageService {
     pub async fn NormalMessage(&self, req: ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
-                ok.push(ServerOutput::convert_type_to_servermsg(req, -1, Normal, MessageReaction::default()));
+                ok.push(ServerOutput::convert_type_to_servermsg(
+                    req,
+                    -1,
+                    Normal,
+                    MessageReaction::default(),
+                ));
             }
             Err(err) => {
                 println!("{err}")
@@ -355,7 +364,7 @@ impl MessageService {
                                         request,
                                         self.original_file_paths.lock().unwrap().len() as i32 - 1,
                                         Upload,
-                                        MessageReaction::default()
+                                        MessageReaction::default(),
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
@@ -404,7 +413,7 @@ impl MessageService {
                                     req.clone(),
                                     image_path_lenght as i32,
                                     Image,
-                                    MessageReaction::default()
+                                    MessageReaction::default(),
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -450,7 +459,7 @@ impl MessageService {
                             req.clone(),
                             audio_paths_lenght as i32,
                             Audio,
-                            MessageReaction::default()
+                            MessageReaction::default(),
                         ));
                     }
                     Err(err) => println!("{err}"),
@@ -535,30 +544,48 @@ impl MessageService {
     }
 
     pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
-        
         match &mut self.messages.try_lock() {
             Ok(message_vec) => {
-                for (index, item) in message_vec[reaction.message_index].clone().reactions.message_reactions.iter().enumerate() {
-                    
+                for (index, item) in message_vec[reaction.message_index]
+                    .clone()
+                    .reactions
+                    .message_reactions
+                    .iter()
+                    .enumerate()
+                {
                     //Check if it has already been reacted before
                     if item.char == reaction.char {
-                        message_vec[reaction.message_index].reactions.message_reactions[index].times += 1;
+                        message_vec[reaction.message_index]
+                            .reactions
+                            .message_reactions[index]
+                            .times += 1;
+                    } else {
+                        message_vec[reaction.message_index]
+                            .reactions
+                            .message_reactions
+                            .push(Reaction {
+                                char: reaction.char,
+                                times: 0,
+                            })
                     }
-                    else {
-                        message_vec[reaction.message_index].reactions.message_reactions.push(
-                            Reaction { char: reaction.char, times: 0 }
-                        )
-                    }
-
                 }
 
                 //First reaction
-                if message_vec[reaction.message_index].clone().reactions.message_reactions.is_empty() {
-                    message_vec[reaction.message_index].reactions.message_reactions.push(
-                        Reaction { char: reaction.char, times: 0 }
-                    )
+                if message_vec[reaction.message_index]
+                    .clone()
+                    .reactions
+                    .message_reactions
+                    .is_empty()
+                {
+                    message_vec[reaction.message_index]
+                        .reactions
+                        .message_reactions
+                        .push(Reaction {
+                            char: reaction.char,
+                            times: 0,
+                        })
                 }
-            },
+            }
             Err(err) => println!("{err}"),
         }
     }

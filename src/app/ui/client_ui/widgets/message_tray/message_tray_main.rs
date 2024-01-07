@@ -194,7 +194,6 @@ impl TemplateApp {
                                 //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
                                 match self.audio_file.clone().try_lock() {
                                     Ok(ok) => {
-
                                         self.send_file(ok.to_path_buf());
 
                                         let _ = fs::remove_file(ok.to_path_buf());
@@ -205,7 +204,6 @@ impl TemplateApp {
                                 //Destroy state
                                 self.atx = None;
                             }
-                            
                         });
                     } else if ui
                         .add(egui::ImageButton::new(egui::include_image!(
