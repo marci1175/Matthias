@@ -9,7 +9,7 @@ rust-version = "1.71"
 egui = "0.24.1"
 egui_extras = { version = "0.24.2", features = ["all_loaders"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
-tonic = {version = "0.7", features = ["tls"]}
+tonic = {version = "0.7", features = ["tls"]} #, "compression"
 
 prost = "0.10"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
