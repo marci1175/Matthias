@@ -212,6 +212,10 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    pub search_buffer: String,
+
+    pub search_mode: bool,
+
     pub emoji_reaction_tray_rect: egui::Rect,
 
     #[serde(skip)]
@@ -309,6 +313,8 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            search_buffer: String::new(),
+            search_mode: false,
             message_group_is_hovered: false,
             emoji_reaction_tray_rect: egui::Rect::NOTHING,
             emoji_reaction_should_open: false,

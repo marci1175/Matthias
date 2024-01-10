@@ -1,5 +1,5 @@
 use device_query::Keycode;
-use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke};
+use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke, RichText};
 
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::app::account_manager::{write_audio, write_file, write_image};
 
 use crate::app::backend::{
-    ClientMessage, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster, TemplateApp,
+    ClientMessage, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster, TemplateApp, ClientMessageType, ServerMessageType,
 };
 use crate::app::client::{self};
 
@@ -53,6 +53,16 @@ impl TemplateApp {
                             .clicked()
                         {
                             self.settings_window = !self.settings_window;
+                        };
+                    });
+                    ui.allocate_ui(vec2(300., 40.), |ui| {
+                        if ui
+                            .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                "../../../icons/search.png"
+                            )))
+                            .clicked()
+                        {
+                            self.client_ui.search_mode = !self.client_ui.search_mode;
                         };
                     });
                 });
@@ -128,15 +138,40 @@ impl TemplateApp {
         });
 
         //usr_input
-        let usr_panel = egui::TopBottomPanel::bottom("usr_input")
-            .max_height(ctx.used_size().y / 2.)
-            .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
+        let usr_panel = egui::TopBottomPanel::bottom("usr_input").max_height(ctx.used_size().y / 2.).show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
                 let msg_tray = self.message_tray(ui, ctx, input_keys);
 
                 self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
+        });
+
+        //search area
+        if self.client_ui.search_mode {
+            egui::SidePanel::left("search_panel").exact_width(ctx.used_size().y / 3.5).show(ctx, |ui|{
+                ui.add(
+                    egui::widgets::TextEdit::singleline(&mut self.client_ui.search_buffer).hint_text("Search for words")
+                );
+                ui.separator();
+
+                egui::ScrollArea::new([true, true]).show(ui, |ui|{
+                    ui.allocate_ui(ui.available_size(), |ui|{
+                        for message in &self.client_ui.incoming_msg.struct_list {
+                            if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                if inner_message.message.contains(self.client_ui.search_buffer.trim()) {
+                                    ui.group(|ui| {
+                                        ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                        ui.label(RichText::from(format!("{}", inner_message.message)));
+                                    });
+                                }
+                            }
+                        }
+                    });
+                });
+                    
+                
             });
+        }
 
         self.file_tray(ctx);
 

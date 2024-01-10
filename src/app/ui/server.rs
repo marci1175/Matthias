@@ -104,14 +104,16 @@ impl TemplateApp {
                             }
                         }
                     }
-                    //ipv4 server mode
-                    // ui.label(RichText::from("Public ipV4 address : ").size(20.));
-                    // ui.text_edit_singleline(&mut pub_ip[1].trim().to_string());
-                    // ui.label("Server address");
-                    // ui.text_edit_singleline(&mut format!(
-                    //     "[{}]:{}",
-                    //     pub_ip[1], self.open_on_port
-                    // ));
+                    /*
+                    ipv4 server mode
+                    ui.label(RichText::from("Public ipV4 address : ").size(20.));
+                    ui.text_edit_singleline(&mut pub_ip[1].trim().to_string());
+                    ui.label("Server address");
+                    ui.text_edit_singleline(&mut format!(
+                        "[{}]:{}",
+                        pub_ip[1], self.open_on_port
+                    ));
+                    */
 
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
                     ui.label(RichText::from("Public ipV6 address : ").size(20.));

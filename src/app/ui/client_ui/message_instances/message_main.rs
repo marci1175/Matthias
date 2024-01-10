@@ -103,36 +103,17 @@ impl TemplateApp {
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-                                        // ui.allocate_ui(vec2(ui.available_width(), 30.), |ui|{
-                                        //     if self.client_ui.message_group_is_hovered {
-                                        //         ui.allocate_ui(vec2(20., 20.), |ui|{
-                                        //             let emoji_button = ui.add(
-                                        //                 egui::widgets::ImageButton::new(
-                                        //                     egui::include_image!("../../../../../icons/reaction_emoji.png")
-                                        //                 ).tint(Color32::GRAY).frame(false)
-                                        //             );
-                                        //             if self.client_ui.emoji_tray_is_hovered ||(self.client_ui.emoji_reaction_should_open && self.client_ui.message_group_is_hovered) {
-                                        //                 self.client_ui.emoji_tray_is_hovered = self.emoji_reaction_instance(ctx, ui, self.client_ui.emoji_reaction_tray_rect).response.hovered();
-                                        //             }
-                                        //             self.client_ui.emoji_reaction_tray_rect = emoji_button.rect;
-                                        //             if emoji_button.clicked() {
-                                        //                 self.client_ui.emoji_reaction_should_open = !self.client_ui.emoji_reaction_should_open;
-                                        //             }
-                                        //         });
-                                        //     } else {
-                                        //         ui.allocate_space(vec2(1., 20.));
-                                        //     }
+                                        // egui::ScrollArea::horizontal().max_height(self.font_size).show(ui, |ui|{
+                                        //     ui.horizontal(|ui| {
+                                        //         for item in &item.reactions.message_reactions {
+                                        //             ui.group(|ui| {
+                                        //                 ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
+                                        //             });
+        
+                                        //             ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
+                                        //         }
+                                        //     });
                                         // });
-                                        for item in &item.reactions.message_reactions {
-                                            ui.horizontal(|ui|{
-
-                                                ui.group(|ui| {
-                                                    ui.label(RichText::from(item.char.to_string()).size(self.font_size * 1.3))
-                                                });
-
-                                                ui.label(RichText::from(item.times.to_string()).size(self.font_size));
-                                            });
-                                        }
                                     }
                                     ).response.context_menu(|ui|{
                                         ui.menu_button("React", |ui| {
