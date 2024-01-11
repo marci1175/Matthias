@@ -189,5 +189,11 @@ impl eframe::App for backend::TemplateApp {
                     Err(err) => eprintln!("{err}"),
                 };
             });
+
+        egui::Window::new("Search mode")
+            .open(&mut self.client_ui.search_settings_panel)
+            .show(ctx, |ui|{
+                
+            });
     }
 }

@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'eframe_template'",
+            "name": "Debug unit tests in library 'Matthias'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=eframe_template"
+                    "--package=Matthias"
                 ],
                 "filter": {
-                    "name": "eframe_template",
+                    "name": "Matthias",
                     "kind": "lib"
                 }
             },
@@ -26,15 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'eframe_template'",
+            "name": "Debug executable 'Matthias'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=eframe_template",
-                    "--package=eframe_template"
+                    "--bin=Matthias",
+                    "--package=Matthias"
                 ],
                 "filter": {
-                    "name": "eframe_template",
+                    "name": "Matthias",
                     "kind": "bin"
                 }
             },
@@ -44,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'eframe_template'",
+            "name": "Debug unit tests in executable 'Matthias'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=eframe_template",
-                    "--package=eframe_template"
+                    "--bin=Matthias",
+                    "--package=Matthias"
                 ],
                 "filter": {
-                    "name": "eframe_template",
+                    "name": "Matthias",
                     "kind": "bin"
                 }
             },

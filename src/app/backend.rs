@@ -3,7 +3,9 @@ use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use std::any::Any;
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -212,8 +214,16 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+
+    pub search_parameters: SearchParameters,
+
+    #[serde(skip)]
+    pub search_settings_panel: bool,
+
+    #[serde(skip)]
     pub search_buffer: String,
 
+    #[serde(skip)]
     pub search_mode: bool,
 
     pub emoji_reaction_tray_rect: egui::Rect,
@@ -313,6 +323,8 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            search_parameters: SearchParameters::default(),
+            search_settings_panel: false,
             search_buffer: String::new(),
             search_mode: false,
             message_group_is_hovered: false,
@@ -910,5 +922,35 @@ pub struct ScrollToMessage {
 impl ScrollToMessage {
     pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage {
         ScrollToMessage { messages, index }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum SearchType {
+    Name,
+    Message,
+    Date,
+}
+
+impl Display for SearchType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&format!("{}", match self {
+                SearchType::Name => "Name",
+                SearchType::Message => "Message",
+                SearchType::Date => "Date",
+            }),
+        f)
+    }
+}
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct SearchParameters {
+    pub search_type: SearchType,
+}
+
+impl Default for SearchParameters {
+    fn default() -> Self {
+        Self { 
+            search_type: SearchType::Message
+        }
     }
 }

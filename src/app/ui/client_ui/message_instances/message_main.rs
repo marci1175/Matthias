@@ -103,17 +103,17 @@ impl TemplateApp {
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-                                        // egui::ScrollArea::horizontal().max_height(self.font_size).show(ui, |ui|{
-                                        //     ui.horizontal(|ui| {
-                                        //         for item in &item.reactions.message_reactions {
-                                        //             ui.group(|ui| {
-                                        //                 ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
-                                        //             });
+                                        egui::ScrollArea::horizontal().max_height(self.font_size).show(ui, |ui|{
+                                            ui.horizontal(|ui| {
+                                                for item in &item.reactions.message_reactions {
+                                                    ui.group(|ui| {
+                                                        ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
+                                                    });
         
-                                        //             ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
-                                        //         }
-                                        //     });
-                                        // });
+                                                    ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
+                                                }
+                                            });
+                                        });
                                     }
                                     ).response.context_menu(|ui|{
                                         ui.menu_button("React", |ui| {
