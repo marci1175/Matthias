@@ -186,55 +186,65 @@ impl TemplateApp {
                         let mut has_search = false;
                         
                         for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
-                            
-                                match self.client_ui.search_parameters.search_type {
-                                    SearchType::Name => {
-                                        if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                                            if message.Author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
-                                                if ui.group(|ui|{
-                                                    ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                    ui.label(RichText::from(format!("{}", inner_message.message)));
-                                                    ui.small(&message.MessageDate);
-                                                }).response.interact(Sense::click()).clicked() {
-                                                    self.client_ui.scroll_to_message_index = Some(index)
-                                                };
-                                                has_search = true;
-                                            }
-                                        }
-                                    },
-                                    SearchType::Message => {
-                                        if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                                            if inner_message.message.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
-                                                if ui.group(|ui|{
-                                                    ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                    ui.label(RichText::from(format!("{}", inner_message.message)));
-                                                    ui.small(&message.MessageDate);
-                                                }).response.interact(Sense::click()).clicked() {
-                                                    self.client_ui.scroll_to_message_index = Some(index)
-                                                };
-    
-                                                has_search = true;
-                                            }
-                                        }
-                                    },
-                                    SearchType::Date => {
-                                        if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                                            if message.MessageDate.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
-                                                if ui.group(|ui|{
-                                                    ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                    ui.label(RichText::from(format!("{}", inner_message.message)));
-                                                    ui.small(&message.MessageDate);
-                                                }).response.interact(Sense::click()).clicked() {
-                                                    self.client_ui.scroll_to_message_index = Some(index)
-                                                };
+                            match self.client_ui.search_parameters.search_type {
+                                SearchType::Name => {
+                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                        if message.Author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
+                                            let group = ui.group(|ui|{
+                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.small(&message.MessageDate);
+                                            });
 
-                                                has_search = true;
-                                            }
+                                            if group.response.interact(Sense::click()).clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+
+                                            group.response.on_hover_text("Click to jump to message");
+
+                                            has_search = true;
                                         }
-                                    },
-                                }
-                            
-                            
+                                    }
+                                },
+                                SearchType::Message => {
+                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                        if inner_message.message.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
+                                            let group = ui.group(|ui|{
+                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.small(&message.MessageDate);
+                                            });
+
+                                            if group.response.interact(Sense::click()).clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+
+                                            group.response.on_hover_text("Click to jump to message");
+
+                                            has_search = true;
+                                        }
+                                    }
+                                },
+                                SearchType::Date => {
+                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                        if message.MessageDate.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
+                                            let group = ui.group(|ui|{
+                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.small(&message.MessageDate);
+                                            });
+
+                                            if group.response.interact(Sense::click()).clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+
+                                            group.response.on_hover_text("Click to jump to message");
+
+                                            has_search = true;
+                                        }
+                                    }
+                                },
+                            }
                         }
 
                         //Display no result :(
