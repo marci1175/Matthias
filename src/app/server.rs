@@ -251,7 +251,6 @@ pub async fn server_main(
     port: String,
     password: String,
 ) -> Result<String, Box<dyn std::error::Error>> {
-
     let addr = format!("[::]:{}", port).parse()?;
 
     let msg_service = MessageService {
@@ -262,14 +261,12 @@ pub async fn server_main(
     let messages = &msg_service.messages.lock().unwrap().to_vec();
 
     Server::builder()
-        .add_service(
-            MessageServer::new(msg_service)
-        )
+        .add_service(MessageServer::new(msg_service))
         .serve(addr)
         .await?;
 
     let reply: String = messages.iter().map(|f| f.struct_into_string()).collect();
-    
+
     Ok(reply)
 }
 
@@ -571,7 +568,7 @@ impl MessageService {
                                 char: reaction.char,
                                 times: 0,
                             });
-                            break;
+                        break;
                     }
                 }
 

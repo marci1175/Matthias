@@ -179,11 +179,25 @@ impl TemplateApp {
                 {
                     if let Some(atx) = self.atx.clone() {
                         ui.horizontal_centered(|ui| {
-                            ui.label(RichText::from("Recording").size(self.font_size).color(Color32::RED));
-                            
+                            ui.label(
+                                RichText::from("Recording")
+                                    .size(self.font_size)
+                                    .color(Color32::RED),
+                            );
+
                             //Display lenght
-                            ui.label(RichText::from(format!("{}s", Utc::now().signed_duration_since(self.client_ui.voice_recording_start.unwrap()).num_seconds())).size(self.font_size));
-                            
+                            ui.label(
+                                RichText::from(format!(
+                                    "{}s",
+                                    Utc::now()
+                                        .signed_duration_since(
+                                            self.client_ui.voice_recording_start.unwrap()
+                                        )
+                                        .num_seconds()
+                                ))
+                                .size(self.font_size),
+                            );
+
                             if ui
                                 .add(
                                     egui::ImageButton::new(egui::include_image!(
@@ -224,7 +238,6 @@ impl TemplateApp {
                         self.client_ui.voice_recording_start = Some(Utc::now());
 
                         audio_recroding(rx, self.audio_file.clone());
-                        
                     }
                 }
             });

@@ -1,7 +1,8 @@
 use device_query::Keycode;
-use egui::{vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, Stroke, RichText, Sense};
-use tonic::IntoRequest;
-
+use egui::{
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
+    Stroke,
+};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -9,7 +10,8 @@ use std::time::Duration;
 use crate::app::account_manager::{write_audio, write_file, write_image};
 
 use crate::app::backend::{
-    ClientMessage, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster, TemplateApp, ClientMessageType, ServerMessageType, SearchType, ScrollToMessage,
+    ClientMessage, SearchType, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster,
+    ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 
@@ -139,13 +141,15 @@ impl TemplateApp {
         });
 
         //usr_input
-        let usr_panel = egui::TopBottomPanel::bottom("usr_input").max_height(ctx.used_size().y / 2.).show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
+        let usr_panel = egui::TopBottomPanel::bottom("usr_input")
+            .max_height(ctx.used_size().y / 2.)
+            .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
                 let msg_tray = self.message_tray(ui, ctx, input_keys);
 
                 self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
-        });
+            });
 
         //search area
         if self.client_ui.search_mode {
@@ -190,7 +194,6 @@ impl TemplateApp {
                         //     }
                         // }
                         let mut has_search = false;
-                        
                         for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
                             match self.client_ui.search_parameters.search_type {
                                 SearchType::Name => {
@@ -198,7 +201,7 @@ impl TemplateApp {
                                         if message.Author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
                                                 ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.label(RichText::from(inner_message.message.to_string()));
                                                 ui.small(&message.MessageDate);
                                             });
 
@@ -217,7 +220,7 @@ impl TemplateApp {
                                         if inner_message.message.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
                                                 ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.label(RichText::from(inner_message.message.to_string()));
                                                 ui.small(&message.MessageDate);
                                             });
 
@@ -236,7 +239,7 @@ impl TemplateApp {
                                         if message.MessageDate.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
                                                 ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.label(RichText::from(inner_message.message.to_string()));
                                                 ui.small(&message.MessageDate);
                                             });
 
@@ -255,7 +258,7 @@ impl TemplateApp {
                                         if message.replying_to.is_some() && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
                                                 ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.label(RichText::from(inner_message.message.to_string()));
                                                 ui.small(&message.MessageDate);
                                             });
 
@@ -269,17 +272,15 @@ impl TemplateApp {
                                         }
                                     }
                                 }
-                                
                                 SearchType::File => {
                                     if let ServerMessageType::Upload(inner_message) = &message.MessageType {
                                         let group = ui.group(|ui|{
                                             ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                             //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
-                                            if ui.small_button(format!("{}", inner_message.file_name)).clicked() {
+                                            if ui.small_button(inner_message.file_name.to_string()).clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            
                                             ui.small(&message.MessageDate);
                                         });
 
@@ -300,7 +301,6 @@ impl TemplateApp {
                                             if ui.small_button("Image").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            
                                             ui.small(&message.MessageDate);
                                         });
 
@@ -320,17 +320,15 @@ impl TemplateApp {
                                             if ui.small_button("Audio").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            
                                             ui.small(&message.MessageDate);
                                         });
-
                                         if group.response.interact(Sense::click()).clicked() {
                                             self.client_ui.scroll_to_message_index = Some(index)
                                         };
 
                                         group.response.on_hover_text("Click to jump to message");
 
-                                        has_search = true;        
+                                        has_search = true;
                                     }
 
                                 }
@@ -344,8 +342,6 @@ impl TemplateApp {
 
                     });
                 });
-                    
-                
             });
         }
 

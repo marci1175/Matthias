@@ -1,7 +1,6 @@
 use chrono::{Duration, Utc};
 use std::fs;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
         res.set_icon("icons/main.ico");
@@ -20,5 +19,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     Ok(())
-    
 }

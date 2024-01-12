@@ -1,4 +1,4 @@
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
@@ -213,7 +213,6 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
-
     pub search_parameters: SearchParameters,
 
     #[serde(skip)]
@@ -941,15 +940,13 @@ pub enum SearchType {
 
 impl Display for SearchType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(
-            match self {
-                SearchType::Name => "Name",
-                SearchType::Message => "Message",
-                SearchType::Date => "Date",
-                SearchType::Reply => "Replies",
-                SearchType::File => "File",
-            }
-        )
+        f.write_str(match self {
+            SearchType::Name => "Name",
+            SearchType::Message => "Message",
+            SearchType::Date => "Date",
+            SearchType::Reply => "Replies",
+            SearchType::File => "File",
+        })
     }
 }
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
@@ -959,8 +956,8 @@ pub struct SearchParameters {
 
 impl Default for SearchParameters {
     fn default() -> Self {
-        Self { 
-            search_type: SearchType::Message
+        Self {
+            search_type: SearchType::Message,
         }
     }
 }

@@ -109,7 +109,6 @@ impl TemplateApp {
                                                     ui.group(|ui| {
                                                         ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
                                                     });
-        
                                                     ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
                                                 }
                                             });
