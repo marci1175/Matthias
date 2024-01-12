@@ -213,21 +213,20 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    ///Search parameters set by user, to chose what to search for obviously
     pub search_parameters: SearchParameters,
 
+    ///Check if search panel settings panel (xd) is open 
     #[serde(skip)]
     pub search_settings_panel: bool,
 
+    ///Search buffer
     #[serde(skip)]
     pub search_buffer: String,
 
+    ///Check if search panel is open 
     #[serde(skip)]
     pub search_mode: bool,
-
-    pub emoji_reaction_tray_rect: egui::Rect,
-
-    #[serde(skip)]
-    pub emoji_reaction_should_open: bool,
 
     ///Message highlighting function
     #[serde(skip)]
@@ -236,9 +235,6 @@ pub struct Client {
     ///emoji tray is hovered
     #[serde(skip)]
     pub emoji_tray_is_hovered: bool,
-
-    #[serde(skip)]
-    pub message_group_is_hovered: bool,
 
     ///audio playback
     #[serde(skip)]
@@ -282,7 +278,10 @@ pub struct Client {
     ///This is the full address of the destionation a message is supposed to be sent to
     pub send_on_ip: String,
 
+    ///self.send_on_ip encoded into base64, this is supposedly for ease of use, I dont know why its even here 
     pub send_on_ip_base64_encoded: String,
+
+    ///Does client have the password required checkbox ticked
     pub req_passw: bool,
 
     ///The password the user has entered for server auth
@@ -318,6 +317,7 @@ pub struct Client {
     ///Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
 
+    ///Log when the voice recording has been started so we know how long the recording is
     #[serde(skip)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 }
@@ -329,9 +329,6 @@ impl Default for Client {
             search_buffer: String::new(),
             search_mode: false,
 
-            message_group_is_hovered: false,
-            emoji_reaction_tray_rect: egui::Rect::NOTHING,
-            emoji_reaction_should_open: false,
             message_highlight_color: Color32::WHITE,
             //audio playback
             audio_playback: AudioPlayback::default(),
@@ -444,12 +441,14 @@ pub struct ClientAudioRequest {
     pub index: i32,
 }
 
+///Reaction packet, defines which message its reacting to and with which char
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientReaction {
     pub char: char,
     pub message_index: usize,
 }
 
+///These are the types of requests the client can ask
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientFileRequestType {
     ///this is when you want to display an image and you have to make a request to the server file
@@ -721,15 +720,6 @@ pub enum ServerMessageType {
     Audio(ServerAudioUpload),
 }
 
-// #[derive(Debug, EnumDiscriminants)]
-// #[strum_discriminants(derive(EnumIter))]
-// pub enum ServerMessageTypeR {
-//     Upload(ServerFileUpload),
-//     Normal(ServerNormalMessage),
-//     Image(ServerImageUpload),
-//     Audio(ServerAudioUpload),
-// }
-
 ///This struct contains all the reactions of one message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct MessageReaction {
@@ -929,15 +919,20 @@ impl ScrollToMessage {
     }
 }
 
+/*
+    Client
+*/
+///Used to decide what to search for (In the Message search bar), defined by the user
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum SearchType {
-    Name,
-    Message,
     Date,
-    Reply,
     File,
+    Message,
+    Name,
+    Reply,
 }
 
+///Implement display for SearchType so its easier to display
 impl Display for SearchType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -949,6 +944,8 @@ impl Display for SearchType {
         })
     }
 }
+
+///Main searchparameter struct contains everyting the client needs for searching
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct SearchParameters {
     pub search_type: SearchType,

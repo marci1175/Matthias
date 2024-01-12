@@ -168,8 +168,6 @@ impl TemplateApp {
                                         };
                                 });
 
-                                self.client_ui.message_group_is_hovered = message_group.hovered();
-
                                 message_instances.push(message_group);
 
                             };
