@@ -103,7 +103,7 @@ impl TemplateApp {
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-                                        egui::ScrollArea::horizontal().max_height(self.font_size).show(ui, |ui|{
+                                        egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
                                                 for item in &item.reactions.message_reactions {
                                                     ui.group(|ui| {
