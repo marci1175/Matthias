@@ -1,6 +1,7 @@
 use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
+use chrono::Utc;
 use device_query::Keycode;
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, RichText,
@@ -178,7 +179,11 @@ impl TemplateApp {
                 {
                     if let Some(atx) = self.atx.clone() {
                         ui.horizontal_centered(|ui| {
-                            ui.label(RichText::from("Recording").size(self.font_size));
+                            ui.label(RichText::from("Recording").size(self.font_size).color(Color32::RED));
+                            
+                            //Display lenght
+                            ui.label(RichText::from(format!("{}s", Utc::now().signed_duration_since(self.client_ui.voice_recording_start.unwrap()).num_seconds())).size(self.font_size));
+                            
                             if ui
                                 .add(
                                     egui::ImageButton::new(egui::include_image!(
@@ -215,7 +220,11 @@ impl TemplateApp {
 
                         self.atx = Some(tx);
 
+                        //Set audio recording start
+                        self.client_ui.voice_recording_start = Some(Utc::now());
+
                         audio_recroding(rx, self.audio_file.clone());
+                        
                     }
                 }
             });

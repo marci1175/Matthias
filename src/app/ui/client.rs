@@ -152,11 +152,15 @@ impl TemplateApp {
             egui::SidePanel::right("search_panel").exact_width(ctx.used_size().x / 3.5).show(ctx, |ui|{
                 ui.separator();
                 ui.horizontal(|ui|{
-                    ui.allocate_ui(vec2(ui.available_width() / 2., ui.available_height()), |ui| {
-                        ui.add(
-                            egui::widgets::TextEdit::singleline(&mut self.client_ui.search_buffer).hint_text("Search for: ")
-                        );
-                    });
+
+                    //Dont allow displaying search buffer when in file or reply searching
+                    if !(self.client_ui.search_parameters.search_type == SearchType::File || self.client_ui.search_parameters.search_type == SearchType::Reply) {
+                        ui.allocate_ui(vec2(ui.available_width() / 2., ui.available_height()), |ui| {
+                            ui.add(
+                                egui::widgets::TextEdit::singleline(&mut self.client_ui.search_buffer).hint_text("Search for: ")
+                            );
+                        });
+                    }
 
                     egui::ComboBox::from_id_source("search_filter")
                             // .icon(|ui, rect, widget_visuals, is_open, above_or_belov| {})
@@ -165,6 +169,8 @@ impl TemplateApp {
                                 ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Message , "Message");
                                 ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Date, "Date");
                                 ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Name, "Name");
+                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Reply, "Reply");
+                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::File, "File");
                             });
                 });
                 ui.separator();
@@ -244,6 +250,90 @@ impl TemplateApp {
                                         }
                                     }
                                 },
+                                SearchType::Reply => {
+                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                        if message.replying_to.is_some() && !self.client_ui.search_buffer.trim().is_empty() {
+                                            let group = ui.group(|ui|{
+                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(format!("{}", inner_message.message)));
+                                                ui.small(&message.MessageDate);
+                                            });
+
+                                            if group.response.interact(Sense::click()).clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+
+                                            group.response.on_hover_text("Click to jump to message");
+
+                                            has_search = true;
+                                        }
+                                    }
+                                }
+                                
+                                SearchType::File => {
+                                    if let ServerMessageType::Upload(inner_message) = &message.MessageType {
+                                        let group = ui.group(|ui|{
+                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+
+                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            if ui.small_button(format!("{}", inner_message.file_name)).clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+                                            
+                                            ui.small(&message.MessageDate);
+                                        });
+
+                                        if group.response.interact(Sense::click()).clicked() {
+                                            self.client_ui.scroll_to_message_index = Some(index)
+                                        };
+
+                                        group.response.on_hover_text("Click to jump to message");
+
+                                        has_search = true;
+                                    }
+                                    /* Inner value shouldnt actaully be used since its only used for asking for a file, and to stay compact i wont implement image displaying in search mode */
+                                    if let ServerMessageType::Image( _ ) = &message.MessageType {
+                                        let group = ui.group(|ui|{
+                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+
+                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            if ui.small_button("Image").clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+                                            
+                                            ui.small(&message.MessageDate);
+                                        });
+
+                                        if group.response.interact(Sense::click()).clicked() {
+                                            self.client_ui.scroll_to_message_index = Some(index)
+                                        };
+
+                                        group.response.on_hover_text("Click to jump to message");
+
+                                        has_search = true;
+                                    }
+                                    if let ServerMessageType::Audio( _ ) = &message.MessageType {
+                                        let group = ui.group(|ui|{
+                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+
+                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            if ui.small_button("Audio").clicked() {
+                                                self.client_ui.scroll_to_message_index = Some(index)
+                                            };
+                                            
+                                            ui.small(&message.MessageDate);
+                                        });
+
+                                        if group.response.interact(Sense::click()).clicked() {
+                                            self.client_ui.scroll_to_message_index = Some(index)
+                                        };
+
+                                        group.response.on_hover_text("Click to jump to message");
+
+                                        has_search = true;        
+                                    }
+
+                                }
                             }
                         }
 

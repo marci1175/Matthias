@@ -1,9 +1,8 @@
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io;
@@ -319,6 +318,9 @@ pub struct Client {
 
     ///Used to decide whether the reactive emoji button should switch emojis (Like discords implementation)
     pub random_generated: bool,
+
+    #[serde(skip)]
+    pub voice_recording_start: Option<DateTime<Utc>>,
 }
 impl Default for Client {
     fn default() -> Self {
@@ -327,6 +329,7 @@ impl Default for Client {
             search_settings_panel: false,
             search_buffer: String::new(),
             search_mode: false,
+
             message_group_is_hovered: false,
             emoji_reaction_tray_rect: egui::Rect::NOTHING,
             emoji_reaction_should_open: false,
@@ -364,6 +367,8 @@ impl Default for Client {
             usr_msg: String::new(),
             replying_to: None,
             incoming_msg: ServerMaster::default(),
+
+            voice_recording_start: None,
         }
     }
 }
@@ -930,16 +935,21 @@ pub enum SearchType {
     Name,
     Message,
     Date,
+    Reply,
+    File,
 }
 
 impl Display for SearchType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&format!("{}", match self {
+        f.write_str(
+            match self {
                 SearchType::Name => "Name",
                 SearchType::Message => "Message",
                 SearchType::Date => "Date",
-            }),
-        f)
+                SearchType::Reply => "Replies",
+                SearchType::File => "File",
+            }
+        )
     }
 }
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
