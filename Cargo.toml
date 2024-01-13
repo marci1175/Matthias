@@ -52,6 +52,9 @@ claxon = "0.4.3"
 strum = {version = "0.25.0", features = ["derive"]}
 strum_macros = "0.25.3"
 
+[dependencies.uuid]
+version = "1.6.1"
+features = ["v4", "fast-rng", "macro-diagnostics"]
 
 [dependencies.windows-sys]
 version = "0.52.0"

@@ -11,7 +11,7 @@ mod server;
 mod ui;
 
 use self::account_manager::{
-    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
+    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file, generate_uuid,
 };
 
 use self::backend::ServerMaster;

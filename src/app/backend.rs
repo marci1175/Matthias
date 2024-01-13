@@ -3,6 +3,7 @@ use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use tonic::transport::Channel;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io;
@@ -97,6 +98,9 @@ pub struct TemplateApp {
     */
     pub client_ui: Client,
 
+    #[serde(skip)]
+    pub client_connection: ClientConnection,
+
     ///thread communication for client
     #[serde(skip)]
     pub rx: mpsc::Receiver<String>,
@@ -179,6 +183,8 @@ impl Default for TemplateApp {
 
             //client main
             client_ui: Client::default(),
+
+            client_connection: ClientConnection::default(),
 
             //font
             font_size: 20.,
@@ -634,6 +640,14 @@ impl ClientMessage {
 
     //this is used for SENDING IMAGES SO THE SERVER CAN DECIDE IF ITS A PICTURE
     //NOTICE: ALL THE AUDIO UPLOAD TYPES HAVE BEEN CONVERTED INTO ONE => "ClientFileUpload" this ensures that the client doesnt handle any backend stuff
+}
+
+///This manages all the settings and variables for maintaining a connection with the server (from client)
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+pub struct ClientConnection {
+    
+    #[serde(skip)]
+    pub channel : Option<Channel>,
 }
 
 /*

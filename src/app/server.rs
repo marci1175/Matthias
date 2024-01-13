@@ -1,4 +1,4 @@
-use std::{env, fs, io::Write, path::PathBuf};
+use std::{env, fs, io::Write, path::PathBuf, time::Duration};
 
 use super::backend::{
     MessageReaction, Reaction,
@@ -6,7 +6,7 @@ use super::backend::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{transport::Server, Request, Response, Status, IntoRequest};
 /*
 use std::{io, time::Duration};
 use clap::Parser;
@@ -261,10 +261,14 @@ pub async fn server_main(
     let messages = &msg_service.messages.lock().unwrap().to_vec();
 
     Server::builder()
-        .add_service(MessageServer::new(msg_service))
+        .http2_keepalive_interval(Some(Duration::from_secs(10)))
+        .add_service(
+            MessageServer::new(msg_service)
+        )
         .serve(addr)
         .await?;
-
+    
+    unimplemented!();
     let reply: String = messages.iter().map(|f| f.struct_into_string()).collect();
 
     Ok(reply)

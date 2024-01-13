@@ -6,6 +6,7 @@ use aes_gcm::{
 use anyhow::{ensure, Context, Result};
 use base64::engine::general_purpose;
 use base64::Engine;
+use chrono::Utc;
 use rfd::FileDialog;
 use std::env;
 use std::fs;
@@ -256,4 +257,10 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     fs::write(path, file_response.bytes)?;
 
     Ok(())
+}
+
+pub fn generate_uuid() -> String {
+    let uuid = uuid::Uuid::new_v4().to_string();
+
+    uuid
 }
