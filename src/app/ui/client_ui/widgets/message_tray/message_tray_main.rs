@@ -94,14 +94,18 @@ impl TemplateApp {
                             };
                             let temp_ip = self.client_ui.send_on_ip.clone();
                             let replying_to = self.client_ui.replying_to;
+                            let connection = self.client_connection.clone();
+
                             tokio::spawn(async move {
-                                match client::send_msg(ClientMessage::construct_normal_msg(
-                                    &temp_msg,
-                                    temp_ip,
-                                    passw,
-                                    username,
-                                    replying_to,
-                                ))
+                                match client::send_msg(
+                                    connection,
+                                    ClientMessage::construct_normal_msg(
+                                        &temp_msg,
+                                        passw,
+                                        username,
+                                        replying_to,
+                                    ),
+                                )
                                 .await
                                 {
                                     Ok(ok) => {
@@ -113,7 +117,7 @@ impl TemplateApp {
                                         };
                                     }
                                     Err(err) => {
-                                        println!("ln 321 {:?}", err.source());
+                                        dbg!(err);
                                     }
                                 };
                             });

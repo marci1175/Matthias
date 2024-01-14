@@ -136,19 +136,23 @@ impl TemplateApp {
                 self.client_ui.files_to_send.push(dropped_file_path);
             }
 
-            //Messages go here
-            self.client_ui_message_main(ui, ctx);
+            //Messages go here, check if there is a connection
+            ui.add_enabled_ui(self.client_connection.client.is_some(), |ui| {
+                self.client_ui_message_main(ui, ctx);
+            });
         });
 
         //usr_input
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
             .max_height(ctx.used_size().y / 2.)
             .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
-                let msg_tray = self.message_tray(ui, ctx, input_keys);
+                ui.add_enabled_ui(self.client_connection.client.is_some(), |ui| {
+                    let msg_tray = self.message_tray(ui, ctx, input_keys);
 
-                self.client_ui.text_widget_offset = msg_tray.response.rect.width();
+                    self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
-                ui.allocate_space(vec2(ui.available_width(), 5.));
+                    ui.allocate_space(vec2(ui.available_width(), 5.));
+                });
             });
 
         //search area
@@ -447,11 +451,13 @@ impl TemplateApp {
                 self.login_username.clone(),
             );
 
+            let connection = self.client_connection.clone();
+
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
                     tokio::time::sleep(Duration::from_secs_f32(2.)).await;
                     //This is where the messages get recieved
-                    match client::send_msg(message.clone()).await {
+                    match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
                             match tx.send(ok) {
                                 Ok(_) => {}
@@ -462,7 +468,7 @@ impl TemplateApp {
                             };
                         }
                         Err(_err) => {
-                            //println!("ln 197 {:?}", err.source());
+                            println!("ln 197 {:?}", _err.source());
                             break;
                         }
                     };
@@ -483,7 +489,7 @@ impl TemplateApp {
                 }
             }
             Err(_err) => {
-                //println!("{}", _err)
+                //self.autosync_sender = None;
             }
         }
     }

@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
+use crate::app::input::Input;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use tonic::transport::Channel;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io;
@@ -11,8 +11,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, Mutex};
-
-use crate::app::input::Input;
+use tonic::transport::{Channel, Endpoint};
+use windows_sys::w;
+use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
+use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -222,7 +224,7 @@ pub struct Client {
     ///Search parameters set by user, to chose what to search for obviously
     pub search_parameters: SearchParameters,
 
-    ///Check if search panel settings panel (xd) is open 
+    ///Check if search panel settings panel (xd) is open
     #[serde(skip)]
     pub search_settings_panel: bool,
 
@@ -230,7 +232,7 @@ pub struct Client {
     #[serde(skip)]
     pub search_buffer: String,
 
-    ///Check if search panel is open 
+    ///Check if search panel is open
     #[serde(skip)]
     pub search_mode: bool,
 
@@ -284,7 +286,7 @@ pub struct Client {
     ///This is the full address of the destionation a message is supposed to be sent to
     pub send_on_ip: String,
 
-    ///self.send_on_ip encoded into base64, this is supposedly for ease of use, I dont know why its even here 
+    ///self.send_on_ip encoded into base64, this is supposedly for ease of use, I dont know why its even here
     pub send_on_ip_base64_encoded: String,
 
     ///Does client have the password required checkbox ticked
@@ -487,7 +489,6 @@ pub struct ClientMessage {
     pub Password: String,
     pub Author: String,
     pub MessageDate: String,
-    pub Destination: String,
 }
 
 impl ClientMessage {
@@ -499,7 +500,6 @@ impl ClientMessage {
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
-        ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
@@ -512,14 +512,12 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
     ///this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_path: PathBuf,
-        ip: String,
         password: String,
         author: String,
         replying_to: Option<usize>,
@@ -545,7 +543,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -554,7 +551,6 @@ impl ClientMessage {
         index: usize,
         author: String,
         password: String,
-        ip: String,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -565,7 +561,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -577,7 +572,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -586,7 +580,6 @@ impl ClientMessage {
         index: i32,
         password: String,
         author: String,
-        ip: String,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -596,7 +589,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -605,7 +597,6 @@ impl ClientMessage {
         index: i32,
         password: String,
         author: String,
-        ip: String,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -615,7 +606,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -624,7 +614,6 @@ impl ClientMessage {
         index: i32,
         password: String,
         author: String,
-        ip: String,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -634,7 +623,6 @@ impl ClientMessage {
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
-            Destination: ip,
         }
     }
 
@@ -645,9 +633,72 @@ impl ClientMessage {
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ClientConnection {
-    
     #[serde(skip)]
-    pub channel : Option<Channel>,
+    pub client: Option<MessageClient<Channel>>,
+}
+
+impl ClientConnection {
+    pub fn connect(ip: String) -> anyhow::Result<Self> {
+        Ok(Self {
+            client: {
+                //Ping server to recive custom uuid, and to also get if server ip is valid
+                let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
+
+                let mut client_clone = client.clone();
+                let (sender, reciver) = mpsc::channel::<Option<MessageClient<Channel>>>();
+
+                tokio::spawn(async move {
+                    //ignore is_err_and
+                    let _ = sender
+                        .send(
+                            match client_clone
+                                .message_main(tonic::Request::new(MessageRequest {
+                                    message: ClientMessage::construct_sync_msg(
+                                        ip.clone(),
+                                        "".to_string(),
+                                        "Anyád".to_string(),
+                                    )
+                                    .struct_into_string(),
+                                }))
+                                .await
+                            {
+                                Ok(message_reply) => {
+                                    dbg!(message_reply.into_inner().message);
+                                    Some(client_clone)
+                                }
+                                Err(error) => {
+                                    std::thread::spawn(move || unsafe {
+                                        MessageBoxW(
+                                            0,
+                                            str::encode_utf16(error.to_string().as_str())
+                                                .chain(std::iter::once(0))
+                                                .collect::<Vec<_>>()
+                                                .as_ptr(),
+                                            w!("Error"),
+                                            MB_ICONERROR,
+                                        );
+                                    });
+                                    None
+                                }
+                            },
+                        )
+                        .is_err_and(|err| {
+                            dbg!(err);
+                            false
+                        });
+                });
+
+                //Is the client valid?
+                reciver.recv().unwrap()
+            },
+        })
+    }
+}
+
+///Used to decide what type fo file i want to send client_actions/actions.rs
+pub enum ClientSendType {
+    File,
+    Message,
 }
 
 /*
@@ -717,6 +768,9 @@ pub struct ServerAudioReply {
 
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
+
+use super::client::messages::message_client::MessageClient;
+use super::client::messages::MessageRequest;
 
 ///This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants)]

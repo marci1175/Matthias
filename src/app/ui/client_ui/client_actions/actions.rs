@@ -41,10 +41,11 @@ impl TemplateApp {
         let author = self.login_username.clone();
         let replying_to = self.client_ui.replying_to;
 
-        let message = ClientMessage::construct_file_msg(file, ip, passw, author, replying_to);
+        let message = ClientMessage::construct_file_msg(file, passw, author, replying_to);
+        let connection = self.client_connection.clone();
 
         tokio::spawn(async move {
-            let _ = client::send_msg(message).await;
+            let _ = client::send_msg(connection, message).await;
         });
     }
 }

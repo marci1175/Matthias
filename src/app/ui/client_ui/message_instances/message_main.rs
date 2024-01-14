@@ -143,11 +143,12 @@ impl TemplateApp {
                                                                         chr, index, self.login_username.clone(), match self.client_ui.req_passw {
                                                                             true => self.client_ui.client_password.clone(),
                                                                             false => "".into(),
-                                                                        }, self.client_ui.send_on_ip.clone(),
+                                                                        },
                                                                     );
+                                                                    let connection = self.client_connection.clone();
 
                                                                     tokio::spawn(async move {
-                                                                        match client::send_msg(message).await {
+                                                                        match client::send_msg(connection, message).await {
                                                                             Ok(_) => {},
                                                                             Err(err) => println!("{err}"),
                                                                         };

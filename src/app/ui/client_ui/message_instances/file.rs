@@ -20,12 +20,12 @@ impl TemplateApp {
                 let send_on_ip = self.client_ui.send_on_ip.clone();
                 let sender = self.ftx.clone();
 
-                let message = ClientMessage::construct_file_request_msg(
-                    file.index, passw, author, send_on_ip,
-                );
+                let message = ClientMessage::construct_file_request_msg(file.index, passw, author);
+
+                let connection = self.client_connection.clone();
 
                 tokio::spawn(async move {
-                    match client::send_msg(message).await {
+                    match client::send_msg(connection, message).await {
                         Ok(ok) => {
                             match sender.send(ok) {
                                 Ok(_) => {}

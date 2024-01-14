@@ -187,11 +187,12 @@ impl TemplateApp {
                             audio.index,
                             passw,
                             author,
-                            send_on_ip,
                         );
 
+                        let connection = self.client_connection.clone();
+
                         tokio::spawn(async move {
-                            match client::send_msg(message).await {
+                            match client::send_msg(connection, message).await {
                                 Ok(ok) => {
                                     match sender.send(ok) {
                                         Ok(_) => {}

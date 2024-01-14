@@ -1,5 +1,7 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
+use windows_sys::w;
+use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
 
 mod account_manager;
 pub mod backend;
@@ -11,10 +13,10 @@ mod server;
 mod ui;
 
 use self::account_manager::{
-    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file, generate_uuid,
+    append_to_file, decrypt_lines_from_vec, delete_line_from_file, generate_uuid, read_from_file,
 };
 
-use self::backend::ServerMaster;
+use self::backend::{ClientConnection, ServerMaster};
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
@@ -39,6 +41,8 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.main.keymap.clone());
+
+        //dbg!(generate_uuid());
 
         /* NOTES:
 
@@ -101,7 +105,54 @@ impl eframe::App for backend::TemplateApp {
 
                             // //format two text inputs, so because im too lazy
                             // self.send_on_ip = format!("[{}]:{}", self.send_on_address, self.send_on_port);
-                            ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
+
+                            //Check if there already is a connection
+                            ui.add_enabled_ui(self.client_connection.client.is_none(), |ui| {
+                                ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
+                            });
+
+                            match self.client_connection.client.is_none() {
+                                true => {
+                                    if ui.button("Connect").clicked() {
+                                        let ip = self.client_ui.send_on_ip.clone();
+                                        match ClientConnection::connect(format!("http://{}", ip)) {
+                                            Ok(ok) => {
+                                                self.client_connection = ok;
+                                            }
+                                            Err(err) => {
+                                                std::thread::spawn(move || unsafe {
+                                                    MessageBoxW(
+                                                        0,
+                                                        str::encode_utf16(err.to_string().as_str())
+                                                            .chain(std::iter::once(0))
+                                                            .collect::<Vec<_>>()
+                                                            .as_ptr(),
+                                                        w!("Error"),
+                                                        MB_ICONERROR,
+                                                    );
+                                                });
+                                            }
+                                        };
+                                        self.autosync_should_run
+                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+                                        //reset autosync
+                                        self.autosync_sender = None;
+                                    }
+                                }
+                                false => {
+                                    if ui
+                                        .button(RichText::from("Disconnect").color(Color32::RED))
+                                        .clicked()
+                                    {
+                                        //Reset client
+                                        self.client_connection.client = None;
+                                        self.client_ui.incoming_msg = ServerMaster::default();
+                                        self.autosync_should_run
+                                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                                    }
+                                }
+                            }
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
                                 if ui

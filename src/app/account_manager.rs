@@ -6,7 +6,6 @@ use aes_gcm::{
 use anyhow::{ensure, Context, Result};
 use base64::engine::general_purpose;
 use base64::Engine;
-use chrono::Utc;
 use rfd::FileDialog;
 use std::env;
 use std::fs;

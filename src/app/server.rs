@@ -6,7 +6,7 @@ use super::backend::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tonic::{transport::Server, Request, Response, Status, IntoRequest};
+use tonic::{transport::Server, IntoRequest, Request, Response, Status};
 /*
 use std::{io, time::Duration};
 use clap::Parser;
@@ -262,12 +262,10 @@ pub async fn server_main(
 
     Server::builder()
         .http2_keepalive_interval(Some(Duration::from_secs(10)))
-        .add_service(
-            MessageServer::new(msg_service)
-        )
+        .add_service(MessageServer::new(msg_service))
         .serve(addr)
         .await?;
-    
+
     unimplemented!();
     let reply: String = messages.iter().map(|f| f.struct_into_string()).collect();
 
