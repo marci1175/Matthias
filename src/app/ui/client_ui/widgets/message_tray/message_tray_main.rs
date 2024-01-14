@@ -92,7 +92,7 @@ impl TemplateApp {
                                 true => self.client_ui.client_password.clone(),
                                 false => "".into(),
                             };
-                            let temp_ip = self.client_ui.send_on_ip.clone();
+
                             let replying_to = self.client_ui.replying_to;
                             let connection = self.client_connection.clone();
 

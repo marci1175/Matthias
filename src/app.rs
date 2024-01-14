@@ -1,5 +1,6 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
+use std::sync::mpsc;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
 
@@ -16,7 +17,7 @@ use self::account_manager::{
     append_to_file, decrypt_lines_from_vec, delete_line_from_file, generate_uuid, read_from_file,
 };
 
-use self::backend::{ClientConnection, ServerMaster};
+use self::backend::{ClientConnection, ServerMaster, ConnectionState};
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
@@ -111,36 +112,8 @@ impl eframe::App for backend::TemplateApp {
                                 ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                             });
 
-                            match self.client_connection.client.is_none() {
-                                true => {
-                                    if ui.button("Connect").clicked() {
-                                        let ip = self.client_ui.send_on_ip.clone();
-                                        match ClientConnection::connect(format!("http://{}", ip)) {
-                                            Ok(ok) => {
-                                                self.client_connection = ok;
-                                            }
-                                            Err(err) => {
-                                                std::thread::spawn(move || unsafe {
-                                                    MessageBoxW(
-                                                        0,
-                                                        str::encode_utf16(err.to_string().as_str())
-                                                            .chain(std::iter::once(0))
-                                                            .collect::<Vec<_>>()
-                                                            .as_ptr(),
-                                                        w!("Error"),
-                                                        MB_ICONERROR,
-                                                    );
-                                                });
-                                            }
-                                        };
-                                        self.autosync_should_run
-                                            .store(true, std::sync::atomic::Ordering::Relaxed);
-
-                                        //reset autosync
-                                        self.autosync_sender = None;
-                                    }
-                                }
-                                false => {
+                            match self.client_connection.state {
+                                ConnectionState::Connected => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
@@ -150,8 +123,85 @@ impl eframe::App for backend::TemplateApp {
                                         self.client_ui.incoming_msg = ServerMaster::default();
                                         self.autosync_should_run
                                             .store(false, std::sync::atomic::Ordering::Relaxed);
+
+                                        self.client_connection.state = ConnectionState::Disconnected;
                                     }
+                                },
+                                ConnectionState::Disconnected => {
+                                    if ui.button("Connect").clicked() {
+
+                                        let ip = self.client_ui.send_on_ip.clone();
+
+                                        let sender = self.connection_sender.clone();
+                                        
+                                        std::thread::spawn(move || {
+                                            match ClientConnection::connect(format!("http://{}", ip)) {
+                                                Ok(ok) => {
+                                                    if let Err(err) = sender.send(ok){
+                                                        dbg!(err);
+                                                    };
+                                                }
+                                                Err(err) => {
+                                                    std::thread::spawn(move || unsafe {
+                                                        MessageBoxW(
+                                                            0,
+                                                            str::encode_utf16(err.to_string().as_str())
+                                                                .chain(std::iter::once(0))
+                                                                .collect::<Vec<_>>()
+                                                                .as_ptr(),
+                                                            w!("Error"),
+                                                            MB_ICONERROR,
+                                                        );
+                                                    });
+                                                }
+                                            };
+                                        });
+
+                                        self.autosync_should_run
+                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+                                        //reset autosync
+                                        self.autosync_sender = None;
+
+                                        self.client_connection.state = ConnectionState::Connecting;
+
+                                    }
+                                },
+                                ConnectionState::Connecting => {
+                                    if ui
+                                        .button(RichText::from("Cancel connection").color(Color32::LIGHT_GRAY))
+                                        .clicked()
+                                    {
+                                        //Reset client
+                                        self.client_connection.client = None;
+                                        self.client_ui.incoming_msg = ServerMaster::default();
+                                        self.autosync_should_run
+                                            .store(false, std::sync::atomic::Ordering::Relaxed);
+
+                                        self.client_connection.state = ConnectionState::Disconnected;
+                                    }
+                                },
+                            }
+
+                            match self.client_connection.client.is_none() {
+                                true => {
+                                    
                                 }
+                                false => {
+                                    
+                                }
+                            }
+
+                            match self.client_connection.state {
+                                ConnectionState::Connected => {
+                                    ui.label(RichText::from("Connected").color(Color32::GREEN));
+                                },
+                                ConnectionState::Disconnected => {
+                                    ui.label(RichText::from("Disconnected").color(Color32::RED));
+                                },
+                                ConnectionState::Connecting => {
+                                    ui.label(RichText::from("Connecting").color(Color32::LIGHT_GREEN));
+                                },
                             }
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
@@ -240,5 +290,13 @@ impl eframe::App for backend::TemplateApp {
                     Err(err) => eprintln!("{err}"),
                 };
             });
+
+        //Connection reciver
+        match self.connection_reciver.try_recv() {
+            Ok(connection) => self.client_connection = connection,
+            Err(err) => {
+                //dbg!(err);
+            },
+        }
     }
 }

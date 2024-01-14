@@ -261,7 +261,6 @@ pub async fn server_main(
     let messages = &msg_service.messages.lock().unwrap().to_vec();
 
     Server::builder()
-        .http2_keepalive_interval(Some(Duration::from_secs(10)))
         .add_service(MessageServer::new(msg_service))
         .serve(addr)
         .await?;

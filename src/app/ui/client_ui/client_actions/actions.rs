@@ -37,7 +37,6 @@ impl TemplateApp {
     #[inline]
     pub fn send_file(&mut self, file: std::path::PathBuf) {
         let passw = self.client_ui.client_password.clone();
-        let ip = self.client_ui.send_on_ip.clone();
         let author = self.login_username.clone();
         let replying_to = self.client_ui.replying_to;
 

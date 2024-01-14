@@ -5,7 +5,7 @@ use rand::rngs::ThreadRng;
 use crate::app::input::Input;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -115,6 +115,13 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub dtx: mpsc::Sender<String>,
 
+    ///Server connection
+    #[serde(skip)]
+    pub connection_reciver: mpsc::Receiver<ClientConnection>,
+    #[serde(skip)]
+    pub connection_sender: mpsc::Sender<ClientConnection>,
+
+
     ///Server - client syncing thread
     #[serde(skip)]
     pub autosync_sender: Option<mpsc::Receiver<String>>,
@@ -135,6 +142,7 @@ impl Default for TemplateApp {
         let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
+        let (connection_sender, connection_reciver) = mpsc::channel::<ClientConnection>();
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_record.wav",
@@ -195,6 +203,10 @@ impl Default for TemplateApp {
             //thread communication for client
             rx,
             tx,
+
+            //Server connection
+            connection_sender,
+            connection_reciver,
 
             //data sync
             drx,
@@ -635,6 +647,8 @@ impl ClientMessage {
 pub struct ClientConnection {
     #[serde(skip)]
     pub client: Option<MessageClient<Channel>>,
+    #[serde(skip)]
+    pub state: ConnectionState,
 }
 
 impl ClientConnection {
@@ -691,11 +705,38 @@ impl ClientConnection {
                 //Is the client valid?
                 reciver.recv().unwrap()
             },
+            state: ConnectionState::Connected,
         })
     }
 }
 
-///Used to decide what type fo file i want to send client_actions/actions.rs
+///Used to show state of the connection
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub enum ConnectionState {
+    Connected,
+    Disconnected,
+    Connecting,
+}
+
+impl Default for ConnectionState {
+    fn default() -> Self {
+        Self::Disconnected
+    }
+}
+
+impl Debug for ConnectionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            match self {
+                ConnectionState::Connected => "Connected",
+                ConnectionState::Disconnected => "Disconnected",
+                ConnectionState::Connecting => "Connecting",
+            }
+        )
+    }
+}
+
+///Used to decide what type fo file i want to send client_actions/actions.rs TODO: include this in main
 pub enum ClientSendType {
     File,
     Message,
