@@ -134,7 +134,7 @@ impl eframe::App for backend::TemplateApp {
 
                                         let sender = self.connection_sender.clone();
                                         
-                                        std::thread::spawn(move || {
+                                        tokio::spawn(async move {
                                             match ClientConnection::connect(format!("http://{}", ip)) {
                                                 Ok(ok) => {
                                                     if let Err(err) = sender.send(ok){
@@ -181,15 +181,6 @@ impl eframe::App for backend::TemplateApp {
                                         self.client_connection.state = ConnectionState::Disconnected;
                                     }
                                 },
-                            }
-
-                            match self.client_connection.client.is_none() {
-                                true => {
-                                    
-                                }
-                                false => {
-                                    
-                                }
                             }
 
                             match self.client_connection.state {
@@ -293,7 +284,7 @@ impl eframe::App for backend::TemplateApp {
 
         //Connection reciver
         match self.connection_reciver.try_recv() {
-            Ok(connection) => self.client_connection = connection,
+            Ok(connection) => {self.client_connection.state = ConnectionState::Connected; self.client_connection = connection},
             Err(err) => {
                 //dbg!(err);
             },
