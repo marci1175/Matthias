@@ -5,7 +5,8 @@ use rand::rngs::ThreadRng;
 use crate::app::input::Input;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
-use std::fmt::{Display, Debug};
+use std::error::Error;
+use std::fmt::{Debug, Display};
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -117,10 +118,9 @@ pub struct TemplateApp {
 
     ///Server connection
     #[serde(skip)]
-    pub connection_reciver: mpsc::Receiver<ClientConnection>,
+    pub connection_reciver: mpsc::Receiver<Option<ClientConnection>>,
     #[serde(skip)]
-    pub connection_sender: mpsc::Sender<ClientConnection>,
-
+    pub connection_sender: mpsc::Sender<Option<ClientConnection>>,
 
     ///Server - client syncing thread
     #[serde(skip)]
@@ -142,7 +142,7 @@ impl Default for TemplateApp {
         let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) = mpsc::channel::<String>();
-        let (connection_sender, connection_reciver) = mpsc::channel::<ClientConnection>();
+        let (connection_sender, connection_reciver) = mpsc::channel::<Option<ClientConnection>>();
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_record.wav",
@@ -652,59 +652,46 @@ pub struct ClientConnection {
 }
 
 impl ClientConnection {
-    pub fn connect(ip: String) -> anyhow::Result<Self> {
+    pub async fn connect(ip: String) -> anyhow::Result<Self> {
         Ok(Self {
             client: {
                 //Ping server to recive custom uuid, and to also get if server ip is valid
                 let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
 
                 let mut client_clone = client.clone();
-                let (sender, reciver) = mpsc::channel::<Option<MessageClient<Channel>>>();
 
-                tokio::spawn(async move {
-                    //ignore is_err_and
-                    let _ = sender
-                        .send(
-                            match client_clone
-                                .message_main(tonic::Request::new(MessageRequest {
-                                    message: ClientMessage::construct_sync_msg(
-                                        ip.clone(),
-                                        "".to_string(),
-                                        "Anyád".to_string(),
-                                    )
-                                    .struct_into_string(),
-                                }))
-                                .await
-                            {
-                                Ok(message_reply) => {
-                                    dbg!(message_reply.into_inner().message);
-                                    Some(client_clone)
-                                }
-                                Err(error) => {
-                                    std::thread::spawn(move || unsafe {
-                                        MessageBoxW(
-                                            0,
-                                            str::encode_utf16(error.to_string().as_str())
-                                                .chain(std::iter::once(0))
-                                                .collect::<Vec<_>>()
-                                                .as_ptr(),
-                                            w!("Error"),
-                                            MB_ICONERROR,
-                                        );
-                                    });
-                                    None
-                                }
-                            },
+                match client_clone
+                    .message_main(tonic::Request::new(MessageRequest {
+                        message: ClientMessage::construct_sync_msg(
+                            ip.clone(),
+                            "".to_string(),
+                            "Anyád".to_string(),
                         )
-                        .is_err_and(|err| {
-                            dbg!(err);
-                            false
-                        });
-                });
+                        .struct_into_string(),
+                    }))
+                    .await
+                {
+                    Ok(message_reply) => {
+                        dbg!(message_reply.into_inner().message);
+                        Some(client_clone)
+                    }
+                    Err(error) => {
+                        dbg!(&error);
 
-                //Is the client valid?
-                //TODO: FIX THIS
-                reciver.recv().unwrap()
+                        std::thread::spawn(move || unsafe {
+                            MessageBoxW(
+                                0,
+                                str::encode_utf16(error.to_string().as_str())
+                                    .chain(std::iter::once(0))
+                                    .collect::<Vec<_>>()
+                                    .as_ptr(),
+                                w!("Error"),
+                                MB_ICONERROR,
+                            );
+                        });
+                        None
+                    }
+                }
             },
             state: ConnectionState::Connected,
         })
@@ -727,13 +714,11 @@ impl Default for ConnectionState {
 
 impl Debug for ConnectionState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(
-            match self {
-                ConnectionState::Connected => "Connected",
-                ConnectionState::Disconnected => "Disconnected",
-                ConnectionState::Connecting => "Connecting",
-            }
-        )
+        f.write_str(match self {
+            ConnectionState::Connected => "Connected",
+            ConnectionState::Disconnected => "Disconnected",
+            ConnectionState::Connecting => "Connecting",
+        })
     }
 }
 

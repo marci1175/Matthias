@@ -17,7 +17,7 @@ use self::account_manager::{
     append_to_file, decrypt_lines_from_vec, delete_line_from_file, generate_uuid, read_from_file,
 };
 
-use self::backend::{ClientConnection, ServerMaster, ConnectionState};
+use self::backend::{ClientConnection, ConnectionState, ServerMaster};
 use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
@@ -124,20 +124,25 @@ impl eframe::App for backend::TemplateApp {
                                         self.autosync_should_run
                                             .store(false, std::sync::atomic::Ordering::Relaxed);
 
-                                        self.client_connection.state = ConnectionState::Disconnected;
+                                        self.client_connection.state =
+                                            ConnectionState::Disconnected;
                                     }
-                                },
+                                }
                                 ConnectionState::Disconnected => {
                                     if ui.button("Connect").clicked() {
-
                                         let ip = self.client_ui.send_on_ip.clone();
 
                                         let sender = self.connection_sender.clone();
-                                        
-                                        tokio::spawn(async move {
-                                            match ClientConnection::connect(format!("http://{}", ip)) {
+
+                                        tokio::task::spawn(async move {
+                                            match ClientConnection::connect(format!(
+                                                "http://{}",
+                                                ip
+                                            ))
+                                            .await
+                                            {
                                                 Ok(ok) => {
-                                                    if let Err(err) = sender.send(ok){
+                                                    if let Err(err) = sender.send(Some(ok)) {
                                                         dbg!(err);
                                                     };
                                                 }
@@ -145,14 +150,19 @@ impl eframe::App for backend::TemplateApp {
                                                     std::thread::spawn(move || unsafe {
                                                         MessageBoxW(
                                                             0,
-                                                            str::encode_utf16(err.to_string().as_str())
-                                                                .chain(std::iter::once(0))
-                                                                .collect::<Vec<_>>()
-                                                                .as_ptr(),
+                                                            str::encode_utf16(
+                                                                err.to_string().as_str(),
+                                                            )
+                                                            .chain(std::iter::once(0))
+                                                            .collect::<Vec<_>>()
+                                                            .as_ptr(),
                                                             w!("Error"),
                                                             MB_ICONERROR,
                                                         );
                                                     });
+                                                    if let Err(err) = sender.send(None) {
+                                                        dbg!(err);
+                                                    };
                                                 }
                                             };
                                         });
@@ -164,12 +174,14 @@ impl eframe::App for backend::TemplateApp {
                                         self.autosync_sender = None;
 
                                         self.client_connection.state = ConnectionState::Connecting;
-
                                     }
-                                },
+                                }
                                 ConnectionState::Connecting => {
                                     if ui
-                                        .button(RichText::from("Cancel connection").color(Color32::LIGHT_GRAY))
+                                        .button(
+                                            RichText::from("Cancel connection")
+                                                .color(Color32::LIGHT_GRAY),
+                                        )
                                         .clicked()
                                     {
                                         //Reset client
@@ -178,21 +190,24 @@ impl eframe::App for backend::TemplateApp {
                                         self.autosync_should_run
                                             .store(false, std::sync::atomic::Ordering::Relaxed);
 
-                                        self.client_connection.state = ConnectionState::Disconnected;
+                                        self.client_connection.state =
+                                            ConnectionState::Disconnected;
                                     }
-                                },
+                                }
                             }
 
                             match self.client_connection.state {
                                 ConnectionState::Connected => {
                                     ui.label(RichText::from("Connected").color(Color32::GREEN));
-                                },
+                                }
                                 ConnectionState::Disconnected => {
                                     ui.label(RichText::from("Disconnected").color(Color32::RED));
-                                },
+                                }
                                 ConnectionState::Connecting => {
-                                    ui.label(RichText::from("Connecting").color(Color32::LIGHT_GREEN));
-                                },
+                                    ui.label(
+                                        RichText::from("Connecting").color(Color32::LIGHT_GREEN),
+                                    );
+                                }
                             }
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
@@ -284,10 +299,17 @@ impl eframe::App for backend::TemplateApp {
 
         //Connection reciver
         match self.connection_reciver.try_recv() {
-            Ok(connection) => {self.client_connection.state = ConnectionState::Connected; self.client_connection = connection},
+            Ok(connection) => {
+                if let Some(connection) = connection {
+                    self.client_connection.state = ConnectionState::Connected;
+                    self.client_connection = connection
+                } else {
+                    self.client_connection.state = ConnectionState::Disconnected;
+                }
+            }
             Err(err) => {
                 //dbg!(err);
-            },
+            }
         }
     }
 }
