@@ -703,6 +703,7 @@ impl ClientConnection {
                 });
 
                 //Is the client valid?
+                //TODO: FIX THIS
                 reciver.recv().unwrap()
             },
             state: ConnectionState::Connected,
