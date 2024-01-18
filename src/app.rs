@@ -194,21 +194,72 @@ impl eframe::App for backend::TemplateApp {
                                             ConnectionState::Disconnected;
                                     }
                                 }
+                                ConnectionState::Error => {
+                                    if ui.button("Connect").clicked() {
+                                        let ip = self.client_ui.send_on_ip.clone();
+
+                                        let sender = self.connection_sender.clone();
+
+                                        tokio::task::spawn(async move {
+                                            match ClientConnection::connect(format!(
+                                                "http://{}",
+                                                ip
+                                            ))
+                                            .await
+                                            {
+                                                Ok(ok) => {
+                                                    if let Err(err) = sender.send(Some(ok)) {
+                                                        dbg!(err);
+                                                    };
+                                                }
+                                                Err(err) => {
+                                                    std::thread::spawn(move || unsafe {
+                                                        MessageBoxW(
+                                                            0,
+                                                            str::encode_utf16(
+                                                                err.to_string().as_str(),
+                                                            )
+                                                            .chain(std::iter::once(0))
+                                                            .collect::<Vec<_>>()
+                                                            .as_ptr(),
+                                                            w!("Error"),
+                                                            MB_ICONERROR,
+                                                        );
+                                                    });
+                                                    if let Err(err) = sender.send(None) {
+                                                        dbg!(err);
+                                                    };
+                                                }
+                                            };
+                                        });
+
+                                        self.autosync_should_run
+                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+                                        //reset autosync
+                                        self.autosync_sender = None;
+
+                                        self.client_connection.state = ConnectionState::Connecting;
+                                    }
+                                },
                             }
 
-                            match self.client_connection.state {
-                                ConnectionState::Connected => {
-                                    ui.label(RichText::from("Connected").color(Color32::GREEN));
+                            ui.label(
+                                match self.client_connection.state {
+                                    ConnectionState::Connected => {
+                                        RichText::from("Connected").color(Color32::GREEN)
+                                    }
+                                    ConnectionState::Disconnected => {
+                                        RichText::from("Disconnected").color(Color32::LIGHT_RED)
+                                    }
+                                    ConnectionState::Connecting => {
+                                        RichText::from("Connecting").color(Color32::LIGHT_GREEN)
+                                    }
+                                    ConnectionState::Error => {
+                                        RichText::from("Error when trying to connect").color(Color32::RED)
+                                    }
                                 }
-                                ConnectionState::Disconnected => {
-                                    ui.label(RichText::from("Disconnected").color(Color32::RED));
-                                }
-                                ConnectionState::Connecting => {
-                                    ui.label(
-                                        RichText::from("Connecting").color(Color32::LIGHT_GREEN),
-                                    );
-                                }
-                            }
+                            );
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
                                 if ui
@@ -301,10 +352,14 @@ impl eframe::App for backend::TemplateApp {
         match self.connection_reciver.try_recv() {
             Ok(connection) => {
                 if let Some(connection) = connection {
-                    self.client_connection.state = ConnectionState::Connected;
-                    self.client_connection = connection
-                } else {
-                    self.client_connection.state = ConnectionState::Disconnected;
+                    if connection.client.is_some() {
+                        self.client_connection.state = ConnectionState::Connected;
+                        self.client_connection = connection
+                    }
+                    else {
+                        println!("err");
+                        self.client_connection.state = ConnectionState::Error;
+                    }
                 }
             }
             Err(err) => {

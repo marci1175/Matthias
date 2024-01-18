@@ -672,12 +672,9 @@ impl ClientConnection {
                     .await
                 {
                     Ok(message_reply) => {
-                        dbg!(message_reply.into_inner().message);
                         Some(client_clone)
                     }
                     Err(error) => {
-                        dbg!(&error);
-
                         std::thread::spawn(move || unsafe {
                             MessageBoxW(
                                 0,
@@ -704,6 +701,7 @@ pub enum ConnectionState {
     Connected,
     Disconnected,
     Connecting,
+    Error,
 }
 
 impl Default for ConnectionState {
@@ -718,6 +716,7 @@ impl Debug for ConnectionState {
             ConnectionState::Connected => "Connected",
             ConnectionState::Disconnected => "Disconnected",
             ConnectionState::Connecting => "Connecting",
+            ConnectionState::Error => "Error",
         })
     }
 }
