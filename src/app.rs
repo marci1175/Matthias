@@ -42,7 +42,6 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let input_keys = keymap(self.main.keymap.clone());
-
         //dbg!(generate_uuid());
 
         /* NOTES:
@@ -79,6 +78,7 @@ impl eframe::App for backend::TemplateApp {
         if self.main.client_mode {
             self.state_client(_frame, ctx, input_keys);
         }
+        
         //character picker
         if self.main.emoji_mode && self.main.client_mode {
             self.window_emoji(ctx);
@@ -357,7 +357,6 @@ impl eframe::App for backend::TemplateApp {
                         self.client_connection = connection
                     }
                     else {
-                        println!("err");
                         self.client_connection.state = ConnectionState::Error;
                     }
                 }

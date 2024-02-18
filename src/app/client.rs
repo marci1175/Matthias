@@ -1,4 +1,5 @@
 use messages::MessageRequest;
+use tonic::{client::Grpc, codec::Codec, transport::Channel, Request};
 
 use super::backend::{ClientMessage, TemplateApp};
 pub mod messages {
@@ -13,6 +14,8 @@ pub async fn send_msg(
     connection: ClientConnection,
     message: ClientMessage,
 ) -> anyhow::Result<String> {
+    // let chan = Channel::builder("http://[::1]".parse().unwrap()).connect().await?;
+
     if let Some(mut client) = connection.client.clone() {
         let request = tonic::Request::new(MessageRequest {
             message: message.struct_into_string(),
@@ -26,4 +29,5 @@ pub async fn send_msg(
     } else {
         Err(anyhow::Error::msg("Request failed, see logs"))
     }
+
 }

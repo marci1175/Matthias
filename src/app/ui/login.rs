@@ -20,6 +20,10 @@ impl TemplateApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(500., 200.)));
         ctx.send_viewport_cmd(ViewportCommand::Resizable(false));
 
+        let is_focused = ctx.input(|input| {
+            input.focused
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
                 ui.label(RichText::from("Matthias").strong().size(25.))
@@ -33,7 +37,7 @@ impl TemplateApp {
 
                 ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
 
-                if ui.button("Login").clicked()
+                if ui.button("Login").clicked() && is_focused
                     || input_keys.contains(&Keycode::Enter)
                         && !(self.login_password.is_empty() && self.login_username.is_empty())
                 {

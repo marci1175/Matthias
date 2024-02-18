@@ -6,21 +6,7 @@ use super::backend::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tonic::{transport::Server, IntoRequest, Request, Response, Status};
-/*
-use std::{io, time::Duration};
-use clap::Parser;
-use rcgen::{Certificate, CertificateParams, DistinguishedName};
-use tokio::time::sleep;
-use log::{info, error};
-use clap_derive::Parser;
-use instant_acme::{
-    Account, AuthorizationStatus, ChallengeType, Identifier, LetsEncrypt, NewAccount, NewOrder,
-    OrderStatus,
-};
-
-*/
-
+use tonic::{transport::Server, IntoRequest, Request, Response, Status, client::GrpcService};
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
@@ -258,17 +244,14 @@ pub async fn server_main(
         ..Default::default()
     };
 
-    let messages = &msg_service.messages.lock().unwrap().to_vec();
-
     Server::builder()
-        .add_service(MessageServer::new(msg_service))
+        .add_service(
+            MessageServer::new(msg_service)
+        )
         .serve(addr)
         .await?;
 
     unimplemented!();
-    let reply: String = messages.iter().map(|f| f.struct_into_string()).collect();
-
-    Ok(reply)
 }
 
 impl MessageService {
