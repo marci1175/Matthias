@@ -1,4 +1,3 @@
-use device_query::Keycode;
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
     Stroke,
@@ -7,7 +6,7 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::app::account_manager::{write_audio, write_file, write_image};
+use crate::app::backend::{write_audio, write_file, write_image};
 
 use crate::app::backend::{
     ClientMessage, SearchType, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster,
@@ -16,12 +15,7 @@ use crate::app::backend::{
 use crate::app::client::{self};
 
 impl TemplateApp {
-    pub fn state_client(
-        &mut self,
-        _frame: &mut eframe::Frame,
-        ctx: &egui::Context,
-        input_keys: Vec<Keycode>,
-    ) {
+    pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         //Window settings
         ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
 
@@ -147,7 +141,7 @@ impl TemplateApp {
             .max_height(ctx.used_size().y / 2.)
             .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
                 ui.add_enabled_ui(self.client_connection.client.is_some(), |ui| {
-                    let msg_tray = self.message_tray(ui, ctx, input_keys);
+                    let msg_tray = self.message_tray(ui, ctx);
 
                     self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
@@ -446,7 +440,6 @@ impl TemplateApp {
             let (tx, rx) = mpsc::channel::<String>();
 
             let message = ClientMessage::construct_sync_msg(
-                self.client_ui.send_on_ip.clone(),
                 self.client_ui.client_password.clone(),
                 self.login_username.clone(),
             );

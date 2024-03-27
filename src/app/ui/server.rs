@@ -4,7 +4,7 @@ use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 
 use crate::app::backend::TemplateApp;
-use crate::app::networking::{ipv4_get, ipv6_get};
+use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
 
 impl TemplateApp {

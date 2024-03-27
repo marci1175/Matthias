@@ -1,4 +1,3 @@
-//use crate::app::account_manager::write_file;
 use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 
@@ -46,5 +45,7 @@ impl TemplateApp {
         tokio::spawn(async move {
             let _ = client::send_msg(connection, message).await;
         });
+
+        dbg!("send");
     }
 }

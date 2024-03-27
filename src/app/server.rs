@@ -1,16 +1,16 @@
-use std::{env, fs, io::Write, path::PathBuf, time::Duration};
+use std::{env, fs, io::Write, path::PathBuf};
 
 use super::backend::{
     MessageReaction, Reaction,
     ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
 };
-use rand::Rng;
-use std::sync::Mutex;
-use tonic::{transport::Server, IntoRequest, Request, Response, Status, client::GrpcService};
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
 };
+use rand::Rng;
+use std::sync::Mutex;
+use tonic::{transport::Server, Request, Response, Status};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
@@ -245,9 +245,7 @@ pub async fn server_main(
     };
 
     Server::builder()
-        .add_service(
-            MessageServer::new(msg_service)
-        )
+        .add_service(MessageServer::new(msg_service))
         .serve(addr)
         .await?;
 

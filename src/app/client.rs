@@ -1,7 +1,6 @@
 use messages::MessageRequest;
-use tonic::{client::Grpc, codec::Codec, transport::Channel, Request};
 
-use super::backend::{ClientMessage, TemplateApp};
+use super::backend::{ClientMessage};
 pub mod messages {
     tonic::include_proto!("messages");
 }
@@ -29,5 +28,4 @@ pub async fn send_msg(
     } else {
         Err(anyhow::Error::msg("Request failed, see logs"))
     }
-
 }

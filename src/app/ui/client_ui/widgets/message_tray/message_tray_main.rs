@@ -2,10 +2,9 @@ use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::client::{self};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
-use device_query::Keycode;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, RichText,
-    Rounding, Stroke,
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, Modifiers,
+    RichText, Rounding, Stroke,
 };
 use rand::Rng;
 use rfd::FileDialog;
@@ -17,7 +16,6 @@ impl TemplateApp {
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-        input_keys: Vec<Keycode>,
     ) -> egui::InnerResponse<()> {
         ui.allocate_space(vec2(ui.available_width(), 5.));
 
@@ -63,11 +61,11 @@ impl TemplateApp {
                 vec2(-30., -msg_scroll.content_size.y / 2. - 4.),
             )
             .show(ctx, |ui| {
-                self.buttons(ui, input_keys, ctx);
+                self.buttons(ui, ctx);
             })
     }
 
-    fn buttons(&mut self, ui: &mut egui::Ui, input_keys: Vec<Keycode>, ctx: &egui::Context) {
+    fn buttons(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.allocate_ui(vec2(ui.available_width(), self.font_size * 1.5), |ui| {
                 //send message button
@@ -78,8 +76,9 @@ impl TemplateApp {
                         )))
                         .clicked()
                         || ctx.input(|reader| reader.key_pressed(Key::Enter))
-                            && !(input_keys.contains(&Keycode::LShift)
-                                || input_keys.contains(&Keycode::RShift))
+                            && !(ctx.input_mut(|reader| {
+                                reader.consume_key(Modifiers::SHIFT, Key::Enter)
+                            }))
                     {
                         if !(self.client_ui.usr_msg.trim().is_empty()
                             || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
@@ -170,8 +169,7 @@ impl TemplateApp {
                                 .client_ui
                                 .rand_eng
                                 .gen_range(0..=self.client_ui.emoji.len() - 1);
-                            self.client_ui.random_emoji =
-                                self.client_ui.emoji[random_number].clone();
+                            self.client_ui.random_emoji.clone_from(&self.client_ui.emoji[random_number]);
                             self.client_ui.random_generated = true;
                         }
                     } else {

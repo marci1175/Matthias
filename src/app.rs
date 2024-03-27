@@ -1,24 +1,19 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
-use std::sync::mpsc;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
 
-mod account_manager;
 pub mod backend;
 
 mod client;
-mod input;
-mod networking;
 mod server;
 mod ui;
 
-use self::account_manager::{
-    append_to_file, decrypt_lines_from_vec, delete_line_from_file, generate_uuid, read_from_file,
+use self::backend::{
+    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
 };
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
-use self::input::keymap;
 
 impl eframe::App for backend::TemplateApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -41,7 +36,6 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let input_keys = keymap(self.main.keymap.clone());
         //dbg!(generate_uuid());
 
         /* NOTES:
@@ -61,7 +55,7 @@ impl eframe::App for backend::TemplateApp {
         egui_extras::install_image_loaders(ctx);
         //Login Page
         if !(self.main.mode_selector || self.main.server_mode || self.main.client_mode) {
-            self.state_login(_frame, ctx, &input_keys);
+            self.state_login(_frame, ctx);
         }
 
         //Main page
@@ -76,9 +70,9 @@ impl eframe::App for backend::TemplateApp {
 
         //Client page
         if self.main.client_mode {
-            self.state_client(_frame, ctx, input_keys);
+            self.state_client(_frame, ctx);
         }
-        
+
         //character picker
         if self.main.emoji_mode && self.main.client_mode {
             self.window_emoji(ctx);
@@ -241,25 +235,24 @@ impl eframe::App for backend::TemplateApp {
 
                                         self.client_connection.state = ConnectionState::Connecting;
                                     }
-                                },
+                                }
                             }
 
-                            ui.label(
-                                match self.client_connection.state {
-                                    ConnectionState::Connected => {
-                                        RichText::from("Connected").color(Color32::GREEN)
-                                    }
-                                    ConnectionState::Disconnected => {
-                                        RichText::from("Disconnected").color(Color32::LIGHT_RED)
-                                    }
-                                    ConnectionState::Connecting => {
-                                        RichText::from("Connecting").color(Color32::LIGHT_GREEN)
-                                    }
-                                    ConnectionState::Error => {
-                                        RichText::from("Error when trying to connect").color(Color32::RED)
-                                    }
+                            ui.label(match self.client_connection.state {
+                                ConnectionState::Connected => {
+                                    RichText::from("Connected").color(Color32::GREEN)
                                 }
-                            );
+                                ConnectionState::Disconnected => {
+                                    RichText::from("Disconnected").color(Color32::LIGHT_RED)
+                                }
+                                ConnectionState::Connecting => {
+                                    RichText::from("Connecting").color(Color32::LIGHT_GREEN)
+                                }
+                                ConnectionState::Error => {
+                                    RichText::from("Error when trying to connect")
+                                        .color(Color32::RED)
+                                }
+                            });
 
                             ui.allocate_ui(vec2(25., 25.), |ui| {
                                 if ui
@@ -318,7 +311,7 @@ impl eframe::App for backend::TemplateApp {
                                     for (counter, item) in ok.iter().enumerate() {
                                         ui.horizontal(|ui| {
                                             if ui.button(RichText::from(item.clone())).clicked() {
-                                                self.client_ui.send_on_ip = item.clone();
+                                                self.client_ui.send_on_ip.clone_from(item);
                                             }
                                             ui.with_layout(
                                                 Layout::right_to_left(Align::Min),
@@ -355,14 +348,13 @@ impl eframe::App for backend::TemplateApp {
                     if connection.client.is_some() {
                         self.client_connection.state = ConnectionState::Connected;
                         self.client_connection = connection
-                    }
-                    else {
+                    } else {
                         self.client_connection.state = ConnectionState::Error;
                     }
                 }
             }
-            Err(err) => {
-                //dbg!(err);
+            Err(_err) => {
+                // dbg!(_err);
             }
         }
     }

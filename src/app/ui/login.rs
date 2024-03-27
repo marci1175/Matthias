@@ -1,28 +1,20 @@
 use std::iter;
 
-use crate::app::account_manager::{login, register};
+use crate::app::backend::{login, register};
 
 use crate::app::backend::TemplateApp;
-use device_query::Keycode;
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
 
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_ICONWARNING};
 
 impl TemplateApp {
-    pub fn state_login(
-        &mut self,
-        _frame: &mut eframe::Frame,
-        ctx: &egui::Context,
-        input_keys: &Vec<Keycode>,
-    ) {
+    pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         //windows settings
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(500., 200.)));
         ctx.send_viewport_cmd(ViewportCommand::Resizable(false));
 
-        let is_focused = ctx.input(|input| {
-            input.focused
-        });
+        let is_focused = ctx.input(|input| input.focused);
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
@@ -38,7 +30,7 @@ impl TemplateApp {
                 ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
 
                 if ui.button("Login").clicked() && is_focused
-                    || input_keys.contains(&Keycode::Enter)
+                    || ctx.input(|reader| reader.key_down(egui::Key::Enter))
                         && !(self.login_password.is_empty() && self.login_username.is_empty())
                 {
                     self.main.mode_selector =
