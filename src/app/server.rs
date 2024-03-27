@@ -60,7 +60,7 @@ impl ServerMessage for MessageService {
         let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
         let req: ClientMessage = req_result.unwrap();
-        if &req.Password == self.passw.trim() {
+        if req.Password == self.passw.trim() {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 

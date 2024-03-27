@@ -61,15 +61,16 @@ impl TemplateApp {
                 vec2(-30., -msg_scroll.content_size.y / 2. - 4.),
             )
             .show(ctx, |ui| {
-                self.buttons(ui, ctx);
+                //We should also pass in whether it should be enabled
+                self.buttons(ui, ctx, self.client_connection.client.is_some());
             })
     }
 
-    fn buttons(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn buttons(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, enabled: bool) {
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.allocate_ui(vec2(ui.available_width(), self.font_size * 1.5), |ui| {
-                //send message button
-                {
+                //Display buttons, check if they should be enabled or nah
+                ui.add_enabled_ui(enabled, |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
                             "../../../../../../icons/send_msg.png"
@@ -124,7 +125,42 @@ impl TemplateApp {
                         for file_path in self.client_ui.files_to_send.clone() {
                             //Check for no user fuckery
                             if file_path.exists() {
-                                self.send_file(file_path);
+                                let tx = self.tx.clone();
+                                let username = self.login_username.clone();
+                                //disable pass if its not ticked
+                                let passw = match self.client_ui.req_passw {
+                                    true => self.client_ui.client_password.clone(),
+                                    false => "".into(),
+                                };
+
+                                let replying_to = self.client_ui.replying_to;
+                                let connection = self.client_connection.clone();
+
+                                tokio::spawn(async move {
+                                    match client::send_msg(
+                                        connection,
+                                        ClientMessage::construct_file_msg(
+                                            file_path,
+                                            passw,
+                                            username,
+                                            replying_to,
+                                        ),
+                                    )
+                                    .await
+                                    {
+                                        Ok(ok) => {
+                                            match tx.send(ok) {
+                                                Ok(_) => {}
+                                                Err(err) => {
+                                                    println!("{} ln 156", err);
+                                                }
+                                            };
+                                        }
+                                        Err(err) => {
+                                            dbg!(err);
+                                        }
+                                    };
+                                });
                             }
                         }
 
@@ -133,9 +169,8 @@ impl TemplateApp {
                         self.client_ui.replying_to = None;
                         self.client_ui.usr_msg.clear();
                     }
-                }
-                //add file button
-                {
+
+                    //add file button
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
                             "../../../../../../icons/add_file.png"
@@ -152,33 +187,31 @@ impl TemplateApp {
                             self.client_ui.files_to_send.push(file);
                         }
                     }
-                }
-                //Emoji button
-                {
+
+                    //Emoji button
                     let button = ui.add(Button::new(
                         RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
                     ));
-
                     if button.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
                     };
-
                     if button.hovered() {
                         if !self.client_ui.random_generated {
                             let random_number = self
                                 .client_ui
                                 .rand_eng
                                 .gen_range(0..=self.client_ui.emoji.len() - 1);
-                            self.client_ui.random_emoji.clone_from(&self.client_ui.emoji[random_number]);
+                            self.client_ui
+                                .random_emoji
+                                .clone_from(&self.client_ui.emoji[random_number]);
                             self.client_ui.random_generated = true;
                         }
                     } else {
                         //check if button has been unhovered, reset variable
                         self.client_ui.random_generated = false;
                     }
-                }
-                //Record button
-                {
+
+                    //Record button
                     if let Some(atx) = self.atx.clone() {
                         ui.horizontal_centered(|ui| {
                             ui.label(
@@ -186,7 +219,6 @@ impl TemplateApp {
                                     .size(self.font_size)
                                     .color(Color32::RED),
                             );
-
                             //Display lenght
                             ui.label(
                                 RichText::from(format!(
@@ -199,7 +231,6 @@ impl TemplateApp {
                                 ))
                                 .size(self.font_size),
                             );
-
                             if ui
                                 .add(
                                     egui::ImageButton::new(egui::include_image!(
@@ -215,7 +246,44 @@ impl TemplateApp {
                                 //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
                                 match self.audio_file.clone().try_lock() {
                                     Ok(ok) => {
-                                        self.send_file(ok.to_path_buf());
+                                        let tx = self.tx.clone();
+                                        let username = self.login_username.clone();
+                                        //disable pass if its not ticked
+                                        let passw = match self.client_ui.req_passw {
+                                            true => self.client_ui.client_password.clone(),
+                                            false => "".into(),
+                                        };
+                                        
+                                        let path_buf = ok.to_path_buf().clone();
+
+                                        let replying_to = self.client_ui.replying_to;
+                                        let connection = self.client_connection.clone();
+        
+                                        tokio::spawn(async move {
+                                            match client::send_msg(
+                                                connection,
+                                                ClientMessage::construct_file_msg(
+                                                    path_buf,
+                                                    passw,
+                                                    username,
+                                                    replying_to,
+                                                ),
+                                            )
+                                            .await
+                                            {
+                                                Ok(ok) => {
+                                                    match tx.send(ok) {
+                                                        Ok(_) => {}
+                                                        Err(err) => {
+                                                            println!("{} ln 156", err);
+                                                        }
+                                                    };
+                                                }
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                }
+                                            };
+                                        });
 
                                         let _ = fs::remove_file(ok.to_path_buf());
                                     }
@@ -241,7 +309,7 @@ impl TemplateApp {
 
                         audio_recroding(rx, self.audio_file.clone());
                     }
-                }
+                });
             });
         });
     }

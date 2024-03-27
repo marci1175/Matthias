@@ -1,6 +1,6 @@
 use messages::MessageRequest;
 
-use super::backend::{ClientMessage};
+use super::backend::ClientMessage;
 pub mod messages {
     tonic::include_proto!("messages");
 }

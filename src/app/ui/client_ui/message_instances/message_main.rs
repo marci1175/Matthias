@@ -59,12 +59,7 @@ impl TemplateApp {
                                     i = &item.message;
                                 }
 
-                                //Reply hovering from inside
-                                // if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
-                                //     if scroll_to_instance.index == index {
-                                //     }
-                                // }
-
+                                //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui|
                                     {
                                         if let Some(replied_to) = item.replying_to {

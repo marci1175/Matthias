@@ -73,48 +73,71 @@ impl TemplateApp {
             //Drop file warning
             self.client_ui.drop_file_animation =
                 ui.input(|input| !input.raw.clone().hovered_files.is_empty());
-            if self.client_ui.how_on >= 0. {
+
+            if self.client_ui.animation_state >= 0. {
+                //Get window size
                 let window_size = ui.input(|reader| reader.screen_rect().max).to_vec2();
+
+                //Define default font
                 let font_id = FontId {
                     family: FontFamily::default(),
                     size: self.font_size,
                 };
 
+                //Draw background fading animation
                 ui.painter().rect_filled(
                     egui::Rect::EVERYTHING,
                     0.,
-                    Color32::from_rgba_premultiplied(0, 0, 0, (self.client_ui.how_on / 3.) as u8),
+                    Color32::from_rgba_premultiplied(
+                        0,
+                        0,
+                        0,
+                        (self.client_ui.animation_state / 3.) as u8,
+                    ),
                 );
 
+                //Draw rectangle in the middle where the text also appears
                 Area::new("warning_overlay").show(ctx, |ui| {
                     ui.painter().rect(
                         egui::Rect {
                             min: Pos2::new(
                                 window_size[0] / 3.,
-                                window_size[0] / 5. + self.client_ui.how_on / 50.,
+                                window_size[0] / 5. + self.client_ui.animation_state / 50.,
                             ),
                             max: Pos2::new(
                                 window_size[0] / 1.5,
-                                window_size[0] / 3. + self.client_ui.how_on / 50.,
+                                window_size[0] / 3. + self.client_ui.animation_state / 50.,
                             ),
                         },
                         5.0,
-                        Color32::from_rgba_unmultiplied(0, 0, 0, self.client_ui.how_on as u8 / 8),
+                        Color32::from_rgba_unmultiplied(
+                            0,
+                            0,
+                            0,
+                            self.client_ui.animation_state as u8 / 8,
+                        ),
                         Stroke::default(),
                     );
                     ui.painter().text(
                         Pos2::new(
                             window_size[0] / 2.,
-                            window_size[0] / 4. + self.client_ui.how_on / 50.,
+                            window_size[0] / 4. + self.client_ui.animation_state / 50.,
                         ),
                         Align2([Align::Center, Align::Center]),
                         "Drop to upload",
                         font_id,
-                        Color32::from_rgba_unmultiplied(255, 255, 255, self.client_ui.how_on as u8),
+                        Color32::from_rgba_unmultiplied(
+                            255,
+                            255,
+                            255,
+                            self.client_ui.animation_state as u8,
+                        ),
                     );
                 });
             }
-            self.client_ui.how_on = ctx.animate_value_with_time(
+
+            //Animate self.client_ui.animation_state by incrementing it with 255. / 0.4 per sec
+            self.client_ui.animation_state = ctx.animate_value_with_time(
                 Id::from("warning_overlay"),
                 match self.client_ui.drop_file_animation {
                     true => 255.,
@@ -136,7 +159,7 @@ impl TemplateApp {
             });
         });
 
-        //usr_input
+        //Message input panel
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
             .max_height(ctx.used_size().y / 2.)
             .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
@@ -178,19 +201,8 @@ impl TemplateApp {
                 ui.separator();
 
                 //For the has_search logic to work and for the rust compiler not to underline everything
-                #[allow(unused_must_use)]
                 egui::ScrollArea::new([true, true]).auto_shrink([false, true]).show(ui, |ui|{
                     ui.allocate_ui(ui.available_size(), |ui|{
-                        // for message in &self.client_ui.incoming_msg.struct_list {
-                        //     if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                        //         if inner_message.message.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
-                        //             ui.group(|ui| {
-                        //                 ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                        //                 ui.label(RichText::from(format!("{}", inner_message.message)));
-                        //             });
-                        //         }
-                        //     }
-                        // }
                         let mut has_search = false;
                         for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
                             match self.client_ui.search_parameters.search_type {
@@ -343,6 +355,7 @@ impl TemplateApp {
             });
         }
 
+        //This is only to display the files added to the list which will be sent
         self.file_tray(ctx);
 
         let panel_height = match usr_panel {
@@ -350,6 +363,7 @@ impl TemplateApp {
             None => 0.,
         };
 
+        //message box expanded
         Area::new("usr_msg_expand")
             .anchor(
                 Align2::RIGHT_BOTTOM,

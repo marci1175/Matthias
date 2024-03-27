@@ -2,31 +2,31 @@ use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
-use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::BTreeMap;
-use std::fmt::{Debug, Display};
-use std::io;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc, Mutex};
-use tonic::transport::{Channel, Endpoint};
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
-use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key,
 };
 use anyhow::{ensure, Context, Result};
+use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
+use rodio::{OutputStream, OutputStreamHandle, Sink};
+use std::collections::BTreeMap;
 use std::env;
+use std::fmt::{Debug, Display};
 use std::fs;
+use std::io;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::PathBuf;
 use std::string::FromUtf8Error;
-use argon2::{Config, Variant, Version};
+use std::sync::atomic::AtomicBool;
+use std::sync::{mpsc, Arc, Mutex};
+use tonic::transport::{Channel, Endpoint};
+use windows_sys::w;
+use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
+use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -319,7 +319,7 @@ pub struct Client {
     pub client_password: String,
 
     ///This gem of a variable is used to contain animation's state
-    pub how_on: f32,
+    pub animation_state: f32,
 
     ///This checks if a file is dragged above Matthias, so it knows when to display the cool animation 8)
     #[serde(skip)]
@@ -373,7 +373,7 @@ impl Default for Client {
             invalid_password: false,
             image_overlay: false,
             files_to_send: Vec::new(),
-            how_on: 0.0,
+            animation_state: 0.0,
             drop_file_animation: false,
             usr_msg_expanded: false,
             send_on_ip: String::new(),
@@ -677,7 +677,9 @@ impl ClientConnection {
                     }))
                     .await
                 {
-                    Ok(_server_reply /*We could return this, this is what the server is supposed to return, when a new user is connected */) => Some(client_clone),
+                    Ok(
+                        _server_reply, /*We could return this, this is what the server is supposed to return, when a new user is connected */
+                    ) => Some(client_clone),
                     Err(error) => {
                         std::thread::spawn(move || unsafe {
                             MessageBoxW(
@@ -727,8 +729,8 @@ impl Debug for ConnectionState {
 
 ///Used to decide what type fo file i want to send client_actions/actions.rs TODO: include this in main
 pub enum ClientSendType {
-    File,
-    Message,
+    File(Vec<u8>),
+    Message(String),
 }
 
 /*
@@ -1087,7 +1089,6 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
         ))
     }
 }
-
 
 //Account management
 pub fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<String> {
