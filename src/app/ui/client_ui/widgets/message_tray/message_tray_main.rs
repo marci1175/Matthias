@@ -54,7 +54,7 @@ impl TemplateApp {
             msg_scroll.inner.rect.height() + 15.,
         ));
 
-        Area::new("msg_action_tray")
+        Area::new("msg_action_tray".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 vec2(-30., -msg_scroll.content_size.y / 2. - 4.),
@@ -135,9 +135,11 @@ impl TemplateApp {
                     let button = ui.add(Button::new(
                         RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
                     ));
+
                     if button.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
                     };
+                    
                     if button.hovered() {
                         if !self.client_ui.random_generated {
                             let random_number = self

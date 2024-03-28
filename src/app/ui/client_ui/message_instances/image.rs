@@ -29,7 +29,7 @@ impl TemplateApp {
             Color32::from_rgba_premultiplied(0, 0, 0, 180),
         );
 
-        Area::new("image_overlay")
+        Area::new("image_overlay".into())
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .show(ctx, |ui| {
@@ -53,7 +53,7 @@ impl TemplateApp {
                     },
                 );
             });
-        Area::new("image_overlay_exit")
+        Area::new("image_overlay_exit".into())
             .movable(false)
             .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
             .show(ctx, |ui| {

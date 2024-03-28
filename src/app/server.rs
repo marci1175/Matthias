@@ -64,7 +64,17 @@ impl ServerMessage for MessageService {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 
-                ClientSyncMessage(_msg) => { /*Dont do anything we will always reply with the list of msgs*/
+                ClientSyncMessage(_msg) => { //Handle incoming connections and disconnections, and syncing
+                    if let Some(sync_attr) = _msg.sync_attribute {
+                        //Incoming connection
+                        if sync_attr {
+                            // request.
+                        }
+                        //Handle disconnections
+                        else {
+                            
+                        }
+                    }
                 }
 
                 ClientFileRequestType(request_type) => {
@@ -293,9 +303,7 @@ impl MessageService {
         */
 
         //500mb limit
-        if req.bytes.len() > 500000000 {
-            //Dont allow the upload
-        } else {
+        if !req.bytes.len() > 500000000 {
             match env::var("APPDATA") {
                 Ok(app_data) => {
                     //generat a random number to avoid file overwrites, cuz of same name files

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::app::backend;
-pub fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String> {
+fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String> {
     ui.fonts(|f| {
         f.lock()
             .fonts
@@ -14,14 +14,14 @@ pub fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap
     })
 }
 
-pub fn char_name(chr: char) -> String {
+fn char_name(chr: char) -> String {
     special_char_name(chr)
         .map(|s| s.to_owned())
         .or_else(|| unicode_names2::name(chr).map(|name| name.to_string().to_lowercase()))
         .unwrap_or_else(|| "unknown".to_owned())
 }
 
-pub fn special_char_name(chr: char) -> Option<&'static str> {
+fn special_char_name(chr: char) -> Option<&'static str> {
     #[allow(clippy::match_same_arms)] // many "flag"
     match chr {
         // Special private-use-area extensions found in `emoji-icon-font.ttf`:

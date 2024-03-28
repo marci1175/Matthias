@@ -97,7 +97,7 @@ impl TemplateApp {
                 );
 
                 //Draw rectangle in the middle where the text also appears
-                Area::new("warning_overlay").show(ctx, |ui| {
+                Area::new("warning_overlay".into()).show(ctx, |ui| {
                     ui.painter().rect(
                         egui::Rect {
                             min: Pos2::new(
@@ -364,7 +364,7 @@ impl TemplateApp {
         };
 
         //message box expanded
-        Area::new("usr_msg_expand")
+        Area::new("usr_msg_expand".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.client_ui.usr_msg_expanded {

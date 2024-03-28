@@ -1,5 +1,4 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
-use std::error::Error;
 use std::fs::{self};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
@@ -129,11 +128,15 @@ impl eframe::App for backend::TemplateApp {
 
                                         let sender = self.connection_sender.clone();
 
+                                        let username = self.login_username.clone();
+                                        
+                                        let password = self.client_ui.client_password.clone();
+
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(format!(
                                                 "http://{}",
                                                 ip
-                                            ))
+                                            ), username, password)
                                             .await
                                             {
                                                 Ok(ok) => {
@@ -193,13 +196,16 @@ impl eframe::App for backend::TemplateApp {
                                     if ui.button("Connect").clicked() {
                                         let ip = self.client_ui.send_on_ip.clone();
 
+                                        let username = self.login_username.clone();
+                                        let password = self.client_ui.client_password.clone();
+
                                         let sender = self.connection_sender.clone();
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(format!(
                                                 "http://{}",
                                                 ip
-                                            ))
+                                            ), username, password)
                                             .await
                                             {
                                                 Ok(ok) => {
