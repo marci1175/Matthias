@@ -1,9 +1,9 @@
-use std::{env, fs, io::Write, path::PathBuf};
+use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use super::backend::{
+use super::{backend::{
     MessageReaction, Reaction,
     ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
-};
+}, client};
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
@@ -48,6 +48,9 @@ pub struct MessageService {
 
     //audio name list
     pub audio_names: Mutex<Vec<Option<String>>>,
+
+    //connected clients
+    pub connected_clients: Mutex<Vec<SocketAddr>>,
 }
 
 #[tonic::async_trait]
@@ -57,6 +60,7 @@ impl ServerMessage for MessageService {
         &self,
         request: Request<MessageRequest>,
     ) -> Result<Response<MessageResponse>, Status> {
+        let inbound_connection_address = request.remote_addr();
         let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
         let req: ClientMessage = req_result.unwrap();
@@ -64,15 +68,48 @@ impl ServerMessage for MessageService {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 
-                ClientSyncMessage(_msg) => { //Handle incoming connections and disconnections, and syncing
-                    if let Some(sync_attr) = _msg.sync_attribute {
-                        //Incoming connection
-                        if sync_attr {
-                            // request.
-                        }
-                        //Handle disconnections
-                        else {
-                            
+                ClientSyncMessage(_msg) => {
+                    //Handle incoming connections and disconnections, and syncing
+                    if let Some(remote_address) = inbound_connection_address {
+                        if let Some(sync_attr) = _msg.sync_attribute {
+                            //Incoming connection, we should be returning temp uuid
+                            if sync_attr {
+                                match self.connected_clients.lock() {
+                                    Ok(mut clients) => {
+                                        //Search for connected ip in all connected ips
+                                        for client in clients.iter() {
+                                            //If found, then the client is already connected
+                                            if *client == remote_address {
+                                                
+                                            }
+                                        }
+
+                                        //If the ip is not found then add it to connected ip's
+                                        clients.push(remote_address);
+
+                                        //Return uuid
+                                    },
+                                    Err(err) => {dbg!(err);}
+                                }
+                            }
+                            //Handle disconnections
+                            else {
+                                match self.connected_clients.lock() {
+                                    Ok(mut clients) => {
+                                        //Search for connected ip in all connected ips
+                                        for (index, client) in clients.clone().iter().enumerate() {
+                                            //If found, then disconnect the client
+                                            if *client == remote_address {
+                                                clients.remove(index);
+
+                                                //Stop the for loop, for safety
+                                                break;
+                                            }
+                                        }
+                                    },
+                                    Err(err) => {dbg!(err);}
+                                }
+                            }
                         }
                     }
                 }
@@ -263,7 +300,8 @@ pub async fn server_main(
 }
 
 impl MessageService {
-    pub async fn NormalMessage(&self, req: ClientMessage) {
+    /// all the functions the server can do
+    async fn NormalMessage(&self, req: ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
                 ok.push(ServerOutput::convert_type_to_servermsg(
@@ -278,7 +316,7 @@ impl MessageService {
             }
         };
     }
-    pub async fn sync_message(&self) -> Result<Response<MessageResponse>, Status> {
+    async fn sync_message(&self) -> Result<Response<MessageResponse>, Status> {
         //pass matching p100 technology
         let shared_messages = self.messages.lock().unwrap().clone();
 
@@ -291,7 +329,7 @@ impl MessageService {
         let reply = MessageResponse { message: final_msg };
         Ok(Response::new(reply))
     }
-    pub async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
+    async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
         /*
 
             DEPRICATED
@@ -372,14 +410,14 @@ impl MessageService {
             }
         }
     }
-    pub async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
+    async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
         let path = &self.generated_file_paths.lock().unwrap()[index as usize];
         (fs::read(path).unwrap_or_default(), path.clone())
     }
-    pub async fn serve_image(&self, index: i32) -> Vec<u8> {
+    async fn serve_image(&self, index: i32) -> Vec<u8> {
         fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
     }
-    pub async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
+    async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
         match env::var("APPDATA") {
             Ok(app_data) => {
                 let mut image_path = self.image_paths.lock().unwrap();
@@ -426,7 +464,7 @@ impl MessageService {
             }
         }
     }
-    pub async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct) {
+    async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct) {
         let mut audio_paths = self.audio_list.lock().unwrap();
 
         let audio_paths_lenght = audio_paths.len();
@@ -474,13 +512,14 @@ impl MessageService {
             }
         }
     }
-    pub async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
+    async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
         (
             fs::read(&self.audio_list.lock().unwrap()[index as usize]).unwrap_or_default(),
             self.audio_names.lock().unwrap()[index as usize].clone(),
         )
     }
 
+    /// used to handle all the requests, route the user's request
     #[inline]
     pub async fn handle_request(
         &self,
@@ -524,6 +563,7 @@ impl MessageService {
         }
     }
 
+    /// handle all the file uploads
     pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
         //Pattern match on upload tpye so we know how to handle the specific request
         match upload_type.extension.clone().unwrap_or_default().as_str() {
@@ -534,49 +574,36 @@ impl MessageService {
         }
     }
 
+    /// handle reaction requests
+    /// TODO: This function enables a race condition
     pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
         match &mut self.messages.try_lock() {
             Ok(message_vec) => {
+                //Borrow as mutable so we dont have to clone, i hope this fixes the above mentioned race condition
                 for (index, item) in message_vec[reaction.message_index]
-                    .clone()
                     .reactions
                     .message_reactions
-                    .iter()
+                    .iter_mut()
                     .enumerate()
                 {
-                    //Check if it has already been reacted before
+                    //Check if it has already been reacted before, if yes add one to the counter
                     if item.char == reaction.char {
-                        message_vec[reaction.message_index]
-                            .reactions
-                            .message_reactions[index]
-                            .times += 1;
-                    } else {
-                        message_vec[reaction.message_index]
-                            .reactions
-                            .message_reactions
-                            .push(Reaction {
-                                char: reaction.char,
-                                times: 0,
-                            });
-                        break;
+                        item.times += 1;
+
+                        //Quit the function immediately, so we can add the new reaction
+                        return;
                     }
                 }
 
-                //First reaction
-                if message_vec[reaction.message_index]
-                    .clone()
-                    .reactions
-                    .message_reactions
-                    .is_empty()
-                {
-                    message_vec[reaction.message_index]
+                //After we have checked all the reactions if there is already one, we can add out *new* one
+                message_vec[reaction.message_index]
                         .reactions
                         .message_reactions
                         .push(Reaction {
                             char: reaction.char,
-                            times: 0,
-                        })
-                }
+                            //Set default amount, start from 1
+                            times: 1,
+                        });
             }
             Err(err) => println!("{err}"),
         }
