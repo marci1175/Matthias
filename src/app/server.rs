@@ -575,11 +575,10 @@ impl MessageService {
     }
 
     /// handle reaction requests
-    /// TODO: This function enables a race condition
     pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
         match &mut self.messages.try_lock() {
             Ok(message_vec) => {
-                //Borrow as mutable so we dont have to clone, i hope this fixes the above mentioned race condition
+                //Borrow as mutable so we dont have to clone
                 for (index, item) in message_vec[reaction.message_index]
                     .reactions
                     .message_reactions
