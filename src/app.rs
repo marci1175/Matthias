@@ -1,4 +1,5 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
+use std::error::Error;
 use std::fs::{self};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
@@ -366,21 +367,17 @@ impl backend::TemplateApp {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            match client::send_msg(
-                connection,
-                message
-            )
-            .await
-            {
+            match client::send_msg(connection, message).await {
                 Ok(ok) => {
                     match tx.send(ok) {
                         Ok(_) => {}
                         Err(err) => {
-                            println!("{} ln 554", err);
+                            println!("{} ln 376", err);
                         }
                     };
                 }
                 Err(err) => {
+                    dbg!(err.source());
                     dbg!(err);
                 }
             };

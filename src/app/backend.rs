@@ -519,7 +519,7 @@ impl ClientMessage {
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
-        password: &str,
+        password: Option<&str>,
         author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
@@ -528,7 +528,8 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
-            Password: password.to_string(),
+            //If the password is set as None (Meaning the user didnt enter any password) just send the message with an empty string
+            Password: password.unwrap_or("").to_string(),
             Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -537,8 +538,8 @@ impl ClientMessage {
     ///this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_path: PathBuf,
-        password: String,
-        author: String,
+        password: Option<&str>,
+        author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
@@ -559,8 +560,8 @@ impl ClientMessage {
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
 
-            Password: password,
-            Author: author,
+            Password: password.unwrap_or("").to_string(),
+            Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -568,8 +569,8 @@ impl ClientMessage {
     pub fn construct_reaction_msg(
         char: char,
         index: usize,
-        author: String,
-        password: String,
+        author: &str,
+        password: Option<&str>,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -577,8 +578,8 @@ impl ClientMessage {
                 char,
                 message_index: index,
             }),
-            Password: password,
-            Author: author,
+            Password: password.unwrap_or("").to_string(),
+            Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -836,7 +837,7 @@ pub struct ServerOutput {
     pub reactions: MessageReaction,
 }
 impl ServerOutput {
-    pub fn struct_into_string(&self) -> String {
+    pub fn _struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
 

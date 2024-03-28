@@ -135,10 +135,7 @@ impl TemplateApp {
                                                                 .frame(false);
                                                                 if ui.add(button).clicked() {
                                                                     let message = ClientMessage::construct_reaction_msg(
-                                                                        chr, index, self.login_username.clone(), match self.client_ui.req_passw {
-                                                                            true => self.client_ui.client_password.clone(),
-                                                                            false => "".into(),
-                                                                        },
+                                                                        chr, index, &self.login_username, self.client_ui.req_passw.then_some((|| &self.client_ui.client_password)()),
                                                                     );
                                                                     let connection = self.client_connection.clone();
 

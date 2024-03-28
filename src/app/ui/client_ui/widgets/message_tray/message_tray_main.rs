@@ -1,5 +1,4 @@
 use crate::app::backend::{ClientMessage, TemplateApp};
-use crate::app::client::{self};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::{
@@ -84,23 +83,27 @@ impl TemplateApp {
                         if !(self.client_ui.usr_msg.trim().is_empty()
                             || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
                         {
-                            self.send_msg(ClientMessage::construct_normal_msg(&self.client_ui.usr_msg, &self.client_ui.client_password, &self.login_username, self.client_ui.replying_to))
+                            self.send_msg(ClientMessage::construct_normal_msg(
+                                &self.client_ui.usr_msg,
+                                self.client_ui
+                                    .req_passw
+                                    .then_some((|| &self.client_ui.client_password)()),
+                                &self.login_username,
+                                self.client_ui.replying_to,
+                            ))
                         }
-                        
+
                         for file_path in self.client_ui.files_to_send.clone() {
                             //Check for no user fuckery
                             if file_path.exists() {
-
                                 self.send_msg(ClientMessage::construct_file_msg(
                                     file_path,
-                                    match self.client_ui.req_passw {
-                                        true => self.client_ui.client_password.clone(),
-                                        false => "".into(),
-                                    },
-                                    self.login_username.clone(),
+                                    self.client_ui
+                                        .req_passw
+                                        .then_some((|| &self.client_ui.client_password)()),
+                                    &self.login_username,
                                     self.client_ui.replying_to,
                                 ));
-
                             }
                         }
 
@@ -186,44 +189,14 @@ impl TemplateApp {
                                 //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
                                 match self.audio_file.clone().try_lock() {
                                     Ok(ok) => {
-                                        let tx = self.tx.clone();
-                                        let username = self.login_username.clone();
-                                        //disable pass if its not ticked
-                                        let passw = match self.client_ui.req_passw {
-                                            true => self.client_ui.client_password.clone(),
-                                            false => "".into(),
-                                        };
-                                        
-                                        let path_buf = ok.to_path_buf().clone();
-
-                                        let replying_to = self.client_ui.replying_to;
-                                        let connection = self.client_connection.clone();
-        
-                                        tokio::spawn(async move {
-                                            match client::send_msg(
-                                                connection,
-                                                ClientMessage::construct_file_msg(
-                                                    path_buf,
-                                                    passw,
-                                                    username,
-                                                    replying_to,
-                                                ),
-                                            )
-                                            .await
-                                            {
-                                                Ok(ok) => {
-                                                    match tx.send(ok) {
-                                                        Ok(_) => {}
-                                                        Err(err) => {
-                                                            println!("{} ln 156", err);
-                                                        }
-                                                    };
-                                                }
-                                                Err(err) => {
-                                                    dbg!(err);
-                                                }
-                                            };
-                                        });
+                                        self.send_msg(ClientMessage::construct_file_msg(
+                                            ok.to_path_buf().clone(),
+                                            self.client_ui
+                                                .req_passw
+                                                .then_some((|| &self.client_ui.client_password)()),
+                                            &self.login_username,
+                                            self.client_ui.replying_to,
+                                        ));
 
                                         let _ = fs::remove_file(ok.to_path_buf());
                                     }
