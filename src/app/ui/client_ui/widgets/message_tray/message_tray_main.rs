@@ -84,83 +84,23 @@ impl TemplateApp {
                         if !(self.client_ui.usr_msg.trim().is_empty()
                             || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
                         {
-                            let temp_msg = self.client_ui.usr_msg.clone();
-                            let tx = self.tx.clone();
-                            let username = self.login_username.clone();
-                            //disable pass if its not ticked
-                            let passw = match self.client_ui.req_passw {
-                                true => self.client_ui.client_password.clone(),
-                                false => "".into(),
-                            };
-
-                            let replying_to = self.client_ui.replying_to;
-                            let connection = self.client_connection.clone();
-
-                            tokio::spawn(async move {
-                                match client::send_msg(
-                                    connection,
-                                    ClientMessage::construct_normal_msg(
-                                        &temp_msg,
-                                        passw,
-                                        username,
-                                        replying_to,
-                                    ),
-                                )
-                                .await
-                                {
-                                    Ok(ok) => {
-                                        match tx.send(ok) {
-                                            Ok(_) => {}
-                                            Err(err) => {
-                                                println!("{} ln 554", err);
-                                            }
-                                        };
-                                    }
-                                    Err(err) => {
-                                        dbg!(err);
-                                    }
-                                };
-                            });
+                            self.send_msg(ClientMessage::construct_normal_msg(&self.client_ui.usr_msg, &self.client_ui.client_password, &self.login_username, self.client_ui.replying_to))
                         }
+                        
                         for file_path in self.client_ui.files_to_send.clone() {
                             //Check for no user fuckery
                             if file_path.exists() {
-                                let tx = self.tx.clone();
-                                let username = self.login_username.clone();
-                                //disable pass if its not ticked
-                                let passw = match self.client_ui.req_passw {
-                                    true => self.client_ui.client_password.clone(),
-                                    false => "".into(),
-                                };
 
-                                let replying_to = self.client_ui.replying_to;
-                                let connection = self.client_connection.clone();
+                                self.send_msg(ClientMessage::construct_file_msg(
+                                    file_path,
+                                    match self.client_ui.req_passw {
+                                        true => self.client_ui.client_password.clone(),
+                                        false => "".into(),
+                                    },
+                                    self.login_username.clone(),
+                                    self.client_ui.replying_to,
+                                ));
 
-                                tokio::spawn(async move {
-                                    match client::send_msg(
-                                        connection,
-                                        ClientMessage::construct_file_msg(
-                                            file_path,
-                                            passw,
-                                            username,
-                                            replying_to,
-                                        ),
-                                    )
-                                    .await
-                                    {
-                                        Ok(ok) => {
-                                            match tx.send(ok) {
-                                                Ok(_) => {}
-                                                Err(err) => {
-                                                    println!("{} ln 156", err);
-                                                }
-                                            };
-                                        }
-                                        Err(err) => {
-                                            dbg!(err);
-                                        }
-                                    };
-                                });
                             }
                         }
 

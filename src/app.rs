@@ -10,7 +10,7 @@ mod server;
 mod ui;
 
 use self::backend::{
-    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file,
+    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file, ClientMessage,
 };
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
@@ -47,12 +47,12 @@ impl eframe::App for backend::TemplateApp {
         /*devlog:
 
             TODO: fix for audio playback
-            TODO: put groups of relating info from TemplateApp into smaller structs
 
         */
 
         //For image loading
         egui_extras::install_image_loaders(ctx);
+
         //Login Page
         if !(self.main.mode_selector || self.main.server_mode || self.main.client_mode) {
             self.state_login(_frame, ctx);
@@ -357,5 +357,33 @@ impl eframe::App for backend::TemplateApp {
                 // dbg!(_err);
             }
         }
+    }
+}
+
+impl backend::TemplateApp {
+    pub fn send_msg(&self, message: ClientMessage) {
+        let connection = self.client_connection.clone();
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            match client::send_msg(
+                connection,
+                message
+            )
+            .await
+            {
+                Ok(ok) => {
+                    match tx.send(ok) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            println!("{} ln 554", err);
+                        }
+                    };
+                }
+                Err(err) => {
+                    dbg!(err);
+                }
+            };
+        });
     }
 }

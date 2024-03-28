@@ -519,8 +519,8 @@ impl ClientMessage {
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
-        password: String,
-        author: String,
+        password: &str,
+        author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
@@ -528,8 +528,8 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
-            Password: password,
-            Author: author,
+            Password: password.to_string(),
+            Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -725,12 +725,6 @@ impl Debug for ConnectionState {
             ConnectionState::Error => "Error",
         })
     }
-}
-
-///Used to decide what type fo file i want to send client_actions/actions.rs TODO: include this in main
-pub enum ClientSendType {
-    File(Vec<u8>),
-    Message(String),
 }
 
 /*
