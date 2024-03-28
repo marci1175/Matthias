@@ -129,14 +129,15 @@ impl eframe::App for backend::TemplateApp {
                                         let sender = self.connection_sender.clone();
 
                                         let username = self.login_username.clone();
-                                        
+
                                         let password = self.client_ui.client_password.clone();
 
                                         tokio::task::spawn(async move {
-                                            match ClientConnection::connect(format!(
-                                                "http://{}",
-                                                ip
-                                            ), username, password)
+                                            match ClientConnection::connect(
+                                                format!("http://{}", ip),
+                                                username,
+                                                password,
+                                            )
                                             .await
                                             {
                                                 Ok(ok) => {
@@ -202,10 +203,11 @@ impl eframe::App for backend::TemplateApp {
                                         let sender = self.connection_sender.clone();
 
                                         tokio::task::spawn(async move {
-                                            match ClientConnection::connect(format!(
-                                                "http://{}",
-                                                ip
-                                            ), username, password)
+                                            match ClientConnection::connect(
+                                                format!("http://{}", ip),
+                                                username,
+                                                password,
+                                            )
                                             .await
                                             {
                                                 Ok(ok) => {

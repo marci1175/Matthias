@@ -594,7 +594,9 @@ impl ClientMessage {
     pub fn construct_sync_msg(password: String, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {sync_attribute: None}),
+            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+                sync_attribute: None,
+            }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -605,7 +607,9 @@ impl ClientMessage {
     pub fn construct_connection_msg(password: String, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {sync_attribute: Some(true)}),
+            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+                sync_attribute: Some(true),
+            }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -617,7 +621,9 @@ impl ClientMessage {
     pub fn construct_disconnection_msg(password: String, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {sync_attribute: Some(false)}),
+            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+                sync_attribute: Some(false),
+            }),
             Password: password,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -701,14 +707,12 @@ impl ClientConnection {
                 match client_clone
                     .message_main(tonic::Request::new(MessageRequest {
                         message: ClientMessage::construct_connection_msg(password, author)
-                        .struct_into_string(),
+                            .struct_into_string(),
                     }))
                     .await
                 {
                     /*We could return this, this is what the server is supposed to return, when a new user is connected */
-                    Ok(server_reply) => {
-                        Some(client_clone)
-                    },
+                    Ok(server_reply) => Some(client_clone),
                     Err(error) => {
                         std::thread::spawn(move || unsafe {
                             MessageBoxW(
@@ -731,16 +735,17 @@ impl ClientConnection {
 
     ///Used to destroy a current ClientConnection instance does not matter if the instance is invalid
     pub async fn disconnect(&mut self, author: String, password: String) -> anyhow::Result<()> {
-        
         //De-register with the server
-        let client = self.client.as_mut().ok_or(anyhow::Error::msg("Invalid ClientConnection instance (Client is None)"))?;
+        let client = self.client.as_mut().ok_or(anyhow::Error::msg(
+            "Invalid ClientConnection instance (Client is None)",
+        ))?;
 
-        client.message_main(
-            tonic::Request::new(MessageRequest {
+        client
+            .message_main(tonic::Request::new(MessageRequest {
                 message: ClientMessage::construct_disconnection_msg(password, author)
-                .struct_into_string(),
-            })
-        ).await?;
+                    .struct_into_string(),
+            }))
+            .await?;
 
         Ok(())
     }

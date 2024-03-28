@@ -75,9 +75,7 @@ impl TemplateApp {
                                         self.client_ui.client_password.clone(),
                                         self.login_username.clone(),
                                     );
-            
                                     let connection = self.client_connection.clone();
-            
                                     tokio::spawn(async move {
                                         match client::send_msg(connection, message).await {
                                             Ok(ok) => {

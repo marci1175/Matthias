@@ -139,7 +139,7 @@ impl TemplateApp {
                     if button.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
                     };
-                    
+
                     if button.hovered() {
                         if !self.client_ui.random_generated {
                             let random_number = self

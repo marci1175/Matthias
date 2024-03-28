@@ -1,9 +1,12 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use super::{backend::{
-    MessageReaction, Reaction,
-    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
-}, client};
+use super::{
+    backend::{
+        MessageReaction, Reaction,
+        ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+    },
+    client,
+};
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
@@ -79,17 +82,17 @@ impl ServerMessage for MessageService {
                                         //Search for connected ip in all connected ips
                                         for client in clients.iter() {
                                             //If found, then the client is already connected
-                                            if *client == remote_address {
-                                                
-                                            }
+                                            if *client == remote_address {}
                                         }
 
                                         //If the ip is not found then add it to connected ip's
                                         clients.push(remote_address);
 
                                         //Return uuid
-                                    },
-                                    Err(err) => {dbg!(err);}
+                                    }
+                                    Err(err) => {
+                                        dbg!(err);
+                                    }
                                 }
                             }
                             //Handle disconnections
@@ -106,8 +109,10 @@ impl ServerMessage for MessageService {
                                                 break;
                                             }
                                         }
-                                    },
-                                    Err(err) => {dbg!(err);}
+                                    }
+                                    Err(err) => {
+                                        dbg!(err);
+                                    }
                                 }
                             }
                         }
@@ -579,7 +584,7 @@ impl MessageService {
         match &mut self.messages.try_lock() {
             Ok(message_vec) => {
                 //Borrow as mutable so we dont have to clone
-                for (index, item) in message_vec[reaction.message_index]
+                for (_index, item) in message_vec[reaction.message_index]
                     .reactions
                     .message_reactions
                     .iter_mut()
@@ -596,13 +601,13 @@ impl MessageService {
 
                 //After we have checked all the reactions if there is already one, we can add out *new* one
                 message_vec[reaction.message_index]
-                        .reactions
-                        .message_reactions
-                        .push(Reaction {
-                            char: reaction.char,
-                            //Set default amount, start from 1
-                            times: 1,
-                        });
+                    .reactions
+                    .message_reactions
+                    .push(Reaction {
+                        char: reaction.char,
+                        //Set default amount, start from 1
+                        times: 1,
+                    });
             }
             Err(err) => println!("{err}"),
         }
