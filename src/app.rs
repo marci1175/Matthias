@@ -10,7 +10,7 @@ mod server;
 mod ui;
 
 use self::backend::{
-    append_to_file, decrypt_lines_from_vec, delete_line_from_file, read_from_file, ClientMessage,
+    ClientMessage, UserInformation,
 };
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
@@ -297,27 +297,26 @@ impl eframe::App for backend::TemplateApp {
         egui::Window::new("Bookmarks")
             .open(&mut self.main.bookmark_mode)
             .show(ctx, |ui| {
-                if ui.button("Save ip address").clicked() {
-                    match append_to_file(
-                        self.main.opened_account_path.clone(),
-                        self.client_ui.send_on_ip.clone(),
-                    ) {
-                        Ok(_ok) => {}
-                        Err(err) => eprintln!("{err}"),
-                    };
-                };
-
-                ui.separator();
+                
                 ui.label(RichText::from("Saved ip addresses"));
-                match read_from_file(self.main.opened_account_path.clone()) {
-                    Ok(mut ok) => {
-                        //actual decryption happens here, overwrite ok
-                        ok = decrypt_lines_from_vec(ok).unwrap();
+                match UserInformation::deserialize(&fs::read_to_string(self.main.opened_account_path.clone()).unwrap()) {
+                    Ok(mut user_info) => {
+                        
+                        if ui.button("Save ip address").clicked() {
 
+                            user_info.add_bookmark_entry(self.client_ui.send_on_ip.clone());
+
+                            let _ = user_info.write_file(self.main.opened_account_path.clone()).inspect_err(|e| eprintln!("{e}"));
+                        };
+        
+                        ui.separator();
+
+                        let bookmark_entries = user_info.bookmarked_ips.clone();
+                        
                         ui.group(|ui| {
-                            if !ok.is_empty() {
+                            if !bookmark_entries.is_empty() {
                                 egui::ScrollArea::vertical().show(ui, |ui| {
-                                    for (counter, item) in ok.iter().enumerate() {
+                                    for (index, item) in bookmark_entries.iter().enumerate() {
                                         ui.horizontal(|ui| {
                                             if ui.button(RichText::from(item.clone())).clicked() {
                                                 self.client_ui.send_on_ip.clone_from(item);
@@ -329,12 +328,10 @@ impl eframe::App for backend::TemplateApp {
                                                         .button(RichText::from("-").strong())
                                                         .clicked()
                                                     {
-                                                        if let Err(err) = delete_line_from_file(
-                                                            counter + 2,
-                                                            self.main.opened_account_path.clone(),
-                                                        ) {
-                                                            eprintln!("{err}")
-                                                        };
+                                                        user_info.delete_bookmark_entry(index);
+
+                                                        //Dont check if user already exists because we overwrite the file which was already there
+                                                        let _ = user_info.write_file(self.main.opened_account_path.clone()).inspect_err(|e| eprintln!("{e}"));
                                                     }
                                                 },
                                             );
@@ -348,6 +345,7 @@ impl eframe::App for backend::TemplateApp {
                     }
                     Err(err) => eprintln!("{err}"),
                 };
+                
             });
 
         //Connection reciver
