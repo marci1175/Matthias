@@ -388,7 +388,6 @@ impl TemplateApp {
         //Recivers
         match self.rx.try_recv() {
             Ok(mut msg) => {
-                        
                 //Decrypt with client secret
                 msg = decrypt_aes256(&msg, &self.client_connection.client_secret).unwrap();
 

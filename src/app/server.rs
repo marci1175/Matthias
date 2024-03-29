@@ -2,7 +2,8 @@ use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use super::{
     backend::{
-        encrypt_aes256, generate_uuid, MessageReaction, Reaction, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
+        encrypt_aes256, generate_uuid, MessageReaction, Reaction,
+        ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
     },
     client,
 };
@@ -361,8 +362,10 @@ impl MessageService {
         let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
 
         //Wrap final reply
-        let reply = MessageResponse { message: encrypted_msg };
-        
+        let reply = MessageResponse {
+            message: encrypted_msg,
+        };
+
         Ok(Response::new(reply))
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {

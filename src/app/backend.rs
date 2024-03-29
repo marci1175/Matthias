@@ -211,7 +211,7 @@ impl Default for TemplateApp {
             font_size: 20.,
 
             //emoji button
-            
+
             //thread communication for client
             rx,
             tx,
@@ -727,8 +727,8 @@ impl ClientConnection {
             Ok(server_reply) => {
                 let msg = server_reply.into_inner().message;
 
-                ensure!(msg != "Invalid Password!", "Invalid Password!");
-
+                ensure!(msg != "Invalid Password!", "Invalid password!");
+                ensure!(msg != "Invalid Client!", "Outdated client or connection!");
                 //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
                 client_secret = hex::decode(msg)?;
 
