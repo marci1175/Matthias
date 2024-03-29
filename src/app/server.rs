@@ -2,7 +2,7 @@ use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use super::{
     backend::{
-        MessageReaction, Reaction,
+        generate_uuid, MessageReaction, Reaction,
         ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
     },
     client,
@@ -67,12 +67,13 @@ impl ServerMessage for MessageService {
         let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
         let req: ClientMessage = req_result.unwrap();
+
         if req.Password == self.passw.trim() {
             match &req.MessageType {
                 ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 
                 ClientSyncMessage(_msg) => {
-                    //Handle incoming connections and disconnections, and syncing
+                    //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
                     if let Some(remote_address) = inbound_connection_address {
                         if let Some(sync_attr) = _msg.sync_attribute {
                             //Incoming connection, we should be returning temp uuid
@@ -89,6 +90,9 @@ impl ServerMessage for MessageService {
                                         clients.push(remote_address);
 
                                         //Return uuid
+                                        return Ok(Response::new(MessageResponse {
+                                            message: generate_uuid(),
+                                        }));
                                     }
                                     Err(err) => {
                                         dbg!(err);
@@ -117,6 +121,8 @@ impl ServerMessage for MessageService {
                             }
                         }
                     }
+
+                    //else: we dont do anything because we return the updated message list in the end
                 }
 
                 ClientFileRequestType(request_type) => {
@@ -132,6 +138,7 @@ impl ServerMessage for MessageService {
                 }
             };
 
+            //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
             return self.sync_message().await;
         } else {
             return Ok(Response::new(MessageResponse {
