@@ -64,17 +64,27 @@ impl ServerMessage for MessageService {
         request: Request<MessageRequest>,
     ) -> Result<Response<MessageResponse>, Status> {
         let inbound_connection_address = request.remote_addr();
+
         let req_result: Result<ClientMessage, serde_json::Error> =
             serde_json::from_str(&request.into_inner().message);
+
         let req: ClientMessage = req_result.unwrap();
 
-        if req.Password == self.passw.trim() {
-            match &req.MessageType {
-                ClientNormalMessage(_msg) => self.NormalMessage(req).await,
+        if let Some(remote_address) = inbound_connection_address {
+            if req.Password == self.passw.trim()
+                || self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
+                    .connected_clients
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|client| *client == remote_address)
+            //Search through the list
+            {
+                match &req.MessageType {
+                    ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 
-                ClientSyncMessage(_msg) => {
-                    //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
-                    if let Some(remote_address) = inbound_connection_address {
+                    ClientSyncMessage(_msg) => {
+                        //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
                         if let Some(sync_attr) = _msg.sync_attribute {
                             //Incoming connection, we should be returning temp uuid
                             if sync_attr {
@@ -89,10 +99,10 @@ impl ServerMessage for MessageService {
                                         //If the ip is not found then add it to connected ip's
                                         clients.push(remote_address);
 
-                                        //Return uuid
-                                        return Ok(Response::new(MessageResponse {
-                                            message: generate_uuid(),
-                                        }));
+                                        //TODO: Return custom which will the server's text will be encrypted with, GONDOLKOZZ MARCELL GONDOLKOZZ FASZFEJŰ
+                                        // return Ok(Response::new(MessageResponse {
+                                        //     message: generate_uuid(),
+                                        // }));
                                     }
                                     Err(err) => {
                                         dbg!(err);
@@ -120,29 +130,33 @@ impl ServerMessage for MessageService {
                                 }
                             }
                         }
+
+                        //else: we dont do anything because we return the updated message list in the end
                     }
 
-                    //else: we dont do anything because we return the updated message list in the end
-                }
+                    ClientFileRequestType(request_type) => {
+                        return self.handle_request(request_type).await;
+                    }
 
-                ClientFileRequestType(request_type) => {
-                    return self.handle_request(request_type).await;
-                }
+                    ClientFileUpload(upload_type) => {
+                        self.handle_upload(req.clone(), upload_type).await;
+                    }
 
-                ClientFileUpload(upload_type) => {
-                    self.handle_upload(req.clone(), upload_type).await;
-                }
+                    ClientReaction(reaction) => {
+                        self.handle_reaction(reaction).await;
+                    }
+                };
 
-                ClientReaction(reaction) => {
-                    self.handle_reaction(reaction).await;
-                }
-            };
-
-            //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-            return self.sync_message().await;
+                //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
+                return self.sync_message().await;
+            } else {
+                return Ok(Response::new(MessageResponse {
+                    message: "Invalid Password!".into(),
+                }));
+            }
         } else {
             return Ok(Response::new(MessageResponse {
-                message: "Invalid Password!".into(),
+                message: "Invalid Client!".into(),
             }));
         }
     }

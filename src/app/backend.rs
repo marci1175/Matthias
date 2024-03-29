@@ -1172,7 +1172,9 @@ impl UserInformation {
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
     pub fn deserialize(serialized_struct: &str) -> anyhow::Result<Self> {
-        Ok(serde_json::from_str::<Self>(&decrypt_aes256(serialized_struct).unwrap())?)
+        Ok(serde_json::from_str::<Self>(
+            &decrypt_aes256(serialized_struct).unwrap(),
+        )?)
     }
 
     /// Write file to the specified path
@@ -1188,13 +1190,15 @@ impl UserInformation {
         Ok(())
     }
 
+    /// Add a bookmark entry which can be converted to a string
     pub fn add_bookmark_entry<T>(&mut self, item: T)
     where
-    T: ToString
+        T: ToString,
     {
         self.bookmarked_ips.push(item.to_string());
     }
 
+    /// Remove bookmark at index from the list, this can panic if the wrong index is passed in
     pub fn delete_bookmark_entry(&mut self, index: usize) {
         self.bookmarked_ips.remove(index);
     }
@@ -1264,7 +1268,7 @@ pub fn login(username: String, password: String) -> Result<PathBuf> {
     let user_check = username == file_contents.username;
 
     ensure!(user_check, "File corrupted at the username entry");
-    
+
     let password_check = file_contents.verify_password(password);
 
     ensure!(password_check, "Invalid password");
@@ -1287,11 +1291,8 @@ pub fn register(username: String, passw: String) -> anyhow::Result<()> {
     }
 
     //Construct user info struct then write it to the appdata matthias folder
-    UserInformation::new(
-        username,
-        passw,
-        encrypt_aes256(generate_uuid()).unwrap(),
-    ).write_file(user_path)?;
+    UserInformation::new(username, passw, encrypt_aes256(generate_uuid()).unwrap())
+        .write_file(user_path)?;
 
     Ok(())
 }

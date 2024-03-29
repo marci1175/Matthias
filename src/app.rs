@@ -9,9 +9,7 @@ mod client;
 mod server;
 mod ui;
 
-use self::backend::{
-    ClientMessage, UserInformation,
-};
+use self::backend::{ClientMessage, UserInformation};
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
 
@@ -297,22 +295,23 @@ impl eframe::App for backend::TemplateApp {
         egui::Window::new("Bookmarks")
             .open(&mut self.main.bookmark_mode)
             .show(ctx, |ui| {
-                
                 ui.label(RichText::from("Saved ip addresses"));
-                match UserInformation::deserialize(&fs::read_to_string(self.main.opened_account_path.clone()).unwrap()) {
+                match UserInformation::deserialize(
+                    &fs::read_to_string(self.main.opened_account_path.clone()).unwrap(),
+                ) {
                     Ok(mut user_info) => {
-                        
                         if ui.button("Save ip address").clicked() {
-
                             user_info.add_bookmark_entry(self.client_ui.send_on_ip.clone());
 
-                            let _ = user_info.write_file(self.main.opened_account_path.clone()).inspect_err(|e| eprintln!("{e}"));
+                            let _ = user_info
+                                .write_file(self.main.opened_account_path.clone())
+                                .inspect_err(|e| eprintln!("{e}"));
                         };
-        
+
                         ui.separator();
 
                         let bookmark_entries = user_info.bookmarked_ips.clone();
-                        
+
                         ui.group(|ui| {
                             if !bookmark_entries.is_empty() {
                                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -331,7 +330,13 @@ impl eframe::App for backend::TemplateApp {
                                                         user_info.delete_bookmark_entry(index);
 
                                                         //Dont check if user already exists because we overwrite the file which was already there
-                                                        let _ = user_info.write_file(self.main.opened_account_path.clone()).inspect_err(|e| eprintln!("{e}"));
+                                                        let _ = user_info
+                                                            .write_file(
+                                                                self.main
+                                                                    .opened_account_path
+                                                                    .clone(),
+                                                            )
+                                                            .inspect_err(|e| eprintln!("{e}"));
                                                     }
                                                 },
                                             );
@@ -345,7 +350,6 @@ impl eframe::App for backend::TemplateApp {
                     }
                     Err(err) => eprintln!("{err}"),
                 };
-                
             });
 
         //Connection reciver
