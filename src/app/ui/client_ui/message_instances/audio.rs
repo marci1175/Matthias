@@ -28,12 +28,6 @@ impl TemplateApp {
         )));
 
         if let ServerMessageType::Audio(audio) = &item.MessageType {
-            let path = PathBuf::from(format!(
-                "{}\\Matthias\\Client\\{}\\Audios\\{}",
-                env!("APPDATA"),
-                self.client_ui.send_on_ip_base64_encoded,
-                audio.index
-            ));
             ui.allocate_ui(vec2(300., 150.), |ui| {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     match self.client_ui.audio_playback.sink_list[current_index_in_message_list]

@@ -1,4 +1,5 @@
 use egui::{vec2, Align, Color32, Layout, RichText};
+use tap::TapFallible;
 use std::fs::{self};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
@@ -347,7 +348,7 @@ impl eframe::App for backend::TemplateApp {
 
                             let _ = user_info
                                 .write_file(self.main.opened_account_path.clone())
-                                .inspect_err(|e| eprintln!("{e}"));
+                                .tap_err_dbg(|err| tracing::error!("{err}"));
                         };
 
                         ui.separator();
@@ -378,7 +379,7 @@ impl eframe::App for backend::TemplateApp {
                                                                     .opened_account_path
                                                                     .clone(),
                                                             )
-                                                            .inspect_err(|e| eprintln!("{e}"));
+                                                            .tap_err_dbg(|err| tracing::error!("{err}"));
                                                     }
                                                 },
                                             );

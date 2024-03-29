@@ -1,12 +1,11 @@
-use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
 
-use super::{
+use super::
     backend::{
-        encrypt_aes256, generate_uuid, MessageReaction, Reaction,
+        encrypt_aes256, MessageReaction, Reaction,
         ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
-    },
-    client,
-};
+    };
+    
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
@@ -108,7 +107,7 @@ impl ServerMessage for MessageService {
 
                                         //TODO: Return custom which will the server's text will be encrypted with, GONDOLKOZZ MARCELL GONDOLKOZZ FASZFEJŰ
                                         return Ok(Response::new(MessageResponse {
-                                            message: hex::encode(self.decryption_key.clone()),
+                                            message: hex::encode(self.decryption_key),
                                         }));
                                     }
                                     Err(err) => {
@@ -618,11 +617,10 @@ impl MessageService {
         match &mut self.messages.try_lock() {
             Ok(message_vec) => {
                 //Borrow as mutable so we dont have to clone
-                for (_index, item) in message_vec[reaction.message_index]
+                for item in message_vec[reaction.message_index]
                     .reactions
                     .message_reactions
                     .iter_mut()
-                    .enumerate()
                 {
                     //Check if it has already been reacted before, if yes add one to the counter
                     if item.char == reaction.char {

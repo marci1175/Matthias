@@ -7,7 +7,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key,
 };
-use anyhow::{ensure, Context, Result};
+use anyhow::{ensure, Result};
 use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -729,6 +729,7 @@ impl ClientConnection {
 
                 ensure!(msg != "Invalid Password!", "Invalid password!");
                 ensure!(msg != "Invalid Client!", "Outdated client or connection!");
+
                 //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
                 client_secret = hex::decode(msg)?;
 
@@ -751,8 +752,8 @@ impl ClientConnection {
         };
 
         Ok(Self {
-            client: client,
-            client_secret: client_secret,
+            client,
+            client_secret,
             state: ConnectionState::Connected,
         })
     }
@@ -1205,9 +1206,9 @@ impl UserInformation {
     pub fn write_file(&self, user_path: PathBuf) -> anyhow::Result<()> {
         let serialized_self = self.serialize()?;
 
-        let mut file = fs::File::create(&user_path)?;
+        let mut file = fs::File::create(user_path)?;
 
-        file.write_all(&mut serialized_self.as_bytes())?;
+        file.write_all(serialized_self.as_bytes())?;
 
         file.flush()?;
 

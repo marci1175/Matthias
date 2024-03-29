@@ -9,7 +9,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "arg",
- "base64 0.21.7",
+ "base64 0.22.0",
  "chrono",
  "clap",
  "clap_derive",
@@ -39,10 +39,12 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
+ "tap",
  "tokio",
  "tonic",
  "tonic-build 0.10.2",
  "tonic-build 0.7.2",
+ "tracing",
  "unicode_names2",
  "uuid",
  "wasm-bindgen-futures",
@@ -727,6 +729,12 @@ name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
+name = "base64"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
 
 [[package]]
 name = "bindgen"
@@ -4607,6 +4615,12 @@ checksum = "a327282c4f64f6dc37e3bba4c2b6842cc3a992f204fa58d917696a89f691e5f6"
 dependencies = [
  "unicode-width",
 ]
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "target-lexicon"
