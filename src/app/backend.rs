@@ -211,6 +211,7 @@ impl Default for TemplateApp {
             font_size: 20.,
 
             //emoji button
+            
             //thread communication for client
             rx,
             tx,
@@ -691,44 +692,67 @@ pub struct ClientConnection {
     #[serde(skip)]
     pub client: Option<MessageClient<Channel>>,
     #[serde(skip)]
+    pub client_secret: Vec<u8>,
+    #[serde(skip)]
     pub state: ConnectionState,
 }
 
 impl ClientConnection {
     ///Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
-    pub async fn connect(ip: String, author: String, password: String) -> anyhow::Result<Self> {
+    pub async fn connect(
+        ip: String,
+        author: String,
+        password: Option<String>,
+    ) -> anyhow::Result<Self> {
+        //Ping server to recive custom uuid, and to also get if server ip is valid
+        let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
+
+        //This will later get modified
+        let mut client_secret: Vec<u8> = Vec::new();
+
+        let mut client_clone = client.clone();
+
+        let client = match client_clone
+            .message_main(tonic::Request::new(MessageRequest {
+                //If its set to none then use a String::defult(), which is nothing
+                message: ClientMessage::construct_connection_msg(
+                    password.unwrap_or(String::from("")),
+                    author,
+                )
+                .struct_into_string(),
+            }))
+            .await
+        {
+            /*We could return this, this is what the server is supposed to return, when a new user is connected */
+            Ok(server_reply) => {
+                let msg = server_reply.into_inner().message;
+
+                ensure!(msg != "Invalid Password!", "Invalid Password!");
+
+                //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
+                client_secret = hex::decode(msg)?;
+
+                Some(client_clone)
+            }
+            Err(error) => {
+                std::thread::spawn(move || unsafe {
+                    MessageBoxW(
+                        0,
+                        str::encode_utf16(error.to_string().as_str())
+                            .chain(std::iter::once(0))
+                            .collect::<Vec<_>>()
+                            .as_ptr(),
+                        w!("Error"),
+                        MB_ICONERROR,
+                    );
+                });
+                None
+            }
+        };
+
         Ok(Self {
-            client: {
-                //Ping server to recive custom uuid, and to also get if server ip is valid
-                let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
-
-                let mut client_clone = client.clone();
-
-                match client_clone
-                    .message_main(tonic::Request::new(MessageRequest {
-                        message: ClientMessage::construct_connection_msg(password, author)
-                            .struct_into_string(),
-                    }))
-                    .await
-                {
-                    /*We could return this, this is what the server is supposed to return, when a new user is connected */
-                    Ok(server_reply) => Some(client_clone),
-                    Err(error) => {
-                        std::thread::spawn(move || unsafe {
-                            MessageBoxW(
-                                0,
-                                str::encode_utf16(error.to_string().as_str())
-                                    .chain(std::iter::once(0))
-                                    .collect::<Vec<_>>()
-                                    .as_ptr(),
-                                w!("Error"),
-                                MB_ICONERROR,
-                            );
-                        });
-                        None
-                    }
-                }
-            },
+            client: client,
+            client_secret: client_secret,
             state: ConnectionState::Connected,
         })
     }
@@ -1167,13 +1191,13 @@ impl UserInformation {
 
     /// This serializer function automaticly encrypts the struct with the *encrypt_aes256* fn to string
     pub fn serialize(&self) -> anyhow::Result<String> {
-        Ok(encrypt_aes256(serde_json::to_string(&self)?).unwrap())
+        Ok(encrypt_aes256(serde_json::to_string(&self)?, &[42; 32]).unwrap())
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
     pub fn deserialize(serialized_struct: &str) -> anyhow::Result<Self> {
         Ok(serde_json::from_str::<Self>(
-            &decrypt_aes256(serialized_struct).unwrap(),
+            &decrypt_aes256(serialized_struct, &[42; 32]).unwrap(),
         )?)
     }
 
@@ -1206,9 +1230,8 @@ impl UserInformation {
 
 #[inline]
 /// aes256 is decrypted by this function by a fixed key
-fn decrypt_aes256(string_to_be_decrypted: &str) -> Result<String, FromUtf8Error> {
+pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> Result<String, FromUtf8Error> {
     let ciphertext = hex::decode(string_to_be_decrypted).unwrap();
-    let key: &[u8] = &[42; 32];
 
     let key = Key::<Aes256Gcm>::from_slice(key);
 
@@ -1220,9 +1243,7 @@ fn decrypt_aes256(string_to_be_decrypted: &str) -> Result<String, FromUtf8Error>
 }
 
 /// aes256 is encrypted by this function by a fixed key
-fn encrypt_aes256(string_to_be_encrypted: String) -> aes_gcm::aead::Result<String> {
-    let key: &[u8] = &[42; 32];
-
+pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> aes_gcm::aead::Result<String> {
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
@@ -1291,8 +1312,12 @@ pub fn register(username: String, passw: String) -> anyhow::Result<()> {
     }
 
     //Construct user info struct then write it to the appdata matthias folder
-    UserInformation::new(username, passw, encrypt_aes256(generate_uuid()).unwrap())
-        .write_file(user_path)?;
+    UserInformation::new(
+        username,
+        passw,
+        encrypt_aes256(generate_uuid(), &[42; 32]).unwrap(),
+    )
+    .write_file(user_path)?;
 
     Ok(())
 }

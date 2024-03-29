@@ -2,8 +2,7 @@ use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use super::{
     backend::{
-        generate_uuid, MessageReaction, Reaction,
-        ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+        encrypt_aes256, generate_uuid, MessageReaction, Reaction, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
     },
     client,
 };
@@ -34,30 +33,37 @@ pub mod messages {
 
 #[derive(Debug, Default)]
 pub struct MessageService {
+    ///Contains all the messages
     pub messages: Mutex<Vec<ServerOutput>>,
+
+    ///This is the required password by the server
     pub passw: String,
 
-    //files
+    ///files
     pub generated_file_paths: Mutex<Vec<PathBuf>>,
 
-    //file_names
+    ///file_names
     pub original_file_paths: Mutex<Vec<PathBuf>>,
 
-    //images
+    ///images
     pub image_paths: Mutex<Vec<PathBuf>>,
 
-    //audio list
+    ///audio list
     pub audio_list: Mutex<Vec<PathBuf>>,
 
-    //audio name list
+    ///audio name list
     pub audio_names: Mutex<Vec<Option<String>>>,
 
-    //connected clients
+    ///connected clients
     pub connected_clients: Mutex<Vec<SocketAddr>>,
+
+    ///Client secret
+    pub decryption_key: [u8; 32],
 }
 
 #[tonic::async_trait]
 impl ServerMessage for MessageService {
+    ///MessageResponse contains the serialized info (String)
     #[inline]
     async fn message_main(
         &self,
@@ -100,9 +106,9 @@ impl ServerMessage for MessageService {
                                         clients.push(remote_address);
 
                                         //TODO: Return custom which will the server's text will be encrypted with, GONDOLKOZZ MARCELL GONDOLKOZZ FASZFEJŰ
-                                        // return Ok(Response::new(MessageResponse {
-                                        //     message: generate_uuid(),
-                                        // }));
+                                        return Ok(Response::new(MessageResponse {
+                                            message: hex::encode(self.decryption_key.clone()),
+                                        }));
                                     }
                                     Err(err) => {
                                         dbg!(err);
@@ -314,6 +320,8 @@ pub async fn server_main(
 
     let msg_service = MessageService {
         passw: password,
+        // Extremely important to set the right lenght to the key!!!!!!!!!!!!
+        decryption_key: rand::random::<[u8; 32]>(),
         ..Default::default()
     };
 
@@ -350,9 +358,11 @@ impl MessageService {
 
         let final_msg: String = server_master.struct_into_string();
 
-        // Wait for the spawned thread to finish
+        let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
 
-        let reply = MessageResponse { message: final_msg };
+        //Wrap final reply
+        let reply = MessageResponse { message: encrypted_msg };
+        
         Ok(Response::new(reply))
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {

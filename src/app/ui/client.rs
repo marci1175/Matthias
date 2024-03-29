@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::app::backend::{write_audio, write_file, write_image};
+use crate::app::backend::{decrypt_aes256, write_audio, write_file, write_image};
 
 use crate::app::backend::{
     ClientMessage, SearchType, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster,
@@ -387,12 +387,17 @@ impl TemplateApp {
 
         //Recivers
         match self.rx.try_recv() {
-            Ok(msg) => {
+            Ok(mut msg) => {
+                        
+                //Decrypt with client secret
+                msg = decrypt_aes256(&msg, &self.client_connection.client_secret).unwrap();
+
                 let incoming_struct: Result<ServerMaster, serde_json::Error> =
                     serde_json::from_str(&msg);
                 match incoming_struct {
                     Ok(ok) => {
                         self.client_ui.invalid_password = false;
+
                         self.client_ui.incoming_msg = ok;
                     }
                     Err(_error) => {

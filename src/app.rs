@@ -104,12 +104,46 @@ impl eframe::App for backend::TemplateApp {
                                 ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                             });
 
+                            let username = self.login_username.clone();
+
+                            let mut connection = self.client_connection.clone();
+
+                            let password = self.client_ui.client_password.clone();
+
                             match self.client_connection.state {
                                 ConnectionState::Connected => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
                                     {
+                                        //Disconnect from server
+                                        tokio::task::spawn(async move {
+                                            match ClientConnection::disconnect(
+                                                &mut connection,
+                                                username,
+                                                password,
+                                            )
+                                            .await
+                                            {
+                                                Ok(_) => {}
+                                                Err(err) => {
+                                                    std::thread::spawn(move || unsafe {
+                                                        MessageBoxW(
+                                                            0,
+                                                            str::encode_utf16(
+                                                                err.to_string().as_str(),
+                                                            )
+                                                            .chain(std::iter::once(0))
+                                                            .collect::<Vec<_>>()
+                                                            .as_ptr(),
+                                                            w!("Error"),
+                                                            MB_ICONERROR,
+                                                        );
+                                                    });
+                                                }
+                                            };
+                                        });
+
                                         //Reset client
                                         self.client_connection.client = None;
                                         self.client_ui.incoming_msg = ServerMaster::default();
@@ -128,7 +162,11 @@ impl eframe::App for backend::TemplateApp {
 
                                         let username = self.login_username.clone();
 
-                                        let password = self.client_ui.client_password.clone();
+                                        let password = self
+                                            .client_ui
+                                            .req_passw
+                                            .then_some((|| &self.client_ui.client_password)())
+                                            .cloned();
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
@@ -196,7 +234,11 @@ impl eframe::App for backend::TemplateApp {
                                         let ip = self.client_ui.send_on_ip.clone();
 
                                         let username = self.login_username.clone();
-                                        let password = self.client_ui.client_password.clone();
+                                        let password = self
+                                            .client_ui
+                                            .req_passw
+                                            .then_some((|| &self.client_ui.client_password)())
+                                            .cloned();
 
                                         let sender = self.connection_sender.clone();
 
