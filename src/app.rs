@@ -1,6 +1,7 @@
+use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
-use tap::TapFallible;
 use std::fs::{self};
+use tap::TapFallible;
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
 
@@ -157,6 +158,11 @@ impl eframe::App for backend::TemplateApp {
                                 }
                                 ConnectionState::Disconnected => {
                                     if ui.button("Connect").clicked() {
+                                        //Set global variable
+                                        self.client_ui.send_on_ip_base64_encoded =
+                                            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                                                .encode(self.client_ui.send_on_ip.clone());
+
                                         let ip = self.client_ui.send_on_ip.clone();
 
                                         let sender = self.connection_sender.clone();
@@ -379,7 +385,9 @@ impl eframe::App for backend::TemplateApp {
                                                                     .opened_account_path
                                                                     .clone(),
                                                             )
-                                                            .tap_err_dbg(|err| tracing::error!("{err}"));
+                                                            .tap_err_dbg(|err| {
+                                                                tracing::error!("{err}")
+                                                            });
                                                     }
                                                 },
                                             );

@@ -160,9 +160,9 @@ impl TemplateApp {
                                             ctx.copy_text(i.clone());
                                         };
                                 });
-                                if let Some(message_group) = message_group {
-                                    message_instances.push(message_group.response);
-                                }
+                                
+                                message_instances.push(message_group);
+
 
                             };
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {

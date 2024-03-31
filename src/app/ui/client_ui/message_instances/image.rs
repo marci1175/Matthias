@@ -1,5 +1,3 @@
-use base64::engine::general_purpose;
-use base64::Engine;
 use egui::{vec2, Align2, Area, Color32, Context, Sense};
 
 use std::fs::{self};
@@ -29,7 +27,7 @@ impl TemplateApp {
             Color32::from_rgba_premultiplied(0, 0, 0, 180),
         );
 
-        Area::new("image_overlay".into())
+        Area::new("image_overlay")
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .show(ctx, |ui| {
@@ -53,7 +51,8 @@ impl TemplateApp {
                     },
                 );
             });
-        Area::new("image_overlay_exit".into())
+
+        Area::new("image_overlay_exit")
             .movable(false)
             .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
             .show(ctx, |ui| {
@@ -69,6 +68,7 @@ impl TemplateApp {
                 })
             });
     }
+
     pub fn image_message_instance(
         &mut self,
         item: &crate::app::backend::ServerOutput,
@@ -76,9 +76,6 @@ impl TemplateApp {
         ctx: &Context,
     ) {
         if let ServerMessageType::Image(picture) = &item.MessageType {
-            self.client_ui.send_on_ip_base64_encoded =
-                general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
-
             let path = PathBuf::from(format!(
                 "{}\\Matthias\\Client\\{}\\Images\\{}",
                 env!("APPDATA"),

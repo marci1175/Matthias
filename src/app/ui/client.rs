@@ -2,6 +2,7 @@ use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
     Stroke,
 };
+use rodio::Decoder;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -97,7 +98,7 @@ impl TemplateApp {
                 );
 
                 //Draw rectangle in the middle where the text also appears
-                Area::new("warning_overlay".into()).show(ctx, |ui| {
+                Area::new("warning_overlay").show(ctx, |ui| {
                     ui.painter().rect(
                         egui::Rect {
                             min: Pos2::new(
@@ -364,7 +365,7 @@ impl TemplateApp {
         };
 
         //message box expanded
-        Area::new("usr_msg_expand".into())
+        Area::new("usr_msg_expand")
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.client_ui.usr_msg_expanded {
@@ -443,10 +444,32 @@ impl TemplateApp {
         }
 
         match self.audio_save_rx.try_recv() {
-            Ok(msg) => {
-                let file_serve: Result<ServerAudioReply, serde_json::Error> =
-                    serde_json::from_str(&msg);
-                let _ = write_audio(file_serve.unwrap(), self.client_ui.send_on_ip.clone());
+            Ok((sink, cursor, index)) => {
+                self.client_ui.audio_playback.sink_list[index] = sink;
+
+                let sink = self.client_ui.audio_playback.sink_list[index]
+                    .as_mut()
+                    .unwrap();
+
+                let source = Decoder::new(
+                    cursor.clone(), /*We can assume its always Some because we just set it to some above (lol)*/
+                );
+
+                match source {
+                    Ok(source) => {
+                        sink.append(source);
+                        sink.play();
+                    }
+                    Err(err) => {
+                        dbg!(err);
+                    }
+                }
+
+                self.client_ui.audio_playback.settings_list[index].cursor =
+                    cursor;
+
+                //Reset button state so it can be used again
+                self.client_ui.audio_playback.settings_list[index].is_loading = false;
             }
             Err(_err) => {}
         }

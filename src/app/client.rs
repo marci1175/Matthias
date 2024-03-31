@@ -17,7 +17,8 @@ pub async fn send_msg(
     if let Some(mut client) = connection.client.clone() {
         let request = tonic::Request::new(MessageRequest {
             message: message.struct_into_string(),
-        }).tap_dbg(|msg| tracing::debug!("{msg:?}"));
+        })
+        .tap_dbg(|msg| tracing::debug!("{msg:?}"));
 
         let response = client.message_main(request).await?.into_inner().clone();
 

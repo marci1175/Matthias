@@ -1,17 +1,15 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
 
-use super::
-    backend::{
-        encrypt_aes256, MessageReaction, Reaction,
-        ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
-    };
-    
+use super::backend::{
+    encrypt_aes256, MessageReaction, Reaction,
+    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+};
+
 use messages::{
     message_server::{Message as ServerMessage, MessageServer},
     MessageRequest, MessageResponse,
 };
 use rand::Rng;
-use tap::Tap;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 
