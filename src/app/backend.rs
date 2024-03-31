@@ -12,7 +12,7 @@ use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
-use rodio::{OutputStream, OutputStreamHandle, Sink};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -247,7 +247,7 @@ impl TemplateApp {
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
     ///Search parameters set by user, to chose what to search for obviously
-    pub search_parameters: SearchType,
+    pub search_parameter: SearchType,
 
     ///Check if search panel settings panel (xd) is open
     #[serde(skip)]
@@ -357,7 +357,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
-            search_parameters: SearchType::default(),
+            search_parameter: SearchType::default(),
             search_settings_panel: false,
             search_buffer: String::new(),
             search_mode: false,
@@ -1025,11 +1025,12 @@ pub struct AudioSettings {
     pub speed: f32,
     ///Reader cursor, for reading the sound file
     pub cursor: PlaybackCursor,
-    ///__UNUSED__
-    pub cursor_offset: u64,
 
     ///This is only for ui usage
     pub is_loading: bool,
+
+    ///Cursor position
+    pub cursor_position: u64,
 }
 
 ///Initialize default values
@@ -1039,8 +1040,8 @@ impl Default for AudioSettings {
             volume: 0.8,
             speed: 1.,
             cursor: PlaybackCursor::new(Vec::new()),
-            cursor_offset: 0,
             is_loading: false,
+            cursor_position: 0,
         }
     }
 }

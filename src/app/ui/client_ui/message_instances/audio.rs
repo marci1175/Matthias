@@ -1,5 +1,5 @@
 use egui::{vec2, Align, Layout};
-use rodio::{Decoder, Sink};
+use rodio::{Decoder, Sink, Source};
 use std::path::PathBuf;
 use tap::{Tap, TapFallible};
 
@@ -26,20 +26,56 @@ impl TemplateApp {
                 "\\Audios"
             )));
 
+            //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
+            let file = PathBuf::from(format!(
+                "{}\\Matthias\\Client\\{}\\Audios\\{}",
+                env!("APPDATA"),
+                self.client_ui.send_on_ip_base64_encoded,
+                audio.index
+            ));
+
             ui.allocate_ui(vec2(300., 150.), |ui| {
                 ui.with_layout(Layout::top_down(Align::Center), |ui| {
                     match self.client_ui.audio_playback.sink_list[current_index_in_message_list]
                         .as_mut()
                     {
                         Some(sink) => match sink.is_paused() {
+                            //Audio is stopped
                             true => {
                                 if ui.button("Play").clicked() {
                                     sink.play();
                                 };
                             }
+                            //Audio is running
                             false => {
                                 //ui.label(format!("{:?}", self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap().remaining_slice().len()));
                                 //let cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
+
+                                //Display cursor placement
+                                let mut cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
+
+                                //Construct new decoder
+                                if let Ok(decoder) = Decoder::new(self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.clone()) {
+                                    ui.label(format!("{:?}/{:?}", cursor.position(), cursor.clone().into_inner().len()));
+
+                                    let bitrate = (decoder.sample_rate() * decoder.channels() as u32) as u64;
+
+                                    dbg!(bitrate);
+
+                                    //Always set the cursor_pos to the cursor's position as a temp value
+                                    let mut cursor_pos = cursor.position() / bitrate;
+
+                                    //If it has been changed, then change the real cursors position too
+                                    if ui.add(
+                                        egui::Slider::new(&mut cursor_pos, 0..=cursor.clone().into_inner().len() as u64 / bitrate).show_value(false).text("Set player")
+                                    ).changed() {
+                                        //Set cursor poition
+                                        cursor.set_position(cursor_pos);
+                                    };
+                                
+                                };
+
+                                
                                 if ui.button("Stop").clicked() {
                                     sink.pause();
                                 }
@@ -57,13 +93,6 @@ impl TemplateApp {
                             //This should be enabled when the audio isnt loading
                             ui.add_enabled_ui(!is_loading, |ui| {
                                 if ui.button("Play").clicked() {
-                                    let file = PathBuf::from(format!(
-                                        "{}\\Matthias\\Client\\{}\\Audios\\{}",
-                                        env!("APPDATA"),
-                                        self.client_ui.send_on_ip_base64_encoded,
-                                        audio.index
-                                    ));
-
                                     //If the user has clicked the play button only then we download the desirted audio file! Great optimisation
                                     if !file.exists() {
                                         let sender = self.audio_save_tx.clone();
@@ -119,7 +148,6 @@ impl TemplateApp {
                                                         .tap_err_dbg(|dbg| {
                                                             tracing::error!("{dbg:?}")
                                                         });
-                                                    
                                                 }
                                             }
                                         });
