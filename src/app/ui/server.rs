@@ -1,9 +1,5 @@
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
-
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
-
-use crate::app::backend::TemplateApp;
+use crate::app::backend::{display_error_message, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
 
@@ -72,10 +68,9 @@ impl TemplateApp {
                                 });
                                 true
                             }
-                            Err(_) => {
-                                unsafe {
-                                    MessageBoxW(0, w!("Enter a valid port!"), w!("Error"), 0);
-                                }
+                            Err(err) => {
+                                display_error_message(err);
+
                                 false
                             }
                         };

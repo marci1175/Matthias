@@ -2,8 +2,6 @@ use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
 use tap::TapFallible;
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
 
 pub mod backend;
 
@@ -11,7 +9,7 @@ mod client;
 mod server;
 mod ui;
 
-use self::backend::{ClientMessage, UserInformation};
+use self::backend::{display_error_message, ClientMessage, UserInformation};
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
 
@@ -129,19 +127,7 @@ impl eframe::App for backend::TemplateApp {
                                             {
                                                 Ok(_) => {}
                                                 Err(err) => {
-                                                    std::thread::spawn(move || unsafe {
-                                                        MessageBoxW(
-                                                            0,
-                                                            str::encode_utf16(
-                                                                err.to_string().as_str(),
-                                                            )
-                                                            .chain(std::iter::once(0))
-                                                            .collect::<Vec<_>>()
-                                                            .as_ptr(),
-                                                            w!("Error"),
-                                                            MB_ICONERROR,
-                                                        );
-                                                    });
+                                                    display_error_message(err);
                                                 }
                                             };
                                         });
@@ -189,19 +175,7 @@ impl eframe::App for backend::TemplateApp {
                                                     };
                                                 }
                                                 Err(err) => {
-                                                    std::thread::spawn(move || unsafe {
-                                                        MessageBoxW(
-                                                            0,
-                                                            str::encode_utf16(
-                                                                err.to_string().as_str(),
-                                                            )
-                                                            .chain(std::iter::once(0))
-                                                            .collect::<Vec<_>>()
-                                                            .as_ptr(),
-                                                            w!("Error"),
-                                                            MB_ICONERROR,
-                                                        );
-                                                    });
+                                                    display_error_message(err);
                                                     if let Err(err) = sender.send(None) {
                                                         dbg!(err);
                                                     };
@@ -263,19 +237,7 @@ impl eframe::App for backend::TemplateApp {
                                                     };
                                                 }
                                                 Err(err) => {
-                                                    std::thread::spawn(move || unsafe {
-                                                        MessageBoxW(
-                                                            0,
-                                                            str::encode_utf16(
-                                                                err.to_string().as_str(),
-                                                            )
-                                                            .chain(std::iter::once(0))
-                                                            .collect::<Vec<_>>()
-                                                            .as_ptr(),
-                                                            w!("Error"),
-                                                            MB_ICONERROR,
-                                                        );
-                                                    });
+                                                    display_error_message(err);
                                                     if let Err(err) = sender.send(None) {
                                                         dbg!(err);
                                                     };

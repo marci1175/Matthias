@@ -7,10 +7,10 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::app::backend::{decrypt_aes256, write_audio, write_file, write_image};
+use crate::app::backend::{decrypt_aes256, display_error_message, write_file, write_image};
 
 use crate::app::backend::{
-    ClientMessage, SearchType, ServerAudioReply, ServerFileReply, ServerImageReply, ServerMaster,
+    ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster,
     ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
@@ -180,7 +180,7 @@ impl TemplateApp {
                 ui.horizontal(|ui|{
 
                     //Dont allow displaying search buffer when in file or reply searching
-                    if !(self.client_ui.search_parameters.search_type == SearchType::File || self.client_ui.search_parameters.search_type == SearchType::Reply) {
+                    if !(self.client_ui.search_parameters == SearchType::File || self.client_ui.search_parameters == SearchType::Reply) {
                         ui.allocate_ui(vec2(ui.available_width() / 2., ui.available_height()), |ui| {
                             ui.add(
                                 egui::widgets::TextEdit::singleline(&mut self.client_ui.search_buffer).hint_text("Search for: ")
@@ -190,13 +190,13 @@ impl TemplateApp {
 
                     egui::ComboBox::from_id_source("search_filter")
                             // .icon(|ui, rect, widget_visuals, is_open, above_or_belov| {})
-                            .selected_text(format!("{}", self.client_ui.search_parameters.search_type.clone()))
+                            .selected_text(format!("{}", self.client_ui.search_parameters.clone()))
                             .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Message , "Message");
-                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Date, "Date");
-                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Name, "Name");
-                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::Reply, "Reply");
-                                ui.selectable_value(&mut self.client_ui.search_parameters.search_type, SearchType::File, "File");
+                                ui.selectable_value(&mut self.client_ui.search_parameters, SearchType::Message , "Message");
+                                ui.selectable_value(&mut self.client_ui.search_parameters, SearchType::Date, "Date");
+                                ui.selectable_value(&mut self.client_ui.search_parameters, SearchType::Name, "Name");
+                                ui.selectable_value(&mut self.client_ui.search_parameters, SearchType::Reply, "Reply");
+                                ui.selectable_value(&mut self.client_ui.search_parameters, SearchType::File, "File");
                             });
                 });
                 ui.separator();
@@ -206,7 +206,7 @@ impl TemplateApp {
                     ui.allocate_ui(ui.available_size(), |ui|{
                         let mut has_search = false;
                         for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
-                            match self.client_ui.search_parameters.search_type {
+                            match self.client_ui.search_parameters {
                                 SearchType::Name => {
                                     if let ServerMessageType::Normal(inner_message) = &message.MessageType {
                                         if message.Author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
@@ -445,6 +445,14 @@ impl TemplateApp {
 
         match self.audio_save_rx.try_recv() {
             Ok((sink, cursor, index)) => {
+                //Check if the request was unsuccesful, so we can reset the states
+                if sink.is_none() {
+                    //Reset state
+                    self.client_ui.audio_playback.settings_list[index].is_loading = false;
+                    return;
+                }
+
+                //Modify audio player
                 self.client_ui.audio_playback.sink_list[index] = sink;
 
                 let sink = self.client_ui.audio_playback.sink_list[index]
@@ -461,7 +469,7 @@ impl TemplateApp {
                         sink.play();
                     }
                     Err(err) => {
-                        dbg!(err);
+                        display_error_message(err);
                     }
                 }
 

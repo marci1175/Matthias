@@ -5,7 +5,7 @@ use tap::{Tap, TapFallible};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    write_audio, ClientMessage, PlaybackCursor, ServerAudioReply, ServerMessageType, TemplateApp,
+    display_error_message, write_audio, ClientMessage, PlaybackCursor, ServerAudioReply, ServerMessageType, TemplateApp
 };
 use crate::app::client::{self};
 use std::fs;
@@ -107,12 +107,24 @@ impl TemplateApp {
                                                         });
                                                 }
                                                 Err(err) => {
-                                                    println!("{err} ln 264")
+                                                    //The error will be logged
+                                                    tracing::error!("{err}");
+
+                                                    //The error will be displayed here
+                                                    display_error_message(err);
+
+                                                    //The error will be sent, we wont have to do anything when reciving it
+                                                    let _ = sender
+                                                        .send((None, PlaybackCursor::new(Vec::new()), current_index))
+                                                        .tap_err_dbg(|dbg| {
+                                                            tracing::error!("{dbg:?}")
+                                                        });
+                                                    
                                                 }
                                             }
                                         });
 
-                                        //Set button to be unusable
+                                        //Set button to be disabled
                                         self.client_ui.audio_playback.settings_list
                                             [current_index_in_message_list]
                                             .is_loading = true;
@@ -138,6 +150,7 @@ impl TemplateApp {
                             .speed,
                     );
                 }
+
                 /*
                 let pos = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor_offset;
                 if let Some(cursor) = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.as_mut() {

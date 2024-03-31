@@ -1,12 +1,7 @@
-use std::iter;
-
-use crate::app::backend::{login, register};
+use crate::app::backend::{display_error_message, login, register};
 
 use crate::app::backend::TemplateApp;
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
-
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_ICONWARNING};
 
 impl TemplateApp {
     pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
@@ -40,17 +35,7 @@ impl TemplateApp {
                                 true
                             }
                             Err(err) => {
-                                std::thread::spawn(move || unsafe {
-                                    MessageBoxW(
-                                        0,
-                                        str::encode_utf16(err.to_string().as_str())
-                                            .chain(iter::once(0))
-                                            .collect::<Vec<_>>()
-                                            .as_ptr(),
-                                        w!("Error"),
-                                        MB_ICONERROR,
-                                    );
-                                });
+                                display_error_message(err);
                                 false
                             }
                         };
@@ -65,17 +50,7 @@ impl TemplateApp {
                     match register(self.login_username.clone(), self.login_password.clone()) {
                         Ok(_) => {}
                         Err(err) => {
-                            std::thread::spawn(move || unsafe {
-                                MessageBoxW(
-                                    0,
-                                    str::encode_utf16(err.to_string().as_str())
-                                        .chain(iter::once(0))
-                                        .collect::<Vec<_>>()
-                                        .as_ptr(),
-                                    w!("Error"),
-                                    MB_ICONWARNING,
-                                );
-                            });
+                            display_error_message(err);
                         }
                     };
                 };

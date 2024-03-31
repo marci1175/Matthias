@@ -247,7 +247,7 @@ impl TemplateApp {
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
     ///Search parameters set by user, to chose what to search for obviously
-    pub search_parameters: SearchParameters,
+    pub search_parameters: SearchType,
 
     ///Check if search panel settings panel (xd) is open
     #[serde(skip)]
@@ -357,7 +357,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
-            search_parameters: SearchParameters::default(),
+            search_parameters: SearchType::default(),
             search_settings_panel: false,
             search_buffer: String::new(),
             search_mode: false,
@@ -736,18 +736,9 @@ impl ClientConnection {
 
                 Some(client_clone)
             }
-            Err(error) => {
-                std::thread::spawn(move || unsafe {
-                    MessageBoxW(
-                        0,
-                        str::encode_utf16(error.to_string().as_str())
-                            .chain(std::iter::once(0))
-                            .collect::<Vec<_>>()
-                            .as_ptr(),
-                        w!("Error"),
-                        MB_ICONERROR,
-                    );
-                });
+            Err(err) => {
+                display_error_message(err);
+
                 None
             }
         };
@@ -1003,11 +994,15 @@ impl ServerMaster {
  Client backend
 */
 
-///Struct for audio playback
+///Struct for global audio playback
 pub struct AudioPlayback {
+    ///Output stream
     pub stream: OutputStream,
+    ///Output stream handle
     pub stream_handle: OutputStreamHandle,
+    ///Audio sinks, these are the audios played
     pub sink_list: Vec<Option<Sink>>,
+    ///Settings list for the sink_list (The audios being played)
     pub settings_list: Vec<AudioSettings>,
 }
 impl Default for AudioPlayback {
@@ -1024,9 +1019,13 @@ impl Default for AudioPlayback {
 
 ///This is used by the audio player, this is where you can set the speed and volume etc
 pub struct AudioSettings {
+    ///Volume for audio stream
     pub volume: f32,
+    ///Speed for audio stream
     pub speed: f32,
+    ///Reader cursor, for reading the sound file
     pub cursor: PlaybackCursor,
+    ///__UNUSED__
     pub cursor_offset: u64,
 
     ///This is only for ui usage
@@ -1097,10 +1096,11 @@ impl ScrollToMessage {
     Client
 */
 ///Used to decide what to search for (In the Message search bar), defined by the user
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Default)]
 pub enum SearchType {
     Date,
     File,
+    #[default]
     Message,
     Name,
     Reply,
@@ -1119,20 +1119,7 @@ impl Display for SearchType {
     }
 }
 
-///Main searchparameter struct contains everyting the client needs for searching
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct SearchParameters {
-    pub search_type: SearchType,
-}
-
-impl Default for SearchParameters {
-    fn default() -> Self {
-        Self {
-            search_type: SearchType::Message,
-        }
-    }
-}
-
+///Get ipv4 ip address from an external website
 pub fn ipv4_get() -> Result<String, std::io::Error> {
     // Send an HTTP GET request to a service that returns your public IPv4 address
     let response = reqwest::blocking::get("https://ipv4.icanhazip.com/");
@@ -1148,6 +1135,8 @@ pub fn ipv4_get() -> Result<String, std::io::Error> {
         ))
     }
 }
+
+///Get ipv6 ip address from an external website
 pub fn ipv6_get() -> Result<String, std::io::Error> {
     // Send an HTTP GET request to a service that returns your public IPv4 address
     let response = reqwest::blocking::get("https://ipv6.icanhazip.com/");
@@ -1285,6 +1274,7 @@ fn pass_hash_match(to_be_verified: String, encoded: String) -> bool {
     argon2::verify_encoded(&encoded, to_be_verified.as_bytes()).unwrap()
 }
 
+///Check login
 pub fn login(username: String, password: String) -> Result<PathBuf> {
     let app_data = env::var("APPDATA")?;
 
@@ -1303,6 +1293,7 @@ pub fn login(username: String, password: String) -> Result<PathBuf> {
     Ok(path)
 }
 
+///Register a new profile
 pub fn register(username: String, passw: String) -> anyhow::Result<()> {
     if username.contains(' ') || username.contains('@') || username.contains(' ') {
         return Err(anyhow::Error::msg("Cant use special characters in name"));
@@ -1328,6 +1319,7 @@ pub fn register(username: String, passw: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+///Write general file, this function takes in a custom path
 pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     let files = FileDialog::new()
         .set_title("Save to")
@@ -1355,6 +1347,7 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     Ok(())
 }
 
+///Write an image file to the appdata folder
 #[inline]
 pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
@@ -1371,6 +1364,7 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     Ok(())
 }
 
+///Write an audio file to the appdata folder
 #[inline]
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
@@ -1386,6 +1380,27 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     Ok(())
 }
 
+///Generate uuid
 pub fn generate_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+///Display Error message with a messagebox
+pub fn display_error_message<T>(display: T)
+where
+    T: ToString + std::marker::Send + 'static
+{
+    std::thread::spawn(move || unsafe {
+        MessageBoxW(
+            0,
+            str::encode_utf16(
+                display.to_string().as_str(),
+            )
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>()
+            .as_ptr(),
+            w!("Error"),
+            MB_ICONERROR,
+        );
+    });
 }
