@@ -1,4 +1,5 @@
 use messages::MessageRequest;
+use tap::Tap;
 
 use super::backend::ClientMessage;
 pub mod messages {
@@ -16,14 +17,14 @@ pub async fn send_msg(
     if let Some(mut client) = connection.client.clone() {
         let request = tonic::Request::new(MessageRequest {
             message: message.struct_into_string(),
-        });
+        }).tap_dbg(|msg| tracing::debug!("{msg:?}"));
 
         let response = client.message_main(request).await?.into_inner().clone();
 
         let message = response.message;
 
         //Reply
-        Ok(message)
+        Ok(message.tap_dbg(|reply| tracing::debug!("{reply}")))
     } else {
         Err(anyhow::Error::msg("Request failed, see logs"))
     }

@@ -11,6 +11,7 @@ use messages::{
     MessageRequest, MessageResponse,
 };
 use rand::Rng;
+use tap::Tap;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 
