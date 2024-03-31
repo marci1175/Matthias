@@ -160,7 +160,6 @@ impl TemplateApp {
                                             ctx.copy_text(i.clone());
                                         };
                                 });
-                                
                                 message_instances.push(message_group);
 
 

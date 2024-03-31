@@ -465,8 +465,7 @@ impl TemplateApp {
                     }
                 }
 
-                self.client_ui.audio_playback.settings_list[index].cursor =
-                    cursor;
+                self.client_ui.audio_playback.settings_list[index].cursor = cursor;
 
                 //Reset button state so it can be used again
                 self.client_ui.audio_playback.settings_list[index].is_loading = false;

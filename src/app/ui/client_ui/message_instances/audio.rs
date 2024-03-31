@@ -46,8 +46,10 @@ impl TemplateApp {
                             }
                         },
                         None => {
-                            let is_loading = self.client_ui.audio_playback.settings_list[current_index_in_message_list].is_loading;
-                            
+                            let is_loading = self.client_ui.audio_playback.settings_list
+                                [current_index_in_message_list]
+                                .is_loading;
+
                             if is_loading {
                                 ui.label("Requesting file from server, please wait!");
                             }
@@ -61,23 +63,23 @@ impl TemplateApp {
                                         self.client_ui.send_on_ip_base64_encoded,
                                         audio.index
                                     ));
-    
+
                                     //If the user has clicked the play button only then we download the desirted audio file! Great optimisation
                                     if !file.exists() {
                                         let sender = self.audio_save_tx.clone();
-    
+
                                         let message = ClientMessage::construct_audio_request_msg(
                                             audio.index,
                                             self.client_ui.client_password.clone(),
                                             self.login_username.clone(),
                                         );
-    
+
                                         let connection = self.client_connection.clone();
                                         let send_on_ip = self.client_ui.send_on_ip.clone();
                                         let stream_handle =
                                             self.client_ui.audio_playback.stream_handle.clone();
                                         let current_index = current_index_in_message_list;
-    
+
                                         tokio::spawn(async move {
                                             match client::send_msg(connection, message).await {
                                                 Ok(response) => {
@@ -85,19 +87,24 @@ impl TemplateApp {
                                                         ServerAudioReply,
                                                         serde_json::Error,
                                                     > = serde_json::from_str(&response);
-                                                    let _ =
-                                                        write_audio(file_serve.unwrap(), send_on_ip);
-    
+                                                    let _ = write_audio(
+                                                        file_serve.unwrap(),
+                                                        send_on_ip,
+                                                    );
+
                                                     let file_stream_to_be_read =
                                                         fs::read(file).unwrap_or_default();
                                                     let cursor =
                                                         PlaybackCursor::new(file_stream_to_be_read);
-                                                    let sink =
-                                                        Some(Sink::try_new(&stream_handle).unwrap());
-    
+                                                    let sink = Some(
+                                                        Sink::try_new(&stream_handle).unwrap(),
+                                                    );
+
                                                     let _ = sender
                                                         .send((sink, cursor, current_index))
-                                                        .tap_err_dbg(|dbg| tracing::error!("{dbg:?}"));
+                                                        .tap_err_dbg(|dbg| {
+                                                            tracing::error!("{dbg:?}")
+                                                        });
                                                 }
                                                 Err(err) => {
                                                     println!("{err} ln 264")
@@ -106,7 +113,9 @@ impl TemplateApp {
                                         });
 
                                         //Set button to be unusable
-                                        self.client_ui.audio_playback.settings_list[current_index_in_message_list].is_loading = true;
+                                        self.client_ui.audio_playback.settings_list
+                                            [current_index_in_message_list]
+                                            .is_loading = true;
                                     }
                                 };
                             });
