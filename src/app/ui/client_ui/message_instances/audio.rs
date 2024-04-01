@@ -52,7 +52,7 @@ impl TemplateApp {
                                 let mut cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
 
                                 //Construct new decoder
-                                if let Ok(decoder) = Decoder::new(self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.clone()) {
+                                if let Ok(decoder) = Decoder::new(PlaybackCursor::new(cursor.clone().into_inner())) {
                                   
                                     // Always set the cursor_pos to the cursor's position as a temp value
                                     let mut cursor_pos = <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(&cursor).into_inner().len() / decoder.sample_rate() as usize;
