@@ -48,30 +48,24 @@ impl TemplateApp {
                             }
                             //Audio is running
                             false => {
-                                //ui.label(format!("{:?}", self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap().remaining_slice().len()));
-                                //let cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
-
                                 //Display cursor placement
                                 let mut cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
 
                                 //Construct new decoder
-                                if let Ok(decoder) = Decoder::new(self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.clone()) {
-                                    ui.label(format!("{:?}/{:?}", cursor.position(), cursor.clone().into_inner().len()));
+                                if let Ok(decoder) = Decoder::new(PlaybackCursor::new(cursor.clone().into_inner())) {
+                                  
+                                    // Always set the cursor_pos to the cursor's position as a temp value
+                                    let mut cursor_pos = <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(&cursor).into_inner().len() / decoder.sample_rate() as usize;
 
-                                    let bitrate = (decoder.sample_rate() * decoder.channels() as u32) as u64;
-
-                                    dbg!(bitrate);
-
-                                    //Always set the cursor_pos to the cursor's position as a temp value
-                                    let mut cursor_pos = cursor.position() / bitrate;
-
-                                    //If it has been changed, then change the real cursors position too
-                                    if ui.add(
-                                        egui::Slider::new(&mut cursor_pos, 0..=cursor.clone().into_inner().len() as u64 / bitrate).show_value(false).text("Set player")
-                                    ).changed() {
-                                        //Set cursor poition
-                                        cursor.set_position(cursor_pos);
-                                    };
+                                    if let Some(total_dur) = dbg!(decoder.total_duration()) {
+                                        // If it has been changed, then change the real cursors position too
+                                        if ui.add(
+                                            egui::Slider::new(&mut cursor_pos, 0..=total_dur.as_secs() as usize).show_value(false).text("Set player")
+                                        ).changed() {
+                                            //Set cursor poition
+                                            cursor.set_position((cursor_pos * decoder.sample_rate() as usize) as u64);
+                                        };
+                                    }
                                 
                                 };
 
