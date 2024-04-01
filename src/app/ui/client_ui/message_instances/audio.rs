@@ -27,7 +27,7 @@ impl TemplateApp {
             )));
 
             //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
-            let file = PathBuf::from(format!(
+            let path_to_audio = PathBuf::from(format!(
                 "{}\\Matthias\\Client\\{}\\Audios\\{}",
                 env!("APPDATA"),
                 self.client_ui.send_on_ip_base64_encoded,
@@ -52,11 +52,12 @@ impl TemplateApp {
                                 let mut cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
 
                                 //Construct new decoder
-                                if let Ok(decoder) = Decoder::new(PlaybackCursor::new(cursor.clone().into_inner())) {
+                                if let Ok(decoder) = Decoder::new(self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.clone()) {
                                   
                                     // Always set the cursor_pos to the cursor's position as a temp value
                                     let mut cursor_pos = <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(&cursor).into_inner().len() / decoder.sample_rate() as usize;
 
+                                    //Why the fuck does this always return a None?!
                                     if let Some(total_dur) = dbg!(decoder.total_duration()) {
                                         // If it has been changed, then change the real cursors position too
                                         if ui.add(
@@ -88,7 +89,7 @@ impl TemplateApp {
                             ui.add_enabled_ui(!is_loading, |ui| {
                                 if ui.button("Play").clicked() {
                                     //If the user has clicked the play button only then we download the desirted audio file! Great optimisation
-                                    if !file.exists() {
+                                    if !path_to_audio.exists() {
                                         let sender = self.audio_save_tx.clone();
 
                                         let message = ClientMessage::construct_audio_request_msg(
@@ -116,7 +117,7 @@ impl TemplateApp {
                                                     );
 
                                                     let file_stream_to_be_read =
-                                                        fs::read(file).unwrap_or_default();
+                                                        fs::read(&path_to_audio).unwrap_or_default();
                                                     let cursor =
                                                         PlaybackCursor::new(file_stream_to_be_read);
                                                     let sink = Some(
@@ -124,7 +125,7 @@ impl TemplateApp {
                                                     );
 
                                                     let _ = sender
-                                                        .send((sink, cursor, current_index))
+                                                        .send((sink, cursor, current_index, path_to_audio))
                                                         .tap_err_dbg(|dbg| {
                                                             tracing::error!("{dbg:?}")
                                                         });
@@ -138,7 +139,7 @@ impl TemplateApp {
 
                                                     //The error will be sent, we wont have to do anything when reciving it
                                                     let _ = sender
-                                                        .send((None, PlaybackCursor::new(Vec::new()), current_index))
+                                                        .send((None, PlaybackCursor::new(Vec::new()), current_index, path_to_audio))
                                                         .tap_err_dbg(|dbg| {
                                                             tracing::error!("{dbg:?}")
                                                         });

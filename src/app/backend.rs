@@ -98,9 +98,9 @@ pub struct TemplateApp {
 
     ///thread communication for audio ! SAVING !
     #[serde(skip)]
-    pub audio_save_rx: mpsc::Receiver<(Option<Sink>, PlaybackCursor, usize)>,
+    pub audio_save_rx: mpsc::Receiver<(Option<Sink>, PlaybackCursor, usize, PathBuf)>,
     #[serde(skip)]
-    pub audio_save_tx: mpsc::Sender<(Option<Sink>, PlaybackCursor, usize)>,
+    pub audio_save_tx: mpsc::Sender<(Option<Sink>, PlaybackCursor, usize, PathBuf)>,
 
     /*
         main
@@ -153,7 +153,7 @@ impl Default for TemplateApp {
         let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
-            mpsc::channel::<(Option<Sink>, PlaybackCursor, usize)>();
+            mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
         let (connection_sender, connection_reciver) = mpsc::channel::<Option<ClientConnection>>();
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -1031,6 +1031,9 @@ pub struct AudioSettings {
 
     ///Cursor position
     pub cursor_position: u64,
+
+    ///Path to audio file
+    pub path_to_audio: PathBuf,
 }
 
 ///Initialize default values
@@ -1042,6 +1045,7 @@ impl Default for AudioSettings {
             cursor: PlaybackCursor::new(Vec::new()),
             is_loading: false,
             cursor_position: 0,
+            path_to_audio: PathBuf::new(),
         }
     }
 }

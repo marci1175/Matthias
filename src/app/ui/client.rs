@@ -444,7 +444,7 @@ impl TemplateApp {
         }
 
         match self.audio_save_rx.try_recv() {
-            Ok((sink, cursor, index)) => {
+            Ok((sink, cursor, index, path_to_audio)) => {
                 //Check if the request was unsuccesful, so we can reset the states
                 if sink.is_none() {
                     //Reset state
@@ -454,6 +454,9 @@ impl TemplateApp {
 
                 //Modify audio player
                 self.client_ui.audio_playback.sink_list[index] = sink;
+
+                //Set path
+                self.client_ui.audio_playback.settings_list[index].path_to_audio = path_to_audio;
 
                 let sink = self.client_ui.audio_playback.sink_list[index]
                     .as_mut()
