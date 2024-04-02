@@ -1,4 +1,5 @@
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
+use tokio::sync;
 use crate::app::backend::{display_error_message, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
@@ -56,10 +57,14 @@ impl TemplateApp {
                             true => self.server_password.clone(),
                             false => "".to_string(),
                         };
+                        let (sender, reciver) = sync::mpsc::channel(1);
+
+                        todo!("TODO MAKE SERVER SHUTFOWN");
+
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw).await {
+                                    match server::server_main(port.to_string(), server_pw, reciver).await {
                                         Ok(_temp_stuff) => {}
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
