@@ -59,7 +59,7 @@ impl TemplateApp {
                         };
                         let (sender, reciver) = sync::mpsc::channel(1);
 
-                        todo!("TODO MAKE SERVER SHUTFOWN");
+                        // todo!("TODO MAKE SERVER SHUTFOWN");
 
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
