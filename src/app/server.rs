@@ -10,8 +10,8 @@ use messages::{
     MessageRequest, MessageResponse,
 };
 use rand::Rng;
-use tokio::sync::mpsc::Receiver;
 use std::sync::Mutex;
+use tokio::sync::mpsc::Receiver;
 use tonic::{transport::Server, Request, Response, Status};
 
 use crate::app::backend::ServerMaster;
@@ -313,7 +313,7 @@ struct Options {
 }*/
 
 async fn shutdown_signal(mut signal: Receiver<()>) {
-
+    signal.recv().await;
 }
 
 fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
@@ -323,8 +323,8 @@ fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
 pub async fn server_main(
     port: String,
     password: String,
-    mut signal: Receiver<()>
-) -> Result<String, Box<dyn std::error::Error>> {
+    mut signal: Receiver<()>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("[::]:{}", port).parse()?;
 
     let msg_service = MessageService {
@@ -339,7 +339,8 @@ pub async fn server_main(
         .serve_with_shutdown(addr, shutdown_signal(signal))
         .await?;
 
-    unimplemented!();
+    //Shutdown gracefully
+    Ok(())
 }
 
 impl MessageService {

@@ -5,7 +5,8 @@ use tap::{Tap, TapFallible};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    display_error_message, write_audio, ClientMessage, PlaybackCursor, ServerAudioReply, ServerMessageType, TemplateApp
+    display_error_message, write_audio, ClientMessage, PlaybackCursor, ServerAudioReply,
+    ServerMessageType, TemplateApp,
 };
 use crate::app::client::{self};
 use std::fs;
@@ -49,28 +50,49 @@ impl TemplateApp {
                             //Audio is running
                             false => {
                                 //Display cursor placement
-                                let mut cursor = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.cursor.lock().unwrap();
+                                let mut cursor = self.client_ui.audio_playback.settings_list
+                                    [current_index_in_message_list]
+                                    .cursor
+                                    .cursor
+                                    .lock()
+                                    .unwrap();
 
                                 //Construct new decoder
-                                if let Ok(decoder) = Decoder::new(PlaybackCursor::new(cursor.clone().into_inner())) {
-                                  
+                                if let Ok(decoder) =
+                                    Decoder::new(PlaybackCursor::new(cursor.clone().into_inner()))
+                                {
                                     // Always set the cursor_pos to the cursor's position as a temp value
-                                    let mut cursor_pos = <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(&cursor).into_inner().len() / decoder.sample_rate() as usize;
+                                    let mut cursor_pos =
+                                        <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(
+                                            &cursor,
+                                        )
+                                        .into_inner()
+                                        .len()
+                                            / decoder.sample_rate() as usize;
 
                                     //Why the fuck does this always return a None?!
                                     if let Some(total_dur) = dbg!(decoder.total_duration()) {
                                         // If it has been changed, then change the real cursors position too
-                                        if ui.add(
-                                            egui::Slider::new(&mut cursor_pos, 0..=total_dur.as_secs() as usize).show_value(false).text("Set player")
-                                        ).changed() {
+                                        if ui
+                                            .add(
+                                                egui::Slider::new(
+                                                    &mut cursor_pos,
+                                                    0..=total_dur.as_secs() as usize,
+                                                )
+                                                .show_value(false)
+                                                .text("Set player"),
+                                            )
+                                            .changed()
+                                        {
                                             //Set cursor poition
-                                            cursor.set_position((cursor_pos * decoder.sample_rate() as usize) as u64);
+                                            cursor.set_position(
+                                                (cursor_pos * decoder.sample_rate() as usize)
+                                                    as u64,
+                                            );
                                         };
                                     }
-                                
                                 };
 
-                                
                                 if ui.button("Stop").clicked() {
                                     sink.pause();
                                 }
@@ -117,7 +139,8 @@ impl TemplateApp {
                                                     );
 
                                                     let file_stream_to_be_read =
-                                                        fs::read(&path_to_audio).unwrap_or_default();
+                                                        fs::read(&path_to_audio)
+                                                            .unwrap_or_default();
                                                     let cursor =
                                                         PlaybackCursor::new(file_stream_to_be_read);
                                                     let sink = Some(
@@ -125,7 +148,12 @@ impl TemplateApp {
                                                     );
 
                                                     let _ = sender
-                                                        .send((sink, cursor, current_index, path_to_audio))
+                                                        .send((
+                                                            sink,
+                                                            cursor,
+                                                            current_index,
+                                                            path_to_audio,
+                                                        ))
                                                         .tap_err_dbg(|dbg| {
                                                             tracing::error!("{dbg:?}")
                                                         });
@@ -139,7 +167,12 @@ impl TemplateApp {
 
                                                     //The error will be sent, we wont have to do anything when reciving it
                                                     let _ = sender
-                                                        .send((None, PlaybackCursor::new(Vec::new()), current_index, path_to_audio))
+                                                        .send((
+                                                            None,
+                                                            PlaybackCursor::new(Vec::new()),
+                                                            current_index,
+                                                            path_to_audio,
+                                                        ))
                                                         .tap_err_dbg(|dbg| {
                                                             tracing::error!("{dbg:?}")
                                                         });

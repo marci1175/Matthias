@@ -1,8 +1,9 @@
-use egui::{vec2, Align, Layout, RichText, ViewportCommand};
-use tokio::sync;
 use crate::app::backend::{display_error_message, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
+use egui::{vec2, Align, Layout, RichText, ViewportCommand};
+use tap::Tap;
+use tokio::sync;
 
 impl TemplateApp {
     pub fn state_server(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
@@ -57,14 +58,19 @@ impl TemplateApp {
                             true => self.server_password.clone(),
                             false => "".to_string(),
                         };
+
+                        //Create a new pair of channels
                         let (sender, reciver) = sync::mpsc::channel(1);
 
-                        // todo!("TODO MAKE SERVER SHUTFOWN");
+                        //Overwrite the channel we have in the TemplateApp struct
+                        self.server_shutdown_sender = sender;
 
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw, reciver).await {
+                                    match server::server_main(port.to_string(), server_pw, reciver)
+                                        .await
+                                    {
                                         Ok(_temp_stuff) => {}
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
@@ -86,6 +92,23 @@ impl TemplateApp {
                         ui.text_edit_singleline(&mut self.server_password);
                     }
                 } else {
+                    
+                    if ui.button("Shutdown").clicked() {
+
+                        let sender = self.server_shutdown_sender.clone();
+
+                        tokio::spawn(async move {
+                            //Throw away error, because we already inspect it
+                            let _ = sender.send(()).await.tap_dbg(|func| {
+                                let _ = func.inspect_err(|e| tracing::error!("{e:?}"));
+                            });
+                        });
+
+                        //Reset server state
+                        self.server_has_started = false;
+
+                    }
+
                     if self.public_ip.is_empty() {
                         let tx = self.dtx.clone();
                         std::thread::spawn(move || {

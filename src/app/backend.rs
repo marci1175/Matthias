@@ -12,7 +12,7 @@ use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
+use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -63,6 +63,14 @@ pub struct TemplateApp {
 
     ///server settings
     pub server_req_password: bool,
+
+    ///Server shutdown handler channel
+    #[serde(skip)]
+    pub server_shutdown_reciver: tokio::sync::mpsc::Receiver<()>,
+
+    ///Server shutdown handler channel
+    #[serde(skip)]
+    pub server_shutdown_sender: tokio::sync::mpsc::Sender<()>,
 
     ///What is the server's password set to
     pub server_password: String,
@@ -152,9 +160,15 @@ impl Default for TemplateApp {
         let (dtx, drx) = mpsc::channel::<String>();
         let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
+
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
+
         let (connection_sender, connection_reciver) = mpsc::channel::<Option<ClientConnection>>();
+
+        //Use the tokio sync crate for it to be async
+        let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
+
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_record.wav",
@@ -192,6 +206,11 @@ impl Default for TemplateApp {
             //thread communication for image requesting
             irx,
             itx,
+            
+            //These default values will get overwritten when crating the new server, so we can pass in the reciver to the thread
+            //Also, the shutdown reciver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D
+            server_shutdown_reciver,
+            server_shutdown_sender,
 
             //thread communication for audio recording
             atx: None,
@@ -1393,17 +1412,15 @@ pub fn generate_uuid() -> String {
 ///Display Error message with a messagebox
 pub fn display_error_message<T>(display: T)
 where
-    T: ToString + std::marker::Send + 'static
+    T: ToString + std::marker::Send + 'static,
 {
     std::thread::spawn(move || unsafe {
         MessageBoxW(
             0,
-            str::encode_utf16(
-                display.to_string().as_str(),
-            )
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>()
-            .as_ptr(),
+            str::encode_utf16(display.to_string().as_str())
+                .chain(std::iter::once(0))
+                .collect::<Vec<_>>()
+                .as_ptr(),
             w!("Error"),
             MB_ICONERROR,
         );

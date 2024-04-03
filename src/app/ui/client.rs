@@ -10,8 +10,8 @@ use std::time::Duration;
 use crate::app::backend::{decrypt_aes256, display_error_message, write_file, write_image};
 
 use crate::app::backend::{
-    ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster,
-    ServerMessageType, TemplateApp,
+    ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType,
+    TemplateApp,
 };
 use crate::app::client::{self};
 
