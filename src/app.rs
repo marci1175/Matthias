@@ -44,7 +44,8 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: fix for audio playback
+            TODO: Make uuid system
+            TODO: Combine server and client
 
         */
 

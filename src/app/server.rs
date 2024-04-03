@@ -105,7 +105,7 @@ impl ServerMessage for MessageService {
                                         //If the ip is not found then add it to connected ip's
                                         clients.push(remote_address);
 
-                                        //TODO: Return custom which will the server's text will be encrypted with, GONDOLKOZZ MARCELL GONDOLKOZZ FASZFEJŰ
+                                        //Return custom which will the server's text will be encrypted with
                                         return Ok(Response::new(MessageResponse {
                                             message: hex::encode(self.decryption_key),
                                         }));
@@ -323,13 +323,12 @@ fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
 pub async fn server_main(
     port: String,
     password: String,
-    mut signal: Receiver<()>,
+    signal: Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("[::]:{}", port).parse()?;
 
     let msg_service = MessageService {
         passw: password,
-        // Extremely important to set the right lenght to the key!!!!!!!!!!!!
         decryption_key: rand::random::<[u8; 32]>(),
         ..Default::default()
     };
