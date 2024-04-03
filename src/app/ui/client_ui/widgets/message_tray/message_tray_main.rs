@@ -85,9 +85,7 @@ impl TemplateApp {
                         {
                             self.send_msg(ClientMessage::construct_normal_msg(
                                 &self.client_ui.usr_msg,
-                                self.client_ui
-                                    .req_passw
-                                    .then_some((|| &self.client_ui.client_password)()),
+                                &self.opened_account.uuid,
                                 &self.login_username,
                                 self.client_ui.replying_to,
                             ))
@@ -98,9 +96,7 @@ impl TemplateApp {
                             if file_path.exists() {
                                 self.send_msg(ClientMessage::construct_file_msg(
                                     file_path,
-                                    self.client_ui
-                                        .req_passw
-                                        .then_some((|| &self.client_ui.client_password)()),
+                                    &self.opened_account.uuid,
                                     &self.login_username,
                                     self.client_ui.replying_to,
                                 ));
@@ -193,9 +189,7 @@ impl TemplateApp {
                                     Ok(ok) => {
                                         self.send_msg(ClientMessage::construct_file_msg(
                                             ok.to_path_buf().clone(),
-                                            self.client_ui
-                                                .req_passw
-                                                .then_some((|| &self.client_ui.client_password)()),
+                                            &self.opened_account.uuid,
                                             &self.login_username,
                                             self.client_ui.replying_to,
                                         ));

@@ -116,13 +116,15 @@ impl eframe::App for backend::TemplateApp {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
-                                    {
+                                    {   
+                                        let uuid = self.opened_account.uuid.clone();
                                         //Disconnect from server
                                         tokio::task::spawn(async move {
                                             match ClientConnection::disconnect(
                                                 &mut connection,
                                                 username,
                                                 password,
+                                                uuid,
                                             )
                                             .await
                                             {
@@ -162,11 +164,14 @@ impl eframe::App for backend::TemplateApp {
                                             .then_some((|| &self.client_ui.client_password)())
                                             .cloned();
 
+                                        let uuid = self.opened_account.uuid.clone();
+
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
                                                 format!("http://{}", ip),
                                                 username,
                                                 password,
+                                                &uuid,
                                             )
                                             .await
                                             {
@@ -223,12 +228,14 @@ impl eframe::App for backend::TemplateApp {
                                             .cloned();
 
                                         let sender = self.connection_sender.clone();
+                                        let uuid = self.opened_account.uuid.clone();
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
                                                 format!("http://{}", ip),
                                                 username,
                                                 password,
+                                                &uuid,
                                             )
                                             .await
                                             {

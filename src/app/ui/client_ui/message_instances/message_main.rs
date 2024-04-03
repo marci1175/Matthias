@@ -134,8 +134,11 @@ impl TemplateApp {
                                                                 )
                                                                 .frame(false);
                                                                 if ui.add(button).clicked() {
+
+                                                                    let uuid = self.opened_account.uuid.clone();
+
                                                                     let message = ClientMessage::construct_reaction_msg(
-                                                                        chr, index, &self.login_username, self.client_ui.req_passw.then_some((|| &self.client_ui.client_password)()),
+                                                                        chr, index, &self.login_username, &uuid,
                                                                     );
                                                                     let connection = self.client_connection.clone();
 

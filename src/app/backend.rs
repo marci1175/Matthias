@@ -151,6 +151,9 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     pub audio_file: Arc<Mutex<PathBuf>>,
+
+    #[serde(skip)]
+    pub opened_account: OpenedAccount,
 }
 
 impl Default for TemplateApp {
@@ -245,6 +248,8 @@ impl Default for TemplateApp {
             dtx,
             autosync_sender: None,
             autosync_should_run: Arc::new(AtomicBool::new(true)),
+
+            opened_account: OpenedAccount::default(),
         }
     }
 }
@@ -448,9 +453,23 @@ pub struct Main {
     #[serde(skip)]
     pub mode_selector: bool,
 
-    ///Opened account's file pathbuf
+    ///IMPORTANT: Opened account's file pathbuf
     #[serde(skip)]
     pub opened_account_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+///Opened account attributes, doesnt contain anything which might change at runtime
+pub struct OpenedAccount {
+    pub uuid: String,
+    pub username: String,
+    pub path: PathBuf,
+}
+
+impl OpenedAccount {
+    pub fn new(uuid: String, username: String, path: PathBuf) -> Self {
+        Self { uuid, username, path }
+    }
 }
 
 ///When the client is uploading a file, this packet gets sent
@@ -474,6 +493,9 @@ pub struct ClientSnycMessage {
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<bool>,
+
+    ///Contain password in the sync message, so we will send the password when authenticating
+    pub password: String,
 }
 
 ///This is used by the client for requesting file
@@ -531,7 +553,7 @@ pub enum ClientMessageType {
 pub struct ClientMessage {
     pub replying_to: Option<usize>,
     pub MessageType: ClientMessageType,
-    pub Password: String,
+    pub Uuid: String,
     pub Author: String,
     pub MessageDate: String,
 }
@@ -545,7 +567,7 @@ impl ClientMessage {
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,
-        password: Option<&str>,
+        uuid: &str,
         author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
@@ -555,7 +577,7 @@ impl ClientMessage {
                 message: msg.trim().to_string(),
             }),
             //If the password is set as None (Meaning the user didnt enter any password) just send the message with an empty string
-            Password: password.unwrap_or("").to_string(),
+            Uuid: uuid.to_string(),
             Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -564,7 +586,7 @@ impl ClientMessage {
     ///this is used when you want to send a file, this contains name, bytes
     pub fn construct_file_msg(
         file_path: PathBuf,
-        password: Option<&str>,
+        uuid: &str,
         author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
@@ -586,7 +608,7 @@ impl ClientMessage {
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
 
-            Password: password.unwrap_or("").to_string(),
+            Uuid: uuid.to_string(),
             Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -596,7 +618,7 @@ impl ClientMessage {
         char: char,
         index: usize,
         author: &str,
-        password: Option<&str>,
+        uuid: &str,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -604,7 +626,7 @@ impl ClientMessage {
                 char,
                 message_index: index,
             }),
-            Password: password.unwrap_or("").to_string(),
+            Uuid: uuid.to_string(),
             Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -612,26 +634,28 @@ impl ClientMessage {
 
     /// this is used for constructing a sync msg aka sending an empty packet, so server can reply
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_sync_msg(password: String, author: String) -> ClientMessage {
+    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: None,
+                password: password.to_string(),
             }),
-            Password: password,
-            Author: author,
+            Uuid: uuid.to_string(),
+            Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_connection_msg(password: String, author: String) -> ClientMessage {
+    pub fn construct_connection_msg(password: String, author: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(true),
+                password,
             }),
-            Password: password,
+            Uuid: uuid.to_string(),
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -639,13 +663,14 @@ impl ClientMessage {
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address TODO: Just switch to uuid's
-    pub fn construct_disconnection_msg(password: String, author: String) -> ClientMessage {
+    pub fn construct_disconnection_msg(password: String, author: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(false),
+                password,
             }),
-            Password: password,
+            Uuid: uuid.to_string(),
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -654,7 +679,7 @@ impl ClientMessage {
     ///this is used for asking for a file
     pub fn construct_file_request_msg(
         index: i32,
-        password: String,
+        uuid: &str,
         author: String,
     ) -> ClientMessage {
         ClientMessage {
@@ -662,7 +687,7 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientFileRequest(ClientFileRequest { index }),
             ),
-            Password: password,
+            Uuid: uuid.to_string(),
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -671,7 +696,7 @@ impl ClientMessage {
     ///this is used for asking for an image
     pub fn construct_image_request_msg(
         index: i32,
-        password: String,
+        uuid: &str,
         author: String,
     ) -> ClientMessage {
         ClientMessage {
@@ -679,7 +704,7 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientImageRequest(ClientImageRequest { index }),
             ),
-            Password: password,
+            Uuid: uuid.to_string(),
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -688,7 +713,7 @@ impl ClientMessage {
     ///this is used for asking for an image
     pub fn construct_audio_request_msg(
         index: i32,
-        password: String,
+        uuid: &str,
         author: String,
     ) -> ClientMessage {
         ClientMessage {
@@ -696,7 +721,7 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientAudioRequest(ClientAudioRequest { index }),
             ),
-            Password: password,
+            Uuid: uuid.to_string(),
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -723,6 +748,7 @@ impl ClientConnection {
         ip: String,
         author: String,
         password: Option<String>,
+        uuid: &str,
     ) -> anyhow::Result<Self> {
         //Ping server to recive custom uuid, and to also get if server ip is valid
         let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
@@ -738,6 +764,7 @@ impl ClientConnection {
                 message: ClientMessage::construct_connection_msg(
                     password.unwrap_or(String::from("")),
                     author,
+                    uuid,
                 )
                 .struct_into_string(),
             }))
@@ -770,7 +797,7 @@ impl ClientConnection {
     }
 
     ///Used to destroy a current ClientConnection instance does not matter if the instance is invalid
-    pub async fn disconnect(&mut self, author: String, password: String) -> anyhow::Result<()> {
+    pub async fn disconnect(&mut self, author: String, password: String, uuid: String) -> anyhow::Result<()> {
         //De-register with the server
         let client = self.client.as_mut().ok_or(anyhow::Error::msg(
             "Invalid ClientConnection instance (Client is None)",
@@ -778,7 +805,7 @@ impl ClientConnection {
 
         client
             .message_main(tonic::Request::new(MessageRequest {
-                message: ClientMessage::construct_disconnection_msg(password, author)
+                message: ClientMessage::construct_disconnection_msg(password, author, &uuid)
                     .struct_into_string(),
             }))
             .await?;
@@ -1177,14 +1204,13 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
     }
 }
 
-//Account management
-
-/// struct containing a new user's info, nothing is encrypted by default
+/// Account management
+/// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct UserInformation {
     /// username
     pub username: String,
-    /// IMPORTANT: PASSWORD IS *NOT* ENCRYPTED BY FUNCTIONS IMPLEMENTED BY THIS TYPE
+    /// IMPORTANT: PASSWORD *IS* ENCRYPTED BY FUNCTIONS IMPLEMENTED BY THIS TYPE
     pub password: String,
     /// uuids are encrypted by the new function
     pub uuid: String,

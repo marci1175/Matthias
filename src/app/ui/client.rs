@@ -489,10 +489,11 @@ impl TemplateApp {
         let should_be_running = self.autosync_should_run.clone();
         let rx = self.autosync_sender.get_or_insert_with(|| {
             let (tx, rx) = mpsc::channel::<String>();
-
+            
             let message = ClientMessage::construct_sync_msg(
-                self.client_ui.client_password.clone(),
-                self.login_username.clone(),
+                &self.client_ui.client_password,
+                &self.login_username,
+                &self.opened_account.uuid,
             );
 
             let connection = self.client_connection.clone();

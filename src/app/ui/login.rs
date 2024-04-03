@@ -1,4 +1,4 @@
-use crate::app::backend::{display_error_message, login, register};
+use crate::app::backend::{display_error_message, login, register, OpenedAccount, UserInformation};
 
 use crate::app::backend::TemplateApp;
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
@@ -30,8 +30,13 @@ impl TemplateApp {
                 {
                     self.main.mode_selector =
                         match login(self.login_username.clone(), self.login_password.clone()) {
-                            Ok(ok) => {
-                                self.main.opened_account_path = ok;
+                            Ok(path_to_file) => {
+                                //Set opened account path
+                                // self.main.opened_account_path = ok;
+                                let account = UserInformation::deserialize(&std::fs::read_to_string(&path_to_file).unwrap()).unwrap();
+
+                                self.opened_account = OpenedAccount::new(account.uuid, account.username, path_to_file);
+
                                 true
                             }
                             Err(err) => {

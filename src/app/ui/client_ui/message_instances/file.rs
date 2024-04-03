@@ -19,7 +19,7 @@ impl TemplateApp {
                 let author = self.login_username.clone();
                 let sender = self.ftx.clone();
 
-                let message = ClientMessage::construct_file_request_msg(file.index, passw, author);
+                let message = ClientMessage::construct_file_request_msg(file.index, &passw, author);
 
                 let connection = self.client_connection.clone();
 

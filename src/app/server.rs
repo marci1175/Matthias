@@ -1,8 +1,7 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
 
 use super::backend::{
-    encrypt_aes256, MessageReaction, Reaction,
-    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
 };
 
 use messages::{
@@ -77,8 +76,60 @@ impl ServerMessage for MessageService {
         let req: ClientMessage = req_result.unwrap();
 
         if let Some(remote_address) = inbound_connection_address {
-            if req.Password == self.passw.trim()
-                || self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
+            if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
+                if sync_msg.password == self.passw.trim() {
+                    //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
+                    if let Some(sync_attr) = sync_msg.sync_attribute {
+                        //Incoming connection, we should be returning temp uuid
+                        if sync_attr {
+                            match self.connected_clients.lock() {
+                                Ok(mut clients) => {
+                                    //Search for connected ip in all connected ips
+                                    for client in clients.iter() {
+                                        //If found, then the client is already connected
+                                        if *client == remote_address {}
+                                    }
+
+                                    //If the ip is not found then add it to connected ip's
+                                    clients.push(remote_address);
+
+                                    //Return custom which will the server's text will be encrypted with
+                                    return Ok(Response::new(MessageResponse {
+                                        message: hex::encode(self.decryption_key),
+                                    }));
+                                }
+                                Err(err) => {
+                                    dbg!(err);
+                                }
+                            }
+                        }
+                        //Handle disconnections
+                        else {
+                            match self.connected_clients.lock() {
+                                Ok(mut clients) => {
+                                    //Search for connected ip in all connected ips
+                                    for (index, client) in clients.clone().iter().enumerate() {
+                                        //If found, then disconnect the client
+                                        if *client == remote_address {
+                                            clients.remove(index);
+
+                                            //Stop the for loop, for safety
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    dbg!(err);
+                                }
+                            }
+                        }
+                    }
+
+                    //else: we dont do anything because we return the updated message list in the end
+                }
+            }
+
+            if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
                     .connected_clients
                     .lock()
                     .unwrap()
@@ -90,54 +141,7 @@ impl ServerMessage for MessageService {
                     ClientNormalMessage(_msg) => self.NormalMessage(req).await,
 
                     ClientSyncMessage(_msg) => {
-                        //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
-                        if let Some(sync_attr) = _msg.sync_attribute {
-                            //Incoming connection, we should be returning temp uuid
-                            if sync_attr {
-                                match self.connected_clients.lock() {
-                                    Ok(mut clients) => {
-                                        //Search for connected ip in all connected ips
-                                        for client in clients.iter() {
-                                            //If found, then the client is already connected
-                                            if *client == remote_address {}
-                                        }
-
-                                        //If the ip is not found then add it to connected ip's
-                                        clients.push(remote_address);
-
-                                        //Return custom which will the server's text will be encrypted with
-                                        return Ok(Response::new(MessageResponse {
-                                            message: hex::encode(self.decryption_key),
-                                        }));
-                                    }
-                                    Err(err) => {
-                                        dbg!(err);
-                                    }
-                                }
-                            }
-                            //Handle disconnections
-                            else {
-                                match self.connected_clients.lock() {
-                                    Ok(mut clients) => {
-                                        //Search for connected ip in all connected ips
-                                        for (index, client) in clients.clone().iter().enumerate() {
-                                            //If found, then disconnect the client
-                                            if *client == remote_address {
-                                                clients.remove(index);
-
-                                                //Stop the for loop, for safety
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        dbg!(err);
-                                    }
-                                }
-                            }
-                        }
-
-                        //else: we dont do anything because we return the updated message list in the end
+                        unimplemented!("How the fuck did you get here?");
                     }
 
                     ClientFileRequestType(request_type) => {

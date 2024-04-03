@@ -132,13 +132,13 @@ impl TemplateApp {
                         }
 
                         //We dont have file on our local system so we have to ask the server to provide it
-                        let passw = self.client_ui.client_password.clone();
+                        let uuid = &self.opened_account.uuid;
                         let author = self.login_username.clone();
                         let sender = self.itx.clone();
 
                         let message = ClientMessage::construct_image_request_msg(
                             picture.index,
-                            passw,
+                            uuid,
                             author,
                         );
 
