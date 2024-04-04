@@ -1,7 +1,7 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
 
 use super::backend::{
-    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
+    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
 };
 
 use messages::{
@@ -15,11 +15,11 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
-    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
+    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessageEdit as ClientMessageEditStruct,
     ClientMessage,
     ClientMessageType::{
         ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientReaction,
-        ClientSyncMessage,
+        ClientSyncMessage, ClientMessageEdit,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
@@ -138,7 +138,7 @@ impl ServerMessage for MessageService {
             //Search through the list
             {
                 match &req.MessageType {
-                    ClientNormalMessage(_msg) => self.NormalMessage(req).await,
+                    ClientNormalMessage(_msg) => self.NormalMessage(&req).await,
 
                     ClientSyncMessage(_msg) => {
                         unimplemented!("How the fuck did you get here?");
@@ -154,6 +154,10 @@ impl ServerMessage for MessageService {
 
                     ClientReaction(reaction) => {
                         self.handle_reaction(reaction).await;
+                    }
+
+                    ClientMessageEdit(edit) => {
+                        self.handle_message_edit(edit, &req).await;
                     }
                 };
 
@@ -348,14 +352,16 @@ pub async fn server_main(
 
 impl MessageService {
     /// all the functions the server can do
-    async fn NormalMessage(&self, req: ClientMessage) {
+    async fn NormalMessage(&self, req: &ClientMessage) {
         match self.messages.lock() {
             Ok(mut ok) => {
                 ok.push(ServerOutput::convert_type_to_servermsg(
-                    req,
+                    req.clone(),
+                    //Im not sure why I did that TODO: Tf is this?
                     -1,
                     Normal,
                     MessageReaction::default(),
+                    req.Uuid.clone(),
                 ));
             }
             Err(err) => {
@@ -441,10 +447,11 @@ impl MessageService {
                             match self.messages.lock() {
                                 Ok(mut ok) => {
                                     ok.push(ServerOutput::convert_type_to_servermsg(
-                                        request,
+                                        request.clone(),
                                         self.original_file_paths.lock().unwrap().len() as i32 - 1,
                                         Upload,
                                         MessageReaction::default(),
+                                        request.Uuid.clone(),
                                     ));
                                 }
                                 Err(err) => println!("{err}"),
@@ -494,6 +501,7 @@ impl MessageService {
                                     image_path_lenght as i32,
                                     Image,
                                     MessageReaction::default(),
+                                    req.Uuid.clone(),
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -540,6 +548,7 @@ impl MessageService {
                             audio_paths_lenght as i32,
                             Audio,
                             MessageReaction::default(),
+                            req.Uuid.clone(),
                         ));
                     }
                     Err(err) => println!("{err}"),
@@ -654,6 +663,22 @@ impl MessageService {
                         times: 1,
                     });
             }
+            Err(err) => println!("{err}"),
+        }
+    }
+
+    async fn handle_message_edit(&self, edit: &ClientMessageEditStruct, req: &ClientMessage) {         
+        match &mut self.messages.try_lock() {
+            Ok(messages_vec) => {   
+                //Server-side uuid check
+                if messages_vec[edit.index].uuid != req.Uuid {
+                    return;
+                }
+
+                if let ServerMessageType::Normal(inner_msg) = &mut messages_vec[edit.index].MessageType {
+                    inner_msg.message = edit.new_message.clone();
+                }
+            },
             Err(err) => println!("{err}"),
         }
     }

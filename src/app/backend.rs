@@ -377,6 +377,10 @@ pub struct Client {
     ///Log when the voice recording has been started so we know how long the recording is
     #[serde(skip)]
     pub voice_recording_start: Option<DateTime<Utc>>,
+
+    ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
+    #[serde(skip)]
+    pub text_edit_buffer: String,
 }
 impl Default for Client {
     fn default() -> Self {
@@ -422,6 +426,7 @@ impl Default for Client {
             incoming_msg: ServerMaster::default(),
 
             voice_recording_start: None,
+            text_edit_buffer: String::new(),
         }
     }
 }
@@ -523,6 +528,15 @@ pub struct ClientReaction {
     pub message_index: usize,
 }
 
+///Lets the client edit their *OWN* message, a client check is implemented TODO: please write a server check for this
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientMessageEdit {
+    ///The message which is edited
+    pub index: usize,
+    ///The new message
+    pub new_message: String,
+}
+
 ///These are the types of requests the client can ask
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientFileRequestType {
@@ -546,6 +560,8 @@ pub enum ClientMessageType {
     ClientSyncMessage(ClientSnycMessage),
 
     ClientReaction(ClientReaction),
+
+    ClientMessageEdit(ClientMessageEdit)
 }
 
 ///This is what gets to be sent out by the client
@@ -723,6 +739,17 @@ impl ClientMessage {
             ),
             Uuid: uuid.to_string(),
             Author: author,
+            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
+
+
+    pub fn construct_client_message_edit(index: usize, new_message: String, uuid: &str, author: &str) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            MessageType: ClientMessageType::ClientMessageEdit(ClientMessageEdit { index, new_message }),
+            Uuid: uuid.to_string(),
+            Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -939,15 +966,24 @@ pub struct Reaction {
     pub times: i64,
 }
 
-///This is one whole server msg (packet), which gets bundled when sending ServerMain
+///This is one msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
+    /// Which message is this a reply to?
+    /// The server stores all messages in a vector so this index shows which message its a reply to (if it is)
     pub replying_to: Option<usize>,
+    /// Inner message which is *wrapped* in the ServerOutput 
     pub MessageType: ServerMessageType,
+    /// The account's name who sent the message
     pub Author: String,
+    /// The date when this message was sent
     pub MessageDate: String,
+    /// The reactions added to the message
     pub reactions: MessageReaction,
+    /// The user who sent this message's uuid
+    pub uuid: String,
 }
+
 impl ServerOutput {
     pub fn _struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
@@ -959,12 +995,13 @@ impl ServerOutput {
         //Automaticly generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
         reactions: MessageReaction,
+        uuid: String,
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
             MessageType:
                 match normal_msg.MessageType {
-                    ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
+                    ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
                     ClientMessageType::ClientFileUpload(upload) => {
                         match upload_type {
                             ServerMessageTypeDiscriminants::Upload => {
@@ -1009,11 +1046,13 @@ impl ServerOutput {
                         )
                     },
                     ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
-                    ClientMessageType::ClientReaction(_) => todo!(),
+                    ClientMessageType::ClientReaction(_) => unimplemented!("This enum has a side effect on one message's MessageReaction which is contained by a ServerMessage stored by the server. This must not be displayed by the client"),
+                    ClientMessageType::ClientMessageEdit(_) => unimplemented!("This enum has a side effect on the server's vec which stores all messages, this must not be displayed by the client"),
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
             reactions,
+            uuid,
         }
     }
 }

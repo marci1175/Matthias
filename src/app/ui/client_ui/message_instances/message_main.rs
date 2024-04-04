@@ -2,7 +2,7 @@ use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
 use crate::app::{
-    backend::{AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp},
+    backend::{AudioSettings, ClientMessage, ClientMessageEdit, ScrollToMessage, ServerMessageType, TemplateApp},
     client,
 };
 
@@ -110,6 +110,20 @@ impl TemplateApp {
                                         });
                                     }
                                     ).response.context_menu(|ui|{
+                                        //Client-side uuid check, there is a check in the server file
+                                        if item.uuid == self.opened_account.uuid {
+                                            ui.horizontal(|ui| {
+                                                ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
+                                                if ui.button("Edit").clicked() {
+                                                    self.send_msg(
+                                                        ClientMessage::construct_client_message_edit(index, self.client_ui.text_edit_buffer.clone(), &self.opened_account.uuid, &self.opened_account.username)
+                                                    );
+                                                    
+                                                    self.client_ui.text_edit_buffer.clear();
+                                                }
+                                            });
+                                        }
+
                                         ui.menu_button("React", |ui| {
                                             let filter = &self.filter;
                                             let named_chars = self.named_chars
