@@ -127,6 +127,7 @@ impl ServerMessage for MessageService {
 
                     //else: we dont do anything because we return the updated message list in the end
                 }
+                return self.sync_message().await;
             }
 
             if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered

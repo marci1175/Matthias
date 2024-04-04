@@ -34,8 +34,6 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        //dbg!(generate_uuid());
-
         /* NOTES:
 
             - file_tray_main.rs contains reply_tray
@@ -44,7 +42,6 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: Make uuid system
             TODO: Combine server and client
 
         */
@@ -64,7 +61,7 @@ impl eframe::App for backend::TemplateApp {
 
         //Server page
         if self.main.server_mode {
-            self.state_server(_frame, ctx);
+            // self.state_server(_frame, ctx);
         }
 
         //Client page
@@ -77,9 +74,12 @@ impl eframe::App for backend::TemplateApp {
             self.window_emoji(ctx);
         }
 
+        //Create value
+        let mut settings_window = self.settings_window;
+
         //children windows
         egui::Window::new("Settings")
-            .open(&mut self.settings_window)
+            .open(&mut settings_window)
             .show(ctx, |ui| {
                 //show client mode settings
                 if self.main.client_mode {
@@ -307,10 +307,18 @@ impl eframe::App for backend::TemplateApp {
                     if self.client_ui.invalid_password {
                         ui.label(RichText::from("Invalid Password!").color(Color32::RED));
                     }
-                } else if self.main.server_mode {
+
+                    ui.separator();
+
+                    ui.label("Host a server!");
+
+                    self.server_setup_ui(ui);
                 }
             });
-
+            
+        //Set value; Im terribly sorry I had to dodge this borrrow checker, LAWD HAVE MERCY
+        self.settings_window = settings_window;
+        
         egui::Window::new("Bookmarks")
             .open(&mut self.main.bookmark_mode)
             .show(ctx, |ui| {

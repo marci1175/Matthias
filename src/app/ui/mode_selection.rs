@@ -1,4 +1,4 @@
-use crate::app::backend::TemplateApp;
+use crate::app::backend::{display_error_message, TemplateApp};
 
 use eframe::Frame;
 use egui::{vec2, Align, Layout, RichText, ViewportCommand};
@@ -22,6 +22,10 @@ impl TemplateApp {
                     );
                     if ui.button("Logout").clicked() {
                         self.main.mode_selector = false;
+                        
+                        if self.server_has_started {
+                            display_error_message("Can not log out while server is running.");
+                        }
                     }
                 });
             });
