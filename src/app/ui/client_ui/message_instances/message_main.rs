@@ -98,6 +98,13 @@ impl TemplateApp {
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
+
+                                        if let ServerMessageType::Normal(inner_msg) = &item.MessageType {
+                                            if inner_msg.has_been_edited {
+                                                ui.label(RichText::from("Edited").strong());
+                                            }
+                                        }
+
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
                                                 for item in &item.reactions.message_reactions {
