@@ -114,15 +114,34 @@ impl TemplateApp {
                                         if item.uuid == self.opened_account.uuid {
                                             ui.horizontal(|ui| {
                                                 ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
-                                                if ui.button("Edit").clicked() {
-                                                    self.send_msg(
-                                                        ClientMessage::construct_client_message_edit(index, self.client_ui.text_edit_buffer.clone(), &self.opened_account.uuid, &self.opened_account.username)
-                                                    );
+                                                ui.vertical(|ui| {
+                                                    ui.allocate_ui(vec2(100., 10.), |ui| {
+                                                        if ui.button("Edit").clicked() {
+                                                            self.send_msg(
+                                                                ClientMessage::construct_client_message_edit(index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
+                                                            );
+        
+                                                            self.client_ui.text_edit_buffer.clear();
+                                                            ui.close_menu();
+                                                        }
+    
+                                                        if ui.button("Delete").clicked() {
+                                                            self.send_msg(
+                                                                ClientMessage::construct_client_message_edit(index, None, &self.opened_account.uuid, &self.opened_account.username)
+                                                            );
+        
+                                                            self.client_ui.text_edit_buffer.clear();
+                                                            ui.close_menu();
+                                                        }
+
+                                                    });
                                                     
-                                                    self.client_ui.text_edit_buffer.clear();
-                                                }
+
+                                                });
                                             });
                                         }
+
+                                        ui.separator();
 
                                         ui.menu_button("React", |ui| {
                                             let filter = &self.filter;

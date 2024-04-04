@@ -676,7 +676,13 @@ impl MessageService {
                 }
 
                 if let ServerMessageType::Normal(inner_msg) = &mut messages_vec[edit.index].MessageType {
-                    inner_msg.message = edit.new_message.clone();
+                    if let Some(new_msg) = edit.new_message.clone() {
+                        inner_msg.message = new_msg;
+                    }
+                    //If its none then it means we need to delete the message
+                    else {
+                        messages_vec.remove(edit.index);
+                    }
                 }
             },
             Err(err) => println!("{err}"),

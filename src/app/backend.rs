@@ -534,7 +534,7 @@ pub struct ClientMessageEdit {
     ///The message which is edited
     pub index: usize,
     ///The new message
-    pub new_message: String,
+    pub new_message: Option<String>,
 }
 
 ///These are the types of requests the client can ask
@@ -744,7 +744,7 @@ impl ClientMessage {
     }
 
 
-    pub fn construct_client_message_edit(index: usize, new_message: String, uuid: &str, author: &str) -> ClientMessage {
+    pub fn construct_client_message_edit(index: usize, new_message: Option<String>, uuid: &str, author: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientMessageEdit(ClientMessageEdit { index, new_message }),
@@ -914,6 +914,7 @@ pub struct ServerImageReply {
 ///This is what the server sends back (pushes to message vector), when reciving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerNormalMessage {
+    pub has_been_edited: bool,
     pub message: String,
 }
 
@@ -1042,6 +1043,8 @@ impl ServerOutput {
                         ServerMessageType::Normal(
                             ServerNormalMessage {
                                 message: message.message,
+                                //Set default value for incoming messages
+                                has_been_edited: false,
                             }
                         )
                     },
