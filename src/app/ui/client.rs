@@ -506,7 +506,8 @@ impl TemplateApp {
 
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure
         self.autosync_sender.get_or_insert_with(|| {
-            let (tx, rx) = mpsc::channel::<String>();
+            //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
+            let (tx, rx) = mpsc::channel::<Option<String>>();
             
             let message = ClientMessage::construct_sync_msg(
                 &self.client_ui.client_password,
@@ -524,7 +525,7 @@ impl TemplateApp {
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
-                            match tx.send(ok) {
+                            match tx.send(Some(ok)) {
                                 Ok(_) => {}
                                 Err(err) => {
                                     println!("{} ln 57", err);
@@ -538,21 +539,30 @@ impl TemplateApp {
                         }
                     };
                 }
+
+                //Error appeared
+                let _  = tx.send(None);
             });
 
             //Return none, because that means we got an error (if we breaked free from the while loop), or we didnt need to sync
-            None
+            // None
         });
 
         //Get sent to the channel to be displayed, if the connections errors out, 
         match self.autosync_reciver.try_recv() {
             Ok(msg) => {
                 //show messages
-                ctx.request_repaint();
-                let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                    serde_json::from_str(&msg);
-                if let Ok(ok) = incoming_struct {
-                    self.client_ui.incoming_msg = ok;
+                if let Some(message) = msg {
+                    ctx.request_repaint();
+                    let incoming_struct: Result<ServerMaster, serde_json::Error> =
+                        serde_json::from_str(&message);
+                    if let Ok(ok) = incoming_struct {
+                        self.client_ui.incoming_msg = ok;
+                    }
+                    else {
+                        //Then the thread got an error, we should reset the state
+                        self.autosync_sender = None;
+                    }
                 }
             }
             Err(_err) => {
