@@ -19,6 +19,7 @@ impl TemplateApp {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         //Window settings
         ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(1000., 800.)));
 
         //Server - Client syncing
         self.client_sync(ctx);
