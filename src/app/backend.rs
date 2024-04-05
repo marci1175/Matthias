@@ -22,6 +22,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::Receiver;
 use std::sync::{mpsc, Arc, Mutex};
 use tonic::transport::{Channel, Endpoint};
 use windows_sys::w;
@@ -143,7 +144,10 @@ pub struct TemplateApp {
 
     ///Server - client syncing thread
     #[serde(skip)]
-    pub autosync_sender: Option<mpsc::Receiver<String>>,
+    pub autosync_sender: Option<Option<()>>,
+
+    #[serde(skip)]
+    pub autosync_reciver: Receiver<String>,
 
     ///Server - client sync worker should run
     #[serde(skip)]
@@ -171,6 +175,8 @@ impl Default for TemplateApp {
 
         //Use the tokio sync crate for it to be async
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
+
+        let (_, autosync_reciver) = mpsc::channel::<String>();
 
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -248,6 +254,7 @@ impl Default for TemplateApp {
             dtx,
             autosync_sender: None,
             autosync_should_run: Arc::new(AtomicBool::new(true)),
+            autosync_reciver,
 
             opened_account: OpenedAccount::default(),
         }

@@ -503,7 +503,9 @@ impl TemplateApp {
 
     fn client_sync(&mut self, ctx: &egui::Context) {
         let should_be_running = self.autosync_should_run.clone();
-        let rx = self.autosync_sender.get_or_insert_with(|| {
+
+        //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure
+        self.autosync_sender.get_or_insert_with(|| {
             let (tx, rx) = mpsc::channel::<String>();
             
             let message = ClientMessage::construct_sync_msg(
@@ -513,6 +515,8 @@ impl TemplateApp {
             );
 
             let connection = self.client_connection.clone();
+
+            self.autosync_reciver = rx;
 
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
@@ -535,11 +539,13 @@ impl TemplateApp {
                     };
                 }
             });
-            rx
+
+            //Return none, because that means we got an error (if we breaked free from the while loop), or we didnt need to sync
+            None
         });
 
-        //Get sent to the channel to be displayed
-        match rx.try_recv() {
+        //Get sent to the channel to be displayed, if the connections errors out, 
+        match self.autosync_reciver.try_recv() {
             Ok(msg) => {
                 //show messages
                 ctx.request_repaint();
@@ -547,12 +553,12 @@ impl TemplateApp {
                     serde_json::from_str(&msg);
                 if let Ok(ok) = incoming_struct {
                     self.client_ui.incoming_msg = ok;
-                    dbg!("RECIVED");
                 }
             }
             Err(_err) => {
-                //self.autosync_sender = None;
-                dbg!(_err);
+                //Why was this commented out
+                self.autosync_sender = None;
+                // dbg!(_err);
             }
         }
     }
