@@ -23,7 +23,7 @@ impl TemplateApp {
         //Server - Client syncing
         self.client_sync(ctx);
 
-        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "setting_area").show(
+        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "settings_area").show(
             ctx,
             |ui| {
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
@@ -34,6 +34,12 @@ impl TemplateApp {
                             )))
                             .clicked()
                         {
+                            self.main.client_mode = false;
+                        
+                            if self.server_has_started {
+                                display_error_message("Can not log out while server is running.");
+                            }
+
                             //shut down sync service
                             self.autosync_should_run.store(false, Ordering::Relaxed);
                             self.autosync_sender = None;
@@ -43,6 +49,7 @@ impl TemplateApp {
                     })
                     .response
                     .on_hover_text("Logout");
+
                     ui.allocate_ui(vec2(300., 40.), |ui| {
                         if ui
                             .add(egui::widgets::ImageButton::new(egui::include_image!(
@@ -62,6 +69,14 @@ impl TemplateApp {
                         {
                             self.client_ui.search_mode = !self.client_ui.search_mode;
                         };
+                    });
+                    ui.allocate_ui(vec2(300., 50.), |ui| {
+                        ui.label(RichText::from("Welcome,").weak().size(20.));
+                        ui.label(
+                            RichText::from(self.opened_account.username.to_string())
+                                .strong()
+                                .size(20.),
+                        );
                     });
                 });
 
@@ -531,10 +546,12 @@ impl TemplateApp {
                     serde_json::from_str(&msg);
                 if let Ok(ok) = incoming_struct {
                     self.client_ui.incoming_msg = ok;
+                    dbg!("RECIVED");
                 }
             }
             Err(_err) => {
                 //self.autosync_sender = None;
+                dbg!(_err);
             }
         }
     }

@@ -119,9 +119,6 @@ impl TemplateApp {
                                     ).response.context_menu(|ui|{
                                         //Client-side uuid check, there is a check in the server file
                                         if item.uuid == self.opened_account.uuid {
-    
-                                            ui.separator();
-
                                             ui.horizontal(|ui| {
                                                 ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
                                                 ui.vertical(|ui| {
@@ -148,6 +145,8 @@ impl TemplateApp {
 
                                                 });
                                             });
+
+                                            ui.separator();
                                         }
 
                                         ui.menu_button("React", |ui| {

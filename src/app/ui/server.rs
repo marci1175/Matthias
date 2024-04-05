@@ -7,110 +7,116 @@ use tokio::sync;
 
 impl TemplateApp {
     pub fn server_setup_ui(&mut self, ui: &mut egui::Ui) {
-        ui.with_layout(Layout::top_down(Align::Center), |ui| {
-            ui.label(RichText::from("Server mode").strong().size(30.));
-            if !self.server_has_started {
-                ui.label(RichText::from("Server setup").size(30.).strong());
-                ui.separator();
-                ui.label(RichText::from("Open on port").size(20.));
-                ui.text_edit_singleline(&mut self.open_on_port);
-                let temp_open_on_port = &self.open_on_port;
+        ui.collapsing("Host a server!", |ui| {
+            ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                if !self.server_has_started {
+                    ui.label(RichText::from("Server setup"));
     
-                //ui.checkbox(&mut self.ipv4_mode, "Internet protocol (IP) v4 mode");
+                    ui.allocate_ui(vec2(100., 30.),|ui| {
+                        ui.horizontal_centered(|ui| {
+                        ui.label(RichText::from("Port"));
+                        ui.text_edit_singleline(&mut self.open_on_port);
+                    });});
+    
+                    let temp_open_on_port = &self.open_on_port;
         
-                if ui.button("Start").clicked() {
-                    //to be implemented for later msg showing to server mode
-                    let _temp_tx = self.stx.clone();
+                    if ui.button("Start server").clicked() {
+                        let server_pw = match self.server_req_password {
+                            true => self.server_password.clone(),
+                            false => "".to_string(),
+                        };
+        
+                        //Create a new pair of channels
+                        let (sender, reciver) = sync::mpsc::channel(1);
+        
+                        //Overwrite the channel we have in the TemplateApp struct
+                        self.server_shutdown_sender = sender;
+        
+                        self.server_has_started = match temp_open_on_port.parse::<i32>() {
+                            Ok(port) => {
+                                tokio::spawn(async move {
+                                    match server::server_main(port.to_string(), server_pw, reciver)
+                                        .await
+                                    {
+                                        Ok(_temp_stuff) => {}
+                                        Err(err) => {
+                                            println!("ln 208 {:?}", err);
+                                        }
+                                    };
+                                });
+                                true
+                            }
+                            Err(err) => {
+                                display_error_message(err);
+        
+                                false
+                            }
+                        };
+                    }
     
-                    let server_pw = match self.server_req_password {
-                        true => self.server_password.clone(),
-                        false => "".to_string(),
-                    };
+                    ui.checkbox(&mut self.server_req_password, "Server requires password");
+                    
+                    if self.server_req_password {
+                        ui.text_edit_singleline(&mut self.server_password);
+                    }
     
-                    //Create a new pair of channels
-                    let (sender, reciver) = sync::mpsc::channel(1);
-    
-                    //Overwrite the channel we have in the TemplateApp struct
-                    self.server_shutdown_sender = sender;
-    
-                    self.server_has_started = match temp_open_on_port.parse::<i32>() {
-                        Ok(port) => {
-                            tokio::spawn(async move {
-                                match server::server_main(port.to_string(), server_pw, reciver)
-                                    .await
-                                {
-                                    Ok(_temp_stuff) => {}
-                                    Err(err) => {
-                                        println!("ln 208 {:?}", err);
-                                    }
-                                };
+                } else {
+                    if ui.button("Shutdown").clicked() {
+        
+                        let sender = self.server_shutdown_sender.clone();
+        
+                        tokio::spawn(async move {
+                            //Throw away error, because we already inspect it
+                            let _ = sender.send(()).await.tap_dbg(|func| {
+                                let _ = func.inspect_err(|e| tracing::error!("{e:?}"));
                             });
-                            true
-                        }
-                        Err(err) => {
-                            display_error_message(err);
-    
-                            false
-                        }
-                    };
-                }
-                ui.separator();
-                ui.checkbox(&mut self.server_req_password, "Server requires password");
-                if self.server_req_password {
-                    ui.text_edit_singleline(&mut self.server_password);
-                }
-            } else {
-                if ui.button("Shutdown").clicked() {
-    
-                    let sender = self.server_shutdown_sender.clone();
-    
-                    tokio::spawn(async move {
-                        //Throw away error, because we already inspect it
-                        let _ = sender.send(()).await.tap_dbg(|func| {
-                            let _ = func.inspect_err(|e| tracing::error!("{e:?}"));
                         });
-                    });
+        
+                        //Reset server state
+                        self.server_has_started = false;
+        
+                    }
+        
+                    if self.public_ip.is_empty() {
+                        let tx = self.dtx.clone();
+                        std::thread::spawn(move || {
+                            let combined_ips = ipv4_get()
+                                .unwrap_or_else(|_| "Couldnt connect to the internet".to_string())
+                                + ";"
+                                + &ipv6_get().unwrap_or_else(|_| {
+                                    "Couldnt connect to the internet".to_string()
+                                });
+                            tx.send(combined_ips.trim().to_owned())
+                        });
+                        match self.drx.recv() {
+                            Ok(ok) => {
+                                self.public_ip = ok.clone();
+                                //Set the ip we are connecting to so we dont need to paste it
+                                let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
     
-                    //Reset server state
-                    self.server_has_started = false;
-    
-                }
-    
-                if self.public_ip.is_empty() {
-                    let tx = self.dtx.clone();
-                    std::thread::spawn(move || {
-                        let combined_ips = ipv4_get()
-                            .unwrap_or_else(|_| "Couldnt connect to the internet".to_string())
-                            + ";"
-                            + &ipv6_get().unwrap_or_else(|_| {
-                                "Couldnt connect to the internet".to_string()
-                            });
-                        tx.send(combined_ips.trim().to_owned())
-                    });
-                    match self.drx.recv() {
-                        Ok(ok) => self.public_ip = ok,
-                        Err(err) => {
-                            eprintln!("{}", err)
+                                self.client_ui.send_on_ip = format!("[{}]:{}", pub_ip[0], self.open_on_port);
+                            },
+                            Err(err) => {
+                                eprintln!("{}", err)
+                            }
                         }
                     }
-                }
-
-                let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
-                ui.label(RichText::from("Public ipV6 address : ").size(20.));
-                ui.text_edit_singleline(&mut pub_ip[0].trim().to_string());
-                ui.label("Server address");
-                ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[0], self.open_on_port));
     
-                if self.server_req_password && !self.server_password.is_empty() {
-                    ui.label(RichText::from(format!(
-                        "Password : {}",
-                        self.server_password
-                    )));
-                }
+                    let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
     
-                ui.label(RichText::from("Port").size(15.).strong());
-                ui.label(RichText::from(self.open_on_port.clone()).size(15.));
-            }
+                    ui.horizontal(|ui| {
+                        ui.label("Server address (Public ipv6 address)");
+                        ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[0], self.open_on_port));
+                    });
+    
+                    if self.server_req_password && !self.server_password.is_empty() {
+                        ui.label(RichText::from(format!(
+                            "Password: {}",
+                            self.server_password
+                        )));
+                    }
+                }
+            });
         });
     }
 }

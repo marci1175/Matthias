@@ -28,11 +28,9 @@ impl TemplateApp {
                     || ctx.input(|reader| reader.key_down(egui::Key::Enter))
                         && !(self.login_password.is_empty() && self.login_username.is_empty())
                 {
-                    self.main.mode_selector =
+                    self.main.client_mode =
                         match login(self.login_username.clone(), self.login_password.clone()) {
                             Ok(path_to_file) => {
-                                //Set opened account path
-                                // self.main.opened_account_path = ok;
                                 let account = UserInformation::deserialize(&std::fs::read_to_string(&path_to_file).unwrap()).unwrap();
 
                                 self.opened_account = OpenedAccount::new(account.uuid, account.username, path_to_file);

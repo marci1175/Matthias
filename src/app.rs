@@ -42,7 +42,7 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: Combine server and client
+            TODO: Fix autosync
 
         */
 
@@ -50,18 +50,8 @@ impl eframe::App for backend::TemplateApp {
         egui_extras::install_image_loaders(ctx);
 
         //Login Page
-        if !(self.main.mode_selector || self.main.server_mode || self.main.client_mode) {
+        if !self.main.client_mode {
             self.state_login(_frame, ctx);
-        }
-
-        //Main page
-        if self.main.mode_selector && !(self.main.server_mode || self.main.client_mode) {
-            self.state_mode_selection(_frame, ctx);
-        }
-
-        //Server page
-        if self.main.server_mode {
-            // self.state_server(_frame, ctx);
         }
 
         //Client page
@@ -77,7 +67,7 @@ impl eframe::App for backend::TemplateApp {
         //Create value
         let mut settings_window = self.settings_window;
 
-        //children windows
+        //Settings window
         egui::Window::new("Settings")
             .open(&mut settings_window)
             .show(ctx, |ui| {
@@ -310,8 +300,6 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.separator();
 
-                    ui.label("Host a server!");
-
                     self.server_setup_ui(ui);
                 }
             });
@@ -319,6 +307,7 @@ impl eframe::App for backend::TemplateApp {
         //Set value; Im terribly sorry I had to dodge this borrrow checker, LAWD HAVE MERCY
         self.settings_window = settings_window;
         
+        //Bookmarks windows
         egui::Window::new("Bookmarks")
             .open(&mut self.main.bookmark_mode)
             .show(ctx, |ui| {

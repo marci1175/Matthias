@@ -450,14 +450,6 @@ pub struct Main {
     #[serde(skip)]
     pub client_mode: bool,
 
-    ///Server mode main switch
-    #[serde(skip)]
-    pub server_mode: bool,
-
-    ///Mode selector mode main switch
-    #[serde(skip)]
-    pub mode_selector: bool,
-
     ///IMPORTANT: Opened account's file pathbuf
     #[serde(skip)]
     pub opened_account_path: PathBuf,
