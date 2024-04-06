@@ -13,6 +13,7 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use winrt_toast::Toast;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -501,6 +502,10 @@ pub struct ClientSnycMessage {
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<bool>,
 
+    ///This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
+    /// This value is ignored if the `sync_attribute` field is Some(_)
+    pub client_message_counter: Option<usize>,
+
     ///Contain password in the sync message, so we will send the password when authenticating
     pub password: String,
 }
@@ -658,6 +663,8 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: None,
                 password: password.to_string(),
+                //This value is not ignored in this context TODO: MAKE SERVER
+                client_message_counter: None,
             }),
             Uuid: uuid.to_string(),
             Author: author.to_string(),
@@ -672,6 +679,8 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(true),
                 password,
+                //If its used for connecting / disconnecting this value is ignored
+                client_message_counter: None,
             }),
             Uuid: uuid.to_string(),
             Author: author,
@@ -687,6 +696,8 @@ impl ClientMessage {
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(false),
                 password,
+                //If its used for connecting / disconnecting this value is ignored
+                client_message_counter: None,
             }),
             Uuid: uuid.to_string(),
             Author: author,
@@ -1496,3 +1507,15 @@ where
         );
     });
 }
+
+// pub fn display_toast_notification() -> anyhow::Result<()> {
+//     let toastmanager = winrt_toast::ToastManager::new("Test123");
+
+//     let mut notif = Toast::new();
+
+//     notif.text1("Title").text2("Body").text3("Footer");
+
+//     toastmanager.show(&notif)?;
+
+//     Ok(())
+// }

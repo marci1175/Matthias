@@ -7,9 +7,13 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
+    // use crate::app::backend::display_toast_notification;
+    // display_toast_notification();
+
     //Ensure all temporary folders are deleted
 
     use egui::ViewportBuilder;
+
     let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
     let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
 

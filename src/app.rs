@@ -42,7 +42,9 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: Fix autosync
+            TODO: improve autosync
+            TODO: add if the user has seen the message
+            TODO: add notfications
 
         */
 
@@ -74,7 +76,8 @@ impl eframe::App for backend::TemplateApp {
                 //show client mode settings
                 if self.main.client_mode {
                     ui.label("Message editor text size");
-                    ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
+                    let asd = ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
+                    
                     ui.separator();
 
                     ui.label("Connect to an ip address");
@@ -83,14 +86,6 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            //Make connecting to an ip more user friendly
-                            // ui.add(egui::TextEdit::singleline(&mut self.send_on_address).hint_text("Address"));
-                            // ui.add(egui::TextEdit::singleline(&mut self.send_on_port).hint_text("Port"));
-
-                            // //format two text inputs, so because im too lazy
-                            // self.send_on_ip = format!("[{}]:{}", self.send_on_address, self.send_on_port);
-
-                            //Check if there already is a connection
                             ui.add_enabled_ui(self.client_connection.client.is_none(), |ui| {
                                 ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                             });
