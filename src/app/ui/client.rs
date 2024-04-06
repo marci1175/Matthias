@@ -3,6 +3,7 @@ use egui::{
     Stroke,
 };
 use rodio::Decoder;
+use core::panic;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -43,7 +44,7 @@ impl TemplateApp {
 
                             //shut down sync service
                             self.autosync_should_run.store(false, Ordering::Relaxed);
-                            self.autosync_sender = None;
+                            self.autosync_sender_thread = None;
 
                             self.main.client_mode = false;
                         };
@@ -505,10 +506,8 @@ impl TemplateApp {
         let should_be_running = self.autosync_should_run.clone();
 
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure
-        self.autosync_sender.get_or_insert_with(|| {
+        self.autosync_sender_thread.get_or_insert_with(|| {
             //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
-            let (tx, rx) = mpsc::channel::<Option<String>>();
-            
             let message = ClientMessage::construct_sync_msg(
                 &self.client_ui.client_password,
                 &self.login_username,
@@ -516,16 +515,17 @@ impl TemplateApp {
             );
 
             let connection = self.client_connection.clone();
-
-            self.autosync_reciver = rx;
-
+            
+            let sender = self.autosync_sender.clone();
+            
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
                     tokio::time::sleep(Duration::from_secs_f32(2.)).await;
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
-                            match tx.send(Some(ok)) {
+                            dbg!("SYNC");
+                            match sender.send(Some(ok)) {
                                 Ok(_) => {}
                                 Err(err) => {
                                     println!("{} ln 57", err);
@@ -541,7 +541,7 @@ impl TemplateApp {
                 }
 
                 //Error appeared
-                let _  = tx.send(None);
+                let _  = sender.send(None);
             });
 
             //Return none, because that means we got an error (if we breaked free from the while loop), or we didnt need to sync
@@ -554,20 +554,28 @@ impl TemplateApp {
                 //show messages
                 if let Some(message) = msg {
                     ctx.request_repaint();
+
+                    //Decrypt the server's reply
+                    let decrypted_message = decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
+
                     let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                        serde_json::from_str(&message);
-                    if let Ok(ok) = incoming_struct {
-                        self.client_ui.incoming_msg = ok;
+                        serde_json::from_str(&decrypted_message);
+
+                    match incoming_struct {
+                        Ok(msg) => {
+                            self.client_ui.incoming_msg = dbg!(msg);
+                        }
+                        Err(_err) => {
+                            // dbg!(_err);
+                        }
                     }
-                    else {
-                        //Then the thread got an error, we should reset the state
-                        self.autosync_sender = None;
-                    }
+                }
+                else {
+                    //Then the thread got an error, we should reset the state
+                    self.autosync_sender_thread = None;
                 }
             }
             Err(_err) => {
-                //Why was this commented out
-                self.autosync_sender = None;
                 // dbg!(_err);
             }
         }

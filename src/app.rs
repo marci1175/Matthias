@@ -183,7 +183,7 @@ impl eframe::App for backend::TemplateApp {
                                             .store(true, std::sync::atomic::Ordering::Relaxed);
 
                                         //reset autosync
-                                        self.autosync_sender = None;
+                                        self.autosync_sender_thread = None;
 
                                         self.client_connection.state = ConnectionState::Connecting;
                                     }
@@ -247,7 +247,7 @@ impl eframe::App for backend::TemplateApp {
                                             .store(true, std::sync::atomic::Ordering::Relaxed);
 
                                         //reset autosync
-                                        self.autosync_sender = None;
+                                        self.autosync_sender_thread = None;
 
                                         self.client_connection.state = ConnectionState::Connecting;
                                     }
@@ -291,7 +291,7 @@ impl eframe::App for backend::TemplateApp {
                     if compare_passwords != self.client_ui.client_password
                         || self.client_ui.send_on_ip != compare_ip
                     {
-                        self.autosync_sender = None;
+                        self.autosync_sender_thread = None;
                         self.client_ui.incoming_msg = ServerMaster::default();
                     }
                     if self.client_ui.invalid_password {
