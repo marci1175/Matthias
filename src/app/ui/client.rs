@@ -563,7 +563,7 @@ impl TemplateApp {
 
                     match incoming_struct {
                         Ok(msg) => {
-                            self.client_ui.incoming_msg = dbg!(msg);
+                            self.client_ui.incoming_msg = msg;
                         }
                         Err(_err) => {
                             // dbg!(_err);
