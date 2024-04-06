@@ -505,7 +505,7 @@ impl TemplateApp {
     fn client_sync(&mut self, ctx: &egui::Context) {
         let should_be_running = self.autosync_should_run.clone();
 
-        //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure
+        //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
         self.autosync_sender_thread.get_or_insert_with(|| {
             //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
             let message = ClientMessage::construct_sync_msg(
@@ -540,12 +540,9 @@ impl TemplateApp {
                     };
                 }
 
-                //Error appeared
+                //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                 let _  = sender.send(None);
             });
-
-            //Return none, because that means we got an error (if we breaked free from the while loop), or we didnt need to sync
-            // None
         });
 
         //Get sent to the channel to be displayed, if the connections errors out, 
