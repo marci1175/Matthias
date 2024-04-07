@@ -87,7 +87,12 @@ impl ServerMessage for MessageService {
                                     //Search for connected ip in all connected ips
                                     for client in clients.iter() {
                                         //If found, then the client is already connected
-                                        if *client == remote_address {}
+                                        if *client == remote_address {
+                                            //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
+                                            return Ok(Response::new(MessageResponse {
+                                                message: hex::encode(self.decryption_key),
+                                            }));
+                                        }
                                     }
 
                                     //If the ip is not found then add it to connected ip's
@@ -127,6 +132,7 @@ impl ServerMessage for MessageService {
 
                     //else: we dont do anything because we return the updated message list in the end
                 }
+                //Sync all messages
                 return self.sync_message(&req).await;
             }
 
@@ -358,7 +364,7 @@ impl MessageService {
             Ok(mut ok) => {
                 ok.push(ServerOutput::convert_type_to_servermsg(
                     req.clone(),
-                    //Im not sure why I did that TODO: Tf is this?
+                    //Im not sure why I did that,  Tf is this?
                     -1,
                     Normal,
                     MessageReaction::default(),
@@ -378,8 +384,16 @@ impl MessageService {
         //Dont ask me why I did it this way
         let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType
         {
+            //client_message_counter is how many messages does the client have
             if let Some(counter) = inner.client_message_counter {
-                &all_messages[all_messages_len-counter..all_messages_len]
+                //Check if user already has all the messages
+                if !counter >= all_messages_len {
+                    &all_messages[counter..all_messages_len]
+                }
+                else {
+                    //Return empty vector
+                    &[]
+                }
             } else {
                 &all_messages
             }

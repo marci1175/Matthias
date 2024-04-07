@@ -13,7 +13,6 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use winrt_toast::Toast;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -148,9 +147,9 @@ pub struct TemplateApp {
     pub autosync_sender_thread: Option<()>,
 
     #[serde(skip)]
-    pub autosync_reciver: Receiver<Option<String>>,
+    pub autosync_output_reciver: Receiver<Option<String>>,
     #[serde(skip)]
-    pub autosync_sender: Sender<Option<String>>,
+    pub autosync_output_sender: Sender<Option<String>>,
 
     ///Server - client sync worker should run
     #[serde(skip)]
@@ -178,7 +177,7 @@ impl Default for TemplateApp {
         //Use the tokio sync crate for it to be async
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
 
-        let (autosync_sender, autosync_reciver) = mpsc::channel::<Option<String>>();
+        let (autosync_output_sender, autosync_output_reciver) = mpsc::channel::<Option<String>>();
 
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -257,8 +256,8 @@ impl Default for TemplateApp {
             autosync_sender_thread: None,
             autosync_should_run: Arc::new(AtomicBool::new(true)),
             
-            autosync_reciver,
-            autosync_sender,
+            autosync_output_reciver,
+            autosync_output_sender,
 
             opened_account: OpenedAccount::default(),
         }
@@ -374,6 +373,14 @@ pub struct Client {
     #[serde(skip)]
     pub incoming_msg: ServerMaster,
 
+    /// Incoming messages len, its a mutex so it can sasfely sent between threads (for syncing)
+    #[serde(skip)]
+    pub incoming_msg_len: Arc<Mutex<usize>>,
+
+    /// Last seen message's index, this will get sent 
+    #[serde(skip)]
+    pub last_seen_msg_index: Arc<Mutex<usize>>,
+
     ///emoji fasz
     pub random_emoji: String,
     pub emoji: Vec<String>,
@@ -438,6 +445,8 @@ impl Default for Client {
 
             voice_recording_start: None,
             text_edit_buffer: String::new(),
+            incoming_msg_len: Arc::new(Mutex::new(0)),
+            last_seen_msg_index: Arc::new(Mutex::new(0)),
         }
     }
 }
@@ -504,6 +513,9 @@ pub struct ClientSnycMessage {
     ///This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
     /// This value is ignored if the `sync_attribute` field is Some(_)
     pub client_message_counter: Option<usize>,
+
+    /// The index of the last seen message by the user, this is sent so we can display which was the last message the user has seen, if its None we ignore the value
+    pub last_seen_message_index: Option<usize>,
 
     ///Contain password in the sync message, so we will send the password when authenticating
     pub password: String,
@@ -656,7 +668,7 @@ impl ClientMessage {
 
     /// this is used for constructing a sync msg aka sending an empty packet, so server can reply
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str, client_message_counter: usize) -> ClientMessage {
+    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str, client_message_counter: usize, last_seen_message_index: Option<usize>) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -664,6 +676,7 @@ impl ClientMessage {
                 password: password.to_string(),
                 //This value is not ignored in this context
                 client_message_counter: Some(client_message_counter),
+                last_seen_message_index,
             }),
             Uuid: uuid.to_string(),
             Author: author.to_string(),
@@ -672,7 +685,7 @@ impl ClientMessage {
     }
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_connection_msg(password: String, author: String, uuid: &str) -> ClientMessage {
+    pub fn construct_connection_msg(password: String, author: String, uuid: &str, last_seen_message_index: Option<usize>) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -680,6 +693,7 @@ impl ClientMessage {
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
+                last_seen_message_index,
             }),
             Uuid: uuid.to_string(),
             Author: author,
@@ -689,7 +703,7 @@ impl ClientMessage {
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address
-    pub fn construct_disconnection_msg(password: String, author: String, uuid: &str) -> ClientMessage {
+    pub fn construct_disconnection_msg(password: String, author: String, uuid: &str, last_seen_message_index: Option<usize>) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -697,6 +711,7 @@ impl ClientMessage {
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
+                last_seen_message_index,
             }),
             Uuid: uuid.to_string(),
             Author: author,
@@ -804,6 +819,7 @@ impl ClientConnection {
                     password.unwrap_or(String::from("")),
                     author,
                     uuid,
+                    None,
                 )
                 .struct_into_string(),
             }))
@@ -844,7 +860,7 @@ impl ClientConnection {
 
         client
             .message_main(tonic::Request::new(MessageRequest {
-                message: ClientMessage::construct_disconnection_msg(password, author, &uuid)
+                message: ClientMessage::construct_disconnection_msg(password, author, &uuid, None)
                     .struct_into_string(),
             }))
             .await?;
@@ -995,6 +1011,8 @@ pub struct ServerOutput {
     pub reactions: MessageReaction,
     /// The user who sent this message's uuid
     pub uuid: String,
+    /// EXPREIMENTAL: if the said message was seen by the user
+    pub seen: bool,
 }
 
 impl ServerOutput {
@@ -1068,6 +1086,7 @@ impl ServerOutput {
             MessageDate: normal_msg.MessageDate,
             reactions,
             uuid,
+            seen: false,
         }
     }
 }
@@ -1075,6 +1094,7 @@ impl ServerOutput {
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
+    ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
 }
 impl ServerMaster {
@@ -1105,6 +1125,7 @@ pub struct AudioPlayback {
     ///Settings list for the sink_list (The audios being played)
     pub settings_list: Vec<AudioSettings>,
 }
+
 impl Default for AudioPlayback {
     fn default() -> Self {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
@@ -1509,12 +1530,8 @@ where
 
 // pub fn display_toast_notification() -> anyhow::Result<()> {
 //     let toastmanager = winrt_toast::ToastManager::new("Test123");
-
 //     let mut notif = Toast::new();
-
 //     notif.text1("Title").text2("Body").text3("Footer");
-
 //     toastmanager.show(&notif)?;
-
 //     Ok(())
 // }

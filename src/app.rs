@@ -19,6 +19,11 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        //try to close connection if there is one
+        if let Some(_) = &self.client_connection.client {
+            self.send_msg(ClientMessage::construct_disconnection_msg(self.client_ui.client_password.clone(), self.opened_account.username.clone(),  &self.opened_account.uuid, None));
+        }
+
         //clean up after server, client
         match std::env::var("APPDATA") {
             Ok(app_data) => {
@@ -32,7 +37,7 @@ impl eframe::App for backend::TemplateApp {
             Err(err) => println!("{err}"),
         }
     }
-
+    
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* NOTES:
 
@@ -42,7 +47,7 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: improve autosync
+            TODO: improve autosync , so it will be optimized not just when sending a sync msg
             TODO: add if the user has seen the message
             TODO: add notfications
 
@@ -76,7 +81,8 @@ impl eframe::App for backend::TemplateApp {
                 //show client mode settings
                 if self.main.client_mode {
                     ui.label("Message editor text size");
-                    let asd = ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
+                    
+                    ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
                     
                     ui.separator();
 

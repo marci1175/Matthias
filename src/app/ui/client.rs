@@ -3,12 +3,10 @@ use egui::{
     Stroke,
 };
 use rodio::Decoder;
-use core::panic;
 use std::sync::atomic::Ordering;
-use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::app::backend::{decrypt_aes256, display_error_message, write_file, write_image};
+use crate::app::backend::{decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType};
 
 use crate::app::backend::{
     ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType,
@@ -505,24 +503,63 @@ impl TemplateApp {
     fn client_sync(&mut self, ctx: &egui::Context) {
         let should_be_running = self.autosync_should_run.clone();
 
+        //Set arc mutex value for message count
+        *self.client_ui.incoming_msg_len.lock().unwrap() = self.client_ui.incoming_msg.struct_list.len();
+
+        let last_seen_msg_index = self.client_ui.incoming_msg.struct_list.iter().rev().position(|value| value.seen).unwrap_or(0);
+        
+        *self.client_ui.last_seen_msg_index.lock().unwrap() = last_seen_msg_index.clone();
+
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
         self.autosync_sender_thread.get_or_insert_with(|| {
             //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
-            let message = ClientMessage::construct_sync_msg(
+            //Create default message
+            let mut message = ClientMessage::construct_sync_msg(
                 &self.client_ui.client_password,
                 &self.login_username,
                 &self.opened_account.uuid,
                 //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
                 self.client_ui.incoming_msg.struct_list.len(),
+                Some(last_seen_msg_index),
             );
-
+            
+            //Clone so we can move it into the closure
             let connection = self.client_connection.clone();
             
-            let sender = self.autosync_sender.clone();
+            //Clone so we can move it into the closure
+            let sender = self.autosync_output_sender.clone();
             
+            //Clone so we can move it into the closure
+            let client_message_counter = self.client_ui.incoming_msg_len.clone();
+
+            let last_seen_message_index = self.client_ui.last_seen_msg_index.clone();
+
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
+                    if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
+                        
+                        inner.client_message_counter = match client_message_counter.lock() {
+                            Ok(index) => {
+                                Some(*index)
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                                None
+                            }
+                        };
+
+                        inner.last_seen_message_index = match last_seen_message_index.lock() {
+                            Ok(index) => Some(*index),
+                            Err(err) => {
+                                dbg!(err);
+                                None
+                            }
+                        }
+                    
+                    }
+
                     tokio::time::sleep(Duration::from_secs_f32(2.)).await;
+                    dbg!(&message.MessageType);
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
@@ -547,7 +584,7 @@ impl TemplateApp {
         });
 
         //Get sent to the channel to be displayed, if the connections errors out, 
-        match self.autosync_reciver.try_recv() {
+        match self.autosync_output_reciver.try_recv() {
             Ok(msg) => {
                 //show messages
                 if let Some(message) = msg {

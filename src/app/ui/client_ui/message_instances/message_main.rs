@@ -62,6 +62,11 @@ impl TemplateApp {
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui|
                                     {
+                                        //Check if visible, so we can send back the info to the server
+                                        if ui.is_visible() {
+                                            self.client_ui.incoming_msg.struct_list[index].seen = true;
+                                        }
+
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
