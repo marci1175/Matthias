@@ -512,6 +512,8 @@ impl TemplateApp {
                 &self.client_ui.client_password,
                 &self.login_username,
                 &self.opened_account.uuid,
+                //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
+                self.client_ui.incoming_msg.struct_list.len(),
             );
 
             let connection = self.client_connection.clone();
@@ -524,7 +526,6 @@ impl TemplateApp {
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
-                            dbg!("SYNC");
                             match sender.send(Some(ok)) {
                                 Ok(_) => {}
                                 Err(err) => {
@@ -559,8 +560,9 @@ impl TemplateApp {
                         serde_json::from_str(&decrypted_message);
 
                     match incoming_struct {
-                        Ok(msg) => {
-                            self.client_ui.incoming_msg = msg;
+                        Ok(mut msg) => {
+                            //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
+                            self.client_ui.incoming_msg.struct_list.append(&mut msg.struct_list);
                         }
                         Err(_err) => {
                             // dbg!(_err);

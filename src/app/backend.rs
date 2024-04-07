@@ -494,10 +494,9 @@ pub struct ClientNormalMessage {
     pub message: String,
 }
 
-///Empty packet, as described later, only used for syncing
+// Used for syncing or connecting & disconnecting
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientSnycMessage {
-    /*Used for syncing or connecting & disconnecting*/
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<bool>,
@@ -657,14 +656,14 @@ impl ClientMessage {
 
     /// this is used for constructing a sync msg aka sending an empty packet, so server can reply
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str) -> ClientMessage {
+    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str, client_message_counter: usize) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: None,
                 password: password.to_string(),
-                //This value is not ignored in this context TODO: MAKE SERVER
-                client_message_counter: None,
+                //This value is not ignored in this context
+                client_message_counter: Some(client_message_counter),
             }),
             Uuid: uuid.to_string(),
             Author: author.to_string(),
@@ -689,7 +688,7 @@ impl ClientMessage {
     }
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address TODO: Just switch to uuid's
+    /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address
     pub fn construct_disconnection_msg(password: String, author: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,

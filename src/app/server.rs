@@ -127,7 +127,7 @@ impl ServerMessage for MessageService {
 
                     //else: we dont do anything because we return the updated message list in the end
                 }
-                return self.sync_message().await;
+                return self.sync_message(&req).await;
             }
 
             if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
@@ -163,7 +163,7 @@ impl ServerMessage for MessageService {
                 };
 
                 //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-                return self.sync_message().await;
+                return self.sync_message(&req).await;
             } else {
                 return Ok(Response::new(MessageResponse {
                     message: "Invalid Password!".into(),
@@ -370,11 +370,25 @@ impl MessageService {
             }
         };
     }
-    async fn sync_message(&self) -> Result<Response<MessageResponse>, Status> {
-        //pass matching p100 technology
-        let shared_messages = self.messages.lock().unwrap().clone();
+    async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
+        let all_messages = self.messages.lock().unwrap().clone();
 
-        let server_master = ServerMaster::convert_vec_serverout_into_server_master(shared_messages);
+        let all_messages_len = all_messages.len();
+
+        //Dont ask me why I did it this way
+        let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType
+        {
+            if let Some(counter) = inner.client_message_counter {
+                &all_messages[all_messages_len-counter..all_messages_len]
+            } else {
+                &all_messages
+            }
+        }
+        else {
+            &all_messages
+        };
+
+        let server_master = ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec());
 
         let final_msg: String = server_master.struct_into_string();
 
