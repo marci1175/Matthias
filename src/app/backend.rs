@@ -770,7 +770,6 @@ impl ClientMessage {
         }
     }
 
-
     pub fn construct_client_message_edit(index: usize, new_message: Option<String>, uuid: &str, author: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,

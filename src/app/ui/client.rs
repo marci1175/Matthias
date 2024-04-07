@@ -536,6 +536,10 @@ impl TemplateApp {
 
             tokio::spawn(async move {
                 while should_be_running.load(Ordering::Relaxed) {
+                    //sleep when begining a new thread
+                    tokio::time::sleep(Duration::from_secs_f32(2.)).await;
+                    
+                    //Do this after sleeping so it will be kept in sync
                     if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
                         
                         inner.client_message_counter = match client_message_counter.lock() {
@@ -558,7 +562,6 @@ impl TemplateApp {
                     
                     }
 
-                    tokio::time::sleep(Duration::from_secs_f32(2.)).await;
                     dbg!(&message.MessageType);
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
@@ -591,13 +594,18 @@ impl TemplateApp {
                     ctx.request_repaint();
 
                     //Decrypt the server's reply
-                    let decrypted_message = decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
+                    let decrypted_message = dbg!(decrypt_aes256(&message, &self.client_connection.client_secret).unwrap());
 
                     let incoming_struct: Result<ServerMaster, serde_json::Error> =
                         serde_json::from_str(&decrypted_message);
 
                     match incoming_struct {
                         Ok(mut msg) => {
+                            //if we recived an empty vector, we can just return
+                            if msg.struct_list.is_empty() {
+                                return;
+                            }
+
                             //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
                             self.client_ui.incoming_msg.struct_list.append(&mut msg.struct_list);
                         }
