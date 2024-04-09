@@ -41,7 +41,8 @@ impl TemplateApp {
                             }
 
                             //shut down sync service
-                            self.autosync_should_run.store(false, Ordering::Relaxed);
+                            self.autosync_should_run = false;
+                            let _ = self.autosync_input_sender.send(());
                             self.autosync_sender_thread = None;
 
                             self.main.client_mode = false;
@@ -501,8 +502,6 @@ impl TemplateApp {
     }
 
     fn client_sync(&mut self, ctx: &egui::Context) {
-        let should_be_running = self.autosync_should_run.clone();
-
         //Set arc mutex value for message count
         *self.client_ui.incoming_msg_len.lock().unwrap() = self.client_ui.incoming_msg.struct_list.len();
 
@@ -512,6 +511,11 @@ impl TemplateApp {
 
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
         self.autosync_sender_thread.get_or_insert_with(|| {
+            //Prevent a race condition
+            if !self.autosync_should_run {
+                return;
+            }
+
             //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
             //Create default message
             let mut message = ClientMessage::construct_sync_msg(
@@ -534,8 +538,14 @@ impl TemplateApp {
 
             let last_seen_message_index = self.client_ui.last_seen_msg_index.clone();
 
+            let (input_sender, reciver) = std::sync::mpsc::channel();
+
+            self.autosync_input_sender = input_sender;
+
+            //Pass in reciver and set sender
             tokio::spawn(async move {
-                while should_be_running.load(Ordering::Relaxed) {
+                //Loop until error occured
+                loop {
                     //sleep when begining a new thread
                     tokio::time::sleep(Duration::from_secs_f32(2.)).await;
                     
@@ -547,7 +557,6 @@ impl TemplateApp {
                                 Some(*index)
                             }
                             Err(err) => {
-                                dbg!(err);
                                 None
                             }
                         };
@@ -555,14 +564,12 @@ impl TemplateApp {
                         inner.last_seen_message_index = match last_seen_message_index.lock() {
                             Ok(index) => Some(*index),
                             Err(err) => {
-                                dbg!(err);
                                 None
                             }
                         }
                     
                     }
 
-                    dbg!(&message.MessageType);
                     //This is where the messages get recieved
                     match client::send_msg(connection.clone(), message.clone()).await {
                         Ok(ok) => {
@@ -579,6 +586,11 @@ impl TemplateApp {
                             break;
                         }
                     };
+
+                    //Recive input from main thread to shutdown
+                    if let Ok(signal) = reciver.try_recv() {
+                        break;
+                    }
                 }
 
                 //Error appeared, after this the tread quits, so there arent an inf amount of threads running

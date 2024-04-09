@@ -21,7 +21,6 @@ use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
-use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use tonic::transport::{Channel, Endpoint};
@@ -147,13 +146,22 @@ pub struct TemplateApp {
     pub autosync_sender_thread: Option<()>,
 
     #[serde(skip)]
+    /// This is what the main thread uses to recive messages from the sync thread
     pub autosync_output_reciver: Receiver<Option<String>>,
     #[serde(skip)]
+    /// This is what the sync thread uses to send messages to the main thread
     pub autosync_output_sender: Sender<Option<String>>,
+
+    #[serde(skip)]
+    /// This is what the sync thread thread uses to recive a shutdown message from the main
+    pub autosync_input_reciver: Receiver<()>,
+    #[serde(skip)]
+    /// This is what the main thread uses to send the shutdown message to the sync thread
+    pub autosync_input_sender: Sender<()>,
 
     ///Server - client sync worker should run
     #[serde(skip)]
-    pub autosync_should_run: Arc<AtomicBool>,
+    pub autosync_should_run: bool,
 
     #[serde(skip)]
     pub audio_file: Arc<Mutex<PathBuf>>,
@@ -178,6 +186,8 @@ impl Default for TemplateApp {
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
 
         let (autosync_output_sender, autosync_output_reciver) = mpsc::channel::<Option<String>>();
+
+        let (autosync_input_sender, autosync_input_reciver) = mpsc::channel::<()>();
 
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -254,10 +264,13 @@ impl Default for TemplateApp {
             drx,
             dtx,
             autosync_sender_thread: None,
-            autosync_should_run: Arc::new(AtomicBool::new(true)),
+            autosync_should_run: true,
             
             autosync_output_reciver,
             autosync_output_sender,
+
+            autosync_input_reciver,
+            autosync_input_sender,
 
             opened_account: OpenedAccount::default(),
         }

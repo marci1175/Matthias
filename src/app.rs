@@ -129,8 +129,8 @@ impl eframe::App for backend::TemplateApp {
                                         //Reset client
                                         self.client_connection.client = None;
                                         self.client_ui.incoming_msg = ServerMaster::default();
-                                        self.autosync_should_run
-                                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                                        self.autosync_should_run = false;
+                                        let _ = self.autosync_input_sender.send(());
 
                                         self.client_connection.state =
                                             ConnectionState::Disconnected;
@@ -180,8 +180,7 @@ impl eframe::App for backend::TemplateApp {
                                             };
                                         });
 
-                                        self.autosync_should_run
-                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                                        self.autosync_should_run = true;
 
                                         //reset autosync
                                         self.autosync_sender_thread = None;
@@ -200,9 +199,9 @@ impl eframe::App for backend::TemplateApp {
                                         //Reset client
                                         self.client_connection.client = None;
                                         self.client_ui.incoming_msg = ServerMaster::default();
-                                        self.autosync_should_run
-                                            .store(false, std::sync::atomic::Ordering::Relaxed);
-
+                                        self.autosync_should_run = false;
+                                        let _ = self.autosync_input_sender.send(());
+                                        
                                         self.client_connection.state =
                                             ConnectionState::Disconnected;
                                     }
@@ -244,8 +243,7 @@ impl eframe::App for backend::TemplateApp {
                                             };
                                         });
 
-                                        self.autosync_should_run
-                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                                        self.autosync_should_run = true;
 
                                         //reset autosync
                                         self.autosync_sender_thread = None;
