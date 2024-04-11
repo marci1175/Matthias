@@ -2,7 +2,10 @@ use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 //use crate::app::account_manager::write_file;
 use crate::app::{
-    backend::{AudioSettings, ClientMessage, ClientMessageEdit, ScrollToMessage, ServerMessageType, TemplateApp},
+    backend::{
+        AudioSettings, ClientMessage, ClientMessageEdit, ScrollToMessage, ServerMessageType,
+        TemplateApp,
+    },
     client,
 };
 

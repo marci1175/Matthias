@@ -136,11 +136,8 @@ impl TemplateApp {
                         let author = self.login_username.clone();
                         let sender = self.itx.clone();
 
-                        let message = ClientMessage::construct_image_request_msg(
-                            picture.index,
-                            uuid,
-                            author,
-                        );
+                        let message =
+                            ClientMessage::construct_image_request_msg(picture.index, uuid, author);
 
                         let connection = self.client_connection.clone();
 

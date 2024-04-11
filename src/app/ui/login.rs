@@ -31,9 +31,16 @@ impl TemplateApp {
                     self.main.client_mode =
                         match login(self.login_username.clone(), self.login_password.clone()) {
                             Ok(path_to_file) => {
-                                let account = UserInformation::deserialize(&std::fs::read_to_string(&path_to_file).unwrap()).unwrap();
+                                let account = UserInformation::deserialize(
+                                    &std::fs::read_to_string(&path_to_file).unwrap(),
+                                )
+                                .unwrap();
 
-                                self.opened_account = OpenedAccount::new(account.uuid, account.username, path_to_file);
+                                self.opened_account = OpenedAccount::new(
+                                    account.uuid,
+                                    account.username,
+                                    path_to_file,
+                                );
 
                                 true
                             }

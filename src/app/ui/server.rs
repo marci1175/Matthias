@@ -11,27 +11,28 @@ impl TemplateApp {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
                 if !self.server_has_started {
                     ui.label(RichText::from("Server setup"));
-    
-                    ui.allocate_ui(vec2(100., 30.),|ui| {
+
+                    ui.allocate_ui(vec2(100., 30.), |ui| {
                         ui.horizontal_centered(|ui| {
-                        ui.label(RichText::from("Port"));
-                        ui.text_edit_singleline(&mut self.open_on_port);
-                    });});
-    
+                            ui.label(RichText::from("Port"));
+                            ui.text_edit_singleline(&mut self.open_on_port);
+                        });
+                    });
+
                     let temp_open_on_port = &self.open_on_port;
-        
+
                     if ui.button("Start server").clicked() {
                         let server_pw = match self.server_req_password {
                             true => self.server_password.clone(),
                             false => "".to_string(),
                         };
-        
+
                         //Create a new pair of channels
                         let (sender, reciver) = sync::mpsc::channel(1);
-        
+
                         //Overwrite the channel we have in the TemplateApp struct
                         self.server_shutdown_sender = sender;
-        
+
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
@@ -48,35 +49,32 @@ impl TemplateApp {
                             }
                             Err(err) => {
                                 display_error_message(err);
-        
+
                                 false
                             }
                         };
                     }
-    
+
                     ui.checkbox(&mut self.server_req_password, "Server requires password");
-                    
+
                     if self.server_req_password {
                         ui.text_edit_singleline(&mut self.server_password);
                     }
-    
                 } else {
                     if ui.button("Shutdown").clicked() {
-        
                         let sender = self.server_shutdown_sender.clone();
-        
+
                         tokio::spawn(async move {
                             //Throw away error, because we already inspect it
                             let _ = sender.send(()).await.tap_dbg(|func| {
                                 let _ = func.inspect_err(|e| tracing::error!("{e:?}"));
                             });
                         });
-        
+
                         //Reset server state
                         self.server_has_started = false;
-        
                     }
-        
+
                     if self.public_ip.is_empty() {
                         let tx = self.dtx.clone();
                         std::thread::spawn(move || {
@@ -93,22 +91,26 @@ impl TemplateApp {
                                 self.public_ip = ok.clone();
                                 //Set the ip we are connecting to so we dont need to paste it
                                 let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
-    
-                                self.client_ui.send_on_ip = format!("[{}]:{}", pub_ip[0], self.open_on_port);
-                            },
+
+                                self.client_ui.send_on_ip =
+                                    format!("[{}]:{}", pub_ip[0], self.open_on_port);
+                            }
                             Err(err) => {
                                 eprintln!("{}", err)
                             }
                         }
                     }
-    
+
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
-    
+
                     ui.horizontal(|ui| {
                         ui.label("Server address (Public ipv6 address)");
-                        ui.text_edit_singleline(&mut format!("[{}]:{}", pub_ip[0], self.open_on_port));
+                        ui.text_edit_singleline(&mut format!(
+                            "[{}]:{}",
+                            pub_ip[0], self.open_on_port
+                        ));
                     });
-    
+
                     if self.server_req_password && !self.server_password.is_empty() {
                         ui.label(RichText::from(format!(
                             "Password: {}",

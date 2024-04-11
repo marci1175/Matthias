@@ -226,7 +226,7 @@ impl Default for TemplateApp {
             //thread communication for image requesting
             irx,
             itx,
-            
+
             //These default values will get overwritten when crating the new server, so we can pass in the reciver to the thread
             //Also, the shutdown reciver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D
             server_shutdown_reciver,
@@ -264,8 +264,8 @@ impl Default for TemplateApp {
             drx,
             dtx,
             autosync_sender_thread: None,
-            autosync_should_run: true,
-            
+            autosync_should_run: false,
+
             autosync_output_reciver,
             autosync_output_sender,
 
@@ -390,7 +390,7 @@ pub struct Client {
     #[serde(skip)]
     pub incoming_msg_len: Arc<Mutex<usize>>,
 
-    /// Last seen message's index, this will get sent 
+    /// Last seen message's index, this will get sent
     #[serde(skip)]
     pub last_seen_msg_index: Arc<Mutex<usize>>,
 
@@ -467,10 +467,6 @@ impl Default for Client {
 ///Main, Global stuff
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 pub struct Main {
-    ///Checks if windwos needs to be set up
-    #[serde(skip)]
-    pub setup: Option<()>,
-
     ///Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -498,7 +494,11 @@ pub struct OpenedAccount {
 
 impl OpenedAccount {
     pub fn new(uuid: String, username: String, path: PathBuf) -> Self {
-        Self { uuid, username, path }
+        Self {
+            uuid,
+            username,
+            path,
+        }
     }
 }
 
@@ -592,7 +592,7 @@ pub enum ClientMessageType {
 
     ClientReaction(ClientReaction),
 
-    ClientMessageEdit(ClientMessageEdit)
+    ClientMessageEdit(ClientMessageEdit),
 }
 
 ///This is what gets to be sent out by the client
@@ -681,7 +681,13 @@ impl ClientMessage {
 
     /// this is used for constructing a sync msg aka sending an empty packet, so server can reply
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_sync_msg(password: &str, author: &str, uuid: &str, client_message_counter: usize, last_seen_message_index: Option<usize>) -> ClientMessage {
+    pub fn construct_sync_msg(
+        password: &str,
+        author: &str,
+        uuid: &str,
+        client_message_counter: usize,
+        last_seen_message_index: Option<usize>,
+    ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -698,7 +704,12 @@ impl ClientMessage {
     }
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    pub fn construct_connection_msg(password: String, author: String, uuid: &str, last_seen_message_index: Option<usize>) -> ClientMessage {
+    pub fn construct_connection_msg(
+        password: String,
+        author: String,
+        uuid: &str,
+        last_seen_message_index: Option<usize>,
+    ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -716,7 +727,12 @@ impl ClientMessage {
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address
-    pub fn construct_disconnection_msg(password: String, author: String, uuid: &str, last_seen_message_index: Option<usize>) -> ClientMessage {
+    pub fn construct_disconnection_msg(
+        password: String,
+        author: String,
+        uuid: &str,
+        last_seen_message_index: Option<usize>,
+    ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
@@ -733,11 +749,7 @@ impl ClientMessage {
     }
 
     ///this is used for asking for a file
-    pub fn construct_file_request_msg(
-        index: i32,
-        uuid: &str,
-        author: String,
-    ) -> ClientMessage {
+    pub fn construct_file_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientFileRequestType(
@@ -750,11 +762,7 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_image_request_msg(
-        index: i32,
-        uuid: &str,
-        author: String,
-    ) -> ClientMessage {
+    pub fn construct_image_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientFileRequestType(
@@ -767,11 +775,7 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_audio_request_msg(
-        index: i32,
-        uuid: &str,
-        author: String,
-    ) -> ClientMessage {
+    pub fn construct_audio_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             MessageType: ClientMessageType::ClientFileRequestType(
@@ -783,10 +787,18 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_client_message_edit(index: usize, new_message: Option<String>, uuid: &str, author: &str) -> ClientMessage {
+    pub fn construct_client_message_edit(
+        index: usize,
+        new_message: Option<String>,
+        uuid: &str,
+        author: &str,
+    ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientMessageEdit(ClientMessageEdit { index, new_message }),
+            MessageType: ClientMessageType::ClientMessageEdit(ClientMessageEdit {
+                index,
+                new_message,
+            }),
             Uuid: uuid.to_string(),
             Author: author.to_string(),
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -864,7 +876,12 @@ impl ClientConnection {
     }
 
     ///Used to destroy a current ClientConnection instance does not matter if the instance is invalid
-    pub async fn disconnect(&mut self, author: String, password: String, uuid: String) -> anyhow::Result<()> {
+    pub async fn disconnect(
+        &mut self,
+        author: String,
+        password: String,
+        uuid: String,
+    ) -> anyhow::Result<()> {
         //De-register with the server
         let client = self.client.as_mut().ok_or(anyhow::Error::msg(
             "Invalid ClientConnection instance (Client is None)",
@@ -1013,7 +1030,7 @@ pub struct ServerOutput {
     /// Which message is this a reply to?
     /// The server stores all messages in a vector so this index shows which message its a reply to (if it is)
     pub replying_to: Option<usize>,
-    /// Inner message which is *wrapped* in the ServerOutput 
+    /// Inner message which is *wrapped* in the ServerOutput
     pub MessageType: ServerMessageType,
     /// The account's name who sent the message
     pub Author: String,
@@ -1162,9 +1179,6 @@ pub struct AudioSettings {
     ///This is only for ui usage
     pub is_loading: bool,
 
-    ///Cursor position
-    pub cursor_position: u64,
-
     ///Path to audio file
     pub path_to_audio: PathBuf,
 }
@@ -1177,7 +1191,6 @@ impl Default for AudioSettings {
             speed: 1.,
             cursor: PlaybackCursor::new(Vec::new()),
             is_loading: false,
-            cursor_position: 0,
             path_to_audio: PathBuf::new(),
         }
     }

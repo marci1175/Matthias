@@ -1,7 +1,8 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
 
 use super::backend::{
-    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
+    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageType,
+    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
 };
 
 use messages::{
@@ -15,11 +16,11 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
-    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessageEdit as ClientMessageEditStruct,
-    ClientMessage,
+    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
+    ClientMessage, ClientMessageEdit as ClientMessageEditStruct,
     ClientMessageType::{
-        ClientFileRequestType, ClientFileUpload, ClientNormalMessage, ClientReaction,
-        ClientSyncMessage, ClientMessageEdit,
+        ClientFileRequestType, ClientFileUpload, ClientMessageEdit, ClientNormalMessage,
+        ClientReaction, ClientSyncMessage,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
@@ -137,11 +138,11 @@ impl ServerMessage for MessageService {
             }
 
             if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
-                    .connected_clients
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .any(|client| *client == remote_address)
+                .connected_clients
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|client| *client == remote_address)
             //Search through the list
             {
                 match &req.MessageType {
@@ -382,27 +383,25 @@ impl MessageService {
         let all_messages_len = all_messages.len();
 
         //Dont ask me why I did it this way
-        let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType
-        {
+        let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType {
             //client_message_counter is how many messages does the client have
             if let Some(counter) = inner.client_message_counter {
                 //Check if user already has all the messages
                 if !counter >= all_messages_len {
                     &all_messages[counter..all_messages_len]
-                }
-                else {
+                } else {
                     //Return empty vector
                     &[]
                 }
             } else {
                 &all_messages
             }
-        }
-        else {
+        } else {
             &all_messages
         };
 
-        let server_master = ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec());
+        let server_master =
+            ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec());
 
         let final_msg: String = server_master.struct_into_string();
 
@@ -696,15 +695,17 @@ impl MessageService {
         }
     }
 
-    async fn handle_message_edit(&self, edit: &ClientMessageEditStruct, req: &ClientMessage) {         
+    async fn handle_message_edit(&self, edit: &ClientMessageEditStruct, req: &ClientMessage) {
         match &mut self.messages.try_lock() {
-            Ok(messages_vec) => {   
+            Ok(messages_vec) => {
                 //Server-side uuid check
                 if messages_vec[edit.index].uuid != req.Uuid {
                     return;
                 }
 
-                if let ServerMessageType::Normal(inner_msg) = &mut messages_vec[edit.index].MessageType {
+                if let ServerMessageType::Normal(inner_msg) =
+                    &mut messages_vec[edit.index].MessageType
+                {
                     if let Some(new_msg) = edit.new_message.clone() {
                         inner_msg.message = new_msg;
 
@@ -715,9 +716,8 @@ impl MessageService {
                         messages_vec.remove(edit.index);
                     }
                 }
-            },
+            }
             Err(err) => println!("{err}"),
         }
     }
 }
-

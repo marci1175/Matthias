@@ -1,49 +1,65 @@
 use egui::{Color32, RichText};
 
 use regex::Regex;
+use tap::Tap;
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::TemplateApp;
 
 impl TemplateApp {
-    pub fn markdown_text_display(&mut self, i: &String, ui: &mut egui::Ui) {
-        if (i.contains('[') && i.contains(']')) && (i.contains('(') && i.contains(')')) {
-            let re = Regex::new(r"\[(?P<link_text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
+    pub fn markdown_text_display(&mut self, input: &String, ui: &mut egui::Ui) {
+        if (input.contains('[') && input.contains(']')) && (input.contains('(') && input.contains(')')) {
+            let regex = Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
+            
             let mut captures: Vec<String> = Vec::new();
-            for capture in re.captures_iter(i) {
+            
+            for capture in regex.captures_iter(input) {
+                //We iterate over all the captures
                 for i in 1..capture.len() {
+                    //We push back the captures into the captures vector
                     captures.push(capture[i].to_string());
                 }
             }
+            
             if captures.is_empty() {
-                ui.label(RichText::from(i).size(self.font_size));
-            } else {
+                ui.label(RichText::from(input).size(self.font_size));
+            }
+            else {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::from(re.replace_all::<&str>(i, "")).size(self.font_size));
-                    for i in (0..captures.len()).step_by(2) {
-                        ui.add(egui::Hyperlink::from_label_and_url(
-                            RichText::from(&captures[i]).size(self.font_size),
-                            &captures[i + 1],
-                        ));
+                    let input_clone = input.clone();
+
+                    let temp = input_clone.split_whitespace().collect::<Vec<_>>();
+
+                    for item in temp.iter() {
+                        if let Some(capture) = regex.captures(item) {
+                            // capture[0] combined
+                            // capture[1] disp
+                            // capture[2] URL
+                            ui.hyperlink_to(capture[1].to_string(), capture[2].to_string());
+                        }
+                        else {
+                            ui.label(*item);
+                        }
                     }
                 });
             }
-        } else if let Some(index) = i.find('@') {
-            let result = i[index + 1..].split_whitespace().collect::<Vec<&str>>()[0];
+
+        } else if let Some(index) = input.find('@') {
+            let result = input[index + 1..].split_whitespace().collect::<Vec<&str>>()[0];
             if self.login_username == result {
                 ui.label(
-                    RichText::from(i)
+                    RichText::from(input)
                         .size(self.font_size)
                         .color(Color32::YELLOW),
                 );
             }
-        } else if i.contains('#') && i.rmatches('#').count() <= 5 {
-            let split_lines = i.rsplit_once('#').unwrap();
+        } else if input.contains('#') && input.rmatches('#').count() <= 5 {
+            let split_lines = input.rsplit_once('#').unwrap();
             ui.horizontal(|ui| {
                 ui.label(RichText::from(split_lines.0.replace('#', "")).size(self.font_size));
                 ui.label(RichText::from(split_lines.1).strong().size(
                     self.font_size
-                        * match i.rmatches('#').collect::<Vec<&str>>().len() {
+                        * match input.rmatches('#').collect::<Vec<&str>>().len() {
                             1 => 2.0,
                             2 => 1.8,
                             3 => 1.6,
@@ -54,7 +70,7 @@ impl TemplateApp {
                 ));
             });
         } else {
-            ui.label(RichText::from(i).size(self.font_size));
+            ui.label(RichText::from(input).size(self.font_size));
         }
     }
 }

@@ -21,7 +21,12 @@ impl eframe::App for backend::TemplateApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         //try to close connection if there is one
         if let Some(_) = &self.client_connection.client {
-            self.send_msg(ClientMessage::construct_disconnection_msg(self.client_ui.client_password.clone(), self.opened_account.username.clone(),  &self.opened_account.uuid, None));
+            self.send_msg(ClientMessage::construct_disconnection_msg(
+                self.client_ui.client_password.clone(),
+                self.opened_account.username.clone(),
+                &self.opened_account.uuid,
+                None,
+            ));
         }
 
         //clean up after server, client
@@ -37,7 +42,7 @@ impl eframe::App for backend::TemplateApp {
             Err(err) => println!("{err}"),
         }
     }
-    
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* NOTES:
 
@@ -50,6 +55,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: improve autosync , so it will be optimized not just when sending a sync msg
             TODO: add if the user has seen the message
             TODO: add notfications
+            TODO: make it so when we type @ the list of connected users get shown
 
         */
 
@@ -81,9 +87,9 @@ impl eframe::App for backend::TemplateApp {
                 //show client mode settings
                 if self.main.client_mode {
                     ui.label("Message editor text size");
-                    
+
                     ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
-                    
+
                     ui.separator();
 
                     ui.label("Connect to an ip address");
@@ -107,7 +113,7 @@ impl eframe::App for backend::TemplateApp {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
-                                    {   
+                                    {
                                         let uuid = self.opened_account.uuid.clone();
                                         //Disconnect from server
                                         tokio::task::spawn(async move {
@@ -201,7 +207,7 @@ impl eframe::App for backend::TemplateApp {
                                         self.client_ui.incoming_msg = ServerMaster::default();
                                         self.autosync_should_run = false;
                                         let _ = self.autosync_input_sender.send(());
-                                        
+
                                         self.client_connection.state =
                                             ConnectionState::Disconnected;
                                     }
@@ -302,10 +308,10 @@ impl eframe::App for backend::TemplateApp {
                     self.server_setup_ui(ui);
                 }
             });
-            
+
         //Set value; Im terribly sorry I had to dodge this borrrow checker, LAWD HAVE MERCY
         self.settings_window = settings_window;
-        
+
         //Bookmarks windows
         egui::Window::new("Bookmarks")
             .open(&mut self.main.bookmark_mode)

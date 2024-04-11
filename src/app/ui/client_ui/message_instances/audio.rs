@@ -113,7 +113,7 @@ impl TemplateApp {
                                     //If the user has clicked the play button only then we download the desirted audio file! Great optimisation
                                     if !path_to_audio.exists() {
                                         let sender = self.audio_save_tx.clone();
-                                        
+
                                         let message = ClientMessage::construct_audio_request_msg(
                                             audio.index,
                                             &self.opened_account.uuid,
