@@ -713,7 +713,8 @@ impl MessageService {
                     }
                     //If its none then it means we need to delete the message
                     else {
-                        messages_vec.remove(edit.index);
+                        //Set the enum to be deleted
+                        messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
                     }
                 }
             }

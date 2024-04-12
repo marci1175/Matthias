@@ -8,11 +8,13 @@ use crate::app::backend::TemplateApp;
 
 impl TemplateApp {
     pub fn markdown_text_display(&mut self, input: &String, ui: &mut egui::Ui) {
-        if (input.contains('[') && input.contains(']')) && (input.contains('(') && input.contains(')')) {
+        if (input.contains('[') && input.contains(']'))
+            && (input.contains('(') && input.contains(')'))
+        {
             let regex = Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
-            
+
             let mut captures: Vec<String> = Vec::new();
-            
+
             for capture in regex.captures_iter(input) {
                 //We iterate over all the captures
                 for i in 1..capture.len() {
@@ -20,11 +22,10 @@ impl TemplateApp {
                     captures.push(capture[i].to_string());
                 }
             }
-            
+
             if captures.is_empty() {
                 ui.label(RichText::from(input).size(self.font_size));
-            }
-            else {
+            } else {
                 ui.horizontal(|ui| {
                     let input_clone = input.clone();
 
@@ -36,14 +37,12 @@ impl TemplateApp {
                             // capture[1] disp
                             // capture[2] URL
                             ui.hyperlink_to(capture[1].to_string(), capture[2].to_string());
-                        }
-                        else {
+                        } else {
                             ui.label(*item);
                         }
                     }
                 });
             }
-
         } else if let Some(index) = input.find('@') {
             let result = input[index + 1..].split_whitespace().collect::<Vec<&str>>()[0];
             if self.login_username == result {

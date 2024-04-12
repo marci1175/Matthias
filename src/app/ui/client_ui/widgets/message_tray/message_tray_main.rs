@@ -30,6 +30,7 @@ impl TemplateApp {
 
         let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
+        //Create widget
         let text_widget = egui::TextEdit::multiline(&mut self.client_ui.usr_msg)
             .font(FontId {
                 size: self.font_size,
@@ -39,7 +40,8 @@ impl TemplateApp {
             .desired_width(ui.available_width() - self.client_ui.text_widget_offset * 1.3)
             .desired_rows(0)
             .frame(false);
-
+        
+        //Create scroll area
         let msg_scroll = egui::ScrollArea::vertical()
             .id_source("usr_input")
             .stick_to_bottom(true)

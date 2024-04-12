@@ -86,6 +86,7 @@ impl TemplateApp {
                                     //Replying to "{author}:"
                                     ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
                                     ui.label(RichText::from(match &selected_message.MessageType {
+                                        ServerMessageType::Deleted => format!("Deleted message"),
                                         ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                         ServerMessageType::Image(_img) => "Image".to_string(),
                                         ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),

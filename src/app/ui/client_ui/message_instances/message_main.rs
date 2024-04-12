@@ -75,6 +75,7 @@ impl TemplateApp {
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
                                                 self.client_ui.incoming_msg.struct_list[replied_to].Author,
                                                 match &self.client_ui.incoming_msg.struct_list[replied_to].MessageType {
+                                                    ServerMessageType::Deleted => format!("Deleted message"),
                                                     ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                     ServerMessageType::Image(_img) => "Image".to_string(),
                                                     ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
@@ -103,6 +104,7 @@ impl TemplateApp {
                                         self.audio_message_instance(item, ui, index);
                                         self.file_message_instance(item, ui);
                                         self.image_message_instance(item, ui, ctx);
+                                        self.deleted_message(ui, ctx, item);
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));

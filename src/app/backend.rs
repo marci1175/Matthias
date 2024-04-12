@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::{Channel, Endpoint, Server};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
@@ -1010,6 +1010,10 @@ pub enum ServerMessageType {
     Image(ServerImageUpload),
     #[strum_discriminants(strum(message = "Audio"))]
     Audio(ServerAudioUpload),
+
+    ///When a message is deleted this is what gets displayed
+    #[strum_discriminants(strum(message = "Deleted"))]
+    Deleted,
 }
 
 ///This struct contains all the reactions of one message
@@ -1096,6 +1100,9 @@ impl ServerOutput {
                                     }
                                 )
                             },
+                            ServerMessageTypeDiscriminants::Deleted => {
+                                ServerMessageType::Deleted
+                            }
                         }
                     },
                     ClientMessageType::ClientNormalMessage(message) => {
