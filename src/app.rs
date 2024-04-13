@@ -57,7 +57,6 @@ impl eframe::App for backend::TemplateApp {
             TODO: add notfications
             TODO: make it so when we type @ the list of connected users get shown
             TODO: fix the mutliline text input widget so, when the user presses the enter a \n wont be added (possibly rework the whole thing)
-            TODO: fix the message displaying functions, change the If lets to a match statement for obv reasons (easier development)
             TODO: fix autosync so that it also syncs emojis
             TODO: Migrate to latest egui
         */

@@ -1215,7 +1215,7 @@ pub struct PlaybackCursor {
     pub cursor: Arc<Mutex<io::Cursor<Vec<u8>>>>,
 }
 
-///Impl new so It can probe a file (in vec<u8> format)
+///Impl new so It can probe a file (in `vec<u8>` format)
 impl PlaybackCursor {
     pub fn new(data: Vec<u8>) -> Self {
         let cursor = Arc::new(Mutex::new(io::Cursor::new(data)));
