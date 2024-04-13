@@ -1,24 +1,202 @@
-use egui::{vec2, Align, Layout};
+use std::{fs, path::PathBuf};
+
+use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
+use regex::Regex;
+
+use crate::app::{backend::{write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp}, client};
 use rodio::{Decoder, Sink, Source};
-use std::path::PathBuf;
-use tap::{Tap, TapFallible};
+use tap::{TapFallible};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::{
-    display_error_message, write_audio, ClientMessage, PlaybackCursor, ServerAudioReply,
-    ServerMessageType, TemplateApp,
+    display_error_message, write_audio, PlaybackCursor, ServerAudioReply,
 };
-use crate::app::client::{self};
-use std::fs;
 impl TemplateApp {
-    pub fn audio_message_instance(
-        &mut self,
-        item: &crate::app::backend::ServerOutput,
-        ui: &mut egui::Ui,
-        current_index_in_message_list: usize,
-    ) {
-        if let ServerMessageType::Audio(audio) = &item.MessageType {
-            //Create folder for audios for later problem avoidance
+    pub fn message_display(&mut self, message: &crate::app::backend::ServerOutput, ui: &mut Ui, ctx: &egui::Context, current_index_in_message_list: usize) {
+        match &message.MessageType {
+            //File upload
+            crate::app::backend::ServerMessageType::Upload(inner) => {
+                    if ui
+                    .button(RichText::from(inner.file_name.to_string()).size(self.font_size))
+                    .clicked()
+                {
+                    let passw = self.client_ui.client_password.clone();
+                    let author = self.login_username.clone();
+                    let sender = self.ftx.clone();
+
+                    let message = ClientMessage::construct_file_request_msg(inner.index, &passw, author);
+
+                    let connection = self.client_connection.clone();
+
+                    tokio::spawn(async move {
+                        match client::send_msg(connection, message).await {
+                            Ok(ok) => {
+                                match sender.send(ok) {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        println!("{}", err);
+                                    }
+                                };
+                            }
+                            Err(err) => {
+                                println!("{err} ln 264")
+                            }
+                        }
+                    });
+                }
+            },
+            crate::app::backend::ServerMessageType::Normal(inner_message) => {
+                    if (inner_message.message.contains('[') && inner_message.message.contains(']'))
+                    && (inner_message.message.contains('(') && inner_message.message.contains(')'))
+                {
+                    let regex = Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
+
+                    let mut captures: Vec<String> = Vec::new();
+
+                    for capture in regex.captures_iter(&inner_message.message) {
+                        //We iterate over all the captures
+                        for i in 1..capture.len() {
+                            //We push back the captures into the captures vector
+                            captures.push(capture[i].to_string());
+                        }
+                    }
+
+                    if captures.is_empty() {
+                        ui.label(RichText::from(&inner_message.message).size(self.font_size));
+                    } else {
+                        ui.horizontal(|ui| {
+                            let inner_message_clone = inner_message.message.clone();
+
+                            let temp = inner_message_clone.split_whitespace().collect::<Vec<_>>();
+
+                            for item in temp.iter() {
+                                if let Some(capture) = regex.captures(item) {
+                                    // capture[0] combined
+                                    // capture[1] disp
+                                    // capture[2] URL
+                                    ui.hyperlink_to(capture[1].to_string(), capture[2].to_string());
+                                } else {
+                                    ui.label(*item);
+                                }
+                            }
+                        });
+                    }
+                } else if let Some(index) = inner_message.message.find('@') {
+                    let result = inner_message.message[index + 1..].split_whitespace().collect::<Vec<&str>>()[0];
+                    if self.login_username == result {
+                        ui.label(
+                            RichText::from(&inner_message.message)
+                                .size(self.font_size)
+                                .color(Color32::YELLOW),
+                        );
+                    }
+                } else if inner_message.message.contains('#') && inner_message.message.rmatches('#').count() <= 5 {
+                    let split_lines = inner_message.message.rsplit_once('#').unwrap();
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::from(split_lines.0.replace('#', "")).size(self.font_size));
+                        ui.label(RichText::from(split_lines.1).strong().size(
+                            self.font_size
+                                * match inner_message.message.rmatches('#').collect::<Vec<&str>>().len() {
+                                    1 => 2.0,
+                                    2 => 1.8,
+                                    3 => 1.6,
+                                    4 => 1.4,
+                                    5 => 1.2,
+                                    _ => 1.,
+                                } as f32,
+                        ));
+                    });
+                } else {
+                    ui.label(RichText::from(&inner_message.message).size(self.font_size));
+                }
+            },
+            crate::app::backend::ServerMessageType::Image(picture) => {
+                let path = PathBuf::from(format!(
+                    "{}\\Matthias\\Client\\{}\\Images\\{}",
+                    env!("APPDATA"),
+                    self.client_ui.send_on_ip_base64_encoded,
+                    picture.index
+                ));
+                ui.allocate_ui(vec2(300., 300.), |ui| {
+                    match fs::read(&path) {
+                        Ok(image_bytes) => {
+                            //display picture from bytes
+                            let image_widget = ui.add(egui::widgets::Image::from_bytes(
+                                format!("bytes://{}", picture.index),
+                                image_bytes.clone(),
+                            ));
+    
+                            if image_widget.interact(Sense::click()).clicked() {
+                                self.client_ui.image_overlay = true;
+                            }
+    
+                            image_widget.context_menu(|ui| {
+                                if ui.button("Save").clicked() {
+                                    //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
+                                    let image_save = ServerFileReply {
+                                        bytes: image_bytes.clone(),
+                                        file_name: PathBuf::from("image.png"),
+                                    };
+                                    let _ = crate::app::backend::write_file(image_save);
+                                }
+                            });
+    
+                            if self.client_ui.image_overlay {
+                                self.image_overlay_draw(ui, ctx, image_bytes, picture);
+                            }
+                        }
+                        Err(_err) => {
+                            //create decoy file, to manually create a race condition
+                            let _ = fs::create_dir_all(PathBuf::from(format!(
+                                "{}\\Matthias\\Client\\{}\\Images",
+                                env!("APPDATA"),
+                                self.client_ui.send_on_ip_base64_encoded,
+                            )));
+    
+                            if let Err(err) = std::fs::write(
+                                path,
+                                "This is a placeholder file, this will get overwritten (hopefully)",
+                            ) {
+                                println!("Error when creating a decoy: {err}");
+                                return;
+                            };
+    
+                            //check if we are visible
+                            if !ui.is_visible() {
+                                return;
+                            }
+    
+                            //We dont have file on our local system so we have to ask the server to provide it
+                            let uuid = &self.opened_account.uuid;
+                            let author = self.login_username.clone();
+                            let sender = self.itx.clone();
+    
+                            let message =
+                                ClientMessage::construct_image_request_msg(picture.index, uuid, author);
+    
+                            let connection = self.client_connection.clone();
+    
+                            tokio::spawn(async move {
+                                match client::send_msg(connection, message).await {
+                                    Ok(ok) => {
+                                        match sender.send(ok) {
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                println!("{}", err);
+                                            }
+                                        };
+                                    }
+                                    Err(err) => {
+                                        println!("{err} ln 264")
+                                    }
+                                }
+                            });
+                        }
+                    };
+                });
+            },
+            crate::app::backend::ServerMessageType::Audio(audio) => {
+                //Create folder for audios for later problem avoidance
             let _ = fs::create_dir_all(PathBuf::from(format!(
                 "{}{}{}{}",
                 env!("APPDATA"),
@@ -254,6 +432,66 @@ impl TemplateApp {
                     .step_by(0.01),
                 );
             });
+            },
+            crate::app::backend::ServerMessageType::Deleted => {
+                ui.label(RichText::from("Deleted message").strong().size(self.font_size));
+            },
         }
+    }
+
+    pub fn image_overlay_draw(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &Context,
+        image_bytes: Vec<u8>,
+        picture: &ServerImageUpload,
+    ) {
+        //Image overlay
+        ui.painter().rect_filled(
+            egui::Rect::EVERYTHING,
+            0.,
+            Color32::from_rgba_premultiplied(0, 0, 0, 180),
+        );
+
+        Area::new("image_overlay")
+            .movable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
+            .show(ctx, |ui| {
+                ui.allocate_ui(
+                    vec2(ui.available_width() / 1.3, ui.available_height() / 1.3),
+                    |ui| {
+                        ui.add(egui::widgets::Image::from_bytes(
+                            format!("bytes://{}", picture.index),
+                            image_bytes.clone(),
+                        )) /*Add the same context menu as before*/
+                        .context_menu(|ui| {
+                            if ui.button("Save").clicked() {
+                                //always name the file ".png"
+                                let image_save = ServerFileReply {
+                                    bytes: image_bytes.clone(),
+                                    file_name: PathBuf::from(".png"),
+                                };
+                                let _ = write_file(image_save);
+                            }
+                        });
+                    },
+                );
+            });
+
+        Area::new("image_overlay_exit")
+            .movable(false)
+            .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
+            .show(ctx, |ui| {
+                ui.allocate_ui(vec2(25., 25.), |ui| {
+                    if ui
+                        .add(egui::ImageButton::new(egui::include_image!(
+                            "../../../../../icons/cross.png"
+                        )))
+                        .clicked()
+                    {
+                        self.client_ui.image_overlay = false;
+                    }
+                })
+            });
     }
 }

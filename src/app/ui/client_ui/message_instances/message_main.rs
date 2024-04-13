@@ -56,12 +56,6 @@ impl TemplateApp {
                             let mut message_instances: Vec<Response> = Vec::new();
 
                             for (index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
-                                let mut i: &String = &Default::default();
-
-                                if let ServerMessageType::Normal(item) = &item.MessageType {
-                                    i = &item.message;
-                                }
-
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui|
                                     {
@@ -100,11 +94,7 @@ impl TemplateApp {
                                         ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
-                                        self.markdown_text_display(i, ui);
-                                        self.audio_message_instance(item, ui, index);
-                                        self.file_message_instance(item, ui);
-                                        self.image_message_instance(item, ui, ctx);
-                                        self.deleted_message(ui, ctx, item);
+                                        self.message_display(item, ui, ctx, index);
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -127,6 +117,7 @@ impl TemplateApp {
                                         });
                                     }
                                     ).response.context_menu(|ui|{
+                                        
                                         //Client-side uuid check, there is a check in the server file
                                         if item.uuid == self.opened_account.uuid {
                                             ui.horizontal(|ui| {
@@ -208,9 +199,11 @@ impl TemplateApp {
                                         if ui.button("Reply").clicked() {
                                             self.client_ui.replying_to = Some(index);
                                         }
-                                        if ui.button("Copy text").clicked() {
-                                            ctx.copy_text(i.clone());
-                                        };
+                                        if let ServerMessageType::Normal(inner) = &item.MessageType {
+                                            if ui.button("Copy text").clicked() {
+                                                ctx.copy_text(inner.message.clone());
+                                            };
+                                        }
                                 });
                                 message_instances.push(message_group);
 

@@ -58,7 +58,8 @@ impl eframe::App for backend::TemplateApp {
             TODO: make it so when we type @ the list of connected users get shown
             TODO: fix the mutliline text input widget so, when the user presses the enter a \n wont be added (possibly rework the whole thing)
             TODO: fix the message displaying functions, change the If lets to a match statement for obv reasons (easier development)
-
+            TODO: fix autosync so that it also syncs emojis
+            TODO: Migrate to latest egui
         */
 
         //For image loading
@@ -295,12 +296,14 @@ impl eframe::App for backend::TemplateApp {
                     if self.client_ui.req_passw {
                         ui.text_edit_singleline(&mut self.client_ui.client_password);
                     };
+                    
                     if compare_passwords != self.client_ui.client_password
                         || self.client_ui.send_on_ip != compare_ip
                     {
                         self.autosync_sender_thread = None;
                         self.client_ui.incoming_msg = ServerMaster::default();
                     }
+
                     if self.client_ui.invalid_password {
                         ui.label(RichText::from("Invalid Password!").color(Color32::RED));
                     }
