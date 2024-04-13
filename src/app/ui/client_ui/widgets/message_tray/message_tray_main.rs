@@ -40,7 +40,7 @@ impl TemplateApp {
             .desired_width(ui.available_width() - self.client_ui.text_widget_offset * 1.3)
             .desired_rows(0)
             .frame(false);
-        
+
         //Create scroll area
         let msg_scroll = egui::ScrollArea::vertical()
             .id_source("usr_input")

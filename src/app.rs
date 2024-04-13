@@ -296,7 +296,7 @@ impl eframe::App for backend::TemplateApp {
                     if self.client_ui.req_passw {
                         ui.text_edit_singleline(&mut self.client_ui.client_password);
                     };
-                    
+
                     if compare_passwords != self.client_ui.client_password
                         || self.client_ui.send_on_ip != compare_ip
                     {

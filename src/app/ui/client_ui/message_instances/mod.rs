@@ -1,2 +1,2 @@
-mod message_main;
 mod message_display;
+mod message_main;

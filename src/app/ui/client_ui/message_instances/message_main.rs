@@ -1,13 +1,8 @@
-use egui::{vec2, Align, Color32, Layout, Response, RichText};
-
-//use crate::app::account_manager::write_file;
 use crate::app::{
-    backend::{
-        AudioSettings, ClientMessage, ClientMessageEdit, ScrollToMessage, ServerMessageType,
-        TemplateApp,
-    },
+    backend::{AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp},
     client,
 };
+use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -117,7 +112,6 @@ impl TemplateApp {
                                         });
                                     }
                                     ).response.context_menu(|ui|{
-                                        
                                         //Client-side uuid check, there is a check in the server file
                                         if item.uuid == self.opened_account.uuid {
                                             ui.horizontal(|ui| {
@@ -128,22 +122,17 @@ impl TemplateApp {
                                                             self.send_msg(
                                                                 ClientMessage::construct_client_message_edit(index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
                                                             );
-        
                                                             self.client_ui.text_edit_buffer.clear();
                                                             ui.close_menu();
                                                         }
-    
                                                         if ui.button("Delete").clicked() {
                                                             self.send_msg(
                                                                 ClientMessage::construct_client_message_edit(index, None, &self.opened_account.uuid, &self.opened_account.username)
                                                             );
-        
                                                             self.client_ui.text_edit_buffer.clear();
                                                             ui.close_menu();
                                                         }
-
                                                     });
-
                                                 });
                                             });
 

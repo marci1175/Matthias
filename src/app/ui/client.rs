@@ -3,7 +3,6 @@ use egui::{
     Stroke,
 };
 use rodio::Decoder;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::app::backend::{
@@ -564,12 +563,12 @@ impl TemplateApp {
                     if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
                         inner.client_message_counter = match client_message_counter.lock() {
                             Ok(index) => Some(*index),
-                            Err(err) => None,
+                            Err(_err) => None,
                         };
 
                         inner.last_seen_message_index = match last_seen_message_index.lock() {
                             Ok(index) => Some(*index),
-                            Err(err) => None,
+                            Err(_err) => None,
                         }
                     }
 
@@ -591,7 +590,7 @@ impl TemplateApp {
                     };
 
                     //Recive input from main thread to shutdown
-                    if let Ok(signal) = reciver.try_recv() {
+                    if let Ok(_) = reciver.try_recv() {
                         break;
                     }
                 }
