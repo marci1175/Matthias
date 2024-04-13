@@ -58,7 +58,8 @@ impl eframe::App for backend::TemplateApp {
             TODO: make it so when we type @ the list of connected users get shown
             TODO: fix the mutliline text input widget so, when the user presses the enter a \n wont be added (possibly rework the whole thing)
             TODO: fix autosync so that it also syncs emojis
-            TODO: Migrate to latest egui
+            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
+
         */
 
         //For image loading

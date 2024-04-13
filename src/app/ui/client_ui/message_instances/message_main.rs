@@ -3,6 +3,7 @@ use crate::app::{
     client,
 };
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
+use tap::Tap;
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -52,8 +53,7 @@ impl TemplateApp {
 
                             for (index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
-                                let message_group = ui.group(|ui|
-                                    {
+                                let message_group = ui.group(|ui| {
                                         //Check if visible, so we can send back the info to the server
                                         if ui.is_visible() {
                                             self.client_ui.incoming_msg.struct_list[index].seen = true;
@@ -110,92 +110,102 @@ impl TemplateApp {
                                                 }
                                             });
                                         });
-                                    }
-                                    ).response.context_menu(|ui|{
-                                        //Client-side uuid check, there is a check in the server file
-                                        if item.uuid == self.opened_account.uuid {
-                                            ui.horizontal(|ui| {
-                                                ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
-                                                ui.vertical(|ui| {
-                                                    ui.allocate_ui(vec2(100., 10.), |ui| {
-                                                        if ui.button("Edit").clicked() {
-                                                            self.send_msg(
-                                                                ClientMessage::construct_client_message_edit(index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
-                                                            );
-                                                            self.client_ui.text_edit_buffer.clear();
-                                                            ui.close_menu();
-                                                        }
-                                                        if ui.button("Delete").clicked() {
-                                                            self.send_msg(
-                                                                ClientMessage::construct_client_message_edit(index, None, &self.opened_account.uuid, &self.opened_account.username)
-                                                            );
-                                                            self.client_ui.text_edit_buffer.clear();
-                                                            ui.close_menu();
-                                                        }
-                                                    });
-                                                });
-                                            });
 
-                                            ui.separator();
+                                        //TODO: HUH
+                                        if ui.is_visible() && *self.client_ui.last_seen_msg_index.lock().unwrap() < index {
+                                            *self.client_ui.last_seen_msg_index.lock().unwrap() = index;
                                         }
-
-                                        ui.menu_button("React", |ui| {
-                                            let filter = &self.filter;
-                                            let named_chars = self.named_chars
-                                                .entry(egui::FontFamily::Monospace)
-                                                .or_insert_with(|| TemplateApp::available_characters(ui, egui::FontFamily::Monospace));
-
-                                            ui.allocate_ui(vec2(300., 300.), |ui|{
-                                                egui::ScrollArea::vertical().show(ui, |ui| {
-                                                    ui.horizontal_wrapped(|ui| {
-                                                        ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
-
-                                                        for (&chr, name) in named_chars {
-                                                            if filter.is_empty()
-                                                                || name.contains(filter)
-                                                                || *filter == chr.to_string()
-                                                            {
-                                                                let button = egui::Button::new(
-                                                                    egui::RichText::new(chr.to_string()).font(egui::FontId {
-                                                                        size: self.font_size,
-                                                                        family: egui::FontFamily::Proportional,
-                                                                    }),
-                                                                )
-                                                                .frame(false);
-                                                                if ui.add(button).clicked() {
-
-                                                                    let uuid = self.opened_account.uuid.clone();
-
-                                                                    let message = ClientMessage::construct_reaction_msg(
-                                                                        chr, index, &self.login_username, &uuid,
-                                                                    );
-                                                                    let connection = self.client_connection.clone();
-
-                                                                    tokio::spawn(async move {
-                                                                        match client::send_msg(connection, message).await {
-                                                                            Ok(_) => {},
-                                                                            Err(err) => println!("{err}"),
-                                                                        };
-                                                                    });
-                                                                }
-                                                            }
-                                                        }
-                                                    });
+                                    }
+                                );
+                                    
+                                message_group.response.context_menu(|ui|{
+                                    //Client-side uuid check, there is a check in the server file
+                                    if item.uuid == self.opened_account.uuid {
+                                        ui.horizontal(|ui| {
+                                            ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
+                                            ui.vertical(|ui| {
+                                                ui.allocate_ui(vec2(100., 10.), |ui| {
+                                                    if ui.button("Edit").clicked() {
+                                                        self.send_msg(
+                                                            ClientMessage::construct_client_message_edit(index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
+                                                        );
+                                                        self.client_ui.text_edit_buffer.clear();
+                                                        ui.close_menu();
+                                                    }
+                                                    if ui.button("Delete").clicked() {
+                                                        self.send_msg(
+                                                            ClientMessage::construct_client_message_edit(index, None, &self.opened_account.uuid, &self.opened_account.username)
+                                                        );
+                                                        self.client_ui.text_edit_buffer.clear();
+                                                        ui.close_menu();
+                                                    }
                                                 });
                                             });
                                         });
 
-                                        if ui.button("Reply").clicked() {
-                                            self.client_ui.replying_to = Some(index);
-                                        }
-                                        if let ServerMessageType::Normal(inner) = &item.MessageType {
-                                            if ui.button("Copy text").clicked() {
-                                                ctx.copy_text(inner.message.clone());
-                                            };
-                                        }
-                                });
-                                message_instances.push(message_group);
+                                        ui.separator();
+                                    }
 
+                                    ui.menu_button("React", |ui| {
+                                        let filter = &self.filter;
+                                        let named_chars = self.named_chars
+                                            .entry(egui::FontFamily::Monospace)
+                                            .or_insert_with(|| TemplateApp::available_characters(ui, egui::FontFamily::Monospace));
+
+                                        ui.allocate_ui(vec2(300., 300.), |ui|{
+                                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                                ui.horizontal_wrapped(|ui| {
+                                                    ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
+
+                                                    for (&chr, name) in named_chars {
+                                                        if filter.is_empty()
+                                                            || name.contains(filter)
+                                                            || *filter == chr.to_string()
+                                                        {
+                                                            let button = egui::Button::new(
+                                                                egui::RichText::new(chr.to_string()).font(egui::FontId {
+                                                                    size: self.font_size,
+                                                                    family: egui::FontFamily::Proportional,
+                                                                }),
+                                                            )
+                                                            .frame(false);
+                                                            if ui.add(button).clicked() {
+
+                                                                let uuid = self.opened_account.uuid.clone();
+
+                                                                let message = ClientMessage::construct_reaction_msg(
+                                                                    chr, index, &self.login_username, &uuid,
+                                                                );
+                                                                let connection = self.client_connection.clone();
+
+                                                                tokio::spawn(async move {
+                                                                    match client::send_msg(connection, message).await {
+                                                                        Ok(_) => {},
+                                                                        Err(err) => println!("{err}"),
+                                                                    };
+                                                                });
+                                                            }
+                                                        }
+                                                    }
+                                                });
+                                            });
+                                        });
+                                    });
+
+                                    if ui.button("Reply").clicked() {
+                                        self.client_ui.replying_to = Some(index);
+                                    }
+                                    if let ServerMessageType::Normal(inner) = &item.MessageType {
+                                        if ui.button("Copy text").clicked() {
+                                            ctx.copy_text(inner.message.clone());
+                                        };
+                                    }
+                                
+                                });
+
+                                message_group.response.paint_debug_info();
+                                
+                                message_instances.push(message_group.response);
 
                             };
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {

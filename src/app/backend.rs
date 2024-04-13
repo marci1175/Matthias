@@ -19,6 +19,7 @@ use std::fmt::{Debug, Display};
 use std::fs;
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
@@ -412,6 +413,10 @@ pub struct Client {
     ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
     #[serde(skip)]
     pub text_edit_buffer: String,
+
+    ///This list contains all of the indexes of the messages the clients have seen, this always gets overriden by the sync thread
+    #[serde(skip)]
+    pub seen_list: Vec<ClientLastSeenMessage>,
 }
 impl Default for Client {
     fn default() -> Self {
@@ -460,6 +465,7 @@ impl Default for Client {
             text_edit_buffer: String::new(),
             incoming_msg_len: Arc::new(Mutex::new(0)),
             last_seen_msg_index: Arc::new(Mutex::new(0)),
+            seen_list: Vec::new(),
         }
     }
 }
@@ -1132,6 +1138,8 @@ impl ServerOutput {
 pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
+    ///Users last seen message index
+    pub user_seen_list: Vec<ClientLastSeenMessage>
 }
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
@@ -1139,10 +1147,40 @@ impl ServerMaster {
     }
     pub fn convert_vec_serverout_into_server_master(
         server_output_list: Vec<ServerOutput>,
+        user_seen_list: Vec<ClientLastSeenMessage>,
     ) -> ServerMaster {
         ServerMaster {
             struct_list: server_output_list,
+            user_seen_list,
         }
+    }
+}
+
+//When a client is connected this is where the client gets saved
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ConnectedClient {
+    pub address: SocketAddr,
+    pub uuid: String,
+    pub username: String,
+}
+
+impl ConnectedClient {
+    pub fn new(address: SocketAddr, uuid: String, username: String) -> Self {
+        Self { address, uuid, username }
+    }
+}
+
+//This contains the client's name and their last seen message's index
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientLastSeenMessage {
+    pub index: usize,
+    pub username: String,
+    pub uuid: String,
+}
+
+impl ClientLastSeenMessage {
+    pub fn new(index: usize, uuid: String, username: String) -> Self {
+        Self { index, username, uuid }
     }
 }
 

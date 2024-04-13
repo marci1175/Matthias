@@ -56,7 +56,7 @@ impl TemplateApp {
             msg_scroll.inner.rect.height() + 15.,
         ));
 
-        Area::new("msg_action_tray")
+        Area::new("msg_action_tray".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 vec2(-30., -msg_scroll.content_size.y / 2. - 4.),

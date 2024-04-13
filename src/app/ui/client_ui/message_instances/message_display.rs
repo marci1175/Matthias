@@ -23,8 +23,9 @@ impl TemplateApp {
         match &message.MessageType {
             //File upload
             crate::app::backend::ServerMessageType::Upload(inner) => {
-                if ui
-                    .button(RichText::from(inner.file_name.to_string()).size(self.font_size))
+                let button = ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
+                button.paint_debug_info();
+                if button
                     .clicked()
                 {
                     let passw = self.client_ui.client_password.clone();
@@ -218,7 +219,7 @@ impl TemplateApp {
                             });
                         }
                     };
-                });
+                }).response.paint_debug_info();
             }
             crate::app::backend::ServerMessageType::Audio(audio) => {
                 //Create folder for audios for later problem avoidance
@@ -391,7 +392,7 @@ impl TemplateApp {
                                                 .is_loading = true;
                                         }
                                     };
-                                });
+                                }).response.paint_debug_info();
                             }
                         }
                     });
@@ -487,7 +488,7 @@ impl TemplateApp {
             Color32::from_rgba_premultiplied(0, 0, 0, 180),
         );
 
-        Area::new("image_overlay")
+        Area::new("image_overlay".into())
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .show(ctx, |ui| {
@@ -512,7 +513,7 @@ impl TemplateApp {
                 );
             });
 
-        Area::new("image_overlay_exit")
+        Area::new("image_overlay_exit".into())
             .movable(false)
             .anchor(Align2::RIGHT_TOP, vec2(-100., 100.))
             .show(ctx, |ui| {

@@ -1,8 +1,7 @@
-use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf};
+use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use super::backend::{
-    encrypt_aes256, ClientMessageType, MessageReaction, Reaction, ServerMessageType,
-    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+    encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
 };
 
 use messages::{
@@ -55,10 +54,13 @@ pub struct MessageService {
     pub audio_names: Mutex<Vec<Option<String>>>,
 
     ///connected clients
-    pub connected_clients: Mutex<Vec<SocketAddr>>,
+    pub connected_clients: Mutex<Vec<ConnectedClient>>,
 
     ///Client secret
     pub decryption_key: [u8; 32],
+
+    ///Client last seen message
+    pub clients_last_seen_index: Mutex<Vec<ClientLastSeenMessage>>,
 }
 
 #[tonic::async_trait]
@@ -88,7 +90,7 @@ impl ServerMessage for MessageService {
                                     //Search for connected ip in all connected ips
                                     for client in clients.iter() {
                                         //If found, then the client is already connected
-                                        if *client == remote_address {
+                                        if client.address == remote_address {
                                             //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
                                             return Ok(Response::new(MessageResponse {
                                                 message: hex::encode(self.decryption_key),
@@ -96,8 +98,9 @@ impl ServerMessage for MessageService {
                                         }
                                     }
 
-                                    //If the ip is not found then add it to connected ip's
-                                    clients.push(remote_address);
+                                    //If the ip is not found then add it to connected clients
+                                    clients.push(ConnectedClient::new(remote_address, req.Uuid, req.Author));
+                                    
 
                                     //Return custom which will the server's text will be encrypted with
                                     return Ok(Response::new(MessageResponse {
@@ -116,7 +119,7 @@ impl ServerMessage for MessageService {
                                     //Search for connected ip in all connected ips
                                     for (index, client) in clients.clone().iter().enumerate() {
                                         //If found, then disconnect the client
-                                        if *client == remote_address {
+                                        if client.address == remote_address {
                                             clients.remove(index);
 
                                             //Stop the for loop, for safety
@@ -133,6 +136,7 @@ impl ServerMessage for MessageService {
 
                     //else: we dont do anything because we return the updated message list in the end
                 }
+
                 //Sync all messages
                 return self.sync_message(&req).await;
             }
@@ -142,7 +146,7 @@ impl ServerMessage for MessageService {
                 .lock()
                 .unwrap()
                 .iter()
-                .any(|client| *client == remote_address)
+                .any(|client| client.address == remote_address)
             //Search through the list
             {
                 match &req.MessageType {
@@ -378,12 +382,30 @@ impl MessageService {
         };
     }
     async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
-        let all_messages = self.messages.lock().unwrap().clone();
+        let all_messages = &mut self.messages.lock().unwrap().clone();
 
         let all_messages_len = all_messages.len();
 
         //Dont ask me why I did it this way
         let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType {
+            //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
+            if let Some(last_seen_message_index) = inner.last_seen_message_index {
+                match &mut self.clients_last_seen_index.lock() {
+                    Ok(client_vec) => {
+                        //Iter over the whole list so we can update the user's index if there is one
+                        if let Some(client_index_pos) = client_vec.iter().position(|client| { client.uuid == req.Uuid }) {
+                            //Update index
+                            client_vec[client_index_pos].index = last_seen_message_index;
+                        }
+                        else {
+                            client_vec.push(ClientLastSeenMessage::new(last_seen_message_index, req.Uuid.clone(), req.Author.clone()));
+                        }
+                    },
+                    Err(err) => {dbg!(err);},
+
+                }
+            }
+
             //client_message_counter is how many messages does the client have
             if let Some(counter) = inner.client_message_counter {
                 //Check if user already has all the messages
@@ -401,7 +423,7 @@ impl MessageService {
         };
 
         let server_master =
-            ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec());
+            ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec(), self.clients_last_seen_index.lock().unwrap().clone());
 
         let final_msg: String = server_master.struct_into_string();
 

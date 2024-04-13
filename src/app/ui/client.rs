@@ -116,7 +116,7 @@ impl TemplateApp {
                 );
 
                 //Draw rectangle in the middle where the text also appears
-                Area::new("warning_overlay").show(ctx, |ui| {
+                Area::new("warning_overlay".into()).show(ctx, |ui| {
                     ui.painter().rect(
                         egui::Rect {
                             min: Pos2::new(
@@ -383,7 +383,7 @@ impl TemplateApp {
         };
 
         //message box expanded
-        Area::new("usr_msg_expand")
+        Area::new("usr_msg_expand".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.client_ui.usr_msg_expanded {
@@ -508,16 +508,16 @@ impl TemplateApp {
         *self.client_ui.incoming_msg_len.lock().unwrap() =
             self.client_ui.incoming_msg.struct_list.len();
 
-        let last_seen_msg_index = self
-            .client_ui
-            .incoming_msg
-            .struct_list
-            .iter()
-            .rev()
-            .position(|value| value.seen)
-            .unwrap_or(0);
+        // let last_seen_msg_index = self
+        //     .client_ui
+        //     .incoming_msg
+        //     .struct_list
+        //     .iter()
+        //     .rev()
+        //     .position(|value| value.seen)
+        //     .unwrap_or(0);
 
-        *self.client_ui.last_seen_msg_index.lock().unwrap() = last_seen_msg_index.clone();
+        // *self.client_ui.last_seen_msg_index.lock().unwrap() = last_seen_msg_index.clone();
 
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
         self.autosync_sender_thread.get_or_insert_with(|| {
@@ -534,7 +534,7 @@ impl TemplateApp {
                 &self.opened_account.uuid,
                 //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
                 self.client_ui.incoming_msg.struct_list.len(),
-                Some(last_seen_msg_index),
+                Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
             );
 
             //Clone so we can move it into the closure
@@ -619,7 +619,9 @@ impl TemplateApp {
 
                     match incoming_struct {
                         Ok(mut msg) => {
-                            //if we recived an empty vector, we can just return
+                            self.client_ui.seen_list = dbg!(msg.user_seen_list);
+
+                            //if we recived an empty vector, we can just return, after updateing seen_list
                             if msg.struct_list.is_empty() {
                                 return;
                             }
@@ -629,6 +631,8 @@ impl TemplateApp {
                                 .incoming_msg
                                 .struct_list
                                 .append(&mut msg.struct_list);
+
+                            
                         }
                         Err(_err) => {
                             // dbg!(_err);
