@@ -17,10 +17,6 @@ use crate::app::client::{self};
 
 impl TemplateApp {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
-        //Window settings
-        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
-        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(1000., 800.)));
-
         //Server - Client syncing
         self.client_sync(ctx);
 
@@ -508,17 +504,6 @@ impl TemplateApp {
         *self.client_ui.incoming_msg_len.lock().unwrap() =
             self.client_ui.incoming_msg.struct_list.len();
 
-        // let last_seen_msg_index = self
-        //     .client_ui
-        //     .incoming_msg
-        //     .struct_list
-        //     .iter()
-        //     .rev()
-        //     .position(|value| value.seen)
-        //     .unwrap_or(0);
-
-        // *self.client_ui.last_seen_msg_index.lock().unwrap() = last_seen_msg_index.clone();
-
         //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
         self.autosync_sender_thread.get_or_insert_with(|| {
             //Prevent a race condition
@@ -608,18 +593,15 @@ impl TemplateApp {
                     ctx.request_repaint();
 
                     //Decrypt the server's reply
-                    let decrypted_message = dbg!(decrypt_aes256(
-                        &message,
-                        &self.client_connection.client_secret
-                    )
-                    .unwrap());
+                    let decrypted_message =
+                        decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
 
                     let incoming_struct: Result<ServerMaster, serde_json::Error> =
                         serde_json::from_str(&decrypted_message);
 
                     match incoming_struct {
                         Ok(mut msg) => {
-                            self.client_ui.seen_list = dbg!(msg.user_seen_list);
+                            self.client_ui.seen_list = msg.user_seen_list;
 
                             //if we recived an empty vector, we can just return, after updateing seen_list
                             if msg.struct_list.is_empty() {
@@ -631,8 +613,6 @@ impl TemplateApp {
                                 .incoming_msg
                                 .struct_list
                                 .append(&mut msg.struct_list);
-
-                            
                         }
                         Err(_err) => {
                             // dbg!(_err);

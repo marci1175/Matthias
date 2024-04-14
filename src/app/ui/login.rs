@@ -5,10 +5,6 @@ use egui::{vec2, Align, Layout, RichText, ViewportCommand};
 
 impl TemplateApp {
     pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
-        //windows settings
-        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(vec2(500., 200.)));
-        ctx.send_viewport_cmd(ViewportCommand::Resizable(false));
-
         let is_focused = ctx.input(|input| input.focused);
 
         egui::CentralPanel::default().show(ctx, |ui| {

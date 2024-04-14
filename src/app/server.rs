@@ -1,7 +1,9 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use super::backend::{
-    encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
+    encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
+    Reaction, ServerMessageType,
+    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
 };
 
 use messages::{
@@ -99,8 +101,11 @@ impl ServerMessage for MessageService {
                                     }
 
                                     //If the ip is not found then add it to connected clients
-                                    clients.push(ConnectedClient::new(remote_address, req.Uuid, req.Author));
-                                    
+                                    clients.push(ConnectedClient::new(
+                                        remote_address,
+                                        req.Uuid,
+                                        req.Author,
+                                    ));
 
                                     //Return custom which will the server's text will be encrypted with
                                     return Ok(Response::new(MessageResponse {
@@ -393,16 +398,22 @@ impl MessageService {
                 match &mut self.clients_last_seen_index.lock() {
                     Ok(client_vec) => {
                         //Iter over the whole list so we can update the user's index if there is one
-                        if let Some(client_index_pos) = client_vec.iter().position(|client| { client.uuid == req.Uuid }) {
+                        if let Some(client_index_pos) =
+                            client_vec.iter().position(|client| client.uuid == req.Uuid)
+                        {
                             //Update index
                             client_vec[client_index_pos].index = last_seen_message_index;
+                        } else {
+                            client_vec.push(ClientLastSeenMessage::new(
+                                last_seen_message_index,
+                                req.Uuid.clone(),
+                                req.Author.clone(),
+                            ));
                         }
-                        else {
-                            client_vec.push(ClientLastSeenMessage::new(last_seen_message_index, req.Uuid.clone(), req.Author.clone()));
-                        }
-                    },
-                    Err(err) => {dbg!(err);},
-
+                    }
+                    Err(err) => {
+                        dbg!(err);
+                    }
                 }
             }
 
@@ -422,8 +433,10 @@ impl MessageService {
             &all_messages
         };
 
-        let server_master =
-            ServerMaster::convert_vec_serverout_into_server_master(selected_messages_part.to_vec(), self.clients_last_seen_index.lock().unwrap().clone());
+        let server_master = ServerMaster::convert_vec_serverout_into_server_master(
+            selected_messages_part.to_vec(),
+            self.clients_last_seen_index.lock().unwrap().clone(),
+        );
 
         let final_msg: String = server_master.struct_into_string();
 

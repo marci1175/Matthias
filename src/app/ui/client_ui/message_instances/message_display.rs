@@ -23,11 +23,10 @@ impl TemplateApp {
         match &message.MessageType {
             //File upload
             crate::app::backend::ServerMessageType::Upload(inner) => {
-                let button = ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
+                let button =
+                    ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
                 button.paint_debug_info();
-                if button
-                    .clicked()
-                {
+                if button.clicked() {
                     let passw = self.client_ui.client_password.clone();
                     let author = self.login_username.clone();
                     let sender = self.ftx.clone();
@@ -185,7 +184,7 @@ impl TemplateApp {
                             };
 
                             //check if we are visible
-                            if !ui.is_visible() {
+                            if !dbg!(ui.is_rect_visible(ui.min_rect())) {
                                 return;
                             }
 
@@ -219,7 +218,9 @@ impl TemplateApp {
                             });
                         }
                     };
-                }).response.paint_debug_info();
+                })
+                .response
+                .paint_debug_info();
             }
             crate::app::backend::ServerMessageType::Audio(audio) => {
                 //Create folder for audios for later problem avoidance
@@ -392,7 +393,9 @@ impl TemplateApp {
                                                 .is_loading = true;
                                         }
                                     };
-                                }).response.paint_debug_info();
+                                })
+                                .response
+                                .paint_debug_info();
                             }
                         }
                     });

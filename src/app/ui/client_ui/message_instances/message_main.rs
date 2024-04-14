@@ -51,12 +51,12 @@ impl TemplateApp {
                             }
                             let mut message_instances: Vec<Response> = Vec::new();
 
-                            for (index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
+                            for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui| {
                                         //Check if visible, so we can send back the info to the server
                                         if ui.is_visible() {
-                                            self.client_ui.incoming_msg.struct_list[index].seen = true;
+                                            self.client_ui.incoming_msg.struct_list[iter_index].seen = true;
                                         }
 
                                         if let Some(replied_to) = item.replying_to {
@@ -89,7 +89,7 @@ impl TemplateApp {
                                         ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
-                                        self.message_display(item, ui, ctx, index);
+                                        self.message_display(item, ui, ctx, iter_index);
 
                                         //Display Message date
                                         ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
@@ -111,30 +111,50 @@ impl TemplateApp {
                                             });
                                         });
 
-                                        //TODO: HUH
-                                        if ui.is_visible() && *self.client_ui.last_seen_msg_index.lock().unwrap() < index {
-                                            *self.client_ui.last_seen_msg_index.lock().unwrap() = index;
+                                        if ui.is_rect_visible(ui.min_rect()) && *self.client_ui.last_seen_msg_index.lock().unwrap() < iter_index {
+                                            *self.client_ui.last_seen_msg_index.lock().unwrap() = iter_index;
                                         }
                                     }
                                 );
-                                    
+
+                                //Display where the users seen their last message
+                                ui.horizontal(|ui| {
+                                    for client in &self.client_ui.seen_list {
+                                        if iter_index == client.index {
+                                            //Make it more visible
+                                            ui.group(|ui| {
+                                                ui.label(RichText::from(&client.username));
+                                            });
+                                        }
+                                    }
+                                });
+                                
                                 message_group.response.context_menu(|ui|{
                                     //Client-side uuid check, there is a check in the server file
                                     if item.uuid == self.opened_account.uuid {
                                         ui.horizontal(|ui| {
-                                            ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
+
+                                            //We should only thisplay the text edit widget if its on an editable message
+                                            if matches!(item.MessageType, ServerMessageType::Normal(_)) {
+                                                ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
+                                            }
+
                                             ui.vertical(|ui| {
                                                 ui.allocate_ui(vec2(100., 10.), |ui| {
-                                                    if ui.button("Edit").clicked() {
-                                                        self.send_msg(
-                                                            ClientMessage::construct_client_message_edit(index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
-                                                        );
-                                                        self.client_ui.text_edit_buffer.clear();
-                                                        ui.close_menu();
+                                                    //We should only display the `edit` button if its anormal message thus its editable
+                                                    if matches!(item.MessageType, ServerMessageType::Normal(_)) {
+                                                        if ui.button("Edit").clicked() {
+                                                            self.send_msg(
+                                                                ClientMessage::construct_client_message_edit(iter_index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
+                                                            );
+                                                            self.client_ui.text_edit_buffer.clear();
+                                                            ui.close_menu();
+                                                        }
                                                     }
+
                                                     if ui.button("Delete").clicked() {
                                                         self.send_msg(
-                                                            ClientMessage::construct_client_message_edit(index, None, &self.opened_account.uuid, &self.opened_account.username)
+                                                            ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_account.uuid, &self.opened_account.username)
                                                         );
                                                         self.client_ui.text_edit_buffer.clear();
                                                         ui.close_menu();
@@ -174,7 +194,7 @@ impl TemplateApp {
                                                                 let uuid = self.opened_account.uuid.clone();
 
                                                                 let message = ClientMessage::construct_reaction_msg(
-                                                                    chr, index, &self.login_username, &uuid,
+                                                                    chr, iter_index, &self.login_username, &uuid,
                                                                 );
                                                                 let connection = self.client_connection.clone();
 
@@ -193,20 +213,16 @@ impl TemplateApp {
                                     });
 
                                     if ui.button("Reply").clicked() {
-                                        self.client_ui.replying_to = Some(index);
+                                        self.client_ui.replying_to = Some(iter_index);
                                     }
                                     if let ServerMessageType::Normal(inner) = &item.MessageType {
                                         if ui.button("Copy text").clicked() {
                                             ctx.copy_text(inner.message.clone());
                                         };
                                     }
-                                
                                 });
-
                                 message_group.response.paint_debug_info();
-                                
                                 message_instances.push(message_group.response);
-
                             };
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));

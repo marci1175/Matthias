@@ -60,6 +60,8 @@ impl eframe::App for backend::TemplateApp {
             TODO: fix autosync so that it also syncs emojis
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
 
+            TODO: FIX IMAGE OPTIMISATION
+
         */
 
         //For image loading

@@ -1139,7 +1139,7 @@ pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
     ///Users last seen message index
-    pub user_seen_list: Vec<ClientLastSeenMessage>
+    pub user_seen_list: Vec<ClientLastSeenMessage>,
 }
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
@@ -1166,7 +1166,11 @@ pub struct ConnectedClient {
 
 impl ConnectedClient {
     pub fn new(address: SocketAddr, uuid: String, username: String) -> Self {
-        Self { address, uuid, username }
+        Self {
+            address,
+            uuid,
+            username,
+        }
     }
 }
 
@@ -1180,7 +1184,11 @@ pub struct ClientLastSeenMessage {
 
 impl ClientLastSeenMessage {
     pub fn new(index: usize, uuid: String, username: String) -> Self {
-        Self { index, username, uuid }
+        Self {
+            index,
+            username,
+            uuid,
+        }
     }
 }
 
