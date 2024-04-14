@@ -47,6 +47,7 @@ impl eframe::App for backend::TemplateApp {
         /* NOTES:
 
             - file_tray_main.rs contains reply_tray
+            - we use the self.client_ui.seen_list to get the list of all of the connected clients
 
         */
 

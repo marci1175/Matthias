@@ -362,7 +362,7 @@ impl TemplateApp {
 
                         //Display no result :(
                         if !has_search && !self.client_ui.search_buffer.trim().is_empty() {
-                            ui.label(RichText::from("Message not found, based on these parameters").color(Color32::RED));
+                            ui.label(RichText::from("Based on these parameters, no messages were found").color(Color32::RED));
                         }
 
                     });

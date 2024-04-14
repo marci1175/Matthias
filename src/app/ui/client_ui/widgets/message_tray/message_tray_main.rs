@@ -56,6 +56,8 @@ impl TemplateApp {
             msg_scroll.inner.rect.height() + 15.,
         ));
 
+        self.get_connected_users(ui, ctx);
+
         Area::new("msg_action_tray".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
@@ -223,5 +225,34 @@ impl TemplateApp {
                 });
             });
         });
+    }
+
+    fn get_connected_users(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        // ctx.input(|reader| reader.key_pressed(Key::Enter))
+        let split_user_msg = dbg!(self.client_ui.usr_msg.split('@').collect::<Vec<_>>());
+
+        if split_user_msg.len() > 1 {
+            for (index, str) in split_user_msg.iter().enumerate().rev() {
+                //If there is already something to search for (the user already typed something after the @)
+                self.draw_connected_users(ctx, str);
+            }
+        }
+    }
+
+    fn draw_connected_users(&self, ctx: &egui::Context, search_parameter: &str) {
+        Area::new("connected_users".into())
+            .enabled(true)
+            .anchor(
+                Align2::LEFT_BOTTOM,
+                vec2(20., self.client_ui.scroll_widget_rect.height()),
+            )
+            .show(ctx, |ui| {
+                for client in &self.client_ui.seen_list {
+                    //If the search buffer is contained in the clients' username
+                    if client.username.contains(search_parameter) {
+                        ui.label(RichText::from(&client.username));
+                    }
+                }
+            });
     }
 }

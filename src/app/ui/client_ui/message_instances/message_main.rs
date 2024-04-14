@@ -131,7 +131,7 @@ impl TemplateApp {
                                 
                                 message_group.response.context_menu(|ui|{
                                     //Client-side uuid check, there is a check in the server file
-                                    if item.uuid == self.opened_account.uuid {
+                                    if item.uuid == self.opened_account.uuid && item.MessageType != ServerMessageType::Deleted {
                                         ui.horizontal(|ui| {
 
                                             //We should only thisplay the text edit widget if its on an editable message

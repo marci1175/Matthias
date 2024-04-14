@@ -948,7 +948,7 @@ impl Debug for ConnectionState {
 */
 
 ///This is what the server sends back (pushes to message vector), when reciving a file
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerFileUpload {
     pub file_name: String,
     pub index: i32,
@@ -962,7 +962,7 @@ pub struct ServerFileReply {
 }
 
 ///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerImageUpload {
     pub index: i32,
 }
@@ -975,14 +975,14 @@ pub struct ServerImageReply {
 }
 
 ///This is what the server sends back (pushes to message vector), when reciving a normal message
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerNormalMessage {
     pub has_been_edited: bool,
     pub message: String,
 }
 
 ///REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerAudioUpload {
     pub index: i32,
     pub file_name: String,
@@ -1003,7 +1003,7 @@ use super::client::messages::message_client::MessageClient;
 use super::client::messages::MessageRequest;
 
 ///This is what server replies can be
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(EnumString, EnumMessage))]
 pub enum ServerMessageType {
     #[strum_discriminants(strum(message = "Upload"))]

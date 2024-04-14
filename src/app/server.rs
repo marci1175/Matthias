@@ -450,16 +450,6 @@ impl MessageService {
         Ok(Response::new(reply))
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
-        /*
-
-            DEPRICATED
-
-        error -> 0 success
-        error -> 1 Server : failed to get APPDATA arg
-        error -> 2 Server : failed to create file
-
-        */
-
         //500mb limit
         if !req.bytes.len() > 500000000 {
             match env::var("APPDATA") {
@@ -738,6 +728,12 @@ impl MessageService {
                     return;
                 }
 
+                //If its none then we can check for the index, because you can delete all messages, rest is ignored
+                if edit.new_message.is_none() {
+                    //Set as `Deleted`
+                    messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
+                }
+
                 if let ServerMessageType::Normal(inner_msg) =
                     &mut messages_vec[edit.index].MessageType
                 {
@@ -745,11 +741,6 @@ impl MessageService {
                         inner_msg.message = new_msg;
 
                         inner_msg.has_been_edited = true;
-                    }
-                    //If its none then it means we need to delete the message
-                    else {
-                        //Set the enum to be deleted
-                        messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
                     }
                 }
             }
