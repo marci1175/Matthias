@@ -2,10 +2,10 @@ use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, Layout, Modifiers,
-    RichText, Rounding, Stroke,
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout, Modifiers, RichText, Rounding, Stroke
 };
 use rand::Rng;
+use regex::Replacer;
 use rfd::FileDialog;
 use std::fs::{self};
 use std::sync::mpsc;
@@ -30,6 +30,49 @@ impl TemplateApp {
 
         let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
+        //Consume input when we are diplaying the user list
+        if self.client_ui.display_user_list {
+            ctx.input_mut(|reader| {
+                //Clone var to avoid error
+                let user_message_clone = self.client_ui.usr_msg.clone();
+                    
+                //We will reconstruct the buffer
+                let mut split = user_message_clone.split('@').collect::<Vec<_>>();
+
+                //TODO: MAKE A GOOD FIX 4 THIS
+                if !self.client_ui.display_user_list {
+                    return;
+                }
+                if let Some(buffer) = split.get_mut(1) {
+
+                if self.client_ui.seen_list.iter().any(|seen| {
+                    seen.username == *buffer
+                }) {
+                    //if we have already typed in a user's whole name we can send said message
+                    return;
+                };
+
+                //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
+                if reader.consume_key(Modifiers::NONE, Key::Enter) {
+                        //format the string so the @ stays
+                        let formatted_string = format!("@{}", self.client_ui.seen_list[self.client_ui.user_selector_index as usize].username);
+
+                        *buffer = &formatted_string;
+
+                        //Concat the vector after modifying it
+                        let split_concat = split.concat();
+
+                        //Set the buffer to the concatenated vector, append the @ to the 0th index
+                        self.client_ui.usr_msg = split_concat;
+                };
+                }
+        });
+        }
+        
+        //Set this var true if the @ menu is being displayed;
+        //* self.get_connected_users function MUST be called before showing the text input widget, so this way we can actually consume the ArrowUp and Down keys
+        self.client_ui.display_user_list = self.get_connected_users(ctx);
+
         //Create widget
         let text_widget = egui::TextEdit::multiline(&mut self.client_ui.usr_msg)
             .font(FontId {
@@ -39,6 +82,7 @@ impl TemplateApp {
             .hint_text(format!("Message to: {}", self.client_ui.send_on_ip))
             .desired_width(ui.available_width() - self.client_ui.text_widget_offset * 1.3)
             .desired_rows(0)
+            .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter))
             .frame(false);
 
         //Create scroll area
@@ -55,8 +99,6 @@ impl TemplateApp {
             ui.available_width(),
             msg_scroll.inner.rect.height() + 15.,
         ));
-
-        self.get_connected_users(ui, ctx);
 
         Area::new("msg_action_tray".into())
             .anchor(
@@ -227,34 +269,58 @@ impl TemplateApp {
         });
     }
 
-    fn get_connected_users(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let split_user_msg = dbg!(self.client_ui.usr_msg.split('@').collect::<Vec<_>>());
+    fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
 
-        //If the user didnt type @
-        if split_user_msg.len() - 1 == 0 {
-            return;
+        let split_user_msg = dbg!(self.client_ui.usr_msg.split(['@', ' ']).collect::<Vec<_>>());
+
+        //If the user didnt type @ || if the seen list is empty
+        if split_user_msg.len() - 1 == 0 || self.client_ui.seen_list.is_empty() {
+            return false;
         }
 
         if let Some(last_str) = split_user_msg.get(split_user_msg.len() - 1) {
             Area::new("Users".into())
-            .enabled(true)
-            .anchor(
-                Align2::LEFT_BOTTOM,
-                vec2(50., -100.),
-            )
-            .show(ctx, |ui| {
+                .enabled(true)
+                .anchor(Align2::LEFT_BOTTOM, vec2(50., -100.))
+                .show(ctx, |ui| {
+                    //First we display it, because then we can return from the logging if seen_list is empty
+                    ui.group(|ui| {
+                        ui.label(
+                            RichText::from("Users:")
+                                .strong()
+                        );
 
-                ui.label(RichText::from("Connected users:").strong().size(self.font_size));
-                
-                ui.group(|ui| {
-                    for client in dbg!(&self.client_ui.seen_list) {
-                        //If the search buffer is contained in the clients' username
-                        if client.username.contains(last_str) {
-                            ui.label(RichText::from(&client.username));
+                        for (index, client) in self.client_ui.seen_list.iter().enumerate() {
+                            //If the search buffer is contained in the clients' username
+                            if client.username.contains(last_str) {
+                                if index == self.client_ui.user_selector_index as usize {
+                                    ui.group(|ui| {
+                                        ui.label(RichText::from(&client.username).color(Color32::LIGHT_YELLOW));
+                                    });
+                                }
+                                else {
+                                    ui.label(RichText::from(&client.username));
+                                }
+                            }
                         }
-                    }
+                    });
+
+                    //Log keyboard actions
+                    ctx.input_mut(|reader| {
+                        if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                            self.client_ui.user_selector_index -= 1;
+                        };
+
+                        if reader.consume_key(Modifiers::NONE, Key::ArrowDown) {
+                            self.client_ui.user_selector_index += 1;
+                        };
+                    });
+
+                    //Clamp to ensure usage safety, we take away 1 for obvious vector indexing reasons
+                    self.client_ui.user_selector_index = self.client_ui.user_selector_index.clamp(0, self.client_ui.seen_list.len() as i32 - 1);
                 });
-            });
         }
+
+        true
     }
 }

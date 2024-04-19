@@ -91,16 +91,28 @@ impl TemplateApp {
                         });
                     }
                 } else if let Some(index) = inner_message.message.find('@') {
-                    let result = inner_message.message[index + 1..]
-                        .split_whitespace()
-                        .collect::<Vec<&str>>()[0];
-                    if self.login_username == result {
-                        ui.label(
-                            RichText::from(&inner_message.message)
-                                .size(self.font_size)
-                                .color(Color32::YELLOW),
-                        );
-                    }
+                    let whole_tag = inner_message.message[index + 1..]
+                    .split_whitespace()
+                    .collect::<Vec<&str>>();
+
+                    let name_sent_to = whole_tag.get(0);
+                    ui.label(
+                        RichText::from(&inner_message.message)
+                            .size(self.font_size)
+                            .color({
+                                if let Some(tagged_name) = name_sent_to {
+                                    if *tagged_name == self.opened_account.username {
+                                        Color32::YELLOW
+                                    }
+                                    else {
+                                        Color32::GRAY
+                                    }
+                                }
+                                else {
+                                    Color32::GRAY
+                                }
+                            }),
+                    );
                 } else if inner_message.message.contains('#')
                     && inner_message.message.rmatches('#').count() <= 5
                 {

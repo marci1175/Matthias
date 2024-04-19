@@ -294,6 +294,13 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    //After pressing @ and the user list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing @ again
+    #[serde(skip)]
+    pub user_selector_index: i32,
+
+    #[serde(skip)]
+    pub display_user_list: bool,
+
     ///Search parameters set by user, to chose what to search for obviously
     pub search_parameter: SearchType,
 
@@ -410,8 +417,8 @@ pub struct Client {
     #[serde(skip)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 
-    ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
     #[serde(skip)]
+    ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
     pub text_edit_buffer: String,
 
     ///This list contains all of the indexes of the messages the clients have seen, this always gets overriden by the sync thread
@@ -421,6 +428,9 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            user_selector_index: 0,
+            display_user_list: false,
+
             search_parameter: SearchType::default(),
             search_settings_panel: false,
             search_buffer: String::new(),
