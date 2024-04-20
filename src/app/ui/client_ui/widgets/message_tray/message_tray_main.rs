@@ -308,8 +308,7 @@ impl TemplateApp {
                                 if index == self.client_ui.user_selector_index as usize {
                                     ui.group(|ui| {
                                         ui.label(
-                                            RichText::from(&client.username)
-                                                .color(Color32::LIGHT_YELLOW),
+                                            RichText::from(&client.username).color(Color32::YELLOW),
                                         );
                                     });
                                 } else {
