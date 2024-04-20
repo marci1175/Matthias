@@ -194,7 +194,7 @@ impl TemplateApp {
                             };
 
                             //check if we are visible
-                            if !dbg!(ui.is_rect_visible(ui.min_rect())) {
+                            if !ui.is_rect_visible(ui.min_rect()) {
                                 return;
                             }
 

@@ -54,14 +54,9 @@ impl eframe::App for backend::TemplateApp {
         /*devlog:
 
             TODO: improve autosync , so it will be optimized not just when sending a sync msg
-            TODO: add if the user has seen the message
             TODO: add notfications
-            TODO: make it so when we type @ the list of connected users get shown
-            TODO: fix the mutliline text input widget so, when the user presses the enter a \n wont be added (possibly rework the whole thing)
             TODO: fix autosync so that it also syncs emojis
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
-
-            TODO: FIX IMAGE OPTIMISATION
 
         */
 
