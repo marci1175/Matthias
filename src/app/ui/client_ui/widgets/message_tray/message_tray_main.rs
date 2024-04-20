@@ -51,11 +51,7 @@ impl TemplateApp {
                         let user_message_clone = self.client_ui.usr_msg.clone();
 
                         //We will reconstruct the buffer
-                        let mut split = dbg!(user_message_clone.split('@').collect::<Vec<_>>());
-
-                        if !self.client_ui.display_user_list {
-                            return;
-                        }
+                        let mut split = user_message_clone.split('@').collect::<Vec<_>>();
 
                         if let Some(buffer) = split.last_mut() {
                             //If we have already typed in the full username OR there are no username matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
