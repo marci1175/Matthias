@@ -77,7 +77,7 @@ impl TemplateApp {
 
                                 *buffer = &formatted_string;
 
-                                //Concat the vector after modifying it
+                                //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
                                 let split_concat = split.join("@");
 
                                 //Set the buffer to the concatenated vector, append the @ to the 0th index
@@ -286,7 +286,7 @@ impl TemplateApp {
     }
 
     fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
-        let split_user_msg = dbg!(self.client_ui.usr_msg.split(['@']).collect::<Vec<_>>());
+        let split_user_msg = self.client_ui.usr_msg.split(['@']).collect::<Vec<_>>();
 
         //If the user didnt type @ || if the seen list is empty
         if split_user_msg.len() - 1 == 0 || self.client_ui.seen_list.is_empty() {
