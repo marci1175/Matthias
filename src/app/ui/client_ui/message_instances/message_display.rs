@@ -92,8 +92,8 @@ impl TemplateApp {
                     }
                 } else if let Some(index) = inner_message.message.find('@') {
                     let whole_tag = inner_message.message[index + 1..]
-                    .split_whitespace()
-                    .collect::<Vec<&str>>();
+                        .split_whitespace()
+                        .collect::<Vec<&str>>();
 
                     let name_sent_to = whole_tag.get(0);
                     ui.label(
@@ -103,12 +103,10 @@ impl TemplateApp {
                                 if let Some(tagged_name) = name_sent_to {
                                     if *tagged_name == self.opened_account.username {
                                         Color32::YELLOW
-                                    }
-                                    else {
+                                    } else {
                                         Color32::GRAY
                                     }
-                                }
-                                else {
+                                } else {
                                     Color32::GRAY
                                 }
                             }),

@@ -2,10 +2,10 @@ use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout, Modifiers, RichText, Rounding, Stroke
+    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout,
+    Modifiers, RichText, Rounding, Stroke,
 };
 use rand::Rng;
-use regex::Replacer;
 use rfd::FileDialog;
 use std::fs::{self};
 use std::sync::mpsc;
@@ -30,48 +30,64 @@ impl TemplateApp {
 
         let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
-        //Consume input when we are diplaying the user list
-        if self.client_ui.display_user_list {
-            ctx.input_mut(|reader| {
-                //Clone var to avoid error
-                let user_message_clone = self.client_ui.usr_msg.clone();
-                    
-                //We will reconstruct the buffer
-                let mut split = user_message_clone.split('@').collect::<Vec<_>>();
+        /*We have to clone here because of the closure*/
+        let user_message_clone = self.client_ui.usr_msg.clone();
 
-                //TODO: MAKE A GOOD FIX 4 THIS
-                if !self.client_ui.display_user_list {
-                    return;
+        //We will reconstruct the buffer
+        let mut split = user_message_clone.split('@').collect::<Vec<_>>();
+
+        //We just pattern match for the sake of never panicing, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
+        if let Some(last) = split.last_mut() {
+            //If the last slice of the string (split by @) doesnt contain any spaces we can paint everything else
+            if !last.contains(' ') {
+                //Set this var true if the @ menu is being displayed;
+                //* self.get_connected_users function MUST be called before showing the text input widget, so this way we can actually consume the ArrowUp and Down keys
+                self.client_ui.display_user_list = self.get_connected_users(ctx);
+
+                //Consume input when we are diplaying the user list
+                if self.client_ui.display_user_list {
+                    ctx.input_mut(|reader| {
+                        //Clone var to avoid error
+                        let user_message_clone = self.client_ui.usr_msg.clone();
+
+                        //We will reconstruct the buffer
+                        let mut split = dbg!(user_message_clone.split('@').collect::<Vec<_>>());
+
+                        if !self.client_ui.display_user_list {
+                            return;
+                        }
+
+                        if let Some(buffer) = split.last_mut() {
+                            //If we have already typed in the full username OR there are no username matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
+                            for seen in &self.client_ui.seen_list {
+                                if !(seen.username.contains(*buffer) && *buffer != seen.username) {
+                                    return;
+                                }
+                            }
+
+                            //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
+                            if reader.consume_key(Modifiers::NONE, Key::Enter) {
+                                //format the string so the @ stays
+                                let formatted_string = format!(
+                                    "@{}",
+                                    self.client_ui.seen_list
+                                        [self.client_ui.user_selector_index as usize]
+                                        .username
+                                );
+
+                                *buffer = &formatted_string;
+
+                                //Concat the vector after modifying it
+                                let split_concat = split.concat();
+
+                                //Set the buffer to the concatenated vector, append the @ to the 0th index
+                                self.client_ui.usr_msg = split_concat;
+                            };
+                        }
+                    });
                 }
-                if let Some(buffer) = split.get_mut(1) {
-
-                if self.client_ui.seen_list.iter().any(|seen| {
-                    seen.username == *buffer
-                }) {
-                    //if we have already typed in a user's whole name we can send said message
-                    return;
-                };
-
-                //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
-                if reader.consume_key(Modifiers::NONE, Key::Enter) {
-                        //format the string so the @ stays
-                        let formatted_string = format!("@{}", self.client_ui.seen_list[self.client_ui.user_selector_index as usize].username);
-
-                        *buffer = &formatted_string;
-
-                        //Concat the vector after modifying it
-                        let split_concat = split.concat();
-
-                        //Set the buffer to the concatenated vector, append the @ to the 0th index
-                        self.client_ui.usr_msg = split_concat;
-                };
-                }
-        });
+            }
         }
-        
-        //Set this var true if the @ menu is being displayed;
-        //* self.get_connected_users function MUST be called before showing the text input widget, so this way we can actually consume the ArrowUp and Down keys
-        self.client_ui.display_user_list = self.get_connected_users(ctx);
 
         //Create widget
         let text_widget = egui::TextEdit::multiline(&mut self.client_ui.usr_msg)
@@ -270,8 +286,7 @@ impl TemplateApp {
     }
 
     fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
-
-        let split_user_msg = dbg!(self.client_ui.usr_msg.split(['@', ' ']).collect::<Vec<_>>());
+        let split_user_msg = dbg!(self.client_ui.usr_msg.split(['@']).collect::<Vec<_>>());
 
         //If the user didnt type @ || if the seen list is empty
         if split_user_msg.len() - 1 == 0 || self.client_ui.seen_list.is_empty() {
@@ -285,20 +300,19 @@ impl TemplateApp {
                 .show(ctx, |ui| {
                     //First we display it, because then we can return from the logging if seen_list is empty
                     ui.group(|ui| {
-                        ui.label(
-                            RichText::from("Users:")
-                                .strong()
-                        );
+                        ui.label(RichText::from("Users:").strong());
 
                         for (index, client) in self.client_ui.seen_list.iter().enumerate() {
                             //If the search buffer is contained in the clients' username
                             if client.username.contains(last_str) {
                                 if index == self.client_ui.user_selector_index as usize {
                                     ui.group(|ui| {
-                                        ui.label(RichText::from(&client.username).color(Color32::LIGHT_YELLOW));
+                                        ui.label(
+                                            RichText::from(&client.username)
+                                                .color(Color32::LIGHT_YELLOW),
+                                        );
                                     });
-                                }
-                                else {
+                                } else {
                                     ui.label(RichText::from(&client.username));
                                 }
                             }
@@ -317,7 +331,10 @@ impl TemplateApp {
                     });
 
                     //Clamp to ensure usage safety, we take away 1 for obvious vector indexing reasons
-                    self.client_ui.user_selector_index = self.client_ui.user_selector_index.clamp(0, self.client_ui.seen_list.len() as i32 - 1);
+                    self.client_ui.user_selector_index = self
+                        .client_ui
+                        .user_selector_index
+                        .clamp(0, self.client_ui.seen_list.len() as i32 - 1);
                 });
         }
 
