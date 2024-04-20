@@ -69,7 +69,7 @@ impl TemplateApp {
                             if reader.consume_key(Modifiers::NONE, Key::Enter) {
                                 //format the string so the @ stays
                                 let formatted_string = format!(
-                                    "@{}",
+                                    "{}",
                                     self.client_ui.seen_list
                                         [self.client_ui.user_selector_index as usize]
                                         .username
@@ -78,7 +78,7 @@ impl TemplateApp {
                                 *buffer = &formatted_string;
 
                                 //Concat the vector after modifying it
-                                let split_concat = split.concat();
+                                let split_concat = split.join("@");
 
                                 //Set the buffer to the concatenated vector, append the @ to the 0th index
                                 self.client_ui.usr_msg = split_concat;
