@@ -294,6 +294,10 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    //The rect of the connected users list (which gets displayed when pressing the @)
+    #[serde(skip)]
+    pub connected_users_display_rect: Option<egui::Rect>,
+
     //After pressing @ and the user list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing @ again
     #[serde(skip)]
     pub user_selector_index: i32,
@@ -428,6 +432,8 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            connected_users_display_rect: None,
+
             user_selector_index: 0,
             display_user_list: false,
 

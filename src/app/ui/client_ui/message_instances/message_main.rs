@@ -49,7 +49,7 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
-                            let mut message_instances: Vec<Response> = Vec::new();
+                            let message_instances: Vec<Response> = Vec::new();
 
                             for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
@@ -128,6 +128,7 @@ impl TemplateApp {
                                         }
                                     }
                                 });
+
                                 message_group.response.context_menu(|ui|{
                                     //Client-side uuid check, there is a check in the server file
                                     if item.uuid == self.opened_account.uuid && item.MessageType != ServerMessageType::Deleted {
@@ -220,8 +221,9 @@ impl TemplateApp {
                                         };
                                     }
                                 });
-                                message_group.response.paint_debug_info();
-                                message_instances.push(message_group.response);
+
+                                // message_group.response.paint_debug_info();
+                                // message_instances.push(message_group.response);
                             };
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));

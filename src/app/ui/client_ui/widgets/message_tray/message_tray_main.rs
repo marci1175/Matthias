@@ -62,7 +62,7 @@ impl TemplateApp {
                             }
 
                             //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
-                            if reader.consume_key(Modifiers::NONE, Key::Enter) {
+                            if reader.consume_key(Modifiers::NONE, Key::Enter) && !self.client_ui.seen_list.is_empty() {
                                 //format the string so the @ stays
                                 let formatted_string = format!(
                                     "{}",
@@ -285,18 +285,28 @@ impl TemplateApp {
         let split_user_msg = self.client_ui.usr_msg.split(['@']).collect::<Vec<_>>();
 
         //If the user didnt type @ || if the seen list is empty
-        if split_user_msg.len() - 1 == 0 || self.client_ui.seen_list.is_empty() {
+        if split_user_msg.len() - 1 == 0 {
             return false;
         }
 
-        if let Some(last_str) = split_user_msg.get(split_user_msg.len() - 1) {
-            Area::new("Users".into())
-                .enabled(true)
-                .anchor(Align2::LEFT_BOTTOM, vec2(50., -100.))
-                .show(ctx, |ui| {
-                    //First we display it, because then we can return from the logging if seen_list is empty
-                    ui.group(|ui| {
-                        ui.label(RichText::from("Users:").strong());
+        Area::new("Users".into())
+            .enabled(true)
+            .anchor(Align2::LEFT_BOTTOM, vec2(50., -100.))
+            .show(ctx, |ui| {
+                //Draw background, before actually allocating the area
+                if let Some(rect) = self.client_ui.connected_users_display_rect {
+                    ui.painter().rect_filled(rect, 5., Color32::BLACK);
+                }
+
+                //First we display it, because then we can return from the logging if seen_list is empty
+                let message_group = ui.group(|ui| {
+                    
+                    ui.label(RichText::from("Users:").strong());
+                    if let Some(last_str) = split_user_msg.last() {
+                        if self.client_ui.seen_list.is_empty() {
+                            //Display greeting message
+                            ui.label(RichText::from("Syncing. . .").color(Color32::RED));
+                        }
 
                         for (index, client) in self.client_ui.seen_list.iter().enumerate() {
                             //If the search buffer is contained in the clients' username
@@ -312,26 +322,38 @@ impl TemplateApp {
                                 }
                             }
                         }
-                    });
-
-                    //Log keyboard actions
-                    ctx.input_mut(|reader| {
-                        if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
-                            self.client_ui.user_selector_index -= 1;
-                        };
-
-                        if reader.consume_key(Modifiers::NONE, Key::ArrowDown) {
-                            self.client_ui.user_selector_index += 1;
-                        };
-                    });
-
-                    //Clamp to ensure usage safety, we take away 1 for obvious vector indexing reasons
-                    self.client_ui.user_selector_index = self
-                        .client_ui
-                        .user_selector_index
-                        .clamp(0, self.client_ui.seen_list.len() as i32 - 1);
+                    }
                 });
-        }
+
+                //Save rect taken up by area
+                self.client_ui.connected_users_display_rect = Some(message_group.response.rect);
+
+                //If the seen list is empty we should display a message indicating its loading but we should return before clamping because it would go -1 therefor we would be panicking
+                if self.client_ui.seen_list.is_empty() {
+                    return;
+                }
+
+                //Log keyboard actions
+                ctx.input_mut(|reader| {
+                    if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                        self.client_ui.user_selector_index -= 1;
+                    };
+
+                    if reader.consume_key(Modifiers::NONE, Key::ArrowDown) {
+                        self.client_ui.user_selector_index += 1;
+                    };
+                });
+
+                //Clamp to ensure usage safety, we take away 1 for obvious vector indexing reasons
+                self.client_ui.user_selector_index = self
+                    .client_ui
+                    .user_selector_index
+                    //*Make sure we return if ```self.client_ui.seen_list``` is empty because then it'd overflow
+                    .clamp(0, self.client_ui.seen_list.len() as i32 - 1);
+            });
+
+        //request repaint so we'll show the latest info
+        ctx.request_repaint();
 
         true
     }
