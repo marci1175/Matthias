@@ -53,9 +53,9 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
-            TODO: improve autosync , so it will be optimized not just when sending a sync msg
+            TODO: Migrate to tokio tcp instead of tonic
+            TODO: improve autosync
             TODO: add notfications
-            TODO: fix autosync so that it also syncs emojis
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
 
         */
