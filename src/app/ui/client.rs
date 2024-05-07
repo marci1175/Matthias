@@ -601,9 +601,13 @@ impl TemplateApp {
 
                     match incoming_struct {
                         Ok(mut msg) => {
+                            //Always snyc the whole seen list no matter what
                             self.client_ui.seen_list = msg.user_seen_list;
+                            
+                            //Always sync the whole reaction list no matter what
+                            self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
 
-                            //if we recived an empty vector, we can just return, after updateing seen_list
+                            //if we recived an empty vector, we can just return, after updateing seen_list and the reaction list
                             if msg.struct_list.is_empty() {
                                 return;
                             }

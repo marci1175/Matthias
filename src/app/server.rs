@@ -37,6 +37,9 @@ pub struct MessageService {
     ///Contains all the messages
     pub messages: Mutex<Vec<ServerOutput>>,
 
+    ///Contains all of the reactions added to the messages
+    pub reactions: Mutex<Vec<MessageReaction>>,
+
     ///This is the required password by the server
     pub passw: String,
 
@@ -374,7 +377,7 @@ impl MessageService {
             Ok(mut ok) => {
                 ok.push(ServerOutput::convert_type_to_servermsg(
                     req.clone(),
-                    //Im not sure why I did that,  Tf is this?
+                    //Im not sure why I did that, Tf is this?
                     -1,
                     Normal,
                     MessageReaction::default(),
@@ -385,6 +388,9 @@ impl MessageService {
                 println!("{err}")
             }
         };
+
+        //Allocate enough space in the messages list, so we can insert reactions safely, we always push an empty list, so we wont panic later
+        self.reactions.lock().unwrap().push(MessageReaction { message_reactions: Vec::new() });
     }
     async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
         let all_messages = &mut self.messages.lock().unwrap().clone();
@@ -433,13 +439,17 @@ impl MessageService {
             &all_messages
         };
 
+        //Construct reply
         let server_master = ServerMaster::convert_vec_serverout_into_server_master(
             selected_messages_part.to_vec(),
+            (*self.reactions.lock().unwrap().clone()).to_vec(),
             self.clients_last_seen_index.lock().unwrap().clone(),
         );
 
+        //convert reply into string
         let final_msg: String = server_master.struct_into_string();
 
+        //Encrypt string
         let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
 
         //Wrap final reply
@@ -447,6 +457,7 @@ impl MessageService {
             message: encrypted_msg,
         };
 
+        //Reply with encrypted string
         Ok(Response::new(reply))
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
@@ -689,11 +700,10 @@ impl MessageService {
 
     /// handle reaction requests
     pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
-        match &mut self.messages.try_lock() {
-            Ok(message_vec) => {
+        match &mut self.reactions.try_lock() {
+            Ok(reaction_vec) => {
                 //Borrow as mutable so we dont have to clone
-                for item in message_vec[reaction.message_index]
-                    .reactions
+                for item in reaction_vec[reaction.message_index]
                     .message_reactions
                     .iter_mut()
                 {
@@ -707,8 +717,7 @@ impl MessageService {
                 }
 
                 //After we have checked all the reactions if there is already one, we can add out *new* one
-                message_vec[reaction.message_index]
-                    .reactions
+                reaction_vec[reaction.message_index]
                     .message_reactions
                     .push(Reaction {
                         char: reaction.char,

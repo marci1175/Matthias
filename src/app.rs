@@ -80,7 +80,7 @@ impl eframe::App for backend::TemplateApp {
 
         //Create value
         let mut settings_window = self.settings_window;
-
+        
         //Settings window
         egui::Window::new("Settings")
             .open(&mut settings_window)

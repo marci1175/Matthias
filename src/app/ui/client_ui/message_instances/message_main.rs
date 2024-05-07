@@ -54,11 +54,6 @@ impl TemplateApp {
                             for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui| {
-                                        //Check if visible, so we can send back the info to the server
-                                        if ui.is_visible() {
-                                            self.client_ui.incoming_msg.struct_list[iter_index].seen = true;
-                                        }
-
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
@@ -102,7 +97,7 @@ impl TemplateApp {
 
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
-                                                for item in &item.reactions.message_reactions {
+                                                for item in &self.client_ui.incoming_msg.reaction_list[iter_index].message_reactions {
                                                     ui.group(|ui| {
                                                         ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
                                                     });

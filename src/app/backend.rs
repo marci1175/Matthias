@@ -386,7 +386,7 @@ pub struct Client {
     #[serde(skip)]
     pub drop_file_animation: bool,
 
-    ////This indexes the user's selected messages for replying
+    //This indexes the user's selected messages for replying
     #[serde(skip)]
     pub replying_to: Option<usize>,
 
@@ -410,7 +410,7 @@ pub struct Client {
     pub random_emoji: String,
     pub emoji: Vec<String>,
 
-    ///Random engine
+    ///Random generating engine
     #[serde(skip)]
     pub rand_eng: ThreadRng,
 
@@ -1062,12 +1062,8 @@ pub struct ServerOutput {
     pub Author: String,
     /// The date when this message was sent
     pub MessageDate: String,
-    /// The reactions added to the message
-    pub reactions: MessageReaction,
     /// The user who sent this message's uuid
     pub uuid: String,
-    /// EXPREIMENTAL: if the said message was seen by the user
-    pub seen: bool,
 }
 
 impl ServerOutput {
@@ -1142,9 +1138,7 @@ impl ServerOutput {
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
-            reactions,
             uuid,
-            seen: false,
         }
     }
 }
@@ -1154,19 +1148,26 @@ impl ServerOutput {
 pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
+
+    ///All of the messages' reactions are
+    pub reaction_list: Vec<MessageReaction>,
+
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
 }
+
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
     pub fn convert_vec_serverout_into_server_master(
         server_output_list: Vec<ServerOutput>,
+        reaction_list: Vec<MessageReaction>,
         user_seen_list: Vec<ClientLastSeenMessage>,
     ) -> ServerMaster {
         ServerMaster {
             struct_list: server_output_list,
+            reaction_list,
             user_seen_list,
         }
     }

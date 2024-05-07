@@ -62,7 +62,9 @@ impl TemplateApp {
                             }
 
                             //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
-                            if reader.consume_key(Modifiers::NONE, Key::Enter) && !self.client_ui.seen_list.is_empty() {
+                            if reader.consume_key(Modifiers::NONE, Key::Enter)
+                                && !self.client_ui.seen_list.is_empty()
+                            {
                                 //format the string so the @ stays
                                 let formatted_string = format!(
                                     "{}",
@@ -300,7 +302,6 @@ impl TemplateApp {
 
                 //First we display it, because then we can return from the logging if seen_list is empty
                 let message_group = ui.group(|ui| {
-                    
                     ui.label(RichText::from("Users:").strong());
                     if let Some(last_str) = split_user_msg.last() {
                         if self.client_ui.seen_list.is_empty() {
