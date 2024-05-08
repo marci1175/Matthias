@@ -181,6 +181,19 @@ impl ServerMessage for MessageService {
                     }
                 };
 
+                //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
+                if !(matches!(&req.MessageType, ClientReaction(_)) || matches!(&req.MessageType, ClientMessageEdit(_))) {
+                    //Allocate a reaction after every type of message except a sync message
+                    match self.reactions.lock() {
+                        Ok(mut ok) => {
+                            ok.push(MessageReaction { message_reactions: Vec::new() });
+                        }
+                        Err(err) => {
+                            println!("{err}")
+                        }
+                    };
+                }
+
                 //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
                 return self.sync_message(&req).await;
             } else {
@@ -388,9 +401,6 @@ impl MessageService {
                 println!("{err}")
             }
         };
-
-        //Allocate enough space in the messages list, so we can insert reactions safely, we always push an empty list, so we wont panic later
-        self.reactions.lock().unwrap().push(MessageReaction { message_reactions: Vec::new() });
     }
     async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
         let all_messages = &mut self.messages.lock().unwrap().clone();

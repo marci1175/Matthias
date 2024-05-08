@@ -6,7 +6,7 @@ use rodio::Decoder;
 use std::time::Duration;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType,
+    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType, MessageReaction,
 };
 
 use crate::app::backend::{
@@ -401,6 +401,8 @@ impl TemplateApp {
             });
 
         //Recivers
+
+        //This reciver is used when we are getting a reply directly after sending the message (This is not autosync)
         match self.rx.try_recv() {
             Ok(mut msg) => {
                 //Decrypt with client secret
@@ -408,9 +410,13 @@ impl TemplateApp {
 
                 let incoming_struct: Result<ServerMaster, serde_json::Error> =
                     serde_json::from_str(&msg);
+
                 match incoming_struct {
                     Ok(ok) => {
                         self.client_ui.invalid_password = false;
+
+                        //Allocate reaction list for the new message
+                        self.client_ui.incoming_msg.reaction_list.push(MessageReaction { message_reactions: Vec::new() });
 
                         self.client_ui.incoming_msg = ok;
                     }

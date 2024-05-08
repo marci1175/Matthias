@@ -97,12 +97,22 @@ impl TemplateApp {
 
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
-                                                for item in &self.client_ui.incoming_msg.reaction_list[iter_index].message_reactions {
-                                                    ui.group(|ui| {
-                                                        ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
-                                                    });
-                                                    ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
+
+                                                //Check if there is a reaction list vector already allocated non the index of the specific message
+                                                match self.client_ui.incoming_msg.reaction_list.get(iter_index) {
+                                                    Some(reactions) => {
+                                                        for item in &reactions.message_reactions {
+                                                            ui.group(|ui| {
+                                                                ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
+                                                            });
+                                                            ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
+                                                        }
+                                                    },
+                                                    None => {
+                                                        eprintln!("No reaction list allocated for message {}", iter_index);
+                                                    },
                                                 }
+
                                             });
                                         });
 
