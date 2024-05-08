@@ -182,11 +182,15 @@ impl ServerMessage for MessageService {
                 };
 
                 //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
-                if !(matches!(&req.MessageType, ClientReaction(_)) || matches!(&req.MessageType, ClientMessageEdit(_))) {
+                if !(matches!(&req.MessageType, ClientReaction(_))
+                    || matches!(&req.MessageType, ClientMessageEdit(_)))
+                {
                     //Allocate a reaction after every type of message except a sync message
                     match self.reactions.lock() {
                         Ok(mut ok) => {
-                            ok.push(MessageReaction { message_reactions: Vec::new() });
+                            ok.push(MessageReaction {
+                                message_reactions: Vec::new(),
+                            });
                         }
                         Err(err) => {
                             println!("{err}")

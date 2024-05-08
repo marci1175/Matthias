@@ -6,7 +6,8 @@ use rodio::Decoder;
 use std::time::Duration;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType, MessageReaction,
+    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType,
+    MessageReaction,
 };
 
 use crate::app::backend::{
@@ -416,7 +417,12 @@ impl TemplateApp {
                         self.client_ui.invalid_password = false;
 
                         //Allocate reaction list for the new message
-                        self.client_ui.incoming_msg.reaction_list.push(MessageReaction { message_reactions: Vec::new() });
+                        self.client_ui
+                            .incoming_msg
+                            .reaction_list
+                            .push(MessageReaction {
+                                message_reactions: Vec::new(),
+                            });
 
                         self.client_ui.incoming_msg = ok;
                     }
@@ -609,7 +615,7 @@ impl TemplateApp {
                         Ok(mut msg) => {
                             //Always snyc the whole seen list no matter what
                             self.client_ui.seen_list = msg.user_seen_list;
-                            
+
                             //Always sync the whole reaction list no matter what
                             self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
 
