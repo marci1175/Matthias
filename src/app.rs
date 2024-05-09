@@ -58,7 +58,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
-
+            TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
         */
 
         //For image loading
