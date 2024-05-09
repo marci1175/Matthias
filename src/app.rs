@@ -57,6 +57,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: improve autosync
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
+            TODO: Discord like emoji :skull:
 
         */
 

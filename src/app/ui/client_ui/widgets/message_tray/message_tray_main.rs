@@ -1,6 +1,8 @@
 use crate::app::backend::{ClientMessage, TemplateApp};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
+use egui::epaint::text::cursor::Cursor;
+use egui::text::{CCursor, CursorRange};
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout,
     Modifiers, RichText, Rounding, Stroke,
@@ -105,7 +107,15 @@ impl TemplateApp {
             .stick_to_bottom(true)
             .auto_shrink([false, true])
             .min_scrolled_height(self.font_size * 2.)
-            .show(&mut frame_ui, |ui| ui.add(text_widget));
+            .show(&mut frame_ui, |ui| {
+                let mut text_widget = text_widget.show(ui);
+
+                if let Some(cursor) = self.client_ui.text_edit_cursor {
+                    text_widget.cursor_range = Some(CursorRange::one(Cursor { ccursor: CCursor::new(cursor),..Default::default()}));
+                }
+
+                text_widget.response
+            });
 
         self.client_ui.scroll_widget_rect = msg_scroll.inner_rect;
 
@@ -151,11 +161,11 @@ impl TemplateApp {
                             ))
                         }
 
-                        for file_path in self.client_ui.files_to_send.clone() {
+                        for file_path in &self.client_ui.files_to_send {
                             //Check for no user fuckery
                             if file_path.exists() {
                                 self.send_msg(ClientMessage::construct_file_msg(
-                                    file_path,
+                                    file_path.clone(),
                                     &self.opened_account.uuid,
                                     &self.login_username,
                                     self.client_ui.replying_to,
