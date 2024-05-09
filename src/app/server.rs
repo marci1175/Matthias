@@ -110,7 +110,7 @@ impl ServerMessage for MessageService {
                                         req.Author,
                                     ));
 
-                                    //Return custom which will the server's text will be encrypted with
+                                    //Return custom key which the server's text will be encrypted with
                                     return Ok(Response::new(MessageResponse {
                                         message: hex::encode(self.decryption_key),
                                     }));
