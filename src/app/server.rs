@@ -138,6 +138,8 @@ async fn spawn_client_reader(
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
+            //UDE TOKIO MUTEX
+            // https://chatgpt.com/c/fe5419ca-acfd-4595-ae58-01e6a9e56b18
             match msg_service.lock() {
                 Ok(msg_svc) => {
                     msg_svc.message_main(recive_message(reader).await?, address, writer).await?;
