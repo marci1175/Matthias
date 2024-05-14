@@ -1,5 +1,7 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
+use anyhow::Result;
+
 use super::backend::{
     encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
     Reaction, ServerMessageType,
@@ -12,8 +14,11 @@ use messages::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tokio::sync::mpsc::Receiver;
-use tonic::{transport::Server, Request, Response, Status};
+use tokio::{net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
+use tonic::{
+    transport::{server::Connected, Server},
+    Request, Response, Status,
+};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
@@ -24,6 +29,11 @@ use crate::app::backend::{
         ClientReaction, ClientSyncMessage,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
+};
+
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{self, tcp::OwnedWriteHalf},
 };
 
 use super::backend::{ServerAudioReply, ServerOutput};
@@ -68,22 +78,162 @@ pub struct MessageService {
     pub clients_last_seen_index: Mutex<Vec<ClientLastSeenMessage>>,
 }
 
-#[tonic::async_trait]
-impl ServerMessage for MessageService {
-    ///MessageResponse contains the serialized info (String)
+async fn shutdown_signal(mut signal: Receiver<()>) {
+    signal.recv().await;
+}
+
+fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
+    Ok(request)
+}
+
+pub async fn server_main(
+    port: String,
+    password: String,
+    signal: Receiver<()>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    //Start listening
+    let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
+
+    //Server default information
+    let msg_service = Arc::new(Mutex::new(MessageService {
+        passw: password,
+        decryption_key: rand::random::<[u8; 32]>(),
+        ..Default::default()
+    }));
+
+    let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        loop {
+            //accept connection
+            let (stream, address) = tcp_listener.accept().await?;
+
+            //split client stream, so we will be able to store these seperately
+            let (mut reader, writer) = stream.into_split();
+
+            //handle request
+            
+
+            //Listen for future client messages (IF the client stays connected)
+            spawn_client_reader(reader, address, writer, msg_service.clone());
+        }
+        Ok(())
+    });
+
+    todo!();
+
+    // Server::builder()
+    //     .add_service(MessageServer::with_interceptor(msg_service, interceptor_fn))
+    //     .serve_with_shutdown(addr, shutdown_signal(signal))
+    //     .await?;
+
+    //Shutdown gracefully
+    Ok(())
+}
+
+///Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
+async fn spawn_client_reader(
+    reader: OwnedReadHalf,
+    address: SocketAddr,
+    writer: OwnedWriteHalf,
+    msg_service: Arc<Mutex<MessageService>>,
+) {
+    let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        loop {
+            match msg_service.lock() {
+                Ok(msg_svc) => {
+                    msg_svc.message_main(recive_message(reader).await?, address, writer).await?;
+                },
+                Err(err) => {
+                    dbg!(err);
+                    //Exit the loop
+                    break;
+                },
+            }
+        }
+        Ok(())
+    });
+}
+
+#[inline]
+async fn recive_message(mut reader: OwnedReadHalf) -> Result<String> {
+    reader.readable().await?;
+
+    let mut message_len_buffer: Vec<u8> = vec![0; 4];
+
+    reader.read_exact(&mut message_len_buffer).await?;
+
+    let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
+
+    let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
+
+    //Wait until the client sends the main message
+    reader.readable().await?;
+
+    reader.read_exact(&mut message_buffer).await?;
+
+    let message = String::from_utf8(message_buffer)?;
+
+    Ok(message)
+}
+
+#[inline]
+/// This function iterates over all the connected clients and all the messages, and sends writes them all to their designated ```OwnedWriteHalf``` (All of the users see all of the messages)
+pub async fn reply_to_all_clients(
+    connected_clients: Mutex<Vec<ConnectedClient>>,
+    messages: Mutex<Vec<ServerOutput>>,
+) -> anyhow::Result<()> {
+    //Sleep thread
+    match connected_clients.lock() {
+        Ok(mut clients) => {
+            for client in clients.iter_mut() {
+                if let Some(client_handle) = &mut client.handle {
+                    match messages.lock() {
+                        Ok(messages) => {
+                            for message in messages.iter() {
+                                let message_as_str = serde_json::to_string(&message)?;
+
+                                //Send message lenght
+                                let message_lenght =
+                                    TryInto::<u32>::try_into(message_as_str.as_bytes().len())?;
+
+                                client_handle
+                                    .write_all(&message_lenght.to_be_bytes())
+                                    .await?;
+
+                                //Send actual message
+                                client_handle.write_all(message_as_str.as_bytes()).await?;
+
+                                client_handle.flush().await?;
+                            }
+                        }
+                        Err(err) => {
+                            dbg!(err);
+                        }
+                    }
+                };
+            }
+        }
+        Err(err) => {
+            dbg!(err);
+        }
+    }
+
+    Ok(())
+}
+
+impl MessageService {
     #[inline]
     async fn message_main(
         &self,
-        request: Request<MessageRequest>,
+        message: String,
+        inbound_connection_address: SocketAddr,
+        client_handle: OwnedWriteHalf,
     ) -> Result<Response<MessageResponse>, Status> {
-        let inbound_connection_address = request.remote_addr();
-
-        let req_result: Result<ClientMessage, serde_json::Error> =
-            serde_json::from_str(&request.into_inner().message);
+        let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
         let req: ClientMessage = req_result.unwrap();
 
-        if let Some(remote_address) = inbound_connection_address {
+        // !!!!! CLEAN UP THIS PART AND MPLEMENT CLIENT RECG. BASED ON UUID!!!!!!!!!!!!!!
+        if let remote_address = inbound_connection_address {
             if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
                 if sync_msg.password == self.passw.trim() {
                     //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
@@ -108,6 +258,7 @@ impl ServerMessage for MessageService {
                                         remote_address,
                                         req.Uuid,
                                         req.Author,
+                                        client_handle,
                                     ));
 
                                     //Return custom which will the server's text will be encrypted with
@@ -125,13 +276,13 @@ impl ServerMessage for MessageService {
                             match self.connected_clients.lock() {
                                 Ok(mut clients) => {
                                     //Search for connected ip in all connected ips
-                                    for (index, client) in clients.clone().iter().enumerate() {
+                                    for (index, client) in clients.iter().enumerate() {
                                         //If found, then disconnect the client
                                         if client.address == remote_address {
                                             clients.remove(index);
 
-                                            //Stop the for loop, for safety
-                                            break;
+                                            //Return None indicating this client listener should Close 
+                                            return None;
                                         }
                                     }
                                 }
@@ -142,7 +293,7 @@ impl ServerMessage for MessageService {
                         }
                     }
 
-                    //else: we dont do anything because we return the updated message list in the end
+                    //else: we dont do anything because we return the updated message list at the end
                 }
 
                 //Sync all messages
@@ -211,39 +362,7 @@ impl ServerMessage for MessageService {
             }));
         }
     }
-}
 
-async fn shutdown_signal(mut signal: Receiver<()>) {
-    signal.recv().await;
-}
-
-fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
-    Ok(request)
-}
-
-pub async fn server_main(
-    port: String,
-    password: String,
-    signal: Receiver<()>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let addr = format!("[::]:{}", port).parse()?;
-
-    let msg_service = MessageService {
-        passw: password,
-        decryption_key: rand::random::<[u8; 32]>(),
-        ..Default::default()
-    };
-
-    Server::builder()
-        .add_service(MessageServer::with_interceptor(msg_service, interceptor_fn))
-        .serve_with_shutdown(addr, shutdown_signal(signal))
-        .await?;
-
-    //Shutdown gracefully
-    Ok(())
-}
-
-impl MessageService {
     /// all the functions the server can do
     async fn NormalMessage(&self, req: &ClientMessage) {
         match self.messages.lock() {

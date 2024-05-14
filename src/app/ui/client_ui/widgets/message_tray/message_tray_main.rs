@@ -111,7 +111,10 @@ impl TemplateApp {
                 let mut text_widget = text_widget.show(ui);
 
                 if let Some(cursor) = self.client_ui.text_edit_cursor {
-                    text_widget.cursor_range = Some(CursorRange::one(Cursor { ccursor: CCursor::new(cursor),..Default::default()}));
+                    text_widget.cursor_range = Some(CursorRange::one(Cursor {
+                        ccursor: CCursor::new(cursor),
+                        ..Default::default()
+                    }));
                 }
 
                 text_widget.response

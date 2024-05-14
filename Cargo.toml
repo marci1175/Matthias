@@ -12,7 +12,7 @@ image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "we
 tonic = {version = "0.7.0", features = ["tls", "transport", "channel"]} #, "compression"
 
 prost = "0.10"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.37.0", features = ["full"] }
 eframe = { version = "0.27.2", default-features = true, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.

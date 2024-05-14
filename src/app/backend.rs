@@ -20,10 +20,12 @@ use std::fs;
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::SocketAddr;
+use std::os::windows::io::OwnedHandle;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
+use tokio::net::tcp::OwnedWriteHalf;
 use tonic::transport::{Channel, Endpoint};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
@@ -294,7 +296,6 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
-
     ///When a text_edit_cursor move has been requested this value is a Some
     #[serde(skip)]
     pub text_edit_cursor: Option<usize>,
@@ -438,7 +439,7 @@ impl Default for Client {
     fn default() -> Self {
         Self {
             text_edit_cursor: None,
-            
+
             connected_users_display_rect: None,
 
             user_selector_index: 0,
@@ -1181,19 +1182,28 @@ impl ServerMaster {
 }
 
 //When a client is connected this is where the client gets saved
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ConnectedClient {
+    ///This handle wouldnt have to be sent so its all okay, its only present on the server's side
+    #[serde(skip)]
+    pub handle: Option<OwnedWriteHalf>,
     pub address: SocketAddr,
     pub uuid: String,
     pub username: String,
 }
 
 impl ConnectedClient {
-    pub fn new(address: SocketAddr, uuid: String, username: String) -> Self {
+    pub fn new(
+        address: SocketAddr,
+        uuid: String,
+        username: String,
+        handle: OwnedWriteHalf,
+    ) -> Self {
         Self {
             address,
             uuid,
             username,
+            handle: Some(handle),
         }
     }
 }
