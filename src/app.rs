@@ -1,5 +1,5 @@
 use base64::Engine;
-use egui::{vec2, Align, Area, Color32, Layout, RichText};
+use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
 use tap::TapFallible;
 

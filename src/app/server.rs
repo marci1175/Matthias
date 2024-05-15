@@ -45,10 +45,10 @@ pub mod messages {
 #[derive(Debug, Default)]
 pub struct MessageService {
     ///Contains all the messages
-    pub messages: tokio::sync::Mutex<Vec<ServerOutput>>,
+    pub messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
 
     ///Contains all of the reactions added to the messages
-    pub reactions: Mutex<Vec<MessageReaction>>,
+    pub reactions: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
 
     ///This is the required password by the server
     pub passw: String,
@@ -69,21 +69,13 @@ pub struct MessageService {
     pub audio_names: Mutex<Vec<Option<String>>>,
 
     ///connected clients
-    pub connected_clients: Mutex<Vec<ConnectedClient>>,
+    pub connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
 
     ///Client secret
     pub decryption_key: [u8; 32],
 
     ///Client last seen message
-    pub clients_last_seen_index: Mutex<Vec<ClientLastSeenMessage>>,
-}
-
-async fn shutdown_signal(mut signal: Receiver<()>) {
-    signal.recv().await;
-}
-
-fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
-    Ok(request)
+    pub clients_last_seen_index: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 }
 
 pub async fn server_main(
@@ -111,7 +103,7 @@ pub async fn server_main(
             }
 
             //accept connection
-            let (stream, address) = tcp_listener.accept().await?;
+            let (stream, _address) = tcp_listener.accept().await?;
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
@@ -119,7 +111,6 @@ pub async fn server_main(
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),
-                address,
                 Arc::new(tokio::sync::Mutex::new(writer)),
                 msg_service.clone(),
             )
@@ -127,27 +118,38 @@ pub async fn server_main(
         }
         Ok(())
     });
-
+    panic!("Server shut down");
     Ok(())
 }
 
 ///Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
 async fn spawn_client_reader(
     reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
-    address: SocketAddr,
     writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     msg_service: Arc<tokio::sync::Mutex<MessageService>>,
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
-            let msg_svc = msg_service.lock().await;
+            let message_service = msg_service.lock().await;
 
             //the thread will block here waiting for client message
             let incoming_message = recive_message(reader.clone()).await?;
 
-            msg_svc
-                .message_main(incoming_message, address, writer.clone())
+            let reply = message_service
+                .message_main(incoming_message, writer.clone())
                 .await?;
+
+            let mut messages = message_service.messages.lock().await;
+            messages.push(serde_json::from_str::<ServerOutput>(&reply)?);
+
+            //If there is an incoming message we should reply to all of the clients, after processing said message
+            sync_all_messages_with_all_clients(
+                message_service.connected_clients.clone(),
+                message_service.messages.clone(),
+                message_service.reactions.clone(),
+                message_service.clients_last_seen_index.clone(),
+            )
+            .await?;
         }
         Ok(())
     });
@@ -179,46 +181,44 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 
 #[inline]
 /// This function iterates over all the connected clients and all the messages, and sends writes them all to their designated ```OwnedWriteHalf``` (All of the users see all of the messages)
-pub async fn reply_to_all_clients(
-    connected_clients: Mutex<Vec<ConnectedClient>>,
-    messages: Mutex<Vec<ServerOutput>>,
+pub async fn sync_all_messages_with_all_clients(
+    connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
+    messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
+    reaction_list: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
+    user_last_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 ) -> anyhow::Result<()> {
-    //Sleep thread
-    match connected_clients.lock() {
-        Ok(mut clients) => {
-            for client in clients.iter_mut() {
-                if let Some(client_handle) = &mut client.handle {
-                    match messages.lock() {
-                        Ok(messages) => {
-                            let mut client_handle = client_handle.lock().await;
+    let mut connected_clients = connected_clients.try_lock()?;
+    let messages = messages.try_lock()?;
+    let reaction_list = reaction_list.try_lock()?;
 
-                            for message in messages.iter() {
-                                let message_as_str = serde_json::to_string(&message)?;
+    let user_last_seen_list = user_last_seen_list.try_lock()?;
 
-                                //Send message lenght
-                                let message_lenght =
-                                    TryInto::<u32>::try_into(message_as_str.as_bytes().len())?;
+    let server_master = ServerMaster::convert_vec_serverout_into_server_master(
+        messages.to_vec(),
+        reaction_list.to_vec(),
+        user_last_seen_list.to_vec(),
+    );
 
-                                client_handle
-                                    .write_all(&message_lenght.to_be_bytes())
-                                    .await?;
+    let server_master_string = server_master.struct_into_string();
 
-                                //Send actual message
-                                client_handle.write_all(message_as_str.as_bytes()).await?;
+    //Send message lenght
+    let message_lenght = TryInto::<u32>::try_into(server_master_string.as_bytes().len())?;
 
-                                client_handle.flush().await?;
-                            }
-                        }
-                        Err(err) => {
-                            dbg!(err);
-                        }
-                    }
-                };
-            }
-        }
-        Err(err) => {
-            dbg!(err);
-        }
+    for client in connected_clients.iter_mut() {
+        if let Some(client_handle) = &mut client.handle {
+            let mut client_handle = client_handle.lock().await;
+
+            client_handle
+                .write_all(&message_lenght.to_be_bytes())
+                .await?;
+
+            //Send actual message
+            client_handle
+                .write_all(server_master_string.as_bytes())
+                .await?;
+
+            client_handle.flush().await?;
+        };
     }
 
     Ok(())
@@ -229,21 +229,19 @@ impl MessageService {
     async fn message_main(
         &self,
         message: String,
-        remote_address: SocketAddr,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> anyhow::Result<String> {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
         let req: ClientMessage = req_result.unwrap();
 
-        // !!!!! CLEAN UP THIS PART AND MPLEMENT CLIENT RECG. BASED ON UUID!!!!!!!!!!!!!!
         if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
                 if let Some(sync_attr) = sync_msg.sync_attribute {
                     //Incoming connection, we should be returning temp uuid
                     if sync_attr {
-                        match self.connected_clients.lock() {
+                        match self.connected_clients.try_lock() {
                             Ok(mut clients) => {
                                 //Search for connected ip in all connected ips
                                 for client in clients.iter() {
@@ -271,7 +269,7 @@ impl MessageService {
                     }
                     //Handle disconnections
                     else {
-                        match self.connected_clients.lock() {
+                        match self.connected_clients.try_lock() {
                             Ok(mut clients) => {
                                 //Search for connected ip in all connected ips
                                 for (index, client) in clients.clone().iter().enumerate() {
@@ -292,14 +290,14 @@ impl MessageService {
                 }
 
                 //Sync all messages
-                return Ok(self.sync_message(&req).await?.into_inner().message);
+                return Ok(self.sync_message(&req).await?);
             }
         }
 
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
             .connected_clients
-            .lock()
+            .try_lock()
             .unwrap()
             .iter()
             .any(|client| client.uuid == req.Uuid)
@@ -313,7 +311,7 @@ impl MessageService {
                 }
 
                 ClientFileRequestType(request_type) => {
-                    return Ok(self.sync_message(&req).await?.into_inner().message);
+                    return Ok(self.handle_request(&request_type).await?);
                 }
 
                 ClientFileUpload(upload_type) => {
@@ -334,7 +332,7 @@ impl MessageService {
                 || matches!(&req.MessageType, ClientMessageEdit(_)))
             {
                 //Allocate a reaction after every type of message except a sync message
-                match self.reactions.lock() {
+                match self.reactions.try_lock() {
                     Ok(mut ok) => {
                         ok.push(MessageReaction {
                             message_reactions: Vec::new(),
@@ -347,7 +345,7 @@ impl MessageService {
             }
 
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-            return Ok(self.sync_message(&req).await?.into_inner().message);
+            return Ok(self.sync_message(&req).await?);
         } else {
             return Ok("Invalid Password!".into());
         }
@@ -365,7 +363,7 @@ impl MessageService {
             req.Uuid.clone(),
         ));
     }
-    async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
+    async fn sync_message(&self, req: &ClientMessage) -> anyhow::Result<String> {
         let all_messages = &mut self.messages.lock().await.clone();
 
         let all_messages_len = all_messages.len();
@@ -374,7 +372,7 @@ impl MessageService {
         let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
             if let Some(last_seen_message_index) = inner.last_seen_message_index {
-                match &mut self.clients_last_seen_index.lock() {
+                match &mut self.clients_last_seen_index.try_lock() {
                     Ok(client_vec) => {
                         //Iter over the whole list so we can update the user's index if there is one
                         if let Some(client_index_pos) =
@@ -415,8 +413,8 @@ impl MessageService {
         //Construct reply
         let server_master = ServerMaster::convert_vec_serverout_into_server_master(
             selected_messages_part.to_vec(),
-            (*self.reactions.lock().unwrap().clone()).to_vec(),
-            self.clients_last_seen_index.lock().unwrap().clone(),
+            (*self.reactions.try_lock().unwrap().clone()).to_vec(),
+            self.clients_last_seen_index.try_lock().unwrap().clone(),
         );
 
         //convert reply into string
@@ -425,13 +423,8 @@ impl MessageService {
         //Encrypt string
         let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
 
-        //Wrap final reply
-        let reply = MessageResponse {
-            message: encrypted_msg,
-        };
-
         //Reply with encrypted string
-        Ok(Response::new(reply))
+        Ok(encrypted_msg)
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
         //500mb limit
@@ -617,7 +610,7 @@ impl MessageService {
     pub async fn handle_request(
         &self,
         request_type: &ClientRequestTypeStruct,
-    ) -> Result<Response<MessageResponse>, Status> {
+    ) -> anyhow::Result<String> {
         match request_type {
             ClientRequestTypeStruct::ClientImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
@@ -628,7 +621,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                Ok(Response::new(MessageResponse { message: output }))
+                Ok(output)
             }
             ClientRequestTypeStruct::ClientFileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
@@ -639,7 +632,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                Ok(Response::new(MessageResponse { message: output }))
+                Ok(output)
             }
             ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
@@ -651,7 +644,7 @@ impl MessageService {
                 })
                 .unwrap_or_default();
 
-                Ok(Response::new(MessageResponse { message: output }))
+                Ok(output)
             }
         }
     }
