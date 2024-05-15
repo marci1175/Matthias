@@ -1,6 +1,6 @@
 use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use super::backend::{
     encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
@@ -45,7 +45,7 @@ pub mod messages {
 #[derive(Debug, Default)]
 pub struct MessageService {
     ///Contains all the messages
-    pub messages: Mutex<Vec<ServerOutput>>,
+    pub messages: tokio::sync::Mutex<Vec<ServerOutput>>,
 
     ///Contains all of the reactions added to the messages
     pub reactions: Mutex<Vec<MessageReaction>>,
@@ -89,31 +89,40 @@ fn interceptor_fn(request: Request<()>) -> Result<Request<()>, Status> {
 pub async fn server_main(
     port: String,
     password: String,
-    signal: Receiver<()>,
+    mut signal: Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
     //Server default information
-    let msg_service = Arc::new(Mutex::new(MessageService {
+    let msg_service = Arc::new(tokio::sync::Mutex::new(MessageService {
         passw: password,
         decryption_key: rand::random::<[u8; 32]>(),
         ..Default::default()
     }));
 
+    //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
+            //check if the server is supposed to run
+            if let Ok(_) = signal.try_recv() {
+                //shutdown server
+                break;
+            }
+
             //accept connection
             let (stream, address) = tcp_listener.accept().await?;
 
             //split client stream, so we will be able to store these seperately
-            let (mut reader, writer) = stream.into_split();
-
-            //handle request
-            
+            let (reader, writer) = stream.into_split();
 
             //Listen for future client messages (IF the client stays connected)
-            spawn_client_reader(reader, address, writer, msg_service.clone());
+            spawn_client_reader(
+                Arc::new(tokio::sync::Mutex::new(reader)),
+                address,
+                Arc::new(tokio::sync::Mutex::new(writer)),
+                msg_service.clone(),
+            ).await;
         }
         Ok(())
     });
@@ -131,32 +140,32 @@ pub async fn server_main(
 
 ///Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
 async fn spawn_client_reader(
-    reader: OwnedReadHalf,
+    reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
     address: SocketAddr,
-    writer: OwnedWriteHalf,
-    msg_service: Arc<Mutex<MessageService>>,
+    writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+    msg_service: Arc<tokio::sync::Mutex<MessageService>>,
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //UDE TOKIO MUTEX
             // https://chatgpt.com/c/fe5419ca-acfd-4595-ae58-01e6a9e56b18
-            match msg_service.lock() {
-                Ok(msg_svc) => {
-                    msg_svc.message_main(recive_message(reader).await?, address, writer).await?;
-                },
-                Err(err) => {
-                    dbg!(err);
-                    //Exit the loop
-                    break;
-                },
-            }
+            let msg_svc = msg_service.lock().await;
+
+            //the thread will block here waiting for client message
+            let incoming_message = recive_message(reader.clone()).await?;
+
+            msg_svc
+                .message_main(incoming_message, address, writer.clone())
+                .await?;
         }
         Ok(())
     });
 }
 
 #[inline]
-async fn recive_message(mut reader: OwnedReadHalf) -> Result<String> {
+async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
+    let mut reader = reader.lock().await;
+
     reader.readable().await?;
 
     let mut message_len_buffer: Vec<u8> = vec![0; 4];
@@ -190,6 +199,8 @@ pub async fn reply_to_all_clients(
                 if let Some(client_handle) = &mut client.handle {
                     match messages.lock() {
                         Ok(messages) => {
+                            let mut client_handle = client_handle.lock().await;
+
                             for message in messages.iter() {
                                 let message_as_str = serde_json::to_string(&message)?;
 
@@ -228,7 +239,7 @@ impl MessageService {
         &self,
         message: String,
         inbound_connection_address: SocketAddr,
-        client_handle: OwnedWriteHalf,
+        client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> Result<Response<MessageResponse>, Status> {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
@@ -283,8 +294,9 @@ impl MessageService {
                                         if client.address == remote_address {
                                             clients.remove(index);
 
-                                            //Return None indicating this client listener should Close 
-                                            return None;
+                                            todo!();
+                                            //Return None indicating this client listener should Close
+                                            // return None;
                                         }
                                     }
                                 }
@@ -295,13 +307,14 @@ impl MessageService {
                         }
                     }
 
-                    //else: we dont do anything because we return the updated message list at the end
+                    //Sync all messages
+                    return self.sync_message(&req).await;
                 }
 
-                //Sync all messages
-                return self.sync_message(&req).await;
+                
             }
 
+            //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
             if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
                 .connected_clients
                 .lock()
@@ -367,24 +380,18 @@ impl MessageService {
 
     /// all the functions the server can do
     async fn NormalMessage(&self, req: &ClientMessage) {
-        match self.messages.lock() {
-            Ok(mut ok) => {
-                ok.push(ServerOutput::convert_type_to_servermsg(
-                    req.clone(),
-                    //Im not sure why I did that, Tf is this?
-                    -1,
-                    Normal,
-                    MessageReaction::default(),
-                    req.Uuid.clone(),
-                ));
-            }
-            Err(err) => {
-                println!("{err}")
-            }
-        };
+        let mut messages = self.messages.lock().await;
+        messages.push(ServerOutput::convert_type_to_servermsg(
+            req.clone(),
+            //Im not sure why I did that, Tf is this?
+            -1,
+            Normal,
+            MessageReaction::default(),
+            req.Uuid.clone(),
+        ));
     }
     async fn sync_message(&self, req: &ClientMessage) -> Result<Response<MessageResponse>, Status> {
-        let all_messages = &mut self.messages.lock().unwrap().clone();
+        let all_messages = &mut self.messages.lock().await.clone();
 
         let all_messages_len = all_messages.len();
 
@@ -499,18 +506,14 @@ impl MessageService {
                                 }
                             };
 
-                            match self.messages.lock() {
-                                Ok(mut ok) => {
-                                    ok.push(ServerOutput::convert_type_to_servermsg(
-                                        request.clone(),
-                                        self.original_file_paths.lock().unwrap().len() as i32 - 1,
-                                        Upload,
-                                        MessageReaction::default(),
-                                        request.Uuid.clone(),
-                                    ));
-                                }
-                                Err(err) => println!("{err}"),
-                            }
+                            let mut messages = self.messages.lock().await;
+                            messages.push(ServerOutput::convert_type_to_servermsg(
+                                request.clone(),
+                                self.original_file_paths.lock().unwrap().len() as i32 - 1,
+                                Upload,
+                                MessageReaction::default(),
+                                request.Uuid.clone(),
+                            ));
                         }
                         Err(err) => {
                             println!(" [{err}\n{}]", err.kind());

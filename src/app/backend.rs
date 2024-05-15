@@ -1186,7 +1186,7 @@ impl ServerMaster {
 pub struct ConnectedClient {
     ///This handle wouldnt have to be sent so its all okay, its only present on the server's side
     #[serde(skip)]
-    pub handle: Option<OwnedWriteHalf>,
+    pub handle: Option<Arc<tokio::sync::Mutex<OwnedWriteHalf>>>,
     pub address: SocketAddr,
     pub uuid: String,
     pub username: String,
@@ -1197,7 +1197,7 @@ impl ConnectedClient {
         address: SocketAddr,
         uuid: String,
         username: String,
-        handle: OwnedWriteHalf,
+        handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> Self {
         Self {
             address,
