@@ -97,7 +97,7 @@ pub async fn server_main(
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //check if the server is supposed to run
-            if let Ok(_) = signal.try_recv() {
+            if let Some(_) = dbg!(signal.recv().await) {
                 //shutdown server
                 break;
             }
@@ -118,11 +118,12 @@ pub async fn server_main(
         }
         Ok(())
     });
-    panic!("Server shut down");
+
     Ok(())
 }
 
 ///Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
+#[inline]
 async fn spawn_client_reader(
     reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
     writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
@@ -181,7 +182,7 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 
 #[inline]
 /// This function iterates over all the connected clients and all the messages, and sends writes them all to their designated ```OwnedWriteHalf``` (All of the users see all of the messages)
-pub async fn sync_all_messages_with_all_clients(
+async fn sync_all_messages_with_all_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
     messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
     reaction_list: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,

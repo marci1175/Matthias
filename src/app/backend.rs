@@ -1181,6 +1181,8 @@ impl ServerMaster {
     }
 }
 
+
+
 //When a client is connected this is where the client gets saved
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ConnectedClient {
