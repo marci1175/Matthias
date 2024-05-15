@@ -1182,25 +1182,22 @@ impl ServerMaster {
 }
 
 //When a client is connected this is where the client gets saved
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ConnectedClient {
     ///This handle wouldnt have to be sent so its all okay, its only present on the server's side
     #[serde(skip)]
     pub handle: Option<Arc<tokio::sync::Mutex<OwnedWriteHalf>>>,
-    pub address: SocketAddr,
     pub uuid: String,
     pub username: String,
 }
 
 impl ConnectedClient {
     pub fn new(
-        address: SocketAddr,
         uuid: String,
         username: String,
         handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> Self {
         Self {
-            address,
             uuid,
             username,
             handle: Some(handle),

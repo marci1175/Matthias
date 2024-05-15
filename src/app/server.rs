@@ -122,19 +122,12 @@ pub async fn server_main(
                 address,
                 Arc::new(tokio::sync::Mutex::new(writer)),
                 msg_service.clone(),
-            ).await;
+            )
+            .await;
         }
         Ok(())
     });
 
-    todo!();
-
-    // Server::builder()
-    //     .add_service(MessageServer::with_interceptor(msg_service, interceptor_fn))
-    //     .serve_with_shutdown(addr, shutdown_signal(signal))
-    //     .await?;
-
-    //Shutdown gracefully
     Ok(())
 }
 
@@ -147,8 +140,6 @@ async fn spawn_client_reader(
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
-            //UDE TOKIO MUTEX
-            // https://chatgpt.com/c/fe5419ca-acfd-4595-ae58-01e6a9e56b18
             let msg_svc = msg_service.lock().await;
 
             //the thread will block here waiting for client message
@@ -238,143 +229,127 @@ impl MessageService {
     async fn message_main(
         &self,
         message: String,
-        inbound_connection_address: SocketAddr,
+        remote_address: SocketAddr,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> Result<Response<MessageResponse>, Status> {
+    ) -> anyhow::Result<String> {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
         let req: ClientMessage = req_result.unwrap();
 
         // !!!!! CLEAN UP THIS PART AND MPLEMENT CLIENT RECG. BASED ON UUID!!!!!!!!!!!!!!
-        if let remote_address = inbound_connection_address {
-            if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
-                if sync_msg.password == self.passw.trim() {
-                    //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
-                    if let Some(sync_attr) = sync_msg.sync_attribute {
-                        //Incoming connection, we should be returning temp uuid
-                        if sync_attr {
-                            match self.connected_clients.lock() {
-                                Ok(mut clients) => {
-                                    //Search for connected ip in all connected ips
-                                    for client in clients.iter() {
-                                        //If found, then the client is already connected
-                                        if client.address == remote_address {
-                                            //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                            return Ok(Response::new(MessageResponse {
-                                                message: hex::encode(self.decryption_key),
-                                            }));
-                                        }
+        if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
+            if sync_msg.password == self.passw.trim() {
+                //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
+                if let Some(sync_attr) = sync_msg.sync_attribute {
+                    //Incoming connection, we should be returning temp uuid
+                    if sync_attr {
+                        match self.connected_clients.lock() {
+                            Ok(mut clients) => {
+                                //Search for connected ip in all connected ips
+                                for client in clients.iter() {
+                                    //If found, then the client is already connected
+                                    if client.uuid == req.Uuid {
+                                        //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
+                                        return Ok(hex::encode(self.decryption_key));
                                     }
-
-                                    //If the ip is not found then add it to connected clients
-                                    clients.push(ConnectedClient::new(
-                                        remote_address,
-                                        req.Uuid,
-                                        req.Author,
-                                        client_handle,
-                                    ));
-
-                                    //Return custom key which the server's text will be encrypted with
-                                    return Ok(Response::new(MessageResponse {
-                                        message: hex::encode(self.decryption_key),
-                                    }));
                                 }
-                                Err(err) => {
-                                    dbg!(err);
-                                }
+
+                                //If the ip is not found then add it to connected clients
+                                clients.push(ConnectedClient::new(
+                                    req.Uuid,
+                                    req.Author,
+                                    client_handle,
+                                ));
+
+                                //Return custom key which the server's text will be encrypted with
+                                return Ok(hex::encode(self.decryption_key));
                             }
-                        }
-                        //Handle disconnections
-                        else {
-                            match self.connected_clients.lock() {
-                                Ok(mut clients) => {
-                                    //Search for connected ip in all connected ips
-                                    for (index, client) in clients.iter().enumerate() {
-                                        //If found, then disconnect the client
-                                        if client.address == remote_address {
-                                            clients.remove(index);
-
-                                            todo!();
-                                            //Return None indicating this client listener should Close
-                                            // return None;
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    dbg!(err);
-                                }
+                            Err(err) => {
+                                dbg!(err);
                             }
                         }
                     }
+                    //Handle disconnections
+                    else {
+                        match self.connected_clients.lock() {
+                            Ok(mut clients) => {
+                                //Search for connected ip in all connected ips
+                                for (index, client) in clients.clone().iter().enumerate() {
+                                    //If found, then disconnect the client
+                                    if client.uuid == req.Uuid {
+                                        clients.remove(index);
 
-                    //Sync all messages
-                    return self.sync_message(&req).await;
+                                        //Break out of the loop
+                                        break;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                            }
+                        }
+                    }
                 }
 
-                
+                //Sync all messages
+                return Ok(self.sync_message(&req).await?.into_inner().message);
             }
+        }
 
-            //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
-            if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
-                .connected_clients
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|client| client.address == remote_address)
-            //Search through the list
+        //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
+        if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
+            .connected_clients
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|client| client.uuid == req.Uuid)
+        //Search through the list
+        {
+            match &req.MessageType {
+                ClientNormalMessage(_msg) => self.NormalMessage(&req).await,
+
+                ClientSyncMessage(_msg) => {
+                    unimplemented!("How the fuck did you get here?");
+                }
+
+                ClientFileRequestType(request_type) => {
+                    return Ok(self.sync_message(&req).await?.into_inner().message);
+                }
+
+                ClientFileUpload(upload_type) => {
+                    self.handle_upload(req.clone(), upload_type).await;
+                }
+
+                ClientReaction(reaction) => {
+                    self.handle_reaction(reaction).await;
+                }
+
+                ClientMessageEdit(edit) => {
+                    self.handle_message_edit(edit, &req).await;
+                }
+            };
+
+            //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
+            if !(matches!(&req.MessageType, ClientReaction(_))
+                || matches!(&req.MessageType, ClientMessageEdit(_)))
             {
-                match &req.MessageType {
-                    ClientNormalMessage(_msg) => self.NormalMessage(&req).await,
-
-                    ClientSyncMessage(_msg) => {
-                        unimplemented!("How the fuck did you get here?");
+                //Allocate a reaction after every type of message except a sync message
+                match self.reactions.lock() {
+                    Ok(mut ok) => {
+                        ok.push(MessageReaction {
+                            message_reactions: Vec::new(),
+                        });
                     }
-
-                    ClientFileRequestType(request_type) => {
-                        return self.handle_request(request_type).await;
-                    }
-
-                    ClientFileUpload(upload_type) => {
-                        self.handle_upload(req.clone(), upload_type).await;
-                    }
-
-                    ClientReaction(reaction) => {
-                        self.handle_reaction(reaction).await;
-                    }
-
-                    ClientMessageEdit(edit) => {
-                        self.handle_message_edit(edit, &req).await;
+                    Err(err) => {
+                        println!("{err}")
                     }
                 };
-
-                //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
-                if !(matches!(&req.MessageType, ClientReaction(_))
-                    || matches!(&req.MessageType, ClientMessageEdit(_)))
-                {
-                    //Allocate a reaction after every type of message except a sync message
-                    match self.reactions.lock() {
-                        Ok(mut ok) => {
-                            ok.push(MessageReaction {
-                                message_reactions: Vec::new(),
-                            });
-                        }
-                        Err(err) => {
-                            println!("{err}")
-                        }
-                    };
-                }
-
-                //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-                return self.sync_message(&req).await;
-            } else {
-                return Ok(Response::new(MessageResponse {
-                    message: "Invalid Password!".into(),
-                }));
             }
+
+            //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
+            return Ok(self.sync_message(&req).await?.into_inner().message);
         } else {
-            return Ok(Response::new(MessageResponse {
-                message: "Invalid Client!".into(),
-            }));
+            return Ok("Invalid Password!".into());
         }
     }
 
