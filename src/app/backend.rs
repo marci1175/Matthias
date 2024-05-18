@@ -7,7 +7,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key,
 };
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Result, bail};
 use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -25,11 +25,16 @@ use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
-use tokio::net::tcp::OwnedWriteHalf;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpStream;
 use tonic::transport::{Channel, Endpoint};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
+use strum::{EnumDiscriminants, EnumMessage};
+use strum_macros::EnumString;
+use super::client::{self, connect_to_server};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -843,66 +848,106 @@ impl ClientMessage {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ClientConnection {
     #[serde(skip)]
-    pub client: Option<MessageClient<Channel>>,
-    #[serde(skip)]
     pub client_secret: Vec<u8>,
     #[serde(skip)]
+    ///This enum wraps the server handle ```Connected(_)```, it also functions as a Sort of Option wrapper
     pub state: ConnectionState,
 }
 
 impl ClientConnection {
-    ///Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
+    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    async fn send_msg(&mut self, message: ClientMessage) -> Result<String> {
+        if let ConnectionState::Connected(server_handle) = &mut self.state {
+            let mut server_handle = server_handle.try_lock()?;
+
+            server_handle.writable().await?;
+
+            let message_as_string = message.struct_into_string();
+
+            let message_bytes = message_as_string.as_bytes();
+
+            server_handle.write_all(&message_bytes.len().to_be_bytes()).await?;
+
+            server_handle.writable().await?;
+
+            server_handle.write_all(message_bytes).await?;
+
+            server_handle.flush().await?;
+
+            //Read the server reply
+            server_handle.readable().await?;
+
+            let msg_len = fetch_incoming_message_lenght(&mut *server_handle).await?;
+
+            let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
+
+            server_handle.read_exact(&mut msg_buffer).await;
+
+            Ok(String::from_utf8(msg_buffer)?)
+        }
+        else {
+            bail!("There is no active connection to send the message on.")
+        }
+    }
+
+    /// This is a wrapper function for ```send_msg```
+    pub async fn send_message(&mut self, message: ClientMessage) -> Result<String> {
+        if let ConnectionState::Connected(connection) = &mut self.state {
+            return client::send_message(&mut *connection.lock().await, message).await;
+        }
+        else {
+            bail!("There is no active connection to send the message on.")
+        }
+    }
+
+    ///Using this function ensures disconnection from the server
+    pub async fn reset_connection(&mut self) {
+        self.client_secret = Vec::new();
+
+        if let ConnectionState::Connected(server_handle) = &mut self.state {
+            // let fasz = send_msg(*&*server_handle.lock().await, ClientMessage::construct_disconnection_msg(password, author, uuid, last_seen_message_index));
+
+        }
+    }
+
+    /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
+    /// This function blocks (time depends on the connection speed)
     pub async fn connect(
         ip: String,
         author: String,
         password: Option<String>,
         uuid: &str,
     ) -> anyhow::Result<Self> {
+        let connection_msg = ClientMessage::construct_connection_msg(
+            password.unwrap_or(String::from("")),
+            author,
+            uuid,
+            None,
+        );
+
         //Ping server to recive custom uuid, and to also get if server ip is valid
-        let client = MessageClient::new(Endpoint::from_shared(ip.clone())?.connect_lazy());
-
-        //This will later get modified
-        let mut client_secret: Vec<u8> = Vec::new();
-
-        let mut client_clone = client.clone();
-
-        let client = match client_clone
-            .message_main(tonic::Request::new(MessageRequest {
-                //If its set to none then use a String::defult(), which is nothing
-                message: ClientMessage::construct_connection_msg(
-                    password.unwrap_or(String::from("")),
-                    author,
-                    uuid,
-                    None,
-                )
-                .struct_into_string(),
-            }))
-            .await
-        {
+        let client_handle = tokio::net::TcpStream::connect(ip).await?;
             /*We could return this, this is what the server is supposed to return, when a new user is connected */
-            Ok(server_reply) => {
-                let msg = server_reply.into_inner().message;
 
-                ensure!(msg != "Invalid Password!", "Invalid password!");
-                ensure!(msg != "Invalid Client!", "Outdated client or connection!");
+        let (server_reply, server_handle) = connect_to_server(client_handle, connection_msg).await?;
 
-                //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
-                client_secret = hex::decode(msg)?;
+        ensure!(server_reply != "Invalid Password!", "Invalid password!");
+        ensure!(
+            server_reply != "Invalid Client!",
+            "Outdated client or connection!"
+        );
 
-                Some(client_clone)
-            }
-            Err(err) => {
-                display_error_message(err);
+        //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
+        let client_secret = hex::decode(server_reply)?;
 
-                None
-            }
-        };
-
-        Ok(Self {
-            client,
+        return Ok(Self {
             client_secret,
-            state: ConnectionState::Connected,
-        })
+            state: ConnectionState::Connected(Arc::new(tokio::sync::Mutex::new(server_handle))),
+        });
+
     }
 
     ///Used to destroy a current ClientConnection instance does not matter if the instance is invalid
@@ -913,40 +958,34 @@ impl ClientConnection {
         uuid: String,
     ) -> anyhow::Result<()> {
         //De-register with the server
-        let client = self.client.as_mut().ok_or(anyhow::Error::msg(
-            "Invalid ClientConnection instance (Client is None)",
-        ))?;
+        // client
+        //     .message_main(tonic::Request::new(MessageRequest {
+        //         message: ClientMessage::construct_disconnection_msg(password, author, &uuid, None)
+        //             .struct_into_string(),
+        //     }))
+        //     .await?;
 
-        client
-            .message_main(tonic::Request::new(MessageRequest {
-                message: ClientMessage::construct_disconnection_msg(password, author, &uuid, None)
-                    .struct_into_string(),
-            }))
-            .await?;
-
-        Ok(())
+        // Ok(())
+        todo!()
     }
 }
 
 ///Used to show state of the connection
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 pub enum ConnectionState {
-    Connected,
+    #[serde(skip)]
+    Connected(Arc<tokio::sync::Mutex<tokio::net::TcpStream>>),
+
+    #[default]
     Disconnected,
     Connecting,
     Error,
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
-
 impl Debug for ConnectionState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            ConnectionState::Connected => "Connected",
+            ConnectionState::Connected(_) => "Connected",
             ConnectionState::Disconnected => "Disconnected",
             ConnectionState::Connecting => "Connecting",
             ConnectionState::Error => "Error",
@@ -1020,11 +1059,7 @@ pub struct ServerAudioReply {
     pub file_name: String,
 }
 
-use strum::{EnumDiscriminants, EnumMessage};
-use strum_macros::EnumString;
 
-use super::client::messages::message_client::MessageClient;
-use super::client::messages::MessageRequest;
 
 ///This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
@@ -1181,8 +1216,6 @@ impl ServerMaster {
     }
 }
 
-
-
 //When a client is connected this is where the client gets saved
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ConnectedClient {
@@ -1306,7 +1339,7 @@ impl PlaybackCursor {
 impl Read for PlaybackCursor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut cursor = self.cursor.lock().unwrap();
-        cursor.read(buf)
+        std::io::Read::read(&mut *cursor, buf)
     }
 }
 
@@ -1314,7 +1347,7 @@ impl Read for PlaybackCursor {
 impl Seek for PlaybackCursor {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut cursor = self.cursor.lock().unwrap();
-        cursor.seek(pos)
+        std::io::Seek::seek(&mut *cursor, pos)
     }
 }
 
@@ -1639,10 +1672,21 @@ where
     });
 }
 
-// pub fn display_toast_notification() -> anyhow::Result<()> {
-//     let toastmanager = winrt_toast::ToastManager::new("Test123");
-//     let mut notif = Toast::new();
-//     notif.text1("Title").text2("Body").text3("Footer");
-//     toastmanager.show(&notif)?;
-//     Ok(())
-// }
+pub fn create_vec_with_len<T>(len: usize) -> Vec<T>
+where
+    T: Default + Clone,
+{
+    vec![T::default(); len]
+}
+
+///This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
+/// Please note that this function does __NOT__ check if the reader is readable
+pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
+where
+T: AsyncReadExt + Unpin
+{
+    let mut buf = create_vec_with_len::<u8>(4);
+    reader.read_exact(&mut buf).await?;
+
+    Ok(u32::from_be_bytes(buf[..4].try_into()?))
+}

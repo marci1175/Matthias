@@ -1,4 +1,4 @@
-use crate::app::backend::{ClientMessage, TemplateApp};
+use crate::app::backend::{ClientMessage, ConnectionState, TemplateApp};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::epaint::text::cursor::Cursor;
@@ -134,7 +134,7 @@ impl TemplateApp {
             )
             .show(ctx, |ui| {
                 //We should also pass in whether it should be enabled
-                self.buttons(ui, ctx, self.client_connection.client.is_some());
+                self.buttons(ui, ctx, matches!(self.client_connection.state, ConnectionState::Connected(_)));
             })
     }
 

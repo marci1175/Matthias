@@ -213,7 +213,7 @@ impl TemplateApp {
 
                             tokio::spawn(async move {
                                 match client::send_msg(connection, message).await {
-                                    Ok(ok) => {
+                                    Ok((ok, _)) => {
                                         match sender.send(ok) {
                                             Ok(_) => {}
                                             Err(err) => {

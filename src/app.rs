@@ -20,14 +20,7 @@ impl eframe::App for backend::TemplateApp {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         //try to close connection if there is one
-        if let Some(_) = &self.client_connection.client {
-            self.send_msg(ClientMessage::construct_disconnection_msg(
-                self.client_ui.client_password.clone(),
-                self.opened_account.username.clone(),
-                &self.opened_account.uuid,
-                None,
-            ));
-        }
+        // &self.client_connection.
 
         //clean up after server, client
         match std::env::var("APPDATA") {
@@ -59,6 +52,9 @@ impl eframe::App for backend::TemplateApp {
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
             TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
+            TODO: CLEAN DEPS
+            TODO: ASK FOR ASYNC DEADLOCKS IN DISCORD SERVER
+            
         */
 
         //For image loading
@@ -100,7 +96,7 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.add_enabled_ui(self.client_connection.client.is_none(), |ui| {
+                            ui.add_enabled_ui(matches!(self.client_connection.state, ConnectionState::Disconnected), |ui| {
                                 ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                             });
 
@@ -111,7 +107,7 @@ impl eframe::App for backend::TemplateApp {
                             let password = self.client_ui.client_password.clone();
 
                             match self.client_connection.state {
-                                ConnectionState::Connected => {
+                                ConnectionState::Connected(server_handle) => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
@@ -262,7 +258,7 @@ impl eframe::App for backend::TemplateApp {
                             }
 
                             ui.label(match self.client_connection.state {
-                                ConnectionState::Connected => {
+                                ConnectionState::Connected(_) => {
                                     RichText::from("Connected").color(Color32::GREEN)
                                 }
                                 ConnectionState::Disconnected => {
@@ -405,7 +401,7 @@ impl backend::TemplateApp {
 
         tokio::spawn(async move {
             match client::send_msg(connection, message).await {
-                Ok(ok) => {
+                Ok((ok, _)) => {
                     match tx.send(ok) {
                         Ok(_) => {}
                         Err(err) => {
