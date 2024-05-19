@@ -2,12 +2,13 @@ use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
+use super::client::{self, connect_to_server};
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key,
 };
-use anyhow::{ensure, Result, bail};
+use anyhow::{bail, ensure, Result};
 use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -25,6 +26,8 @@ use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
+use strum::{EnumDiscriminants, EnumMessage};
+use strum_macros::EnumString;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
@@ -32,9 +35,6 @@ use tonic::transport::{Channel, Endpoint};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
-use strum::{EnumDiscriminants, EnumMessage};
-use strum_macros::EnumString;
-use super::client::{self, connect_to_server};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -766,7 +766,6 @@ impl ClientMessage {
         password: String,
         author: String,
         uuid: String,
-        last_seen_message_index: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -775,7 +774,7 @@ impl ClientMessage {
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
-                last_seen_message_index,
+                last_seen_message_index: None,
             }),
             Uuid: uuid,
             Author: author,
@@ -855,61 +854,12 @@ pub struct ClientConnection {
 }
 
 impl ClientConnection {
-    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //DO NOT TOUCH!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    async fn send_msg(&mut self, message: ClientMessage) -> Result<String> {
-        if let ConnectionState::Connected(server_handle) = &mut self.state {
-            let mut server_handle = server_handle.try_lock()?;
-
-            server_handle.writable().await?;
-
-            let message_as_string = message.struct_into_string();
-
-            let message_bytes = message_as_string.as_bytes();
-
-            server_handle.write_all(&message_bytes.len().to_be_bytes()).await?;
-
-            server_handle.writable().await?;
-
-            server_handle.write_all(message_bytes).await?;
-
-            server_handle.flush().await?;
-
-            //Read the server reply
-            server_handle.readable().await?;
-
-            let msg_len = fetch_incoming_message_lenght(&mut *server_handle).await?;
-
-            let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
-
-            server_handle.read_exact(&mut msg_buffer).await;
-
-            Ok(String::from_utf8(msg_buffer)?)
-        }
-        else {
-            bail!("There is no active connection to send the message on.")
-        }
-    }
-
-    /// This is a wrapper function for ```send_msg```
+    /// This is a wrapper function for ```client::send_message```
     pub async fn send_message(&mut self, message: ClientMessage) -> Result<String> {
         if let ConnectionState::Connected(connection) = &mut self.state {
             return client::send_message(&mut *connection.lock().await, message).await;
-        }
-        else {
+        } else {
             bail!("There is no active connection to send the message on.")
-        }
-    }
-
-    ///Using this function ensures disconnection from the server
-    pub async fn reset_connection(&mut self) {
-        self.client_secret = Vec::new();
-
-        if let ConnectionState::Connected(server_handle) = &mut self.state {
-            // let fasz = send_msg(*&*server_handle.lock().await, ClientMessage::construct_disconnection_msg(password, author, uuid, last_seen_message_index));
-
         }
     }
 
@@ -930,9 +880,10 @@ impl ClientConnection {
 
         //Ping server to recive custom uuid, and to also get if server ip is valid
         let client_handle = tokio::net::TcpStream::connect(ip).await?;
-            /*We could return this, this is what the server is supposed to return, when a new user is connected */
+        /*We could return this, this is what the server is supposed to return, when a new user is connected */
 
-        let (server_reply, server_handle) = connect_to_server(client_handle, connection_msg).await?;
+        let (server_reply, server_handle) =
+            connect_to_server(client_handle, connection_msg).await?;
 
         ensure!(server_reply != "Invalid Password!", "Invalid password!");
         ensure!(
@@ -947,36 +898,50 @@ impl ClientConnection {
             client_secret,
             state: ConnectionState::Connected(Arc::new(tokio::sync::Mutex::new(server_handle))),
         });
-
     }
 
-    ///Used to destroy a current ClientConnection instance does not matter if the instance is invalid
+    pub fn reset_state(&mut self) {
+        self.client_secret = Vec::new();
+        self.state = ConnectionState::default();
+    }
+
+    /// This function is used to __DISCONNECT__ from a server, with this the ```ClientConnection``` instance is destoryed (reset to its default values)
     pub async fn disconnect(
         &mut self,
         author: String,
         password: String,
         uuid: String,
     ) -> anyhow::Result<()> {
-        //De-register with the server
-        // client
-        //     .message_main(tonic::Request::new(MessageRequest {
-        //         message: ClientMessage::construct_disconnection_msg(password, author, &uuid, None)
-        //             .struct_into_string(),
-        //     }))
-        //     .await?;
-
-        // Ok(())
-        
         if let ConnectionState::Connected(connection) = &mut self.state {
-            client::send_message(&mut *connection.lock().await, ClientMessage::construct_disconnection_msg(password, author, uuid, None)).await;
-        }
-        else {
+            let tcp_stream = &mut *connection.lock().await;
+
+            //We pray it doesnt deadlock, amen
+            client::send_message(
+                tcp_stream,
+                ClientMessage::construct_disconnection_msg(password, author, uuid),
+            )
+            .await;
+
+            //Shutdown connection from the client side
+            connection.lock().await.shutdown();
+        } else {
             bail!("There is no active connection to send the message on.")
         }
 
-        todo!()
+        //Reset state
+        self.reset_state();
+
+        Ok(())
     }
 }
+
+///UNUSED
+#[derive(Clone)]
+pub struct ConnectionPair {
+    pub reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+    pub writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+}
+///UNUSED
 
 ///Used to show state of the connection
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
@@ -1066,8 +1031,6 @@ pub struct ServerAudioReply {
     pub index: i32,
     pub file_name: String,
 }
-
-
 
 ///This is what server replies can be
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
@@ -1691,7 +1654,7 @@ where
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
 where
-T: AsyncReadExt + Unpin
+    T: AsyncReadExt + Unpin,
 {
     let mut buf: Vec<u8> = create_vec_with_len::<u8>(4);
     reader.read_exact(&mut buf).await?;

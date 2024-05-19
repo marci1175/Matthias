@@ -134,7 +134,11 @@ impl TemplateApp {
             )
             .show(ctx, |ui| {
                 //We should also pass in whether it should be enabled
-                self.buttons(ui, ctx, matches!(self.client_connection.state, ConnectionState::Connected(_)));
+                self.buttons(
+                    ui,
+                    ctx,
+                    matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                );
             })
     }
 

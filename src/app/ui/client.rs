@@ -6,7 +6,8 @@ use rodio::Decoder;
 use std::time::Duration;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType, ConnectionState, MessageReaction
+    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType,
+    ConnectionState, MessageReaction,
 };
 
 use crate::app::backend::{
@@ -168,23 +169,28 @@ impl TemplateApp {
             }
 
             //Messages go here, check if there is a connection
-            ui.add_enabled_ui(matches!(self.client_connection.state, ConnectionState::Connected(_)), |ui| {
-                self.client_ui_message_main(ui, ctx);
-            });
-            
+            ui.add_enabled_ui(
+                matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                |ui| {
+                    self.client_ui_message_main(ui, ctx);
+                },
+            );
         });
 
         //Message input panel
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
             .max_height(ctx.used_size().y / 2.)
             .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
-                ui.add_enabled_ui(self.client_connection.client.is_some(), |ui| {
-                    let msg_tray = self.message_tray(ui, ctx);
+                ui.add_enabled_ui(
+                    matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                    |ui| {
+                        let msg_tray = self.message_tray(ui, ctx);
 
-                    self.client_ui.text_widget_offset = msg_tray.response.rect.width();
+                        self.client_ui.text_widget_offset = msg_tray.response.rect.width();
 
-                    ui.allocate_space(vec2(ui.available_width(), 5.));
-                });
+                        ui.allocate_space(vec2(ui.available_width(), 5.));
+                    },
+                );
             });
 
         //search area

@@ -57,8 +57,11 @@ impl eframe::App for backend::TemplateApp {
             TODO: ASK FOR ASYNC DEADLOCKS IN DISCORD SERVER
             TODO: split the client_connection's TcpStream
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-            -----TODO: Sender functions shouldnt wait for the server's reponse
             
+            TODO: functions which only send a normal message (this excludes file req messages),
+                  wont need to wait for a server response becuase we will need a server message reader,
+                  which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
+
         */
 
         //For image loading
@@ -100,9 +103,15 @@ impl eframe::App for backend::TemplateApp {
 
                     ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.add_enabled_ui(matches!(self.client_connection.state, ConnectionState::Disconnected), |ui| {
-                                ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
-                            });
+                            ui.add_enabled_ui(
+                                matches!(
+                                    self.client_connection.state,
+                                    ConnectionState::Disconnected
+                                ),
+                                |ui| {
+                                    ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
+                                },
+                            );
 
                             let username = self.login_username.clone();
 
@@ -110,7 +119,7 @@ impl eframe::App for backend::TemplateApp {
 
                             let password = self.client_ui.client_password.clone();
 
-                            match self.client_connection.state {
+                            match &self.client_connection.state {
                                 ConnectionState::Connected(server_handle) => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
@@ -134,14 +143,7 @@ impl eframe::App for backend::TemplateApp {
                                             };
                                         });
 
-                                        //Reset client
-                                        self.client_connection.client = None;
-                                        self.client_ui.incoming_msg = ServerMaster::default();
-                                        self.autosync_should_run = false;
-                                        let _ = self.autosync_input_sender.send(());
-
-                                        self.client_connection.state =
-                                            ConnectionState::Disconnected;
+                                        self.reset_client_connection();
                                     }
                                 }
                                 ConnectionState::Disconnected => {
@@ -205,13 +207,7 @@ impl eframe::App for backend::TemplateApp {
                                         .clicked()
                                     {
                                         //Reset client
-                                        self.client_connection.client = None;
-                                        self.client_ui.incoming_msg = ServerMaster::default();
-                                        self.autosync_should_run = false;
-                                        let _ = self.autosync_input_sender.send(());
-
-                                        self.client_connection.state =
-                                            ConnectionState::Disconnected;
+                                        self.reset_client_connection();
                                     }
                                 }
                                 ConnectionState::Error => {
@@ -418,5 +414,19 @@ impl backend::TemplateApp {
                 }
             };
         });
+    }
+
+    /// This function resets clientconnection and all of its other attributes (self.client_ui.incoming_msg, self.autosync_should_run)
+    fn reset_client_connection(&mut self) {
+        //Reset client, as we are already disconnecting above
+        self.client_connection.reset_state();
+
+        self.client_ui.incoming_msg = ServerMaster::default();
+        self.autosync_should_run = false;
+
+        //THIS IS NOT NEEDED ANYMORE, REMOVE THIS IN v5
+        let _ = self.autosync_input_sender.send(());
+
+        self.client_connection.state = ConnectionState::Disconnected;
     }
 }
