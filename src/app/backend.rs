@@ -1685,7 +1685,7 @@ pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u
 where
 T: AsyncReadExt + Unpin
 {
-    let mut buf = create_vec_with_len::<u8>(4);
+    let mut buf: Vec<u8> = create_vec_with_len::<u8>(4);
     reader.read_exact(&mut buf).await?;
 
     Ok(u32::from_be_bytes(buf[..4].try_into()?))

@@ -1,6 +1,7 @@
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
+use std::sync::Arc;
 use tap::TapFallible;
 
 pub mod backend;
@@ -379,12 +380,11 @@ impl eframe::App for backend::TemplateApp {
         match self.connection_reciver.try_recv() {
             Ok(connection) => {
                 if let Some(connection) = connection {
-                    if connection.client.is_some() {
-                        self.client_connection.state = ConnectionState::Connected;
-                        self.client_connection = connection
-                    } else {
-                        self.client_connection.state = ConnectionState::Error;
-                    }
+                    //Modify client_connection
+                    self.client_connection = connection;
+                } else {
+                    //If we recived a None it means we have an error
+                    self.client_connection.state = ConnectionState::Error;
                 }
             }
             Err(_err) => {
