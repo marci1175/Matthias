@@ -863,6 +863,14 @@ impl ClientConnection {
         }
     }
 
+    // pub async fn send_message_without(&mut self, message: ClientMessage) -> Result<String> {
+    //     if let ConnectionState::Connected(connection) = &mut self.state {
+    //         return client::send_message(&mut *connection.lock().await, message).await;
+    //     } else {
+    //         bail!("There is no active connection to send the message on.")
+    //     }
+    // }
+
     /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
     /// This function blocks (time depends on the connection speed)
     pub async fn connect(

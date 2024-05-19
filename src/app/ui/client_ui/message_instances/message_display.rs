@@ -37,7 +37,7 @@ impl TemplateApp {
                     let connection = self.client_connection.clone();
 
                     tokio::spawn(async move {
-                        match client::send_msg(connection, message).await {
+                        match connection.send_message(message).await {
                             Ok(ok) => {
                                 match sender.send(ok) {
                                     Ok(_) => {}
@@ -212,7 +212,7 @@ impl TemplateApp {
                             let connection = self.client_connection.clone();
 
                             tokio::spawn(async move {
-                                match client::send_msg(connection, message).await {
+                                match connection.send_message(message).await {
                                     Ok((ok, _)) => {
                                         match sender.send(ok) {
                                             Ok(_) => {}
@@ -343,7 +343,7 @@ impl TemplateApp {
                                             let current_index = current_index_in_message_list;
 
                                             tokio::spawn(async move {
-                                                match client::send_msg(connection, message).await {
+                                                match connection.send_message(message).await {
                                                     Ok(response) => {
                                                         let file_serve: Result<
                                                             ServerAudioReply,

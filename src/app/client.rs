@@ -7,7 +7,7 @@ use std::{
 use tap::Tap;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::TcpStream,
+    net::{tcp::OwnedWriteHalf, TcpStream},
 };
 
 use super::backend::{
@@ -83,6 +83,25 @@ where
     connection.read_exact(&mut msg_buffer).await;
 
     Ok(String::from_utf8(msg_buffer)?)
+}
+
+/// This function should only be used when we want to send normal messages (backend::ClientMessageType::ClientNormalMessage)
+/// because we will recive the server's reply in a different place with the ```OwnedReadHalf```, thats why this function only needs an ```OwnedWriteHalf```
+pub async fn send_message_without_reply(mut connection: OwnedWriteHalf, message: ClientMessage) -> anyhow::Result<()>
+{
+    let message_string = message.struct_into_string();
+
+    let message_bytes = message_string.as_bytes();
+
+    //Send message lenght to server
+    connection
+        .write_all(&message_bytes.len().to_be_bytes())
+        .await?;
+
+    //Send message to server
+    connection.write_all(message_bytes).await?;
+
+    Ok(())
 }
 
 #[inline]

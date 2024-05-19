@@ -399,7 +399,7 @@ impl backend::TemplateApp {
         let tx = self.tx.clone();
 
         tokio::spawn(async move {
-            match client::send_msg(connection, message).await {
+            match connection.send_message(message).await {
                 Ok((ok, _)) => {
                     match tx.send(ok) {
                         Ok(_) => {}
