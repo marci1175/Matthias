@@ -765,7 +765,7 @@ impl ClientMessage {
     pub fn construct_disconnection_msg(
         password: String,
         author: String,
-        uuid: &str,
+        uuid: String,
         last_seen_message_index: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
@@ -777,7 +777,7 @@ impl ClientMessage {
                 client_message_counter: None,
                 last_seen_message_index,
             }),
-            Uuid: uuid.to_string(),
+            Uuid: uuid,
             Author: author,
             MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -966,6 +966,14 @@ impl ClientConnection {
         //     .await?;
 
         // Ok(())
+        
+        if let ConnectionState::Connected(connection) = &mut self.state {
+            client::send_message(&mut *connection.lock().await, ClientMessage::construct_disconnection_msg(password, author, uuid, None)).await;
+        }
+        else {
+            bail!("There is no active connection to send the message on.")
+        }
+
         todo!()
     }
 }
@@ -1070,7 +1078,7 @@ pub enum ServerMessageType {
     #[strum_discriminants(strum(message = "Normal"))]
     Normal(ServerNormalMessage),
 
-    ///Used to send and index to client so it knows which index to ask for VERY IMPORTANT!!!!!!!!!
+    ///Used to send and index to client so it knows which index to ask for, this is VERY IMPORTANT!!!!!!!!!
     #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
     #[strum_discriminants(strum(message = "Audio"))]
@@ -1679,8 +1687,8 @@ where
     vec![T::default(); len]
 }
 
-///This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
-/// Please note that this function does __NOT__ check if the reader is readable
+/// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
+/// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
 where
 T: AsyncReadExt + Unpin

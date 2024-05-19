@@ -6,15 +6,13 @@ use rodio::Decoder;
 use std::time::Duration;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType,
-    MessageReaction,
+    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType, ConnectionState, MessageReaction
 };
 
 use crate::app::backend::{
     ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType,
     TemplateApp,
 };
-use crate::app::client::{self};
 
 impl TemplateApp {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
@@ -170,9 +168,10 @@ impl TemplateApp {
             }
 
             //Messages go here, check if there is a connection
-            ui.add_enabled_ui(self.client_connection.client.is_some(), |ui| {
+            ui.add_enabled_ui(matches!(self.client_connection.state, ConnectionState::Connected(_)), |ui| {
                 self.client_ui_message_main(ui, ctx);
             });
+            
         });
 
         //Message input panel

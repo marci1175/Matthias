@@ -17,7 +17,8 @@ fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<cha
 fn char_name(chr: char) -> String {
     special_char_name(chr)
         .map(|s| s.to_owned())
-        .or_else(|| unicode_names2::name(chr).map(|name| name.to_string().to_lowercase()))
+        //Deleted unciode names crate cuz of big bin size
+        // .or_else(|| unicode_names2::name(chr).map(|name| name.to_string().to_lowercase()))
         .unwrap_or_else(|| "unknown".to_owned())
 }
 

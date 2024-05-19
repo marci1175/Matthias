@@ -55,6 +55,9 @@ impl eframe::App for backend::TemplateApp {
             TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
             TODO: CLEAN DEPS
             TODO: ASK FOR ASYNC DEADLOCKS IN DISCORD SERVER
+            TODO: split the client_connection's TcpStream
+            TODO: make an installer for this app so there wouldnt be so many huge binary sizes
+            -----TODO: Sender functions shouldnt wait for the server's reponse
             
         */
 

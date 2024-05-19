@@ -53,6 +53,7 @@ pub async fn connect_to_server(
 }
 
 /// This function can take a ```MutexGuard<TcpStream>>``` as a connection, but it does not check if the buffer is writeable
+/// It also waits for the server to reply, so it awaits a sever repsonse
 pub async fn send_message<T>(
     mut connection: T,
     message: ClientMessage
@@ -70,9 +71,6 @@ T: AsyncReadExt + AsyncWriteExt + Unpin,
     //Send message to server
     connection.write_all(message_bytes).await?;
 
-    //Check if the server has responded
-    // connection.read
-
     //Read the server reply lenght
     let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
 
@@ -84,7 +82,6 @@ T: AsyncReadExt + AsyncWriteExt + Unpin,
 
     Ok(String::from_utf8(msg_buffer)?)
 }
-
 
 #[inline]
 pub async fn recive_message() -> anyhow::Result<ServerMaster> {
