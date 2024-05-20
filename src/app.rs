@@ -120,7 +120,7 @@ impl eframe::App for backend::TemplateApp {
                             let password = self.client_ui.client_password.clone();
 
                             match &self.client_connection.state {
-                                ConnectionState::Connected(server_handle) => {
+                                ConnectionState::Connected(_) => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
@@ -146,58 +146,6 @@ impl eframe::App for backend::TemplateApp {
                                         self.reset_client_connection();
                                     }
                                 }
-                                ConnectionState::Disconnected => {
-                                    if ui.button("Connect").clicked() {
-                                        //Set global variable
-                                        self.client_ui.send_on_ip_base64_encoded =
-                                            base64::engine::general_purpose::URL_SAFE_NO_PAD
-                                                .encode(self.client_ui.send_on_ip.clone());
-
-                                        let ip = self.client_ui.send_on_ip.clone();
-
-                                        let sender = self.connection_sender.clone();
-
-                                        let username = self.login_username.clone();
-
-                                        let password = self
-                                            .client_ui
-                                            .req_passw
-                                            .then_some((|| &self.client_ui.client_password)())
-                                            .cloned();
-
-                                        let uuid = self.opened_account.uuid.clone();
-
-                                        tokio::task::spawn(async move {
-                                            match ClientConnection::connect(
-                                                format!("http://{}", ip),
-                                                username,
-                                                password,
-                                                &uuid,
-                                            )
-                                            .await
-                                            {
-                                                Ok(ok) => {
-                                                    if let Err(err) = sender.send(Some(ok)) {
-                                                        dbg!(err);
-                                                    };
-                                                }
-                                                Err(err) => {
-                                                    display_error_message(err);
-                                                    if let Err(err) = sender.send(None) {
-                                                        dbg!(err);
-                                                    };
-                                                }
-                                            };
-                                        });
-
-                                        self.autosync_should_run = true;
-
-                                        //reset autosync
-                                        self.autosync_sender_thread = None;
-
-                                        self.client_connection.state = ConnectionState::Connecting;
-                                    }
-                                }
                                 ConnectionState::Connecting => {
                                     if ui
                                         .button(
@@ -210,7 +158,8 @@ impl eframe::App for backend::TemplateApp {
                                         self.reset_client_connection();
                                     }
                                 }
-                                ConnectionState::Error => {
+                                //this is what will get displayed if there sint a connection or the last connection attempt failed
+                                _ => {
                                     if ui.button("Connect").clicked() {
                                         let ip = self.client_ui.send_on_ip.clone();
 
@@ -226,7 +175,7 @@ impl eframe::App for backend::TemplateApp {
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
-                                                format!("http://{}", ip),
+                                                ip,
                                                 username,
                                                 password,
                                                 &uuid,
@@ -380,7 +329,7 @@ impl eframe::App for backend::TemplateApp {
             Ok(connection) => {
                 if let Some(connection) = connection {
                     //Modify client_connection
-                    self.client_connection = connection;
+                    self.client_connection = dbg!(connection);
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;
@@ -400,7 +349,7 @@ impl backend::TemplateApp {
 
         tokio::spawn(async move {
             match connection.send_message(message).await {
-                Ok((ok, _)) => {
+                Ok(ok) => {
                     match tx.send(ok) {
                         Ok(_) => {}
                         Err(err) => {

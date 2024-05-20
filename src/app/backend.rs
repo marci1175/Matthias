@@ -20,18 +20,14 @@ use std::fmt::{Debug, Display};
 use std::fs;
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::net::SocketAddr;
-use std::os::windows::io::OwnedHandle;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::TcpStream;
-use tonic::transport::{Channel, Endpoint};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
@@ -855,15 +851,15 @@ pub struct ClientConnection {
 
 impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
-    pub async fn send_message(&mut self, message: ClientMessage) -> Result<String> {
-        if let ConnectionState::Connected(connection) = &mut self.state {
+    pub async fn send_message(&self, message: ClientMessage) -> Result<String> {
+        if let ConnectionState::Connected(connection) = &self.state {
             return client::send_message(&mut *connection.lock().await, message).await;
         } else {
             bail!("There is no active connection to send the message on.")
         }
     }
 
-    // pub async fn send_message_without(&mut self, message: ClientMessage) -> Result<String> {
+    // pub async fn send_message_without_reply(&mut self, message: ClientMessage) -> Result<String> {
     //     if let ConnectionState::Connected(connection) = &mut self.state {
     //         return client::send_message(&mut *connection.lock().await, message).await;
     //     } else {
@@ -887,7 +883,7 @@ impl ClientConnection {
         );
 
         //Ping server to recive custom uuid, and to also get if server ip is valid
-        let client_handle = tokio::net::TcpStream::connect(ip).await?;
+        let client_handle = tokio::net::TcpStream::connect(dbg!(ip)).await?;
         /*We could return this, this is what the server is supposed to return, when a new user is connected */
 
         let (server_reply, server_handle) =
@@ -928,10 +924,10 @@ impl ClientConnection {
                 tcp_stream,
                 ClientMessage::construct_disconnection_msg(password, author, uuid),
             )
-            .await;
+            .await?;
 
             //Shutdown connection from the client side
-            connection.lock().await.shutdown();
+            connection.lock().await.shutdown().await?;
         } else {
             bail!("There is no active connection to send the message on.")
         }
@@ -1662,7 +1658,7 @@ where
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
 where
-    T: AsyncReadExt + Unpin,
+    T: AsyncReadExt + Unpin + AsyncRead,
 {
     let mut buf: Vec<u8> = create_vec_with_len::<u8>(4);
     reader.read_exact(&mut buf).await?;

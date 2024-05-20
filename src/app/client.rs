@@ -1,4 +1,3 @@
-use messages::MessageRequest;
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
@@ -13,9 +12,6 @@ use tokio::{
 use super::backend::{
     create_vec_with_len, fetch_incoming_message_lenght, ClientMessage, ServerMaster,
 };
-pub mod messages {
-    tonic::include_proto!("messages");
-}
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
@@ -38,20 +34,16 @@ pub async fn connect_to_server(
     //Send message to server
     writer.write_all(message_bytes).await?;
 
-    writer.flush().await?;
-
-    //Check if the server has responed
-    reader.readable().await?;
-
     //Read the server reply lenght
+    //block here for unknown reason
     let msg_len = fetch_incoming_message_lenght(&mut reader).await?;
 
     //Create buffer with said lenght
     let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
 
     //Read the server reply
-    reader.read_exact(&mut msg_buffer).await;
-
+    reader.read_exact(&mut msg_buffer).await?;
+panic!();
     Ok((String::from_utf8(msg_buffer)?, reader.reunite(writer)?))
 }
 
@@ -80,7 +72,7 @@ where
     let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
 
     //Read the server reply
-    connection.read_exact(&mut msg_buffer).await;
+    connection.read_exact(&mut msg_buffer).await?;
 
     Ok(String::from_utf8(msg_buffer)?)
 }

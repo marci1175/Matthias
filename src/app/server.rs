@@ -8,17 +8,9 @@ use super::backend::{
     ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
 };
 
-use messages::{
-    message_server::{Message as ServerMessage, MessageServer},
-    MessageRequest, MessageResponse,
-};
 use rand::Rng;
 use std::sync::Mutex;
-use tokio::{net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
-use tonic::{
-    transport::{server::Connected, Server},
-    Request, Response, Status,
-};
+use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
@@ -37,10 +29,6 @@ use tokio::{
 };
 
 use super::backend::{ServerAudioReply, ServerOutput};
-
-pub mod messages {
-    tonic::include_proto!("messages");
-}
 
 #[derive(Debug, Default)]
 pub struct MessageService {
@@ -140,8 +128,13 @@ async fn spawn_client_reader(
                 .message_main(incoming_message, writer.clone())
                 .await?;
 
+            //Send it to all the other clients
+
             let mut messages = message_service.messages.lock().await;
-            messages.push(serde_json::from_str::<ServerOutput>(&reply)?);
+            //We only push back if it was an incoming message which should be stored and displayed to other clients
+            if let Some(msg) = reply {
+                messages.push(serde_json::from_str::<ServerOutput>(&msg)?);
+            }
 
             //If there is an incoming message we should reply to all of the clients, after processing said message
             sync_all_messages_with_all_clients(
@@ -224,6 +217,20 @@ async fn sync_all_messages_with_all_clients(
 
     Ok(())
 }
+pub async fn send_message_to_client<T>(mut writer: T, message: String) -> anyhow::Result<()>
+where
+T: AsyncWriteExt + Unpin + AsyncWrite
+{
+    let message_bytes = message.as_bytes();
+
+    //Send message lenght
+    writer.write_all(&message_bytes.len().to_be_bytes()).await?;
+
+    //Send message
+    writer.write_all(message_bytes).await?;
+
+    Ok(())
+}
 
 impl MessageService {
     #[inline]
@@ -231,8 +238,9 @@ impl MessageService {
         &self,
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<Option<String>> {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
+        let mut client_buffer = client_handle.try_lock()?;
 
         let req: ClientMessage = req_result.unwrap();
 
@@ -249,19 +257,23 @@ impl MessageService {
                                     //If found, then the client is already connected
                                     if client.uuid == req.Uuid {
                                         //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                        return Ok(hex::encode(self.decryption_key));
+                                        send_message_to_client(&mut *client_buffer, hex::encode(self.decryption_key)).await?;
+
+                                        return Ok(None);
                                     }
                                 }
 
                                 //If the ip is not found then add it to connected clients
                                 clients.push(ConnectedClient::new(
-                                    req.Uuid,
-                                    req.Author,
-                                    client_handle,
+                                    req.Uuid.clone(),
+                                    req.Author.clone(),
+                                    client_handle.clone(),
                                 ));
 
                                 //Return custom key which the server's text will be encrypted with
-                                return Ok(hex::encode(self.decryption_key));
+                                send_message_to_client(&mut *client_buffer, hex::encode(self.decryption_key)).await?;
+
+                                return Ok(None);
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -290,8 +302,9 @@ impl MessageService {
                     }
                 }
 
-                //Sync all messages
-                return Ok(self.sync_message(&req).await?);
+                //Sync all messages, send all of the messages to the client
+                send_message_to_client(&mut *client_buffer, self.sync_message(&req).await?).await?;
+                return Ok(None);
             }
         }
 
@@ -312,7 +325,9 @@ impl MessageService {
                 }
 
                 ClientFileRequestType(request_type) => {
-                    return Ok(self.handle_request(&request_type).await?);
+                    send_message_to_client(&mut *client_buffer, self.handle_request(&request_type).await?).await?;
+
+                    return Ok(None);
                 }
 
                 ClientFileUpload(upload_type) => {
@@ -346,9 +361,13 @@ impl MessageService {
             }
 
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-            return Ok(self.sync_message(&req).await?);
+            // return Ok(self.sync_message(&req).await?);
+
+            //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
+
+            return Ok(None);
         } else {
-            return Ok("Invalid Password!".into());
+            return Ok(Some("Invalid Password!".into()));
         }
     }
 

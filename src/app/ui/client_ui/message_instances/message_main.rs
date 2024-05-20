@@ -204,7 +204,7 @@ impl TemplateApp {
                                                                 let connection = self.client_connection.clone();
 
                                                                 tokio::spawn(async move {
-                                                                    match client::send_msg(connection, message).await {
+                                                                    match connection.send_message(message).await {
                                                                         Ok(_) => {},
                                                                         Err(err) => println!("{err}"),
                                                                     };
