@@ -68,12 +68,10 @@ impl TemplateApp {
                                 && !self.client_ui.seen_list.is_empty()
                             {
                                 //format the string so the @ stays
-                                let formatted_string = format!(
-                                    "{}",
-                                    self.client_ui.seen_list
-                                        [self.client_ui.user_selector_index as usize]
-                                        .username
-                                );
+                                let formatted_string = self.client_ui.seen_list
+                                    [self.client_ui.user_selector_index as usize]
+                                    .username
+                                    .to_string();
 
                                 *buffer = &formatted_string;
 

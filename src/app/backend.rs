@@ -26,7 +26,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
@@ -853,7 +853,7 @@ impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
     pub async fn send_message(&self, message: ClientMessage) -> Result<String> {
         if let ConnectionState::Connected(connection) = &self.state {
-            return client::send_message(&mut *connection.lock().await, message).await;
+            client::send_message(&mut *connection.lock().await, message).await
         } else {
             bail!("There is no active connection to send the message on.")
         }
@@ -898,10 +898,10 @@ impl ClientConnection {
         //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
         let client_secret = hex::decode(server_reply)?;
 
-        return Ok(Self {
+        Ok(Self {
             client_secret,
             state: ConnectionState::Connected(Arc::new(tokio::sync::Mutex::new(server_handle))),
-        });
+        })
     }
 
     pub fn reset_state(&mut self) {

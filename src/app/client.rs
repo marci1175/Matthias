@@ -1,11 +1,5 @@
-use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
-use tap::Tap;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedWriteHalf, TcpStream},
 };
 
@@ -15,36 +9,36 @@ use super::backend::{
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
-    connection: TcpStream,
+    mut connection: TcpStream,
     message: ClientMessage,
 ) -> anyhow::Result<(String, TcpStream)> {
-    let (mut reader, mut writer) = connection.into_split();
-
-    writer.writable().await?;
-
     let message_as_string = message.struct_into_string();
 
     let message_bytes = message_as_string.as_bytes();
 
-    //Send message lenght to server
-    writer.write_all(&message_bytes.len().to_be_bytes()).await?;
+    dbg!("SEND CLIENT MESSAGE LEN");
 
-    writer.writable().await?;
+    //Send message lenght to server
+    connection
+        .write_all(&message_bytes.len().to_be_bytes())
+        .await?;
+
+    dbg!("SEND CLIENT MESSAGE");
 
     //Send message to server
-    writer.write_all(message_bytes).await?;
+    connection.write_all(message_bytes).await?;
 
     //Read the server reply lenght
-    //block here for unknown reason
-    let msg_len = fetch_incoming_message_lenght(&mut reader).await?;
+    //blocks here for unknown reason
+    let msg_len = dbg!(fetch_incoming_message_lenght(&mut connection).await?);
 
     //Create buffer with said lenght
     let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
 
     //Read the server reply
-    reader.read_exact(&mut msg_buffer).await?;
-panic!();
-    Ok((String::from_utf8(msg_buffer)?, reader.reunite(writer)?))
+    connection.read_exact(&mut msg_buffer).await?;
+
+    Ok((String::from_utf8(msg_buffer)?, connection))
 }
 
 /// This function can take a ```MutexGuard<TcpStream>>``` as a connection, but it does not check if the buffer is writeable
@@ -79,8 +73,10 @@ where
 
 /// This function should only be used when we want to send normal messages (backend::ClientMessageType::ClientNormalMessage)
 /// because we will recive the server's reply in a different place with the ```OwnedReadHalf```, thats why this function only needs an ```OwnedWriteHalf```
-pub async fn send_message_without_reply(mut connection: OwnedWriteHalf, message: ClientMessage) -> anyhow::Result<()>
-{
+pub async fn send_message_without_reply(
+    mut connection: OwnedWriteHalf,
+    message: ClientMessage,
+) -> anyhow::Result<()> {
     let message_string = message.struct_into_string();
 
     let message_bytes = message_string.as_bytes();

@@ -1,7 +1,7 @@
 use crate::app::backend::{display_error_message, login, register, OpenedAccount, UserInformation};
 
 use crate::app::backend::TemplateApp;
-use egui::{vec2, Align, Layout, RichText, ViewportCommand};
+use egui::{Align, Layout, RichText};
 
 impl TemplateApp {
     pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {

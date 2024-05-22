@@ -1,9 +1,7 @@
-use crate::app::{
-    backend::{AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp},
-    client,
+use crate::app::backend::{
+    AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp,
 };
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
-use tap::Tap;
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -59,7 +57,7 @@ impl TemplateApp {
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
                                                 self.client_ui.incoming_msg.struct_list[replied_to].Author,
                                                 match &self.client_ui.incoming_msg.struct_list[replied_to].MessageType {
-                                                    ServerMessageType::Deleted => format!("Deleted message"),
+                                                    ServerMessageType::Deleted => "Deleted message".to_string(),
                                                     ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                     ServerMessageType::Image(_img) => "Image".to_string(),
                                                     ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
@@ -147,14 +145,12 @@ impl TemplateApp {
                                             ui.vertical(|ui| {
                                                 ui.allocate_ui(vec2(100., 10.), |ui| {
                                                     //We should only display the `edit` button if its anormal message thus its editable
-                                                    if matches!(item.MessageType, ServerMessageType::Normal(_)) {
-                                                        if ui.button("Edit").clicked() {
-                                                            self.send_msg(
-                                                                ClientMessage::construct_client_message_edit(iter_index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
-                                                            );
-                                                            self.client_ui.text_edit_buffer.clear();
-                                                            ui.close_menu();
-                                                        }
+                                                    if matches!(item.MessageType, ServerMessageType::Normal(_)) && ui.button("Edit").clicked() {
+                                                        self.send_msg(
+                                                            ClientMessage::construct_client_message_edit(iter_index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
+                                                        );
+                                                        self.client_ui.text_edit_buffer.clear();
+                                                        ui.close_menu();
                                                     }
 
                                                     if ui.button("Delete").clicked() {

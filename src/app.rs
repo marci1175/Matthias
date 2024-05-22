@@ -1,7 +1,5 @@
-use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
-use std::sync::Arc;
 use tap::TapFallible;
 
 pub mod backend;
@@ -57,7 +55,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: ASK FOR ASYNC DEADLOCKS IN DISCORD SERVER
             TODO: split the client_connection's TcpStream
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-            
+
             TODO: functions which only send a normal message (this excludes file req messages),
                   wont need to wait for a server response becuase we will need a server message reader,
                   which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
@@ -167,7 +165,7 @@ impl eframe::App for backend::TemplateApp {
                                         let password = self
                                             .client_ui
                                             .req_passw
-                                            .then_some((|| &self.client_ui.client_password)())
+                                            .then_some(&self.client_ui.client_password)
                                             .cloned();
 
                                         let sender = self.connection_sender.clone();
@@ -175,10 +173,7 @@ impl eframe::App for backend::TemplateApp {
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
-                                                ip,
-                                                username,
-                                                password,
-                                                &uuid,
+                                                ip, username, password, &uuid,
                                             )
                                             .await
                                             {

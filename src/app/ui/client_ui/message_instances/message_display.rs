@@ -3,9 +3,8 @@ use std::{fs, path::PathBuf};
 use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
 use regex::Regex;
 
-use crate::app::{
-    backend::{write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp},
-    client,
+use crate::app::backend::{
+    write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
 };
 use rodio::{Decoder, Sink, Source};
 use tap::TapFallible;
@@ -95,7 +94,7 @@ impl TemplateApp {
                         .split_whitespace()
                         .collect::<Vec<&str>>();
 
-                    let name_sent_to = whole_tag.get(0);
+                    let name_sent_to = whole_tag.first();
                     ui.label(
                         RichText::from(&inner_message.message)
                             .size(self.font_size)

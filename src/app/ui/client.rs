@@ -3,16 +3,14 @@ use egui::{
     Stroke,
 };
 use rodio::Decoder;
-use std::time::Duration;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ClientMessageType,
-    ConnectionState, MessageReaction,
+    decrypt_aes256, display_error_message, write_file, write_image, ConnectionState,
+    MessageReaction,
 };
 
 use crate::app::backend::{
-    ClientMessage, SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType,
-    TemplateApp,
+    SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp,
 };
 
 impl TemplateApp {

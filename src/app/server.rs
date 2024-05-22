@@ -1,6 +1,6 @@
-use std::{env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use super::backend::{
     encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
@@ -85,13 +85,14 @@ pub async fn server_main(
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //check if the server is supposed to run
-            if let Some(_) = dbg!(signal.recv().await) {
+            if dbg!(signal.try_recv()).is_ok() {
                 //shutdown server
                 break;
             }
 
             //accept connection
             let (stream, _address) = tcp_listener.accept().await?;
+            dbg!("ACCEPTED CONNECTION");
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
@@ -124,6 +125,8 @@ async fn spawn_client_reader(
             //the thread will block here waiting for client message
             let incoming_message = recive_message(reader.clone()).await?;
 
+            dbg!(&incoming_message);
+
             let reply = message_service
                 .message_main(incoming_message, writer.clone())
                 .await?;
@@ -152,14 +155,16 @@ async fn spawn_client_reader(
 #[inline]
 async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
     let mut reader = reader.lock().await;
-
     reader.readable().await?;
+    dbg!("RECIVED MESSAGE");
 
     let mut message_len_buffer: Vec<u8> = vec![0; 4];
 
-    reader.read_exact(&mut message_len_buffer).await?;
+    let fasz = dbg!(reader.read_exact(&mut message_len_buffer).await?);
 
     let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
+
+    dbg!(incoming_message_len);
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 
@@ -219,7 +224,7 @@ async fn sync_all_messages_with_all_clients(
 }
 pub async fn send_message_to_client<T>(mut writer: T, message: String) -> anyhow::Result<()>
 where
-T: AsyncWriteExt + Unpin + AsyncWrite
+    T: AsyncWriteExt + Unpin + AsyncWrite,
 {
     let message_bytes = message.as_bytes();
 
@@ -248,7 +253,7 @@ impl MessageService {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
                 if let Some(sync_attr) = sync_msg.sync_attribute {
-                    //Incoming connection, we should be returning temp uuid
+                    //sync attr is true if its a connection message i.e a licnet is trying to connect to us
                     if sync_attr {
                         match self.connected_clients.try_lock() {
                             Ok(mut clients) => {
@@ -257,8 +262,13 @@ impl MessageService {
                                     //If found, then the client is already connected
                                     if client.uuid == req.Uuid {
                                         //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                        send_message_to_client(&mut *client_buffer, hex::encode(self.decryption_key)).await?;
+                                        send_message_to_client(
+                                            &mut *client_buffer,
+                                            hex::encode(self.decryption_key),
+                                        )
+                                        .await?;
 
+                                        //If found return None, and end execution
                                         return Ok(None);
                                     }
                                 }
@@ -271,7 +281,11 @@ impl MessageService {
                                 ));
 
                                 //Return custom key which the server's text will be encrypted with
-                                send_message_to_client(&mut *client_buffer, hex::encode(self.decryption_key)).await?;
+                                send_message_to_client(
+                                    &mut *client_buffer,
+                                    hex::encode(self.decryption_key),
+                                )
+                                .await?;
 
                                 return Ok(None);
                             }
@@ -325,7 +339,11 @@ impl MessageService {
                 }
 
                 ClientFileRequestType(request_type) => {
-                    send_message_to_client(&mut *client_buffer, self.handle_request(&request_type).await?).await?;
+                    send_message_to_client(
+                        &mut *client_buffer,
+                        self.handle_request(request_type).await?,
+                    )
+                    .await?;
 
                     return Ok(None);
                 }
@@ -365,9 +383,9 @@ impl MessageService {
 
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
 
-            return Ok(None);
+            Ok(None)
         } else {
-            return Ok(Some("Invalid Password!".into()));
+            Ok(Some("Invalid Password!".into()))
         }
     }
 
@@ -424,10 +442,10 @@ impl MessageService {
                     &[]
                 }
             } else {
-                &all_messages
+                all_messages
             }
         } else {
-            &all_messages
+            all_messages
         };
 
         //Construct reply
