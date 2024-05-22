@@ -883,7 +883,7 @@ impl ClientConnection {
         );
 
         //Ping server to recive custom uuid, and to also get if server ip is valid
-        let client_handle = tokio::net::TcpStream::connect(dbg!(ip)).await?;
+        let client_handle = tokio::net::TcpStream::connect(ip).await?;
         /*We could return this, this is what the server is supposed to return, when a new user is connected */
 
         let (server_reply, server_handle) =
@@ -1647,20 +1647,14 @@ where
     });
 }
 
-pub fn create_vec_with_len<T>(len: usize) -> Vec<T>
-where
-    T: Default + Clone,
-{
-    vec![T::default(); len]
-}
-
 /// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
 where
     T: AsyncReadExt + Unpin + AsyncRead,
 {
-    let mut buf: Vec<u8> = create_vec_with_len::<u8>(4);
+    let mut buf: Vec<u8> = vec![0; 4];
+    
     reader.read_exact(&mut buf).await?;
 
     Ok(u32::from_be_bytes(buf[..4].try_into()?))

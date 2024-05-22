@@ -85,14 +85,13 @@ pub async fn server_main(
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //check if the server is supposed to run
-            if dbg!(signal.try_recv()).is_ok() {
+            if signal.try_recv().is_ok() {
                 //shutdown server
                 break;
             }
 
             //accept connection
             let (stream, _address) = tcp_listener.accept().await?;
-            dbg!("ACCEPTED CONNECTION");
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
@@ -125,8 +124,6 @@ async fn spawn_client_reader(
             //the thread will block here waiting for client message
             let incoming_message = recive_message(reader.clone()).await?;
 
-            dbg!(&incoming_message);
-
             let reply = message_service
                 .message_main(incoming_message, writer.clone())
                 .await?;
@@ -155,22 +152,15 @@ async fn spawn_client_reader(
 #[inline]
 async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
     let mut reader = reader.lock().await;
-    reader.readable().await?;
-    dbg!("RECIVED MESSAGE");
-
     let mut message_len_buffer: Vec<u8> = vec![0; 4];
 
-    let fasz = dbg!(reader.read_exact(&mut message_len_buffer).await?);
+    reader.read_exact(&mut message_len_buffer).await?;
 
     let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
-
-    dbg!(incoming_message_len);
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 
     //Wait until the client sends the main message
-    reader.readable().await?;
-
     reader.read_exact(&mut message_buffer).await?;
 
     let message = String::from_utf8(message_buffer)?;
@@ -229,7 +219,7 @@ where
     let message_bytes = message.as_bytes();
 
     //Send message lenght
-    writer.write_all(&message_bytes.len().to_be_bytes()).await?;
+    writer.write_all(&(message_bytes.len() as u32).to_be_bytes()).await?;
 
     //Send message
     writer.write_all(message_bytes).await?;
@@ -320,6 +310,14 @@ impl MessageService {
                 send_message_to_client(&mut *client_buffer, self.sync_message(&req).await?).await?;
                 return Ok(None);
             }
+            else {
+                send_message_to_client(
+                    &mut *client_buffer,
+                    "Invalid Password!".into(),
+                )
+                .await?;
+                return Ok(None);
+            }
         }
 
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
@@ -385,7 +383,12 @@ impl MessageService {
 
             Ok(None)
         } else {
-            Ok(Some("Invalid Password!".into()))
+            send_message_to_client(
+                &mut *client_buffer,
+                "Invalid Password!".into(),
+            )
+            .await?;
+            return Ok(None);
         }
     }
 

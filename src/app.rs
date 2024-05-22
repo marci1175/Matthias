@@ -324,7 +324,7 @@ impl eframe::App for backend::TemplateApp {
             Ok(connection) => {
                 if let Some(connection) = connection {
                     //Modify client_connection
-                    self.client_connection = dbg!(connection);
+                    self.client_connection = connection;
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;

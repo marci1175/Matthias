@@ -4,7 +4,7 @@ use tokio::{
 };
 
 use super::backend::{
-    create_vec_with_len, fetch_incoming_message_lenght, ClientMessage, ServerMaster,
+    fetch_incoming_message_lenght, ClientMessage, ServerMaster,
 };
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
@@ -16,27 +16,23 @@ pub async fn connect_to_server(
 
     let message_bytes = message_as_string.as_bytes();
 
-    dbg!("SEND CLIENT MESSAGE LEN");
-
     //Send message lenght to server
     connection
-        .write_all(&message_bytes.len().to_be_bytes())
+        .write_all(&(message_bytes.len() as u32).to_be_bytes())
         .await?;
-
-    dbg!("SEND CLIENT MESSAGE");
 
     //Send message to server
     connection.write_all(message_bytes).await?;
 
     //Read the server reply lenght
     //blocks here for unknown reason
-    let msg_len = dbg!(fetch_incoming_message_lenght(&mut connection).await?);
+    let msg_len = dbg!(fetch_incoming_message_lenght(&mut connection).await)?;
 
     //Create buffer with said lenght
-    let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
+    let mut msg_buffer = vec![0; msg_len as usize];
 
     //Read the server reply
-    connection.read_exact(&mut msg_buffer).await?;
+    dbg!(connection.read_exact(&mut msg_buffer).await)?;
 
     Ok((String::from_utf8(msg_buffer)?, connection))
 }
@@ -63,7 +59,7 @@ where
     let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
 
     //Create buffer with said lenght
-    let mut msg_buffer = create_vec_with_len::<u8>(msg_len as usize);
+    let mut msg_buffer = vec![0; msg_len as usize];
 
     //Read the server reply
     connection.read_exact(&mut msg_buffer).await?;
