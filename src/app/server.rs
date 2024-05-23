@@ -143,14 +143,15 @@ async fn spawn_client_reader(
                 messages.push(serde_json::from_str::<ServerOutput>(dbg!(&msg))?);
             }
 
+            //This will block until it could reply to all fot he clients
             //If there is an incoming message we should reply to all of the clients, after processing said message
-            sync_all_messages_with_all_clients(
-                message_service.connected_clients.clone(),
-                message_service.messages.clone(),
-                message_service.reactions.clone(),
-                message_service.clients_last_seen_index.clone(),
-            )
-            .await?;
+            // sync_all_messages_with_all_clients(
+            //     message_service.connected_clients.clone(),
+            //     message_service.messages.clone(),
+            //     message_service.reactions.clone(),
+            //     message_service.clients_last_seen_index.clone(),
+            // )
+            // .await?;
         }
         Ok(())
     });
@@ -165,14 +166,14 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 
     let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
 
-    let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
+    let mut message_buffer: Vec<u8> = vec![0; dbg!(incoming_message_len) as usize];
 
     //Wait until the client sends the main message
     reader.read_exact(&mut message_buffer).await?;
 
     let message = String::from_utf8(message_buffer)?;
 
-    Ok(message)
+    Ok(dbg!(message))
 }
 
 #[inline]
@@ -241,7 +242,7 @@ impl MessageService {
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> anyhow::Result<Option<String>> {
-        let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
+        let req_result: Result<ClientMessage, serde_json::Error> = dbg!(serde_json::from_str(dbg!(&message)));
         let mut client_buffer = client_handle.try_lock()?;
 
         let req: ClientMessage = req_result.unwrap();

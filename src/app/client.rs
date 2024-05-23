@@ -49,8 +49,8 @@ where
 
     //Send message lenght to server
     connection
-        .write_all(&message_bytes.len().to_be_bytes())
-        .await?;
+    .write_all(&(message_bytes.len() as u32).to_be_bytes())
+    .await?;
 
     //Send message to server
     connection.write_all(message_bytes).await?;
@@ -79,7 +79,8 @@ pub async fn send_message_without_reply(
 
     //Send message lenght to server
     connection
-        .write_all(&message_bytes.len().to_be_bytes())
+    .write_all(&(message_bytes.len() as u32).to_be_bytes())
+
         .await?;
 
     //Send message to server
