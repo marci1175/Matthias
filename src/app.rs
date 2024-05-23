@@ -345,7 +345,7 @@ impl backend::TemplateApp {
         tokio::spawn(async move {
             match connection.send_message(message).await {
                 Ok(ok) => {
-                    match tx.send(ok) {
+                    match tx.send(dbg!(ok)) {
                         Ok(_) => {}
                         Err(err) => {
                             println!("{} ln 376", err);

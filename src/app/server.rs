@@ -95,7 +95,7 @@ pub async fn server_main(
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
-
+            
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),
@@ -130,10 +130,10 @@ async fn spawn_client_reader(
 
             //Send it to all the other clients
 
-            let mut messages = message_service.messages.lock().await;
+            let mut messages = dbg!(message_service.messages.lock().await);
             //We only push back if it was an incoming message which should be stored and displayed to other clients
             if let Some(msg) = reply {
-                messages.push(serde_json::from_str::<ServerOutput>(&msg)?);
+                messages.push(serde_json::from_str::<ServerOutput>(dbg!(&msg))?);
             }
 
             //If there is an incoming message we should reply to all of the clients, after processing said message
@@ -320,6 +320,8 @@ impl MessageService {
             }
         }
 
+        dbg!(&req);
+        
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
             .connected_clients

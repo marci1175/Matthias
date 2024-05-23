@@ -26,13 +26,13 @@ pub async fn connect_to_server(
 
     //Read the server reply lenght
     //blocks here for unknown reason
-    let msg_len = dbg!(fetch_incoming_message_lenght(&mut connection).await)?;
+    let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
 
     //Create buffer with said lenght
     let mut msg_buffer = vec![0; msg_len as usize];
 
     //Read the server reply
-    dbg!(connection.read_exact(&mut msg_buffer).await)?;
+    connection.read_exact(&mut msg_buffer).await?;
 
     Ok((String::from_utf8(msg_buffer)?, connection))
 }
@@ -43,7 +43,7 @@ pub async fn send_message<T>(mut connection: T, message: ClientMessage) -> anyho
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
-    let message_string = message.struct_into_string();
+    let message_string = dbg!(message.struct_into_string());
 
     let message_bytes = message_string.as_bytes();
 
