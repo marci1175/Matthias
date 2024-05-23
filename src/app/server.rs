@@ -65,7 +65,14 @@ pub struct MessageService {
     ///Client last seen message
     pub clients_last_seen_index: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 }
-
+/// Issue:
+/// Connecting seems fine, the first normal message doesnt get a response, all other messages give
+/// [src\app.rs:357:21] err = Os {
+/// code: 10053,
+/// kind: ConnectionAborted,
+/// message: "A felépített kapcsolatot az állomás szoftvere megszakította.",
+/// }
+/// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
 pub async fn server_main(
     port: String,
     password: String,
