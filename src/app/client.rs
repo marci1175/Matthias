@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedWriteHalf, TcpStream},
@@ -37,7 +39,8 @@ pub async fn connect_to_server(
 
 /// This function can take a ```MutexGuard<TcpStream>>``` as a connection, but it does not check if the buffer is writeable
 /// It also waits for the server to reply, so it awaits a sever repsonse
-pub async fn send_message<T>(mut connection: T, message: ClientMessage) -> anyhow::Result<()>
+/// This function returns a wait for response value, which means when awaiting on the returned value of this function we are awaiting the response from the server
+pub async fn send_message<T>(mut connection: T, message: ClientMessage) -> anyhow::Result<impl Future<Output = Result<String, anyhow::Error>>>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
@@ -54,42 +57,23 @@ where
     connection.write_all(message_bytes).await?;
 
     connection.flush().await?;
-
-    //Read the server reply lenght
-    // let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
-
-    // //Create buffer with said lenght
-    // let mut msg_buffer = vec![0; msg_len as usize];
-
-    // //Read the server reply
-    // connection.read_exact(&mut msg_buffer).await?;
-
-    // Ok(String::from_utf8(msg_buffer)?)
-    Ok(())
+    
+    
+    Ok(recive_message(connection))
 }
 
-/// This function should only be used when we want to send normal messages (backend::ClientMessageType::ClientNormalMessage)
-/// because we will recive the server's reply in a different place with the ```OwnedReadHalf```, thats why this function only needs an ```OwnedWriteHalf```
-pub async fn send_message_without_reply(
-    mut connection: OwnedWriteHalf,
-    message: ClientMessage,
-) -> anyhow::Result<()> {
-    let message_string = message.struct_into_string();
+pub async fn recive_message<T>(mut connection: T) -> anyhow::Result<String>
+where
+T: AsyncReadExt + Unpin,
+{
+    // Read the server reply lenght
+    let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
 
-    let message_bytes = message_string.as_bytes();
+    //Create buffer with said lenght
+    let mut msg_buffer = vec![0; msg_len as usize];
 
-    //Send message lenght to server
-    connection
-        .write_all(&(message_bytes.len() as u32).to_be_bytes())
-        .await?;
+    //Read the server reply
+    connection.read_exact(&mut msg_buffer).await?;
 
-    //Send message to server
-    connection.write_all(message_bytes).await?;
-
-    Ok(())
-}
-
-#[inline]
-pub async fn recive_message() -> anyhow::Result<ServerMaster> {
-    todo!()
+    Ok(String::from_utf8(msg_buffer)?)
 }

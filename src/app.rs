@@ -338,19 +338,20 @@ impl eframe::App for backend::TemplateApp {
 }
 
 impl backend::TemplateApp {
+    /// This function spawn an async tokio thread, to send the message passed in as the argument, this function does not await a response from the server
     pub fn send_msg(&self, message: ClientMessage) {
         let connection = self.client_connection.clone();
-        let tx = self.tx.clone();
 
         tokio::spawn(async move {
             match connection.send_message(message).await {
-                Ok(ok) => {
-                    match tx.send(dbg!(ok)) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            println!("{} ln 376", err);
-                        }
-                    };
+                //We dont need the server's reply since we dont handle it here
+                Ok(_server_reply) => {
+                    // match tx.send(dbg!(ok)) {
+                    //     Ok(_) => {}
+                    //     Err(err) => {
+                    //         println!("{} ln 376", err);
+                    //     }
+                    // };
                 }
                 Err(err) => {
                     dbg!(err.source());

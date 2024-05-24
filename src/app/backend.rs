@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
+use std::future::{Future, IntoFuture};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
@@ -851,11 +852,12 @@ pub struct ClientConnection {
 
 impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
-    pub async fn send_message(&self, message: ClientMessage) -> Result<String> {
+    pub async fn send_message(self, message: ClientMessage) -> Result<impl Future<Output = Result<String, anyhow::Error>>> {
         if let ConnectionState::Connected(connection) = &self.state {
-            client::send_message(&mut *connection.try_lock()?, message).await;
-
-            Ok(String::from("dfa"))
+            #[allow(unused_must_use)]
+            {
+                Ok(client::send_message(&mut *connection.try_lock()?, message).await?)
+            }
         } else {
             bail!("There is no active connection to send the message on.")
         }
@@ -912,13 +914,16 @@ impl ClientConnection {
     ) -> anyhow::Result<()> {
         if let ConnectionState::Connected(connection) = &mut self.state {
             let tcp_stream = &mut *connection.lock().await;
-
+            
             //We pray it doesnt deadlock, amen
-            client::send_message(
-                tcp_stream,
-                ClientMessage::construct_disconnection_msg(password, author, uuid),
-            )
-            .await?;
+            #[allow(unused_must_use)]
+            {
+                client::send_message(
+                    tcp_stream,
+                    ClientMessage::construct_disconnection_msg(password, author, uuid),
+                )
+                .await?;
+            }
 
             //Shutdown connection from the client side
             connection.lock().await.shutdown().await?;
