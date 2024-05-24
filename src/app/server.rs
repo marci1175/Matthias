@@ -145,12 +145,10 @@ fn spawn_client_reader(
                 break;
             }
             
-            println!("0");
             let message_service = msg_service.lock().await;
-            println!("1");
-            //the thread will block here waiting for client message
+
+            //the thread will block here waiting for client message, problem appears here
             let incoming_message = recive_message(reader.clone()).await?;
-            println!("2");
 
             let reply = dbg!(
                 message_service
@@ -158,12 +156,9 @@ fn spawn_client_reader(
                     .await
             )?;
 
-            println!("FASZ");
-
             // Send it to all the other clients,
             // the message_main function modifes the messages list
             // let mut messages = message_service.messages.lock().await;
-
             //This will block until it could reply to all fot he clients
             //If there is an incoming message we should reply to all of the clients, after processing said message
             // sync_all_messages_with_all_clients(
@@ -186,20 +181,14 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
     //Shite gets stuck here, i cant peek any bytes
     reader.read_exact(&mut message_len_buffer).await?;
 
-    println!("READ LEN");
-
     let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 
-
     //Wait until the client sends the main message
     reader.read_exact(&mut message_buffer).await?;
-    println!("READ MSG");
 
     let message = String::from_utf8(message_buffer)?;
-
-    
 
     Ok(message)
 }
