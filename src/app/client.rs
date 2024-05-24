@@ -3,9 +3,7 @@ use tokio::{
     net::{tcp::OwnedWriteHalf, TcpStream},
 };
 
-use super::backend::{
-    fetch_incoming_message_lenght, ClientMessage, ServerMaster,
-};
+use super::backend::{fetch_incoming_message_lenght, ClientMessage, ServerMaster};
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
@@ -43,17 +41,19 @@ pub async fn send_message<T>(mut connection: T, message: ClientMessage) -> anyho
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
-    let message_string = dbg!(message.struct_into_string());
+    let message_string = message.struct_into_string();
 
     let message_bytes = message_string.as_bytes();
 
     //Send message lenght to server
     connection
-    .write_all(&(message_bytes.len() as u32).to_be_bytes())
-    .await?;
+        .write_all(&(message_bytes.len() as u32).to_be_bytes())
+        .await?;
 
     //Send message to server
     connection.write_all(message_bytes).await?;
+    
+    connection.flush().await?;
 
     //Read the server reply lenght
     let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
@@ -79,8 +79,7 @@ pub async fn send_message_without_reply(
 
     //Send message lenght to server
     connection
-    .write_all(&(message_bytes.len() as u32).to_be_bytes())
-
+        .write_all(&(message_bytes.len() as u32).to_be_bytes())
         .await?;
 
     //Send message to server

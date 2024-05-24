@@ -1,6 +1,6 @@
 use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 
 use super::backend::{
     encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
@@ -10,7 +10,11 @@ use super::backend::{
 
 use rand::Rng;
 use std::sync::Mutex;
-use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
+use tokio::{
+    io::AsyncWrite,
+    net::tcp::OwnedReadHalf,
+    sync::{broadcast, mpsc::Receiver},
+};
 
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
@@ -88,11 +92,16 @@ pub async fn server_main(
         ..Default::default()
     }));
 
+    let (thread_sender, thread_reciver) = broadcast::channel::<()>(1);
+
     //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //check if the server is supposed to run
             if signal.try_recv().is_ok() {
+                //send a shutdown signal to all of the client recivers using the broadcast channel
+                thread_sender.send(())?;
+
                 //shutdown server
                 break;
             }
@@ -102,14 +111,16 @@ pub async fn server_main(
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
-            
+
+            let msg_service_clone = msg_service.clone();
+
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),
                 Arc::new(tokio::sync::Mutex::new(writer)),
-                msg_service.clone(),
-            )
-            .await;
+                msg_service_clone,
+                thread_reciver.resubscribe(),
+            );
         }
         Ok(())
     });
@@ -117,31 +128,41 @@ pub async fn server_main(
     Ok(())
 }
 
-///Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
+/// This function does not need to be async since it spawn an async thread anyway
+/// Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
 #[inline]
-async fn spawn_client_reader(
+fn spawn_client_reader(
     reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
     writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     msg_service: Arc<tokio::sync::Mutex<MessageService>>,
+    mut thread_reciver: broadcast::Receiver<()>,
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
+            //Check if the thread needs to be shut down
+            if thread_reciver.try_recv().is_ok() {
+                println!("CLIENT LISTENER THREAD SHUT DOWN");
+                break;
+            }
+            
+            println!("0");
             let message_service = msg_service.lock().await;
-
+            println!("1");
             //the thread will block here waiting for client message
             let incoming_message = recive_message(reader.clone()).await?;
+            println!("2");
 
-            let reply = message_service
-                .message_main(incoming_message, writer.clone())
-                .await?;
+            let reply = dbg!(
+                message_service
+                    .message_main(incoming_message, writer.clone())
+                    .await
+            )?;
 
-            //Send it to all the other clients
+            println!("FASZ");
 
-            let mut messages = dbg!(message_service.messages.lock().await);
-            //We only push back if it was an incoming message which should be stored and displayed to other clients
-            if let Some(msg) = reply {
-                messages.push(serde_json::from_str::<ServerOutput>(dbg!(&msg))?);
-            }
+            // Send it to all the other clients,
+            // the message_main function modifes the messages list
+            // let mut messages = message_service.messages.lock().await;
 
             //This will block until it could reply to all fot he clients
             //If there is an incoming message we should reply to all of the clients, after processing said message
@@ -161,19 +182,26 @@ async fn spawn_client_reader(
 async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
     let mut reader = reader.lock().await;
     let mut message_len_buffer: Vec<u8> = vec![0; 4];
-
+    
+    //Shite gets stuck here, i cant peek any bytes
     reader.read_exact(&mut message_len_buffer).await?;
+
+    println!("READ LEN");
 
     let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
 
-    let mut message_buffer: Vec<u8> = vec![0; dbg!(incoming_message_len) as usize];
+    let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
+
 
     //Wait until the client sends the main message
     reader.read_exact(&mut message_buffer).await?;
+    println!("READ MSG");
 
     let message = String::from_utf8(message_buffer)?;
 
-    Ok(dbg!(message))
+    
+
+    Ok(message)
 }
 
 #[inline]
@@ -227,7 +255,9 @@ where
     let message_bytes = message.as_bytes();
 
     //Send message lenght
-    writer.write_all(&(message_bytes.len() as u32).to_be_bytes()).await?;
+    writer
+        .write_all(&(message_bytes.len() as u32).to_be_bytes())
+        .await?;
 
     //Send message
     writer.write_all(message_bytes).await?;
@@ -236,13 +266,16 @@ where
 }
 
 impl MessageService {
+    /// The result returned by this function may be a real error, or an error constructed on purpose so that the thread call this function gets shut down.
+    /// When experiening errors, make sure to check the error message as it may be on purpose
     #[inline]
     async fn message_main(
         &self,
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> anyhow::Result<Option<String>> {
-        let req_result: Result<ClientMessage, serde_json::Error> = dbg!(serde_json::from_str(dbg!(&message)));
+    ) -> anyhow::Result<()> {
+        let req_result: Result<ClientMessage, serde_json::Error> =
+            dbg!(serde_json::from_str(&message));
         let mut client_buffer = client_handle.try_lock()?;
 
         let req: ClientMessage = req_result.unwrap();
@@ -266,8 +299,8 @@ impl MessageService {
                                         )
                                         .await?;
 
-                                        //If found return None, and end execution
-                                        return Ok(None);
+                                        //If found return, and end execution
+                                        return Ok(());
                                     }
                                 }
 
@@ -285,7 +318,7 @@ impl MessageService {
                                 )
                                 .await?;
 
-                                return Ok(None);
+                                return Ok(());
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -302,8 +335,8 @@ impl MessageService {
                                     if client.uuid == req.Uuid {
                                         clients.remove(index);
 
-                                        //Break out of the loop
-                                        break;
+                                        //Break out of the loop, return an error so the client listener thread stops
+                                        return Err(Error::msg("Client disconnected!"));
                                     }
                                 }
                             }
@@ -315,21 +348,16 @@ impl MessageService {
                 }
 
                 //Sync all messages, send all of the messages to the client
-                send_message_to_client(&mut *client_buffer, self.sync_message(&req).await?).await?;
-                return Ok(None);
-            }
-            else {
-                send_message_to_client(
-                    &mut *client_buffer,
-                    "Invalid Password!".into(),
-                )
-                .await?;
-                return Ok(None);
+                // send_message_to_client(&mut *client_buffer, self.sync_message(&req).await?).await?;
+                return Ok(());
+            } else {
+                send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
+
+                //return an error so the client listener thread stops
+                return Err(Error::msg("Invalid password entered by client!"));
             }
         }
 
-        dbg!(&req);
-        
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
             .connected_clients
@@ -353,7 +381,7 @@ impl MessageService {
                     )
                     .await?;
 
-                    return Ok(None);
+                    return Ok(());
                 }
 
                 ClientFileUpload(upload_type) => {
@@ -391,14 +419,10 @@ impl MessageService {
 
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
 
-            Ok(None)
+            Ok(())
         } else {
-            send_message_to_client(
-                &mut *client_buffer,
-                "Invalid Password!".into(),
-            )
-            .await?;
-            return Ok(None);
+            send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
+            return Err(Error::msg("Invalid password entered by client!"));
         }
     }
 
@@ -750,7 +774,7 @@ impl MessageService {
                     return;
                 }
 
-                //If its none then we can check for the index, because you can delete all messages, rest is ignored
+                //If its () then we can check for the index, because you can delete all messages, rest is ignored
                 if edit.new_message.is_none() {
                     //Set as `Deleted`
                     messages_vec[edit.index].MessageType = ServerMessageType::Deleted;

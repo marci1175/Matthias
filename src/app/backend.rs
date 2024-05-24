@@ -1654,7 +1654,7 @@ where
     T: AsyncReadExt + Unpin + AsyncRead,
 {
     let mut buf: Vec<u8> = vec![0; 4];
-    
+
     reader.read_exact(&mut buf).await?;
 
     Ok(u32::from_be_bytes(buf[..4].try_into()?))
