@@ -41,7 +41,7 @@ pub async fn send_message<T>(mut connection: T, message: ClientMessage) -> anyho
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
-    let message_string = message.struct_into_string();
+    let message_string = dbg!(message.struct_into_string());
 
     let message_bytes = message_string.as_bytes();
 

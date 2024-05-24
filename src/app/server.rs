@@ -3,9 +3,7 @@ use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 use anyhow::{Error, Result};
 
 use super::backend::{
-    encrypt_aes256, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction,
-    Reaction, ServerMessageType,
-    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+    encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
 };
 
 use rand::Rng;
@@ -176,12 +174,12 @@ fn spawn_client_reader(
 #[inline]
 async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
     let mut reader = reader.lock().await;
-    let mut message_len_buffer: Vec<u8> = vec![0; 4];
-    
-    //Shite gets stuck here, i cant peek any bytes
-    reader.read_exact(&mut message_len_buffer).await?;
+    // let mut message_len_buffer: Vec<u8> = vec![0; 4];
 
-    let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
+    let incoming_message_len = fetch_incoming_message_lenght(&mut *reader).await?;
+    //Shite gets stuck here, i cant peek any bytes
+    // reader.read_exact(&mut message_len_buffer).await?;
+    // let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 

@@ -853,19 +853,14 @@ impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
     pub async fn send_message(&self, message: ClientMessage) -> Result<String> {
         if let ConnectionState::Connected(connection) = &self.state {
-            client::send_message(&mut *connection.lock().await, message).await
+            let connection = &mut *connection.try_lock()?;
+            let fasz = client::send_message(connection, message).await;
+
+            fasz
         } else {
             bail!("There is no active connection to send the message on.")
         }
     }
-
-    // pub async fn send_message_without_reply(&mut self, message: ClientMessage) -> Result<String> {
-    //     if let ConnectionState::Connected(connection) = &mut self.state {
-    //         return client::send_message(&mut *connection.lock().await, message).await;
-    //     } else {
-    //         bail!("There is no active connection to send the message on.")
-    //     }
-    // }
 
     /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
     /// This function blocks (time depends on the connection speed)
@@ -938,14 +933,6 @@ impl ClientConnection {
         Ok(())
     }
 }
-
-///UNUSED
-#[derive(Clone)]
-pub struct ConnectionPair {
-    pub reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
-    pub writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-}
-///UNUSED
 
 ///Used to show state of the connection
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
