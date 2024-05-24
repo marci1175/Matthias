@@ -853,10 +853,9 @@ impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
     pub async fn send_message(&self, message: ClientMessage) -> Result<String> {
         if let ConnectionState::Connected(connection) = &self.state {
-            let connection = &mut *connection.try_lock()?;
-            let fasz = client::send_message(connection, message).await;
+            client::send_message(&mut *connection.try_lock()?, message).await;
 
-            fasz
+            Ok(String::from("dfa"))
         } else {
             bail!("There is no active connection to send the message on.")
         }

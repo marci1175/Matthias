@@ -407,45 +407,45 @@ impl TemplateApp {
         //Recivers
 
         //This reciver is used when we are getting a reply directly after sending the message (This is not autosync)
-        match self.rx.try_recv() {
-            Ok(mut msg) => {
-                //Decrypt with client secret
-                msg = decrypt_aes256(&msg, &self.client_connection.client_secret).unwrap();
+        // match self.rx.try_recv() {
+        //     Ok(mut msg) => {
+        //         //Decrypt with client secret
+        //         msg = decrypt_aes256(&msg, &self.client_connection.client_secret).unwrap();
 
-                let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                    serde_json::from_str(&msg);
+        //         let incoming_struct: Result<ServerMaster, serde_json::Error> =
+        //             serde_json::from_str(&msg);
 
-                match incoming_struct {
-                    Ok(ok) => {
-                        self.client_ui.invalid_password = false;
+        //         match incoming_struct {
+        //             Ok(ok) => {
+        //                 self.client_ui.invalid_password = false;
 
-                        //Allocate reaction list for the new message
-                        self.client_ui
-                            .incoming_msg
-                            .reaction_list
-                            .push(MessageReaction {
-                                message_reactions: Vec::new(),
-                            });
+        //                 //Allocate reaction list for the new message
+        //                 self.client_ui
+        //                     .incoming_msg
+        //                     .reaction_list
+        //                     .push(MessageReaction {
+        //                         message_reactions: Vec::new(),
+        //                     });
 
-                        self.client_ui.incoming_msg = ok;
-                    }
-                    Err(_error) => {
-                        //Funny server response check, this must match what server replies when inv passw
-                        if msg == "Invalid Password!" {
-                            //Reset messages
-                            self.client_ui.incoming_msg = ServerMaster::default();
+        //                 self.client_ui.incoming_msg = ok;
+        //             }
+        //             Err(_error) => {
+        //                 //Funny server response check, this must match what server replies when inv passw
+        //                 if msg == "Invalid Password!" {
+        //                     //Reset messages
+        //                     self.client_ui.incoming_msg = ServerMaster::default();
 
-                            //Set bools etc.
-                            self.client_ui.invalid_password = true;
-                            self.settings_window = true;
-                        }
-                    }
-                }
-            }
-            Err(_err) => {
-                //println!("ln 332 {}", err);
-            }
-        }
+        //                     //Set bools etc.
+        //                     self.client_ui.invalid_password = true;
+        //                     self.settings_window = true;
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     Err(_err) => {
+        //         //println!("ln 332 {}", err);
+        //     }
+        // }
 
         match self.frx.try_recv() {
             Ok(msg) => {

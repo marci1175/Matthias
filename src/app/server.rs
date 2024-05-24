@@ -3,7 +3,9 @@ use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 use anyhow::{Error, Result};
 
 use super::backend::{
-    encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload}
+    encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
+    ConnectedClient, MessageReaction, Reaction, ServerMessageType,
+    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
 };
 
 use rand::Rng;
@@ -142,7 +144,7 @@ fn spawn_client_reader(
                 println!("CLIENT LISTENER THREAD SHUT DOWN");
                 break;
             }
-            
+
             let message_service = msg_service.lock().await;
 
             //the thread will block here waiting for client message, problem appears here
