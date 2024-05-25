@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
-use tokio::net::TcpStream;
 
 use super::client::{self, connect_to_server, ServerReply};
 use aes_gcm::aead::generic_array::GenericArray;
@@ -19,7 +18,6 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
-use std::future::{Future, IntoFuture};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
@@ -93,12 +91,6 @@ pub struct TemplateApp {
     ///child windows
     #[serde(skip)]
     pub settings_window: bool,
-
-    ///thread communication for file requesting
-    #[serde(skip)]
-    pub frx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub ftx: mpsc::Sender<String>,
 
     ///thread communication for image requesting
     #[serde(skip)]
@@ -224,10 +216,6 @@ impl Default for TemplateApp {
 
             //child windows
             settings_window: false,
-
-            //thread communication for file requesting
-            frx,
-            ftx,
 
             //thread communication for image requesting
             irx,
@@ -853,13 +841,11 @@ pub struct ClientConnection {
 
 impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
-    pub async fn send_message(self, message: ClientMessage) -> anyhow::Result<ServerReply<OwnedReadHalf>> {
+    pub async fn send_message(self, message: ClientMessage) -> anyhow::Result<ServerReply> {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
-                let (reader, writer) = connection.try_lock()?.into_split();
-                
-                Ok(client::send_message(writer, reader, message).await?)
+                Ok(client::send_message(connection.clone(), message).await?)
             }
         } else {
             bail!("There is no active connection to send the message on.")
@@ -897,9 +883,11 @@ impl ClientConnection {
         //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
         let client_secret = hex::decode(server_reply)?;
 
+        let (reader, writer) = server_handle.into_split();
+
         Ok(Self {
             client_secret,
-            state: ConnectionState::Connected(Arc::new(tokio::sync::Mutex::new(server_handle))),
+            state: ConnectionState::Connected(ConnectionPair::new(writer, reader)),
         })
     }
 
@@ -915,22 +903,19 @@ impl ClientConnection {
         password: String,
         uuid: String,
     ) -> anyhow::Result<()> {
-        if let ConnectionState::Connected(connection) = &mut self.state {
-            let (reader, writer) = connection.lock().await.into_split();
-            
+        if let ConnectionState::Connected(connection) = &self.state {
             //We pray it doesnt deadlock, amen
             #[allow(unused_must_use)]
             {
                 client::send_message(
-                    writer,
-                    reader,
+                    connection.clone(),
                     ClientMessage::construct_disconnection_msg(password, author, uuid),
                 )
                 .await?;
             }
 
             //Shutdown connection from the client side
-            connection.lock().await.shutdown().await?;
+            connection.writer.lock().await.shutdown().await?;
         } else {
             bail!("There is no active connection to send the message on.")
         }
@@ -942,11 +927,26 @@ impl ClientConnection {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ConnectionPair {
+    pub writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+    pub reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+}
+
+impl ConnectionPair {
+    pub fn new(writer: OwnedWriteHalf, reader: OwnedReadHalf) -> Self {
+        Self {
+            writer: Arc::new(tokio::sync::Mutex::new(writer)),
+            reader: Arc::new(tokio::sync::Mutex::new(reader)),
+        }
+    }
+}
+
 ///Used to show state of the connection
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 pub enum ConnectionState {
     #[serde(skip)]
-    Connected(Arc<tokio::sync::Mutex<tokio::net::TcpStream>>),
+    Connected(ConnectionPair),
 
     #[default]
     Disconnected,
@@ -1644,7 +1644,7 @@ where
 
 /// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
-pub async fn fetch_incoming_message_lenght<T>(mut reader: T) -> anyhow::Result<u32>
+pub async fn fetch_incoming_message_lenght<T>(reader: &mut T) -> anyhow::Result<u32>
 where
     T: AsyncReadExt + Unpin + AsyncRead,
 {

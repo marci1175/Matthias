@@ -45,6 +45,7 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
+            TODO: Fix file ```recivers``` becasue they're dumb, pointless code
             TODO: Migrate to tokio tcp instead of tonic
             TODO: improve autosync
             TODO: add notfications

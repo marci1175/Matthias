@@ -25,11 +25,11 @@ impl TemplateApp {
                 let button =
                     ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
                 button.paint_debug_info();
+
+                //If we want to download the file included in the message
                 if button.clicked() {
                     let passw = self.client_ui.client_password.clone();
                     let author = self.login_username.clone();
-                    let sender = self.ftx.clone();
-
                     let message =
                         ClientMessage::construct_file_request_msg(inner.index, &passw, author);
 
@@ -38,12 +38,12 @@ impl TemplateApp {
                     tokio::spawn(async move {
                         match connection.send_message(message).await {
                             Ok(ok) => {
-                                match sender.send(ok) {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        println!("{}", err);
-                                    }
-                                };
+                                //If we cant wait for response, we should panic
+                                let msg = ok.wait_for_response().await.unwrap();
+
+                                let file_serve: Result<ServerFileReply, serde_json::Error> =
+                                    serde_json::from_str(&msg);
+                                let _ = write_file(file_serve.unwrap());
                             }
                             Err(err) => {
                                 println!("{err} ln 264")
@@ -213,7 +213,10 @@ impl TemplateApp {
                             tokio::spawn(async move {
                                 match connection.send_message(message).await {
                                     Ok(ok) => {
-                                        match sender.send(ok) {
+                                        //If a problem appeared whilst waiting for response its okay to panic since it is not the main thread
+                                        let msg = ok.wait_for_response().await.unwrap();
+
+                                        match sender.send(msg) {
                                             Ok(_) => {}
                                             Err(err) => {
                                                 println!("{}", err);
@@ -344,10 +347,15 @@ impl TemplateApp {
                                             tokio::spawn(async move {
                                                 match connection.send_message(message).await {
                                                     Ok(response) => {
+                                                        let message = response
+                                                            .wait_for_response()
+                                                            .await
+                                                            .unwrap();
+
                                                         let file_serve: Result<
                                                             ServerAudioReply,
                                                             serde_json::Error,
-                                                        > = serde_json::from_str(&response);
+                                                        > = serde_json::from_str(&message);
                                                         let _ = write_audio(
                                                             file_serve.unwrap(),
                                                             send_on_ip,

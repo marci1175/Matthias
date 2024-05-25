@@ -150,7 +150,7 @@ fn spawn_client_reader(
             //the thread will block here waiting for client message, problem appears here
             let incoming_message = recive_message(reader.clone()).await?;
 
-            let reply = dbg!(
+            dbg!(
                 message_service
                     .message_main(incoming_message, writer.clone())
                     .await
@@ -411,7 +411,7 @@ impl MessageService {
             Ok(())
         } else {
             send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
-            return Err(Error::msg("Invalid password entered by client!"));
+            Err(Error::msg("Invalid password entered by client!"))
         }
     }
 

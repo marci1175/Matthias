@@ -4,14 +4,9 @@ use egui::{
 };
 use rodio::Decoder;
 
-use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_file, write_image, ConnectionState,
-    MessageReaction,
-};
+use crate::app::backend::{display_error_message, write_image, ConnectionState};
 
-use crate::app::backend::{
-    SearchType, ServerFileReply, ServerImageReply, ServerMaster, ServerMessageType, TemplateApp,
-};
+use crate::app::backend::{SearchType, ServerImageReply, ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
@@ -446,15 +441,6 @@ impl TemplateApp {
         //         //println!("ln 332 {}", err);
         //     }
         // }
-
-        match self.frx.try_recv() {
-            Ok(msg) => {
-                let file_serve: Result<ServerFileReply, serde_json::Error> =
-                    serde_json::from_str(&msg);
-                let _ = write_file(file_serve.unwrap());
-            }
-            Err(_err) => {}
-        }
 
         match self.irx.try_recv() {
             Ok(msg) => {
