@@ -916,13 +916,14 @@ impl ClientConnection {
         uuid: String,
     ) -> anyhow::Result<()> {
         if let ConnectionState::Connected(connection) = &mut self.state {
-            let tcp_stream = &mut *connection.lock().await;
+            let (reader, writer) = connection.lock().await.into_split();
             
             //We pray it doesnt deadlock, amen
             #[allow(unused_must_use)]
             {
                 client::send_message(
-                    tcp_stream,
+                    writer,
+                    reader,
                     ClientMessage::construct_disconnection_msg(password, author, uuid),
                 )
                 .await?;
