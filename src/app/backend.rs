@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
+use tokio::net::TcpStream;
 
-use super::client::{self, connect_to_server};
+use super::client::{self, connect_to_server, ServerReply};
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -852,11 +853,13 @@ pub struct ClientConnection {
 
 impl ClientConnection {
     /// This is a wrapper function for ```client::send_message```
-    pub async fn send_message(self, message: ClientMessage) -> Result<impl Future<Output = Result<String, anyhow::Error>>> {
+    pub async fn send_message(self, message: ClientMessage) -> anyhow::Result<ServerReply<OwnedReadHalf>> {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
-                Ok(client::send_message(&mut *connection.try_lock()?, message).await?)
+                let (reader, writer) = connection.try_lock()?.into_split();
+                
+                Ok(client::send_message(writer, reader, message).await?)
             }
         } else {
             bail!("There is no active connection to send the message on.")
