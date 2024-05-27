@@ -45,19 +45,20 @@ pub struct MessageService {
     ///This is the required password by the server
     pub passw: String,
 
-    ///files
+    /// This is the list, which we will send the files from, these are generated file names, so names will rarely ever match (1 / 1.8446744e+19) chance
+    /// The names are not relevant since when downloading them the client will always ask for a new name
     pub generated_file_paths: Mutex<Vec<PathBuf>>,
 
-    ///file_names
-    pub original_file_paths: Mutex<Vec<PathBuf>>,
+    /// This list contains a list of the path to the stored images
+    /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
+    pub image_list: Mutex<Vec<PathBuf>>,
 
-    ///images
-    pub image_paths: Mutex<Vec<PathBuf>>,
-
-    ///audio list
+    ///This list contains a list of the path to the stored audio files
+    /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
     pub audio_list: Mutex<Vec<PathBuf>>,
 
-    ///audio name list
+    /// This list contains the names of the saved audios, since we generate a random name for the files we want to store
+    /// We also dont ask the user the provide a name whenever playing an audio (requesting it from the server)
     pub audio_names: Mutex<Vec<Option<String>>>,
 
     ///connected clients
@@ -69,13 +70,7 @@ pub struct MessageService {
     ///Client last seen message
     pub clients_last_seen_index: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 }
-/// Issue:
-/// Connecting seems fine, the first normal message doesnt get a response, all other messages give
-/// [src\app.rs:357:21] err = Os {
-/// code: 10053,
-/// kind: ConnectionAborted,
-/// message: "A felépített kapcsolatot az állomás szoftvere megszakította.",
-/// }
+
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
 pub async fn server_main(
     port: String,
@@ -141,7 +136,7 @@ fn spawn_client_reader(
         loop {
             //Check if the thread needs to be shut down
             if thread_reciver.try_recv().is_ok() {
-                println!("CLIENT LISTENER THREAD SHUT DOWN");
+                //MAybe we should implement sending a disconnection msg to all of the clients
                 break;
             }
 
@@ -150,11 +145,9 @@ fn spawn_client_reader(
             //the thread will block here waiting for client message, problem appears here
             let incoming_message = recive_message(reader.clone()).await?;
 
-            dbg!(
-                message_service
-                    .message_main(incoming_message, writer.clone())
-                    .await
-            )?;
+            message_service
+                .message_main(incoming_message, writer.clone())
+                .await?;
 
             // Send it to all the other clients,
             // the message_main function modifes the messages list
@@ -176,12 +169,8 @@ fn spawn_client_reader(
 #[inline]
 async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
     let mut reader = reader.lock().await;
-    // let mut message_len_buffer: Vec<u8> = vec![0; 4];
 
     let incoming_message_len = fetch_incoming_message_lenght(&mut *reader).await?;
-    //Shite gets stuck here, i cant peek any bytes
-    // reader.read_exact(&mut message_len_buffer).await?;
-    // let incoming_message_len = u32::from_be_bytes(message_len_buffer[..4].try_into()?);
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 
@@ -195,20 +184,21 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 
 #[inline]
 /// This function iterates over all the connected clients and all the messages, and sends writes them all to their designated ```OwnedWriteHalf``` (All of the users see all of the messages)
-async fn sync_all_messages_with_all_clients(
+/// This creates a server_master message, with the message passed in being the only one in the list of the messages
+async fn sync_message_with_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
-    messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
+    message: Vec<ServerOutput>,
     reaction_list: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
     user_last_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 ) -> anyhow::Result<()> {
     let mut connected_clients = connected_clients.try_lock()?;
-    let messages = messages.try_lock()?;
-    let reaction_list = reaction_list.try_lock()?;
 
+    let reaction_list = reaction_list.try_lock()?;
+    
     let user_last_seen_list = user_last_seen_list.try_lock()?;
 
     let server_master = ServerMaster::convert_vec_serverout_into_server_master(
-        messages.to_vec(),
+        message,
         reaction_list.to_vec(),
         user_last_seen_list.to_vec(),
     );
@@ -237,6 +227,7 @@ async fn sync_all_messages_with_all_clients(
 
     Ok(())
 }
+
 pub async fn send_message_to_client<T>(mut writer: T, message: String) -> anyhow::Result<()>
 where
     T: AsyncWriteExt + Unpin + AsyncWrite,
@@ -402,15 +393,37 @@ impl MessageService {
                     }
                 };
             }
-
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
-            // return Ok(self.sync_message(&req).await?);
-
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
+            sync_message_with_clients(self.connected_clients.lock().await, vec![ServerOutput::convert_type_to_servermsg(req, 
+                    match req.MessageType {
+                        //This is unreachable, as requests are handled elsewhere
+                        ClientFileRequestType(_) => unreachable!(),
+                        
+                        ClientFileUpload(_) => {
 
+                        },
+
+                        ClientNormalMessage(_) => {
+
+                        },
+
+                        ClientSyncMessage(_) => panic!("What the fuck"),
+                        
+                        //The client will update their own message
+                        ClientReaction(_) => {
+
+                        },
+                        //The client will update their own message
+                        ClientMessageEdit(_) => {
+
+                        },
+                    }, upload_type, reactions, uuid)], reaction_list, user_last_seen_list)
+            //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
             send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
+
             Err(Error::msg("Invalid password entered by client!"))
         }
     }
@@ -495,7 +508,7 @@ impl MessageService {
         if !req.bytes.len() > 500000000 {
             match env::var("APPDATA") {
                 Ok(app_data) => {
-                    //generat a random number to avoid file overwrites, cuz of same name files
+                    //generate a random number to avoid file overwrites, cuz of same name files
                     let random_generated_number = rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
 
                     //create file, add file to its named so it can never be mixed with images
@@ -525,23 +538,10 @@ impl MessageService {
                                 }
                             };
 
-                            match self.original_file_paths.lock() {
-                                Ok(mut ok) => {
-                                    ok.push(PathBuf::from(format!(
-                                        "{app_data}\\Matthias\\Server\\{}.{}",
-                                        req.name.clone().unwrap_or_default(),
-                                        req.extension.clone().unwrap_or_default()
-                                    )));
-                                }
-                                Err(err) => {
-                                    println!("{err}")
-                                }
-                            };
-
                             let mut messages = self.messages.lock().await;
                             messages.push(ServerOutput::convert_type_to_servermsg(
                                 request.clone(),
-                                self.original_file_paths.lock().unwrap().len() as i32 - 1,
+                                self.generated_file_paths.lock().unwrap().len() as i32,
                                 Upload,
                                 MessageReaction::default(),
                                 request.Uuid.clone(),
@@ -563,12 +563,12 @@ impl MessageService {
         (fs::read(path).unwrap_or_default(), path.clone())
     }
     async fn serve_image(&self, index: i32) -> Vec<u8> {
-        fs::read(&self.image_paths.lock().unwrap()[index as usize]).unwrap_or_default()
+        fs::read(&self.image_list.lock().unwrap()[index as usize]).unwrap_or_default()
     }
     async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
         match env::var("APPDATA") {
             Ok(app_data) => {
-                let mut image_path = self.image_paths.lock().unwrap();
+                let mut image_path = self.image_list.lock().unwrap();
 
                 let image_path_lenght = image_path.len();
 

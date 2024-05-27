@@ -1031,7 +1031,28 @@ pub struct ServerAudioReply {
     pub file_name: String,
 }
 
-///This is what server replies can be
+/// This struct contains all the important information for the client to edit / update its own message list
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerMessageEdit {
+    /// The message's index it belongs to
+    pub index: i32,
+
+    /// None indicates a deleted message, rest is self explanatory
+    pub new_message: Option<String>,
+}
+
+/// This struct contains all the necesarily information for the client to update its own message list's reactions
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerMessageReaction {
+    /// The message's index it belongs to
+    pub index: i32,
+
+    /// The char added to the message specified by the index field 
+    pub char: char,
+}
+
+/// These are the possible server replies
+/// Why do we have to implement PartialEq for all of the structs? This is so funny
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(EnumString, EnumMessage))]
 pub enum ServerMessageType {
@@ -1041,6 +1062,7 @@ pub enum ServerMessageType {
     Normal(ServerNormalMessage),
 
     ///Used to send and index to client so it knows which index to ask for, this is VERY IMPORTANT!!!!!!!!!
+    ///The index provided by this enum 
     #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
     #[strum_discriminants(strum(message = "Audio"))]
@@ -1049,6 +1071,14 @@ pub enum ServerMessageType {
     ///When a message is deleted this is what gets displayed
     #[strum_discriminants(strum(message = "Deleted"))]
     Deleted,
+
+    ///This message indicates an edit in the server's message list, therefor we need to send a message to the client so that the client will update its own list
+    #[strum_discriminants(strum(message = "Edit"))]
+    Edit(ServerMessageEdit),
+
+    ///This message indicates an edit in the server's message list, therefor we need to send a message to the client so that the client will update its own list
+    #[strum_discriminants(strum(message = "Reaction"))]
+    Reaction(ServerMessageReaction),
 }
 
 ///This struct contains all the reactions of one message
@@ -1096,6 +1126,14 @@ impl ServerOutput {
             replying_to: normal_msg.replying_to,
             MessageType:
                 match normal_msg.MessageType {
+                    //These messages also have a side effect on the server's list of the messages
+                    //The client will interpret these messages and modify its own message list
+                    ClientMessageType::ClientReaction(message) => {
+                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, char: message.char })
+                    },
+                    ClientMessageType::ClientMessageEdit(message) => {
+                        ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
+                    },
                     ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
                     ClientMessageType::ClientFileUpload(upload) => {
                         match upload_type {
@@ -1134,6 +1172,8 @@ impl ServerOutput {
                             ServerMessageTypeDiscriminants::Deleted => {
                                 ServerMessageType::Deleted
                             }
+                            ServerMessageTypeDiscriminants::Edit => unreachable!(),
+                            ServerMessageTypeDiscriminants::Reaction => unreachable!(),
                         }
                     },
                     ClientMessageType::ClientNormalMessage(message) => {
@@ -1146,8 +1186,6 @@ impl ServerOutput {
                         )
                     },
                     ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
-                    ClientMessageType::ClientReaction(_) => unimplemented!("This enum has a side effect on one message's MessageReaction which is contained by a ServerMessage stored by the server. This must not be displayed by the client"),
-                    ClientMessageType::ClientMessageEdit(_) => unimplemented!("This enum has a side effect on the server's vec which stores all messages, this must not be displayed by the client"),
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,

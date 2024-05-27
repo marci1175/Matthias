@@ -45,6 +45,7 @@ impl eframe::App for backend::TemplateApp {
 
         /*devlog:
 
+            TODO: MAKE IT SO THAT THE CLIENT DOESNT SAVE THE FILE BASED ON ITS NAME, INSTEAD ON ITS INDEX OR UNIQUE IDENTIFIER, AND SHOULD USE THIS NAME TO DISPLAY IT
             TODO: Fix file ```recivers``` becasue they're dumb, pointless code
             TODO: Migrate to tokio tcp instead of tonic
             TODO: improve autosync
