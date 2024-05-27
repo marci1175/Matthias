@@ -5,7 +5,7 @@ use anyhow::{Error, Result};
 use super::backend::{
     encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
-    ServerMessageTypeDiscriminants::{Audio, Image, Normal, Upload},
+    ServerMessageTypeDiscriminants::{self, Audio, Image, Normal, Upload, Edit, Reaction as ServerMessageTypeDiscriminantReaction},
 };
 
 use rand::Rng;
@@ -188,19 +188,14 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 async fn sync_message_with_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
     message: Vec<ServerOutput>,
-    reaction_list: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
-    user_last_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 ) -> anyhow::Result<()> {
     let mut connected_clients = connected_clients.try_lock()?;
 
-    let reaction_list = reaction_list.try_lock()?;
-    
-    let user_last_seen_list = user_last_seen_list.try_lock()?;
-
     let server_master = ServerMaster::convert_vec_serverout_into_server_master(
         message,
-        reaction_list.to_vec(),
-        user_last_seen_list.to_vec(),
+        //Since we only sync new messages, they musnt have reactions, or user_seen_list
+        vec![],
+        vec![],
     );
 
     let server_master_string = server_master.struct_into_string();
@@ -253,7 +248,7 @@ impl MessageService {
         &self,
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let req_result: Result<ClientMessage, serde_json::Error> =
             dbg!(serde_json::from_str(&message));
         let mut client_buffer = client_handle.try_lock()?;
@@ -393,32 +388,47 @@ impl MessageService {
                     }
                 };
             }
+
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
-            sync_message_with_clients(self.connected_clients.lock().await, vec![ServerOutput::convert_type_to_servermsg(req, 
-                    match req.MessageType {
+            sync_message_with_clients(
+                self.connected_clients.clone(),
+                vec![ServerOutput::convert_type_to_servermsg(
+                    req.clone(),
+                    match &req.MessageType {
                         //This is unreachable, as requests are handled elsewhere
                         ClientFileRequestType(_) => unreachable!(),
-                        
-                        ClientFileUpload(_) => {
 
-                        },
+                        ClientFileUpload(_) => {
+                            (self.generated_file_paths.lock().unwrap().len() - 1) as i32
+                        }
 
                         ClientNormalMessage(_) => {
-
-                        },
+                            -1
+                        }
 
                         ClientSyncMessage(_) => panic!("What the fuck"),
-                        
+
                         //The client will update their own message
                         ClientReaction(_) => {
-
-                        },
+                            -1
+                        }
                         //The client will update their own message
                         ClientMessageEdit(_) => {
-
-                        },
-                    }, upload_type, reactions, uuid)], reaction_list, user_last_seen_list)
+                            -1
+                        }
+                    },
+                    match &req.MessageType {
+                        ClientFileRequestType(_) => unreachable!(),
+                        ClientFileUpload(_) => Upload,
+                        ClientNormalMessage(_) => Normal,
+                        ClientSyncMessage(_) => unreachable!("Ezt gondold át geci"),
+                        ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
+                        ClientMessageEdit(_) => Edit,
+                    },
+                    req.Uuid,
+                )],
+            );
             //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
@@ -436,7 +446,6 @@ impl MessageService {
             //Im not sure why I did that, Tf is this?
             -1,
             Normal,
-            MessageReaction::default(),
             req.Uuid.clone(),
         ));
     }
@@ -543,7 +552,6 @@ impl MessageService {
                                 request.clone(),
                                 self.generated_file_paths.lock().unwrap().len() as i32,
                                 Upload,
-                                MessageReaction::default(),
                                 request.Uuid.clone(),
                             ));
                         }
@@ -590,7 +598,6 @@ impl MessageService {
                                     req.clone(),
                                     image_path_lenght as i32,
                                     Image,
-                                    MessageReaction::default(),
                                     req.Uuid.clone(),
                                 ));
                             }
@@ -637,7 +644,6 @@ impl MessageService {
                             req.clone(),
                             audio_paths_lenght as i32,
                             Audio,
-                            MessageReaction::default(),
                             req.Uuid.clone(),
                         ));
                     }

@@ -1047,7 +1047,7 @@ pub struct ServerMessageReaction {
     /// The message's index it belongs to
     pub index: i32,
 
-    /// The char added to the message specified by the index field 
+    /// The char added to the message specified by the index field
     pub char: char,
 }
 
@@ -1062,7 +1062,7 @@ pub enum ServerMessageType {
     Normal(ServerNormalMessage),
 
     ///Used to send and index to client so it knows which index to ask for, this is VERY IMPORTANT!!!!!!!!!
-    ///The index provided by this enum 
+    ///The index provided by this enum
     #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
     #[strum_discriminants(strum(message = "Audio"))]
@@ -1114,28 +1114,26 @@ impl ServerOutput {
         serde_json::to_string(self).unwrap_or_default()
     }
 
+    /// This function convert a client message to a ServerOutput, which gets sent to all the clients (Its basicly a simplified client message)
     pub fn convert_type_to_servermsg(
         normal_msg: ClientMessage,
+        // The index is used to ask bytes from the server, for example in a image message this index will be used to get the image's byte
         index: i32,
         //Automaticly generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
-        reactions: MessageReaction,
         uuid: String,
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
             MessageType:
                 match normal_msg.MessageType {
-                    //These messages also have a side effect on the server's list of the messages
-                    //The client will interpret these messages and modify its own message list
-                    ClientMessageType::ClientReaction(message) => {
-                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, char: message.char })
-                    },
-                    ClientMessageType::ClientMessageEdit(message) => {
-                        ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
-                    },
                     ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
                     ClientMessageType::ClientFileUpload(upload) => {
+                        //The reason it doesnt panic if for example it a normal message because, an Upload can never be a:
+                        //  Normal message
+                        //  Message edit
+                        //  Reaction to a message
+
                         match upload_type {
                             ServerMessageTypeDiscriminants::Upload => {
                                 ServerMessageType::Upload(
@@ -1149,7 +1147,6 @@ impl ServerOutput {
                                     }
                                 )
                             },
-                            ServerMessageTypeDiscriminants::Normal => unreachable!(),
                             ServerMessageTypeDiscriminants::Image => {
                                 ServerMessageType::Image(
                                     ServerImageUpload {
@@ -1172,6 +1169,7 @@ impl ServerOutput {
                             ServerMessageTypeDiscriminants::Deleted => {
                                 ServerMessageType::Deleted
                             }
+                            ServerMessageTypeDiscriminants::Normal => unreachable!(),
                             ServerMessageTypeDiscriminants::Edit => unreachable!(),
                             ServerMessageTypeDiscriminants::Reaction => unreachable!(),
                         }
@@ -1186,6 +1184,14 @@ impl ServerOutput {
                         )
                     },
                     ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
+                    //These messages also have a side effect on the server's list of the messages
+                    //The client will interpret these messages and modify its own message list
+                    ClientMessageType::ClientReaction(message) => {
+                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, char: message.char })
+                    },
+                    ClientMessageType::ClientMessageEdit(message) => {
+                        ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
+                    },
                 },
             Author: normal_msg.Author,
             MessageDate: normal_msg.MessageDate,
