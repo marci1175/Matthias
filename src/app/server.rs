@@ -151,18 +151,6 @@ fn spawn_client_reader(
                 .message_main(incoming_message, writer.clone())
                 .await?;
 
-            // Send it to all the other clients,
-            // the message_main function modifes the messages list
-            // let mut messages = message_service.messages.lock().await;
-            //This will block until it could reply to all fot he clients
-            //If there is an incoming message we should reply to all of the clients, after processing said message
-            // sync_all_messages_with_all_clients(
-            //     message_service.connected_clients.clone(),
-            //     message_service.messages.clone(),
-            //     message_service.reactions.clone(),
-            //     message_service.clients_last_seen_index.clone(),
-            // )
-            // .await?;
         }
         Ok(())
     });
@@ -191,7 +179,7 @@ async fn sync_message_with_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
     message: Vec<ServerOutput>,
 ) -> anyhow::Result<()> {
-    let mut connected_clients = connected_clients.try_lock()?;
+    let mut connected_clients_locked = connected_clients.try_lock().expect("msg");
 
     let server_master = ServerMaster {
         struct_list: message,
@@ -203,22 +191,22 @@ async fn sync_message_with_clients(
     let server_master_string = server_master.struct_into_string();
 
     //Send message lenght
-    let message_lenght = TryInto::<u32>::try_into(server_master_string.as_bytes().len())?;
+    let message_lenght = TryInto::<u32>::try_into(server_master_string.as_bytes().len()).expect("msg");
 
-    for client in connected_clients.iter_mut() {
+    for client in connected_clients_locked.iter_mut() {
         if let Some(client_handle) = &mut client.handle {
-            let mut client_handle = client_handle.lock().await;
+            let mut client_handle = client_handle.try_lock().expect("msg");
 
             client_handle
                 .write_all(&message_lenght.to_be_bytes())
-                .await?;
+                .await.expect("msg");
 
             //Send actual message
             client_handle
                 .write_all(server_master_string.as_bytes())
-                .await?;
+                .await.expect("msg");
 
-            client_handle.flush().await?;
+            client_handle.flush().await.expect("msg");
         };
     }
 
@@ -253,7 +241,6 @@ impl MessageService {
     ) -> Result<()> {
         let req_result: Result<ClientMessage, serde_json::Error> =
             dbg!(serde_json::from_str(&message));
-        let mut client_buffer = client_handle.try_lock()?;
 
         let req: ClientMessage = req_result.unwrap();
 
@@ -271,7 +258,7 @@ impl MessageService {
                                     if client.uuid == req.Uuid {
                                         //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
                                         send_message_to_client(
-                                            &mut *client_buffer,
+                                            &mut *client_handle.try_lock()?,
                                             hex::encode(self.decryption_key),
                                         )
                                         .await?;
@@ -290,7 +277,7 @@ impl MessageService {
 
                                 //Return custom key which the server's text will be encrypted with
                                 send_message_to_client(
-                                    &mut *client_buffer,
+                                    &mut *client_handle.try_lock()?,
                                     hex::encode(self.decryption_key),
                                 )
                                 .await?;
@@ -325,10 +312,10 @@ impl MessageService {
                 }
 
                 //Sync all messages, send all of the messages to the client
-                // send_message_to_client(&mut *client_buffer, self.sync_message(&req).await?).await?;
+                // send_message_to_client(&mut *client_handle.try_lock()?, self.sync_message(&req).await?).await?;
                 return Ok(());
             } else {
-                send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
+                send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into()).await?;
 
                 //return an error so the client listener thread stops
                 return Err(Error::msg("Invalid password entered by client!"));
@@ -353,7 +340,7 @@ impl MessageService {
 
                 ClientFileRequestType(request_type) => {
                     send_message_to_client(
-                        &mut *client_buffer,
+                        &mut *client_handle.try_lock()?,
                         self.handle_request(request_type).await?,
                     )
                     .await?;
@@ -426,12 +413,12 @@ impl MessageService {
                     },
                     req.Uuid,
                 )],
-            );
+            ).await.expect("Syncing failed");
 
             //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
-            send_message_to_client(&mut *client_buffer, "Invalid Password!".into()).await?;
+            send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into()).await?;
 
             Err(Error::msg("Invalid password entered by client!"))
         }
