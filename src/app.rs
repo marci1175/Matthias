@@ -193,10 +193,8 @@ impl eframe::App for backend::TemplateApp {
                                             };
                                         });
 
-                                        self.autosync_should_run = true;
-
                                         //reset autosync
-                                        self.autosync_sender_thread = None;
+                                        self.server_sender_thread = None;
 
                                         self.client_connection.state = ConnectionState::Connecting;
                                     }
@@ -241,7 +239,7 @@ impl eframe::App for backend::TemplateApp {
                     if compare_passwords != self.client_ui.client_password
                         || self.client_ui.send_on_ip != compare_ip
                     {
-                        self.autosync_sender_thread = None;
+                        self.server_sender_thread = None;
                         self.client_ui.incoming_msg = ServerMaster::default();
                     }
 
@@ -369,7 +367,6 @@ impl backend::TemplateApp {
         self.client_connection.reset_state();
 
         self.client_ui.incoming_msg = ServerMaster::default();
-        self.autosync_should_run = false;
 
         //THIS IS NOT NEEDED ANYMORE, REMOVE THIS IN v5
         let _ = self.autosync_input_sender.send(());

@@ -37,10 +37,8 @@ impl TemplateApp {
                                 return;
                             }
 
-                            //shut down sync service
-                            self.autosync_should_run = false;
                             let _ = self.autosync_input_sender.send(());
-                            self.autosync_sender_thread = None;
+                            self.server_sender_thread = None;
 
                             self.main.client_mode = false;
                         };
@@ -405,54 +403,8 @@ impl TemplateApp {
                 });
             });
 
-        //Server syncer
-        self.client_sync(ctx);
-
         //Server reciver
         self.client_recv(ctx);
-
-        //Recivers
-        //THIS CODE IS NO LONGER NEEDED
-        //This reciver is used when we are getting a reply directly after sending the message (This is not autosync)
-        // match self.rx.try_recv() {
-        //     Ok(mut msg) => {
-        //         //Decrypt with client secret
-        //         msg = decrypt_aes256(&msg, &self.client_connection.client_secret).unwrap();
-
-        //         let incoming_struct: Result<ServerMaster, serde_json::Error> =
-        //             serde_json::from_str(&msg);
-
-        //         match incoming_struct {
-        //             Ok(ok) => {
-        //                 self.client_ui.invalid_password = false;
-
-        //                 //Allocate reaction list for the new message
-        //                 self.client_ui
-        //                     .incoming_msg
-        //                     .reaction_list
-        //                     .push(MessageReaction {
-        //                         message_reactions: Vec::new(),
-        //                     });
-
-        //                 self.client_ui.incoming_msg = ok;
-        //             }
-        //             Err(_error) => {
-        //                 //Funny server response check, this must match what server replies when inv passw
-        //                 if msg == "Invalid Password!" {
-        //                     //Reset messages
-        //                     self.client_ui.incoming_msg = ServerMaster::default();
-
-        //                     //Set bools etc.
-        //                     self.client_ui.invalid_password = true;
-        //                     self.settings_window = true;
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     Err(_err) => {
-        //         //println!("ln 332 {}", err);
-        //     }
-        // }
 
         match self.irx.try_recv() {
             Ok(msg) => {
@@ -517,14 +469,17 @@ impl TemplateApp {
         //This should only run when the connection is valid
         if let ConnectionState::Connected(connection_pair) = self.client_connection.state.clone() {
             //Clone so we can move it into the closure
-            let sender = self.autosync_output_sender.clone();
+            let sender = self.server_output_sender.clone();
 
-            let (input_sender, reciver) = std::sync::mpsc::channel();
+            let (input_sender, mut reciver) = tokio::sync::broadcast::channel(1);
 
             self.autosync_input_sender = input_sender;
 
-            self.autosync_sender_thread.get_or_insert_with(|| {
-                println!("THREAD SPAWNED");
+            //This is used for server syncing
+            let mut reciver_clone = reciver.resubscribe();
+
+            self.server_sender_thread.get_or_insert_with(|| {
+                //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
                         //Recive input from main thread to shutdown
@@ -547,148 +502,70 @@ impl TemplateApp {
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender.send(None);
                 });
+
+                //Spawn server syncer thread
+                tokio::spawn(async move {
+                    loop {
+                        //Recive input from main thread to shutdown
+                        if let Ok(_) = reciver_clone.try_recv() {
+                            break;
+                        }
+
+                        
+
+                    }
+                });
             });
             
+            //Try to recive the threads messages
+            //Get sent to the channel to be displayed, if the connections errors out, do nothing lol cuz its prolly cuz the sender hadnt done anything
+            match self.server_output_reciver.try_recv() {
+                Ok(msg) => {
+                    //show messages
+                    if let Some(message) = msg {
+                        ctx.request_repaint();
+
+                        //Decrypt the server's reply
+                        let decrypted_message =
+                            decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
+
+                        let incoming_struct: Result<ServerMaster, serde_json::Error> =
+                            serde_json::from_str(&decrypted_message);
+
+                        match incoming_struct {
+                            Ok(mut msg) => {
+                                //Always make sure to store the latest user_seen list
+                                self.client_ui.incoming_msg.user_seen_list = msg.user_seen_list;
+
+                                //Allocate Message vec for the new message
+                                self.client_ui.incoming_msg.reaction_list.push(MessageReaction::default());
+
+                                //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
+                                self.client_ui
+                                    .incoming_msg
+                                    .struct_list
+                                    .append(&mut msg.struct_list);
+                            }
+                            Err(_err) => {
+                                // dbg!(_err);
+                            }
+                        }
+                    } else {
+                        //Then the thread got an error, we should reset the state
+                        self.server_sender_thread = None;
+                    }
+                }
+                Err(_err) => {
+                    // dbg!(_err);
+                }
+            }
         }
         
     }
 
-    ///This function is used for client syncing
-    fn client_sync(&mut self, ctx: &egui::Context) {
-        //Set arc mutex value for message count
-        // *self.client_ui.incoming_msg_len.lock().unwrap() =
-        //     self.client_ui.incoming_msg.struct_list.len();
-
-        // //We call this function on an option so we can avoid using ONCE, we dont need to return anything, because we set the variable in the closure, this will get reset (None) if an error appears in the thread crated by this
-        // self.autosync_sender_thread.get_or_insert_with(|| {
-        //     //Prevent a race condition
-        //     if !self.autosync_should_run {
-        //         return;
-        //     }
-
-        //     //If none is sent, we shall reset the self.autosync_sender, because that means we got an error
-        //     //Create default message
-        //     let mut message = ClientMessage::construct_sync_msg(
-        //         &self.client_ui.client_password,
-        //         &self.login_username,
-        //         &self.opened_account.uuid,
-        //         //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
-        //         self.client_ui.incoming_msg.struct_list.len(),
-        //         Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
-        //     );
-
-        //     //Clone so we can move it into the closure
-        //     let connection = self.client_connection.clone();
-
-        //     //Clone so we can move it into the closure
-        //     let sender = self.autosync_output_sender.clone();
-
-        //     //Clone so we can move it into the closure
-        //     let client_message_counter = self.client_ui.incoming_msg_len.clone();
-
-        //     let last_seen_message_index = self.client_ui.last_seen_msg_index.clone();
-
-        //     let (input_sender, reciver) = std::sync::mpsc::channel();
-
-        //     self.autosync_input_sender = input_sender;
-
-        //     //Pass in reciver and set sender
-        //     tokio::spawn(async move {
-        //         //Loop until error occured
-        //         loop {
-        //             //Recive input from main thread to shutdown
-        //             if let Ok(_) = reciver.try_recv() {
-        //                 break;
-        //             }
-
-        //             //sleep when begining a new thread
-        //             tokio::time::sleep(Duration::from_secs_f32(2.)).await;
-
-        //             //Do this after sleeping so it will be kept in sync
-        //             if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
-        //                 inner.client_message_counter = match client_message_counter.lock() {
-        //                     Ok(index) => Some(*index),
-        //                     Err(_err) => None,
-        //                 };
-        //                 inner.last_seen_message_index = match last_seen_message_index.lock() {
-        //                     Ok(index) => Some(*index),
-        //                     Err(_err) => None,
-        //                 }
-        //             }
-
-        //             //This is where the messages get recieved
-        //             match connection.clone().send_message(message.clone()).await {
-        //                 Ok(ok) => {
-        //                     //We can cuz we will have out problem shown and also this is not the main thread and we dont await it
-        //                     let response = ok.wait_for_response().await.unwrap();
-
-        //                     match sender.send(Some(dbg!(response))) {
-        //                         Ok(_) => {}
-        //                         Err(err) => {
-        //                             println!("{} ln 57", err);
-        //                             break;
-        //                         }
-        //                     };
-        //                 }
-        //                 Err(_err) => {
-        //                     println!("ln 197 {:?}", _err.source());
-        //                     break;
-        //                 }
-        //             };
-        //         }
-
-        //         //Error appeared, after this the tread quits, so there arent an inf amount of threads running
-        //         let _ = sender.send(None);
-        //     });
-        // });
-
-        //Get sent to the channel to be displayed, if the connections errors out, do nothing lol cuz its prolly cuz the sender hadnt done anything
-        match self.autosync_output_reciver.try_recv() {
-            Ok(msg) => {
-                //show messages
-                if let Some(message) = msg {
-                    ctx.request_repaint();
-                    //Decrypt the server's reply
-                    let decrypted_message =
-                        decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
-
-                    let incoming_struct: Result<ServerMaster, serde_json::Error> =
-                        serde_json::from_str(&decrypted_message);
-
-                    match incoming_struct {
-                        Ok(mut msg) => {
-                            //Always sync the whole seen list no matter what
-                            // self.client_ui.seen_list = msg.user_seen_list;
-
-                            //Always sync the whole reaction list no matter what
-                            // self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
-
-                            //if we recived an empty vector, we can just return, after updateing seen_list and the reaction list, so we can avoid using something like an option and having to rewrite everything
-                            // if msg.struct_list.is_empty() {
-                            //     return;
-                            // }
-                            
-                            //Allocate Message vec for the new message
-                            self.client_ui.incoming_msg.reaction_list.push(MessageReaction::default());
-
-                            //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
-                            self.client_ui
-                                .incoming_msg
-                                .struct_list
-                                .append(&mut dbg!(msg.struct_list));
-                        }
-                        Err(_err) => {
-                            // dbg!(_err);
-                        }
-                    }
-                } else {
-                    //Then the thread got an error, we should reset the state
-                    self.autosync_sender_thread = None;
-                }
-            }
-            Err(_err) => {
-                // dbg!(_err);
-            }
-        }
+    ///This function is used for client/server syncing
+    /// This function is mostly used for sending client data to the server (like last seen message etc.)
+    fn server_syncer(&mut self, ctx: &egui::Context) {
+        
     }
 }

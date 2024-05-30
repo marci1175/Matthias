@@ -141,25 +141,21 @@ pub struct TemplateApp {
 
     ///Server - client syncing thread
     #[serde(skip)]
-    pub autosync_sender_thread: Option<()>,
+    pub server_sender_thread: Option<()>,
 
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
-    pub autosync_output_reciver: Receiver<Option<String>>,
+    pub server_output_reciver: Receiver<Option<String>>,
     #[serde(skip)]
     /// This is what the sync thread uses to send messages to the main thread
-    pub autosync_output_sender: Sender<Option<String>>,
+    pub server_output_sender: Sender<Option<String>>,
 
     #[serde(skip)]
     /// This is what the sync thread thread uses to recive a shutdown message from the main
-    pub autosync_input_reciver: Receiver<()>,
+    pub autosync_input_reciver: tokio::sync::broadcast::Receiver<()>,
     #[serde(skip)]
     /// This is what the main thread uses to send the shutdown message to the sync thread
-    pub autosync_input_sender: Sender<()>,
-
-    ///Server - client sync worker should run
-    #[serde(skip)]
-    pub autosync_should_run: bool,
+    pub autosync_input_sender: tokio::sync::broadcast::Sender<()>,
 
     #[serde(skip)]
     pub audio_file: Arc<Mutex<PathBuf>>,
@@ -173,7 +169,6 @@ impl Default for TemplateApp {
         let (tx, rx) = mpsc::channel::<String>();
         let (stx, srx) = mpsc::channel::<String>();
         let (dtx, drx) = mpsc::channel::<String>();
-        let (ftx, frx) = mpsc::channel::<String>();
         let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
@@ -183,9 +178,9 @@ impl Default for TemplateApp {
         //Use the tokio sync crate for it to be async
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
 
-        let (autosync_output_sender, autosync_output_reciver) = mpsc::channel::<Option<String>>();
+        let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
-        let (autosync_input_sender, autosync_input_reciver) = mpsc::channel::<()>();
+        let (autosync_input_sender, autosync_input_reciver) = tokio::sync::broadcast::channel(1);
 
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -257,11 +252,10 @@ impl Default for TemplateApp {
             //data sync
             drx,
             dtx,
-            autosync_sender_thread: None,
-            autosync_should_run: false,
+            server_sender_thread: None,
 
-            autosync_output_reciver,
-            autosync_output_sender,
+            server_output_reciver,
+            server_output_sender,
 
             autosync_input_reciver,
             autosync_input_sender,
@@ -320,10 +314,6 @@ pub struct Client {
     ///Message highlighting function
     #[serde(skip)]
     pub message_highlight_color: Color32,
-
-    ///emoji tray is hovered
-    #[serde(skip)]
-    pub emoji_tray_is_hovered: bool,
 
     ///audio playback
     #[serde(skip)]
@@ -444,7 +434,6 @@ impl Default for Client {
             message_highlight_color: Color32::WHITE,
             //audio playback
             audio_playback: AudioPlayback::default(),
-            emoji_tray_is_hovered: false,
             scroll_widget_rect: egui::Rect::NAN,
             text_widget_offset: 0.0,
             scroll_to_message_index: None,
@@ -1204,6 +1193,7 @@ impl ServerOutput {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
+    /// I will leave this field as a vec because I may have to implement syncing sometime in the future
     pub struct_list: Vec<ServerOutput>,
 
     ///All of the messages' reactions are
@@ -1235,18 +1225,6 @@ impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
-    // pub fn convert_vec_serverout_into_server_master(
-    //     server_output_list: Vec<ServerOutput>,
-    //     reaction_list: Vec<MessageReaction>,
-    //     user_seen_list: Vec<ClientLastSeenMessage>,
-    // ) -> ServerMaster {
-    //     ServerMaster {
-    //         struct_list: server_output_list,
-    //         reaction_list,
-    //         user_seen_list,
-    //         auto_sync_attributes: None,
-    //     }
-    // }
 }
 
 ///Provides additional information to a ServerMain message, this is used to auto sync
