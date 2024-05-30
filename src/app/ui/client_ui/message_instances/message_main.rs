@@ -112,7 +112,7 @@ impl TemplateApp {
                                                         }
                                                     },
                                                     None => {
-                                                        eprintln!("No reaction list allocated for message {}", iter_index);
+                                                        eprintln!("message_main.rs: No reaction list allocated for message {}", iter_index);
                                                     },
                                                 }
 

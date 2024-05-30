@@ -1215,14 +1215,19 @@ pub struct ServerMaster {
     ///Additional information about this message (struct), this is used at the auto sync part to provide more efficient syncing
     /// This has two states:
     /// Whole: Syncs all messages
-    /// Partial: Appends the messages to the client's list 
+    /// Partial: Appends the messages to the client's list
     /// If the auto_sync attribute is none it means it doesnt need to sync (the struct_list is also empty)
     pub auto_sync_attributes: Option<SyncType>,
 }
 
 impl Default for ServerMaster {
     fn default() -> Self {
-        Self { struct_list: vec![], reaction_list: vec![], user_seen_list: vec![], auto_sync_attributes: None }
+        Self {
+            struct_list: vec![],
+            reaction_list: vec![],
+            user_seen_list: vec![],
+            auto_sync_attributes: None,
+        }
     }
 }
 

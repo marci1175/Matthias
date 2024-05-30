@@ -138,7 +138,7 @@ fn spawn_client_reader(
         loop {
             //Check if the thread needs to be shut down
             if thread_reciver.try_recv().is_ok() {
-                //MAybe we should implement sending a disconnection msg to all of the clients
+                //Maybe we should implement sending a disconnection msg to all of the clients
                 break;
             }
 
@@ -149,8 +149,8 @@ fn spawn_client_reader(
 
             message_service
                 .message_main(incoming_message, writer.clone())
-                .await?;
-
+                .await
+                .expect("Error occured while reciving message");
         }
         Ok(())
     });
@@ -178,6 +178,7 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 async fn sync_message_with_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
     message: Vec<ServerOutput>,
+    key: [u8; 32],
 ) -> anyhow::Result<()> {
     let mut connected_clients_locked = connected_clients.try_lock().expect("msg");
 
@@ -185,28 +186,29 @@ async fn sync_message_with_clients(
         struct_list: message,
         user_seen_list: vec![],
         reaction_list: vec![],
-        auto_sync_attributes: None
+        auto_sync_attributes: None,
     };
 
     let server_master_string = server_master.struct_into_string();
 
+    //Encrypt string
+    let encrypted_string = encrypt_aes256(server_master_string, &key).unwrap();
+
     //Send message lenght
-    let message_lenght = TryInto::<u32>::try_into(server_master_string.as_bytes().len()).expect("msg");
+    let message_lenght = TryInto::<u32>::try_into(encrypted_string.as_bytes().len())?;
 
     for client in connected_clients_locked.iter_mut() {
         if let Some(client_handle) = &mut client.handle {
-            let mut client_handle = client_handle.try_lock().expect("msg");
+            let mut client_handle = client_handle.try_lock()?;
 
             client_handle
                 .write_all(&message_lenght.to_be_bytes())
-                .await.expect("msg");
+                .await?;
 
             //Send actual message
-            client_handle
-                .write_all(server_master_string.as_bytes())
-                .await.expect("msg");
+            client_handle.write_all(encrypted_string.as_bytes()).await?;
 
-            client_handle.flush().await.expect("msg");
+            client_handle.flush().await?;
         };
     }
 
@@ -239,8 +241,7 @@ impl MessageService {
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> Result<()> {
-        let req_result: Result<ClientMessage, serde_json::Error> =
-            dbg!(serde_json::from_str(&message));
+        let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
         let req: ClientMessage = req_result.unwrap();
 
@@ -315,7 +316,8 @@ impl MessageService {
                 // send_message_to_client(&mut *client_handle.try_lock()?, self.sync_message(&req).await?).await?;
                 return Ok(());
             } else {
-                send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into()).await?;
+                send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
+                    .await?;
 
                 //return an error so the client listener thread stops
                 return Err(Error::msg("Invalid password entered by client!"));
@@ -413,12 +415,16 @@ impl MessageService {
                     },
                     req.Uuid,
                 )],
-            ).await.expect("Syncing failed");
+                self.decryption_key,
+            )
+            .await
+            .expect("Syncing failed");
 
             //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
-            send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into()).await?;
+            send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
+                .await?;
 
             Err(Error::msg("Invalid password entered by client!"))
         }
@@ -487,7 +493,7 @@ impl MessageService {
             struct_list: selected_messages_part.to_vec(),
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
             reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
-            auto_sync_attributes: None
+            auto_sync_attributes: None,
         };
 
         //convert reply into string

@@ -39,12 +39,12 @@ pub async fn connect_to_server(
 use std::sync::Arc;
 
 pub struct ServerReply {
-    reader: Arc<Mutex<OwnedReadHalf>>,
+    pub reader: Arc<Mutex<OwnedReadHalf>>,
 }
 
 impl ServerReply {
     pub async fn wait_for_response(&self) -> anyhow::Result<String> {
-        let reader = &mut *self.reader.lock().await;
+        let reader = &mut *self.reader.try_lock()?;
         // Read the server reply lenght
         let msg_len = fetch_incoming_message_lenght(reader).await?;
 
@@ -54,7 +54,7 @@ impl ServerReply {
         //Read the server reply
         reader.read_exact(&mut msg_buffer).await?;
 
-        Ok(String::from_utf8(msg_buffer)?)
+        Ok(dbg!(String::from_utf8(dbg!(msg_buffer))?))
     }
 
     pub fn new(reader: Arc<Mutex<OwnedReadHalf>>) -> Self {
