@@ -426,7 +426,7 @@ impl MessageService {
                     },
                     req.Uuid,
                 )],
-            ).await?;
+            );
 
             //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
