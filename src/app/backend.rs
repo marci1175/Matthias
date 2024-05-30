@@ -1061,7 +1061,7 @@ pub enum ServerMessageType {
     #[strum_discriminants(strum(message = "Normal"))]
     Normal(ServerNormalMessage),
 
-    ///Used to send and index to client so it knows which index to ask for, this is VERY IMPORTANT!!!!!!!!!
+    ///Used to send and index to client so it knows which index to ask for
     ///The index provided by this enum
     #[strum_discriminants(strum(message = "Image"))]
     Image(ServerImageUpload),
@@ -1201,7 +1201,7 @@ impl ServerOutput {
 }
 
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
@@ -1211,23 +1211,47 @@ pub struct ServerMaster {
 
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
+
+    ///Additional information about this message (struct), this is used at the auto sync part to provide more efficient syncing
+    /// This has two states:
+    /// Whole: Syncs all messages
+    /// Partial: Appends the messages to the client's list 
+    /// If the auto_sync attribute is none it means it doesnt need to sync (the struct_list is also empty)
+    pub auto_sync_attributes: Option<SyncType>,
+}
+
+impl Default for ServerMaster {
+    fn default() -> Self {
+        Self { struct_list: vec![], reaction_list: vec![], user_seen_list: vec![], auto_sync_attributes: None }
+    }
 }
 
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
-    pub fn convert_vec_serverout_into_server_master(
-        server_output_list: Vec<ServerOutput>,
-        reaction_list: Vec<MessageReaction>,
-        user_seen_list: Vec<ClientLastSeenMessage>,
-    ) -> ServerMaster {
-        ServerMaster {
-            struct_list: server_output_list,
-            reaction_list,
-            user_seen_list,
-        }
-    }
+    // pub fn convert_vec_serverout_into_server_master(
+    //     server_output_list: Vec<ServerOutput>,
+    //     reaction_list: Vec<MessageReaction>,
+    //     user_seen_list: Vec<ClientLastSeenMessage>,
+    // ) -> ServerMaster {
+    //     ServerMaster {
+    //         struct_list: server_output_list,
+    //         reaction_list,
+    //         user_seen_list,
+    //         auto_sync_attributes: None,
+    //     }
+    // }
+}
+
+///Provides additional information to a ServerMain message, this is used to auto sync
+/// This has two states:
+/// Whole: Syncs all messages
+/// Partial: Appends the messages to the client's list
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum SyncType {
+    Whole,
+    Partial,
 }
 
 //When a client is connected this is where the client gets saved

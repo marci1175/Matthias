@@ -78,6 +78,7 @@ impl TemplateApp {
                     }
                     ui.horizontal(|ui| {
                         ui.group(|ui|{
+                            //Replying to ui part
                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                 //place them in one line
                                 //Selected message
@@ -91,6 +92,10 @@ impl TemplateApp {
                                         ServerMessageType::Image(_img) => "Image".to_string(),
                                         ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
                                         ServerMessageType::Normal(msg) => msg.message.clone(),
+                                        //These two enums shouldnt be displayed, thus are not supposed to be interacted with (by the user)
+                                        // ServerMessageType::Edit(_) => todo!(),
+                                        // ServerMessageType::Reaction(_) => todo!(),
+                                        _ => { unimplemented!() }
                                     }).size(self.font_size).strong());
                                 });
                             });

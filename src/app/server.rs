@@ -5,7 +5,9 @@ use anyhow::{Error, Result};
 use super::backend::{
     encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
-    ServerMessageTypeDiscriminants::{self, Audio, Image, Normal, Upload, Edit, Reaction as ServerMessageTypeDiscriminantReaction},
+    ServerMessageTypeDiscriminants::{
+        self, Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Upload,
+    },
 };
 
 use rand::Rng;
@@ -191,12 +193,12 @@ async fn sync_message_with_clients(
 ) -> anyhow::Result<()> {
     let mut connected_clients = connected_clients.try_lock()?;
 
-    let server_master = ServerMaster::convert_vec_serverout_into_server_master(
-        message,
-        //Since we only sync new messages, they musnt have reactions, or user_seen_list
-        vec![],
-        vec![],
-    );
+    let server_master = ServerMaster {
+        struct_list: message,
+        user_seen_list: vec![],
+        reaction_list: vec![],
+        auto_sync_attributes: None
+    };
 
     let server_master_string = server_master.struct_into_string();
 
@@ -395,6 +397,7 @@ impl MessageService {
                 self.connected_clients.clone(),
                 vec![ServerOutput::convert_type_to_servermsg(
                     req.clone(),
+                    //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.MessageType {
                         //This is unreachable, as requests are handled elsewhere
                         ClientFileRequestType(_) => unreachable!(),
@@ -403,21 +406,16 @@ impl MessageService {
                             (self.generated_file_paths.lock().unwrap().len() - 1) as i32
                         }
 
-                        ClientNormalMessage(_) => {
-                            -1
-                        }
+                        ClientNormalMessage(_) => -1,
 
                         ClientSyncMessage(_) => panic!("What the fuck"),
 
                         //The client will update their own message
-                        ClientReaction(_) => {
-                            -1
-                        }
+                        ClientReaction(_) => -1,
                         //The client will update their own message
-                        ClientMessageEdit(_) => {
-                            -1
-                        }
+                        ClientMessageEdit(_) => -1,
                     },
+                    //Get message type
                     match &req.MessageType {
                         ClientFileRequestType(_) => unreachable!(),
                         ClientFileUpload(_) => Upload,
@@ -428,7 +426,8 @@ impl MessageService {
                     },
                     req.Uuid,
                 )],
-            );
+            ).await?;
+
             //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
@@ -497,11 +496,12 @@ impl MessageService {
         };
 
         //Construct reply
-        let server_master = ServerMaster::convert_vec_serverout_into_server_master(
-            selected_messages_part.to_vec(),
-            (*self.reactions.try_lock().unwrap().clone()).to_vec(),
-            self.clients_last_seen_index.try_lock().unwrap().clone(),
-        );
+        let server_master = ServerMaster {
+            struct_list: selected_messages_part.to_vec(),
+            user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
+            reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
+            auto_sync_attributes: None
+        };
 
         //convert reply into string
         let final_msg: String = server_master.struct_into_string();

@@ -68,7 +68,12 @@ impl TemplateApp {
                                                             message_clone.push_str(" ...");
                                                         }
                                                         message_clone.to_string()
-                                                },
+                                                    },
+                                                    //These message enums (described below), are supposed to have a side effect on messages which we are already storing
+                                                    //ServerMessageType::Deleted gets displayed thats why that not here
+                                                    //ServerMessageType::Edit(_)
+                                                    //ServerMessageType::Reaction(())
+                                                    _ => { unreachable!() }
                                             })
                                             ).size(self.font_size / 1.5))
                                                 .frame(false))

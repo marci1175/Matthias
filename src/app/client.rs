@@ -69,7 +69,7 @@ pub async fn send_message(
     connection_pair: ConnectionPair,
     message: ClientMessage,
 ) -> anyhow::Result<ServerReply> {
-    let mut writer = connection_pair.writer.lock().await;
+    let mut writer = connection_pair.writer.try_lock()?;
 
     let message_string = message.struct_into_string();
 

@@ -491,6 +491,14 @@ impl TemplateApp {
                         .size(self.font_size),
                 );
             }
+
+            //These are supposed to be removed
+            //When reciving messages which have this enum, they are supposed to be interpreted and cause a side effect on the messages list (ie modify it according to the messages)
+            // crate::app::backend::ServerMessageType::Edit(_)
+            // crate::app::backend::ServerMessageType::Reaction(_)
+            _ => {
+                unimplemented!()
+            }
         }
     }
 
