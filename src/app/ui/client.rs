@@ -658,15 +658,18 @@ impl TemplateApp {
                     match incoming_struct {
                         Ok(mut msg) => {
                             //Always sync the whole seen list no matter what
-                            self.client_ui.seen_list = msg.user_seen_list;
+                            // self.client_ui.seen_list = msg.user_seen_list;
 
                             //Always sync the whole reaction list no matter what
-                            self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
+                            // self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
 
                             //if we recived an empty vector, we can just return, after updateing seen_list and the reaction list, so we can avoid using something like an option and having to rewrite everything
-                            if msg.struct_list.is_empty() {
-                                return;
-                            }
+                            // if msg.struct_list.is_empty() {
+                            //     return;
+                            // }
+                            
+                            //Allocate Message vec for the new message
+                            self.client_ui.incoming_msg.reaction_list.push(MessageReaction::default());
 
                             //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
                             self.client_ui

@@ -54,7 +54,7 @@ impl ServerReply {
         //Read the server reply
         reader.read_exact(&mut msg_buffer).await?;
 
-        Ok(dbg!(String::from_utf8(dbg!(msg_buffer))?))
+        Ok(dbg!(String::from_utf8(msg_buffer)?))
     }
 
     pub fn new(reader: Arc<Mutex<OwnedReadHalf>>) -> Self {
