@@ -54,36 +54,10 @@ impl ServerReply {
         //Read the server reply
         reader.read_exact(&mut msg_buffer).await?;
 
-        Ok(dbg!(String::from_utf8(msg_buffer)?))
+        Ok(String::from_utf8(msg_buffer)?)
     }
 
     pub fn new(reader: Arc<Mutex<OwnedReadHalf>>) -> Self {
         Self { reader }
     }
-}
-
-/// This function can take a ```MutexGuard<TcpStream>>``` as a connection
-/// It also waits for the server to reply, so it awaits a sever repsonse
-/// This function returns a wait for response value, which means when awaiting on the returned value of this function we are awaiting the response from the server
-pub async fn send_message(
-    connection_pair: ConnectionPair,
-    message: ClientMessage,
-) -> anyhow::Result<ServerReply> {
-    let mut writer = connection_pair.writer.try_lock()?;
-
-    let message_string = message.struct_into_string();
-
-    let message_bytes = message_string.as_bytes();
-
-    //Send message lenght to server
-    writer
-        .write_all(&(message_bytes.len() as u32).to_be_bytes())
-        .await?;
-
-    //Send message to server
-    writer.write_all(message_bytes).await?;
-
-    writer.flush().await?;
-
-    Ok(ServerReply::new(connection_pair.reader))
 }

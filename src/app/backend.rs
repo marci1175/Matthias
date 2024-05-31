@@ -411,10 +411,6 @@ pub struct Client {
     #[serde(skip)]
     ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
     pub text_edit_buffer: String,
-
-    ///This list contains all of the indexes of the messages the clients have seen, this always gets overriden by the sync thread
-    #[serde(skip)]
-    pub seen_list: Vec<ClientLastSeenMessage>,
 }
 impl Default for Client {
     fn default() -> Self {
@@ -469,7 +465,6 @@ impl Default for Client {
             text_edit_buffer: String::new(),
             incoming_msg_len: Arc::new(Mutex::new(0)),
             last_seen_msg_index: Arc::new(Mutex::new(0)),
-            seen_list: Vec::new(),
         }
     }
 }
@@ -834,7 +829,7 @@ impl ClientConnection {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
-                Ok(client::send_message(connection.clone(), message).await?)
+                Ok(connection.send_message(message).await?)
             }
         } else {
             bail!("There is no active connection to send the message on.")
@@ -894,14 +889,11 @@ impl ClientConnection {
     ) -> anyhow::Result<()> {
         if let ConnectionState::Connected(connection) = &self.state {
             //We pray it doesnt deadlock, amen
-            #[allow(unused_must_use)]
-            {
-                client::send_message(
-                    connection.clone(),
-                    ClientMessage::construct_disconnection_msg(password, author, uuid),
-                )
+            connection
+                .send_message(ClientMessage::construct_disconnection_msg(
+                    password, author, uuid,
+                ))
                 .await?;
-            }
 
             //Shutdown connection from the client side
             connection.writer.lock().await.shutdown().await?;
@@ -928,6 +920,26 @@ impl ConnectionPair {
             writer: Arc::new(tokio::sync::Mutex::new(writer)),
             reader: Arc::new(tokio::sync::Mutex::new(reader)),
         }
+    }
+
+    pub async fn send_message(&self, message: ClientMessage) -> anyhow::Result<ServerReply> {
+        let mut writer: tokio::sync::MutexGuard<OwnedWriteHalf> = self.writer.try_lock()?;
+
+        let message_string = message.struct_into_string();
+
+        let message_bytes = message_string.as_bytes();
+
+        //Send message lenght to server
+        writer
+            .write_all(&(message_bytes.len() as u32).to_be_bytes())
+            .await?;
+
+        //Send message to server
+        writer.write_all(message_bytes).await?;
+
+        writer.flush().await?;
+
+        Ok(ServerReply::new(self.reader.clone()))
     }
 }
 

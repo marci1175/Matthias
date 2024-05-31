@@ -473,10 +473,17 @@ impl TemplateApp {
 
             let (input_sender, mut reciver) = tokio::sync::broadcast::channel(1);
 
+            //This is used to shut down the two threads later
             self.autosync_input_sender = input_sender;
 
             //This is used for server syncing
             let mut reciver_clone = reciver.resubscribe();
+
+            //Clone the reader so we can move it in the closure
+            let reader = connection_pair.reader.clone();
+
+            //Clone the sender so that 2 threads can each get a sender
+            let sender_clone = sender.clone();
 
             self.server_sender_thread.get_or_insert_with(|| {
                 //Spawn server reader thread
@@ -486,22 +493,32 @@ impl TemplateApp {
                         if let Ok(_) = reciver.try_recv() {
                             break;
                         }
-    
                         match ServerReply::wait_for_response(&ServerReply {
-                            reader: connection_pair.reader.clone(),
+                            reader: reader.clone(),
                         }).await {
                             Ok(response) => {
-                                sender.send(Some(dbg!(response))).expect("Error occured when trying to send message, after reciving message from client");
+                                sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
                             },
-                            Err(_) => {
-                                eprintln!("client.rs\nError occured when the client tried to recive a message from the server");
+                            Err(err) => {
+                                eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                 break;
                             },
                         };
                     }
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
-                    let _ = sender.send(None);
+                    let _ = sender_clone.send(None);
                 });
+
+                //Init sync message
+                let mut message = ClientMessage::construct_sync_msg(
+                    &self.client_ui.client_password,
+                    &self.login_username,
+                    &self.opened_account.uuid,
+                    //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
+                    self.client_ui.incoming_msg.struct_list.len(),
+                    Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
+                );
+                let last_seen_message_index = self.client_ui.last_seen_msg_index.clone();
 
                 //Spawn server syncer thread
                 tokio::spawn(async move {
@@ -511,12 +528,25 @@ impl TemplateApp {
                             break;
                         }
 
-                        
+                        // sleep when begining a new thread
+                        tokio::time::sleep(Duration::from_secs_f32(2.)).await;
 
+                        //We should update the message for syncing, so we will provide the latest info to the server
+                        if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
+                            inner.last_seen_message_index = match last_seen_message_index.lock() {
+                                Ok(index) => Some(*index),
+                                Err(_err) => None,
+                            }
+                        }
+
+                        //We only have to send the sync message, since in the other thread we are reciving every message sent to us
+                        connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
                     }
+                    //Error appeared, after this the tread quits, so there arent an inf amount of threads running
+                    let _ = sender.send(None);
                 });
             });
-            
+
             //Try to recive the threads messages
             //Get sent to the channel to be displayed, if the connections errors out, do nothing lol cuz its prolly cuz the sender hadnt done anything
             match self.server_output_reciver.try_recv() {
@@ -527,7 +557,8 @@ impl TemplateApp {
 
                         //Decrypt the server's reply
                         let decrypted_message =
-                            decrypt_aes256(&message, &self.client_connection.client_secret).unwrap();
+                            decrypt_aes256(&message, &self.client_connection.client_secret)
+                                .unwrap();
 
                         let incoming_struct: Result<ServerMaster, serde_json::Error> =
                             serde_json::from_str(&decrypted_message);
@@ -538,7 +569,7 @@ impl TemplateApp {
                                 self.client_ui.incoming_msg.user_seen_list = msg.user_seen_list;
 
                                 //Allocate Message vec for the new message
-                                self.client_ui.incoming_msg.reaction_list.push(MessageReaction::default());
+                                self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
 
                                 //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
                                 self.client_ui
@@ -560,12 +591,9 @@ impl TemplateApp {
                 }
             }
         }
-        
     }
 
     ///This function is used for client/server syncing
     /// This function is mostly used for sending client data to the server (like last seen message etc.)
-    fn server_syncer(&mut self, ctx: &egui::Context) {
-        
-    }
+    fn server_syncer(&mut self, ctx: &egui::Context) {}
 }

@@ -247,7 +247,7 @@ impl MessageService {
 
         if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
             if sync_msg.password == self.passw.trim() {
-                //Handle incoming connections and disconnections, if inbound_connection_address is some, else we assume its for syncing *ONLY*
+                //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = sync_msg.sync_attribute {
                     //sync attr is true if its a connection message i.e a licnet is trying to connect to us
                     if sync_attr {
@@ -313,7 +313,11 @@ impl MessageService {
                 }
 
                 //Sync all messages, send all of the messages to the client
-                // send_message_to_client(&mut *client_handle.try_lock()?, self.sync_message(&req).await?).await?;
+                send_message_to_client(
+                    &mut *client_handle.try_lock()?,
+                    self.sync_message(&req).await?,
+                )
+                .await?;
                 return Ok(());
             } else {
                 send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
@@ -441,13 +445,14 @@ impl MessageService {
             req.Uuid.clone(),
         ));
     }
+
     async fn sync_message(&self, req: &ClientMessage) -> anyhow::Result<String> {
         let all_messages = &mut self.messages.lock().await.clone();
 
         let all_messages_len = all_messages.len();
 
         //Dont ask me why I did it this way
-        let selected_messages_part = if let ClientSyncMessage(inner) = &req.MessageType {
+        if let ClientSyncMessage(inner) = &req.MessageType {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
             if let Some(last_seen_message_index) = inner.last_seen_message_index {
                 match &mut self.clients_last_seen_index.try_lock() {
@@ -471,26 +476,12 @@ impl MessageService {
                     }
                 }
             }
-
-            //client_message_counter is how many messages does the client have
-            if let Some(counter) = inner.client_message_counter {
-                //Check if user already has all the messages
-                if !counter >= all_messages_len {
-                    &all_messages[counter..all_messages_len]
-                } else {
-                    //Return empty vector
-                    &[]
-                }
-            } else {
-                all_messages
-            }
-        } else {
-            all_messages
         };
 
         //Construct reply
         let server_master = ServerMaster {
-            struct_list: selected_messages_part.to_vec(),
+            //Return an empty message list
+            struct_list: vec![],
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
             reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
             auto_sync_attributes: None,

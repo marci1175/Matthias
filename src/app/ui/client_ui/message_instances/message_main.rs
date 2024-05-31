@@ -102,7 +102,7 @@ impl TemplateApp {
                                             ui.horizontal(|ui| {
 
                                                 //Check if there is a reaction list vector already allocated non the index of the specific message
-                                                match self.client_ui.incoming_msg.reaction_list.get(iter_index) {
+                                                match &self.client_ui.incoming_msg.reaction_list.get(iter_index) {
                                                     Some(reactions) => {
                                                         for item in &reactions.message_reactions {
                                                             ui.group(|ui| {
@@ -127,7 +127,7 @@ impl TemplateApp {
 
                                 //Display where the users seen their last message
                                 ui.horizontal(|ui| {
-                                    for client in &self.client_ui.seen_list {
+                                    for client in &self.client_ui.incoming_msg.user_seen_list {
                                         if iter_index == client.index {
                                             //Make it more visible
                                             ui.group(|ui| {
@@ -227,9 +227,6 @@ impl TemplateApp {
                                         };
                                     }
                                 });
-
-                                // message_group.response.paint_debug_info();
-                                // message_instances.push(message_group.response);
                             };
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
