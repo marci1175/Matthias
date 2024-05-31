@@ -134,10 +134,11 @@ pub struct TemplateApp {
     pub dtx: mpsc::Sender<String>,
 
     ///Server connection
+    /// This channel hosts a Client connection and the sync message sent by the server in a String format
     #[serde(skip)]
-    pub connection_reciver: mpsc::Receiver<Option<ClientConnection>>,
+    pub connection_reciver: mpsc::Receiver<Option<(ClientConnection, String)>>,
     #[serde(skip)]
-    pub connection_sender: mpsc::Sender<Option<ClientConnection>>,
+    pub connection_sender: mpsc::Sender<Option<(ClientConnection, String)>>,
 
     ///Server - client syncing thread
     #[serde(skip)]
@@ -173,7 +174,7 @@ impl Default for TemplateApp {
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
 
-        let (connection_sender, connection_reciver) = mpsc::channel::<Option<ClientConnection>>();
+        let (connection_sender, connection_reciver) = mpsc::channel::<Option<(ClientConnection, String)>>();
 
         //Use the tokio sync crate for it to be async
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
@@ -843,18 +844,18 @@ impl ClientConnection {
         author: String,
         password: Option<String>,
         uuid: &str,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<(Self, String)> {
         let connection_msg = ClientMessage::construct_connection_msg(
-            password.unwrap_or(String::from("")),
-            author,
+            password.clone().unwrap_or(String::from("")),
+            author.clone(),
             uuid,
             None,
         );
 
         //Ping server to recive custom uuid, and to also get if server ip is valid
         let client_handle = tokio::net::TcpStream::connect(ip).await?;
-        /*We could return this, this is what the server is supposed to return, when a new user is connected */
 
+        /*We could return this, this is what the server is supposed to return, when a new user is connected */
         let (server_reply, server_handle) =
             connect_to_server(client_handle, connection_msg).await?;
 
@@ -867,12 +868,23 @@ impl ClientConnection {
         //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
         let client_secret = hex::decode(server_reply)?;
 
+        //Create connection pair
         let (reader, writer) = server_handle.into_split();
 
-        Ok(Self {
+        let connection_pair = ConnectionPair::new(writer, reader);
+
+        //Sync with the server
+        let sync_message = ClientMessage::construct_sync_msg(&password.unwrap_or(String::from("")), &author, uuid, 0, None);
+
+        let server_response = connection_pair.send_message(sync_message).await?.wait_for_response().await?;
+
+        //This contains the sync string
+        let server_reply = decrypt_aes256(&server_response, &client_secret).expect("Failed to decrypt server sync packet");
+
+        Ok((Self {
             client_secret,
-            state: ConnectionState::Connected(ConnectionPair::new(writer, reader)),
-        })
+            state: ConnectionState::Connected(connection_pair),
+        }, server_reply))
     }
 
     pub fn reset_state(&mut self) {
@@ -1202,6 +1214,7 @@ impl ServerOutput {
 }
 
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
+/// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
@@ -1213,13 +1226,6 @@ pub struct ServerMaster {
 
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
-
-    ///Additional information about this message (struct), this is used at the auto sync part to provide more efficient syncing
-    /// This has two states:
-    /// Whole: Syncs all messages
-    /// Partial: Appends the messages to the client's list
-    /// If the auto_sync attribute is none it means it doesnt need to sync (the struct_list is also empty)
-    pub auto_sync_attributes: Option<SyncType>,
 }
 
 impl Default for ServerMaster {
@@ -1228,7 +1234,6 @@ impl Default for ServerMaster {
             struct_list: vec![],
             reaction_list: vec![],
             user_seen_list: vec![],
-            auto_sync_attributes: None,
         }
     }
 }
@@ -1239,14 +1244,19 @@ impl ServerMaster {
     }
 }
 
-///Provides additional information to a ServerMain message, this is used to auto sync
-/// This has two states:
-/// Whole: Syncs all messages
-/// Partial: Appends the messages to the client's list
+///This struct provides all the necessary information to keep the client and the server in sync
+/// Its struct contains ```Vec<ClientLastSeenMessage>``` which is for displaying which message has the user seen
+/// We dont need to provide any other information since, the ```ServerMaster``` struct ensures all the clients have the same field when connecting
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum SyncType {
-    Whole,
-    Partial,
+pub struct ServerSync {
+    ///Users last seen message index
+    pub user_seen_list: Vec<ClientLastSeenMessage>,
+}
+
+impl ServerSync {
+    pub fn struct_into_string(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
 }
 
 //When a client is connected this is where the client gets saved

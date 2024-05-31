@@ -7,7 +7,7 @@ use super::backend::{
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
     ServerMessageTypeDiscriminants::{
         self, Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Upload,
-    },
+    }, ServerSync,
 };
 
 use rand::Rng;
@@ -186,7 +186,6 @@ async fn sync_message_with_clients(
         struct_list: message,
         user_seen_list: vec![],
         reaction_list: vec![],
-        auto_sync_attributes: None,
     };
 
     let server_master_string = server_master.struct_into_string();
@@ -282,8 +281,6 @@ impl MessageService {
                                     hex::encode(self.decryption_key),
                                 )
                                 .await?;
-
-                                return Ok(());
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -315,7 +312,7 @@ impl MessageService {
                 //Sync all messages, send all of the messages to the client
                 send_message_to_client(
                     &mut *client_handle.try_lock()?,
-                    self.sync_message(&req).await?,
+                    self.sync_client().await?,
                 )
                 .await?;
                 return Ok(());
@@ -401,7 +398,7 @@ impl MessageService {
 
                         ClientNormalMessage(_) => -1,
 
-                        ClientSyncMessage(_) => panic!("What the fuck"),
+                        ClientSyncMessage(_) => panic!(),
 
                         //The client will update their own message
                         ClientReaction(_) => -1,
@@ -413,7 +410,7 @@ impl MessageService {
                         ClientFileRequestType(_) => unreachable!(),
                         ClientFileUpload(_) => Upload,
                         ClientNormalMessage(_) => Normal,
-                        ClientSyncMessage(_) => unreachable!("Ezt gondold át geci"),
+                        ClientSyncMessage(_) => unreachable!(),
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         ClientMessageEdit(_) => Edit,
                     },
@@ -446,11 +443,28 @@ impl MessageService {
         ));
     }
 
+    /// This function returns a message containing a full sync (all the messages etc)
+    async fn sync_client(&self) -> anyhow::Result<String> {
+        //Construct reply
+        let server_master = ServerMaster {
+            //Return an empty message list
+            struct_list: self.messages.try_lock().unwrap().clone(),
+            user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
+            reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
+        };
+
+        //convert reply into string
+        let final_msg: String = server_master.struct_into_string();
+
+        //Encrypt string
+        let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
+
+        //Reply with encrypted string
+        Ok(encrypted_msg)
+    }
+
+    /// This function returns a message containing all the important info from all the clients
     async fn sync_message(&self, req: &ClientMessage) -> anyhow::Result<String> {
-        let all_messages = &mut self.messages.lock().await.clone();
-
-        let all_messages_len = all_messages.len();
-
         //Dont ask me why I did it this way
         if let ClientSyncMessage(inner) = &req.MessageType {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
@@ -479,16 +493,12 @@ impl MessageService {
         };
 
         //Construct reply
-        let server_master = ServerMaster {
-            //Return an empty message list
-            struct_list: vec![],
+        let server_reply = ServerSync {
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
-            reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
-            auto_sync_attributes: None,
         };
 
         //convert reply into string
-        let final_msg: String = server_master.struct_into_string();
+        let final_msg: String = server_reply.struct_into_string();
 
         //Encrypt string
         let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();

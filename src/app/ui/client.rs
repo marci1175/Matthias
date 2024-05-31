@@ -592,8 +592,4 @@ impl TemplateApp {
             }
         }
     }
-
-    ///This function is used for client/server syncing
-    /// This function is mostly used for sending client data to the server (like last seen message etc.)
-    fn server_syncer(&mut self, ctx: &egui::Context) {}
 }

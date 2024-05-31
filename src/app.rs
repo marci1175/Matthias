@@ -325,7 +325,19 @@ impl eframe::App for backend::TemplateApp {
             Ok(connection) => {
                 if let Some(connection) = connection {
                     //Modify client_connection
-                    self.client_connection = connection;
+                    self.client_connection = connection.0;
+
+                    //Modify local message list
+                    let incoming_sync_message: Result<ServerMaster, serde_json::Error> =
+                    serde_json::from_str(&connection.1);
+
+                    if let Ok(incoming_message) = incoming_sync_message {
+                        self.client_ui.incoming_msg = incoming_message; 
+                    }
+                    else {
+                        eprintln!("Failed to convert {} to ServerMaster", connection.1)
+                    }
+
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;
@@ -347,12 +359,7 @@ impl backend::TemplateApp {
             match connection.send_message(message).await {
                 //We dont need the server's reply since we dont handle it here
                 Ok(_server_reply) => {
-                    // match tx.send(dbg!(ok)) {
-                    //     Ok(_) => {}
-                    //     Err(err) => {
-                    //         println!("{} ln 376", err);
-                    //     }
-                    // };
+
                 }
                 Err(err) => {
                     dbg!(err.source());
