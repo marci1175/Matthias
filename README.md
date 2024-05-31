@@ -1,4 +1,4 @@
-## szeChat
+## Matthias
 
 # Independent chat application with encryption, made from scratch
 
