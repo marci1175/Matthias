@@ -61,7 +61,8 @@ impl eframe::App for backend::TemplateApp {
             TODO: functions which only send a normal message (this excludes file req messages),
                   wont need to wait for a server response becuase we will need a server message reader,
                   which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
-            TODO: Recode syncing we may not even need it
+
+            TODO: Recode syncing we may not even need it, also rework reciving messages from the server
 
         */
 
