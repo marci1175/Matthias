@@ -640,6 +640,9 @@ impl TemplateApp {
                             }
                         }
                     } else {
+                        //Signal the remaining thread to be shut down
+                        let _ = self.autosync_input_sender.send(()).inspect_err(|err| {dbg!(err);});
+
                         //Then the thread got an error, we should reset the state
                         self.server_sender_thread = None;
                     }
