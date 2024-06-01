@@ -8,7 +8,7 @@ use rodio::Decoder;
 
 use crate::app::backend::{
     decrypt_aes256, display_error_message, write_image, ClientMessage, ClientMessageType,
-    ConnectionState, MessageReaction, Reaction, ServerMaster, ServerSync,
+    ConnectionState, MessageReaction, Reaction, ServerSync,
 };
 
 use crate::app::backend::{SearchType, ServerImageReply, ServerMessageType, TemplateApp};
@@ -16,9 +16,6 @@ use crate::app::client::ServerReply;
 
 impl TemplateApp {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
-        //Server - Client syncing
-        // self.client_sync(ctx);
-
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "settings_area").show(
             ctx,
             |ui| {
@@ -490,7 +487,7 @@ impl TemplateApp {
                 tokio::spawn(async move {
                     loop {
                         //Recive input from main thread to shutdown
-                        if let Ok(_) = reciver.try_recv() {
+                        if reciver.try_recv().is_ok() {
                             break;
                         }
                         match ServerReply::wait_for_response(&ServerReply {
@@ -524,7 +521,7 @@ impl TemplateApp {
                 tokio::spawn(async move {
                     loop {
                         //Recive input from main thread to shutdown
-                        if let Ok(_) = reciver_clone.try_recv() {
+                        if reciver_clone.try_recv().is_ok() {
                             break;
                         }
 

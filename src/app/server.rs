@@ -6,7 +6,7 @@ use super::backend::{
     encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
     ServerMessageTypeDiscriminants::{
-        self, Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
+        Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
         Upload,
     },
     ServerSync,

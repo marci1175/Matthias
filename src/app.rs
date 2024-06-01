@@ -44,26 +44,16 @@ impl eframe::App for backend::TemplateApp {
         */
 
         /*devlog:
-
             TODO: MAKE IT SO THAT THE CLIENT DOESNT SAVE THE FILE BASED ON ITS NAME, INSTEAD ON ITS INDEX OR UNIQUE IDENTIFIER, AND SHOULD USE THIS NAME TO DISPLAY IT
-            TODO: Fix file ```recivers``` becasue they're dumb, pointless code
-            TODO: Migrate to tokio tcp instead of tonic
-            TODO: improve autosync
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
             TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
-            TODO: CLEAN DEPS
-            TODO: ASK FOR ASYNC DEADLOCKS IN DISCORD SERVER
-            TODO: split the client_connection's TcpStream
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
 
             TODO: functions which only send a normal message (this excludes file req messages),
                   wont need to wait for a server response becuase we will need a server message reader,
                   which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
-
-            TODO: Recode syncing we may not even need it, also rework reciving messages from the server
-
         */
 
         //For image loading

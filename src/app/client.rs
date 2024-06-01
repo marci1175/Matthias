@@ -4,7 +4,7 @@ use tokio::{
     sync::Mutex,
 };
 
-use super::backend::{fetch_incoming_message_lenght, ClientMessage, ConnectionPair};
+use super::backend::{fetch_incoming_message_lenght, ClientMessage};
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(

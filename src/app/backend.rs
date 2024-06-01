@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use egui::Color32;
 use rand::rngs::ThreadRng;
 
-use super::client::{self, connect_to_server, ServerReply};
+use super::client::{connect_to_server, ServerReply};
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -1240,6 +1240,7 @@ impl ServerOutput {
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 /// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(Default)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
@@ -1251,15 +1252,6 @@ pub struct ServerMaster {
     pub user_seen_list: Vec<ClientLastSeenMessage>,
 }
 
-impl Default for ServerMaster {
-    fn default() -> Self {
-        Self {
-            struct_list: vec![],
-            reaction_list: vec![],
-            user_seen_list: vec![],
-        }
-    }
-}
 
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {
