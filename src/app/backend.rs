@@ -950,7 +950,7 @@ impl ConnectionPair {
     }
 
     pub async fn send_message(&self, message: ClientMessage) -> anyhow::Result<ServerReply> {
-        let mut writer: tokio::sync::MutexGuard<OwnedWriteHalf> = self.writer.try_lock()?;
+        let mut writer: tokio::sync::MutexGuard<'_, OwnedWriteHalf> = self.writer.try_lock()?;
 
         let message_string = message.struct_into_string();
 
@@ -1239,8 +1239,7 @@ impl ServerOutput {
 
 ///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 /// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[derive(Default)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
     pub struct_list: Vec<ServerOutput>,
@@ -1251,7 +1250,6 @@ pub struct ServerMaster {
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
 }
-
 
 impl ServerMaster {
     pub fn struct_into_string(&self) -> String {

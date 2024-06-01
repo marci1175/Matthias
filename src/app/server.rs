@@ -6,8 +6,7 @@ use super::backend::{
     encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
     ServerMessageTypeDiscriminants::{
-        Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
-        Upload,
+        Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
     },
     ServerSync,
 };
@@ -23,7 +22,7 @@ use tokio::{
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
-    ClientMessage, ClientMessageEdit as ClientMessageEditStruct,
+    ClientMessage,
     ClientMessageType::{
         ClientFileRequestType, ClientFileUpload, ClientMessageEdit, ClientNormalMessage,
         ClientReaction, ClientSyncMessage,
@@ -367,7 +366,32 @@ impl MessageService {
                 }
 
                 ClientMessageEdit(edit) => {
-                    self.handle_message_edit(edit, &req).await;
+                    match &mut self.messages.try_lock() {
+                        Ok(messages_vec) => {
+                            //Server-side uuid check
+                            if messages_vec[edit.index].uuid != req.Uuid {
+                                //Nice try :)
+                                return Ok(());
+                            }
+
+                            //If its () then we can check for the index, because you can delete all messages, rest is ignored
+                            if edit.new_message.is_none() {
+                                //Set as `Deleted`
+                                messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
+                            }
+
+                            if let ServerMessageType::Normal(inner_msg) =
+                                &mut messages_vec[edit.index].MessageType
+                            {
+                                if let Some(new_msg) = edit.new_message.clone() {
+                                    inner_msg.message = new_msg;
+
+                                    inner_msg.has_been_edited = true;
+                                }
+                            }
+                        }
+                        Err(err) => println!("{err}"),
+                    };
                 }
             };
 
@@ -408,9 +432,8 @@ impl MessageService {
 
                         ClientSyncMessage(_) => -1,
 
-                        //The client will update their own message
                         ClientReaction(_) => -1,
-                        //The client will update their own message
+
                         ClientMessageEdit(_) => -1,
                     },
                     //Get message type
@@ -745,34 +768,6 @@ impl MessageService {
                         //Set default amount, start from 1
                         times: 1,
                     });
-            }
-            Err(err) => println!("{err}"),
-        }
-    }
-
-    async fn handle_message_edit(&self, edit: &ClientMessageEditStruct, req: &ClientMessage) {
-        match &mut self.messages.try_lock() {
-            Ok(messages_vec) => {
-                //Server-side uuid check
-                if messages_vec[edit.index].uuid != req.Uuid {
-                    return;
-                }
-
-                //If its () then we can check for the index, because you can delete all messages, rest is ignored
-                if edit.new_message.is_none() {
-                    //Set as `Deleted`
-                    messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
-                }
-
-                if let ServerMessageType::Normal(inner_msg) =
-                    &mut messages_vec[edit.index].MessageType
-                {
-                    if let Some(new_msg) = edit.new_message.clone() {
-                        inner_msg.message = new_msg;
-
-                        inner_msg.has_been_edited = true;
-                    }
-                }
             }
             Err(err) => println!("{err}"),
         }

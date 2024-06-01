@@ -497,7 +497,7 @@ impl TemplateApp {
             // crate::app::backend::ServerMessageType::Edit(_)
             // crate::app::backend::ServerMessageType::Reaction(_)
             _ => {
-                unimplemented!()
+                unimplemented!("ServerMessageType::Edit(_) and ServerMessageType::Reaction(_) should not be displayed")
             }
         }
     }

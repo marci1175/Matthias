@@ -465,24 +465,24 @@ impl TemplateApp {
     fn client_recv(&mut self, ctx: &egui::Context) {
         //This should only run when the connection is valid
         if let ConnectionState::Connected(connection_pair) = self.client_connection.state.clone() {
-            //Clone so we can move it into the closure
-            let sender = self.server_output_sender.clone();
-
-            let (input_sender, mut reciver) = tokio::sync::broadcast::channel(1);
-
-            //This is used to shut down the two threads later
-            self.autosync_input_sender = input_sender;
-
-            //This is used for server syncing
-            let mut reciver_clone = reciver.resubscribe();
-
-            //Clone the reader so we can move it in the closure
-            let reader = connection_pair.reader.clone();
-
-            //Clone the sender so that 2 threads can each get a sender
-            let sender_clone = sender.clone();
-
             self.server_sender_thread.get_or_insert_with(|| {
+                //Clone so we can move it into the closure
+                let sender = self.server_output_sender.clone();
+
+                let (input_sender, mut reciver) = tokio::sync::broadcast::channel(1);
+
+                //This is used to shut down the two threads later
+                self.autosync_input_sender = input_sender;
+
+                //This is used for server syncing
+                let mut reciver_clone = reciver.resubscribe();
+
+                //Clone the reader so we can move it in the closure
+                let reader = connection_pair.reader.clone();
+
+                //Clone the sender so that 2 threads can each get a sender
+                let sender_clone = sender.clone();
+                
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
@@ -572,24 +572,19 @@ impl TemplateApp {
 
                                 match &msg.message.MessageType {
                                     ServerMessageType::Edit(message) => {
-                                        if let ServerMessageType::Normal(inner) =
-                                            &mut self.client_ui.incoming_msg.struct_list
-                                                [message.index as usize]
-                                                .MessageType
-                                        {
-                                            match message.new_message.clone() {
-                                                //If the message is edited
-                                                Some(message) => {
-                                                    inner.message = message;
-                                                    inner.has_been_edited = true;
-                                                }
-                                                //If the message is deleted
-                                                None => {
-                                                    self.client_ui.incoming_msg.struct_list
-                                                        [message.index as usize]
-                                                        .MessageType = ServerMessageType::Deleted;
-                                                }
+                                        if let Some(new_message) = message.new_message.clone() {
+                                            if let ServerMessageType::Normal(inner) =
+                                                &mut self.client_ui.incoming_msg.struct_list
+                                                    [message.index as usize]
+                                                    .MessageType
+                                            {
+                                                inner.message = new_message;
+                                                inner.has_been_edited = true;
                                             }
+                                        } else {
+                                            self.client_ui.incoming_msg.struct_list
+                                                [message.index as usize]
+                                                .MessageType = ServerMessageType::Deleted;
                                         }
                                     }
                                     ServerMessageType::Reaction(message) => {
@@ -638,7 +633,9 @@ impl TemplateApp {
                         }
                     } else {
                         //Signal the remaining thread to be shut down
-                        let _ = self.autosync_input_sender.send(()).inspect_err(|err| {dbg!(err);});
+                        let _ = self.autosync_input_sender.send(()).inspect_err(|err| {
+                            dbg!(err);
+                        });
 
                         //Then the thread got an error, we should reset the state
                         self.server_sender_thread = None;
