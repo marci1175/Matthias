@@ -950,7 +950,7 @@ impl ConnectionPair {
     }
 
     pub async fn send_message(&self, message: ClientMessage) -> anyhow::Result<ServerReply> {
-        let mut writer: tokio::sync::MutexGuard<'_, OwnedWriteHalf> = self.writer.try_lock()?;
+        let mut writer: tokio::sync::MutexGuard<'_, OwnedWriteHalf> = self.writer.lock().await;
 
         let message_string = message.struct_into_string();
 

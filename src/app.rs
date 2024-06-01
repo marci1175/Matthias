@@ -50,7 +50,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: Discord like emoji :skull:
             TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-
+            TODO: fix mutexes locking
             TODO: functions which only send a normal message (this excludes file req messages),
                   wont need to wait for a server response becuase we will need a server message reader,
                   which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
