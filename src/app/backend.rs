@@ -820,9 +820,14 @@ impl ClientMessage {
 pub struct ClientConnection {
     #[serde(skip)]
     pub client_secret: Vec<u8>,
+    
     #[serde(skip)]
     ///This enum wraps the server handle ```Connected(_)```, it also functions as a Sort of Option wrapper
     pub state: ConnectionState,
+
+    #[serde(skip)]
+    //Password which was used to connect (and could connect with, it has been password matched with the server)
+    pub password: String,
 }
 
 impl ClientConnection {
@@ -840,14 +845,16 @@ impl ClientConnection {
 
     /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
     /// This function blocks (time depends on the connection speed)
+    /// This function also hashes the password argument which it sends, and then if the connection was successful the returned struct's password field will contain the already hashed password
     pub async fn connect(
         ip: String,
         author: String,
         password: Option<String>,
         uuid: &str,
     ) -> anyhow::Result<(Self, String)> {
+        let hashed_password = encrypt(password.clone().unwrap_or(String::from("")));
         let connection_msg = ClientMessage::construct_connection_msg(
-            password.clone().unwrap_or(String::from("")),
+            hashed_password.clone(),
             author.clone(),
             uuid,
             None,
@@ -876,7 +883,7 @@ impl ClientConnection {
 
         //Sync with the server
         let sync_message = ClientMessage::construct_sync_msg(
-            &password.unwrap_or(String::from("")),
+            &hashed_password,
             &author,
             uuid,
             0,
@@ -897,6 +904,7 @@ impl ClientConnection {
             Self {
                 client_secret,
                 state: ConnectionState::Connected(connection_pair),
+                password: hashed_password,
             },
             server_reply,
         ))
@@ -1580,7 +1588,7 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> aes_gcm::ae
 
 #[inline]
 /// Argon is used to encrypt this
-fn encrypt(string_to_be_encrypted: String) -> String {
+pub fn encrypt(string_to_be_encrypted: String) -> String {
     let password = string_to_be_encrypted.as_bytes();
     let salt = b"c1eaa94ec38ab7aa16e9c41d029256d3e423f01defb0a2760b27117ad513ccd2";
     let config = Config {

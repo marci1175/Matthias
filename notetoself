@@ -1,5 +1,0 @@
-thread 'tokio-runtime-worker' panicked at src\app\server.rs:210:62:
-msg: TryLockError(())
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-happens cuz client buffer never gets dropped at server/244

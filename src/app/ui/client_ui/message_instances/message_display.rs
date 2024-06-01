@@ -28,7 +28,7 @@ impl TemplateApp {
 
                 //If we want to download the file included in the message
                 if button.clicked() {
-                    let passw = self.client_ui.client_password.clone();
+                    let passw = self.client_connection.password.clone();
                     let author = self.login_username.clone();
                     let message =
                         ClientMessage::construct_file_request_msg(inner.index, &passw, author);

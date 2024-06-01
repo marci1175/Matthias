@@ -3,12 +3,9 @@ use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 use anyhow::{Error, Result};
 
 use super::backend::{
-    encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
-    ConnectedClient, MessageReaction, Reaction, ServerMessageType,
-    ServerMessageTypeDiscriminants::{
+    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    },
-    ServerSync,
+    }, ServerSync
 };
 
 use rand::Rng;
@@ -85,7 +82,7 @@ pub async fn server_main(
 
     //Server default information
     let msg_service = Arc::new(tokio::sync::Mutex::new(MessageService {
-        passw: password,
+        passw: encrypt(password),
         decryption_key: rand::random::<[u8; 32]>(),
         ..Default::default()
     }));
@@ -151,7 +148,7 @@ fn spawn_client_reader(
             message_service
                 .message_main(incoming_message, writer.clone())
                 .await
-                .expect("Error occured while reciving message");
+                .expect("Error occured while reciving a message");
         }
         Ok(())
     });
@@ -251,7 +248,9 @@ impl MessageService {
         let req: ClientMessage = req_result.unwrap();
 
         if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
-            if sync_msg.password == self.passw.trim() {
+            dbg!(&sync_msg.password);
+            dbg!(&sync_msg);
+            if sync_msg.password == dbg!(self.passw.trim()) {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = sync_msg.sync_attribute {
                     //sync attr is true if its a connection message i.e a licnet is trying to connect to us

@@ -498,6 +498,7 @@ impl TemplateApp {
                             },
                             Err(err) => {
                                 eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
+                                eprintln!("Early end of file error is a normal occurence after disconnecting");
                                 break;
                             },
                         };
@@ -508,7 +509,7 @@ impl TemplateApp {
 
                 //Init sync message
                 let mut message = ClientMessage::construct_sync_msg(
-                    &self.client_ui.client_password,
+                    dbg!(&self.client_connection.password),
                     &self.login_username,
                     &self.opened_account.uuid,
                     //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
@@ -520,13 +521,13 @@ impl TemplateApp {
                 //Spawn server syncer thread
                 tokio::spawn(async move {
                     loop {
+                        // sleep when begining a new thread
+                        tokio::time::sleep(Duration::from_secs_f32(2.)).await;
+
                         //Recive input from main thread to shutdown
                         if reciver_clone.try_recv().is_ok() {
                             break;
                         }
-
-                        // sleep when begining a new thread
-                        tokio::time::sleep(Duration::from_secs_f32(2.)).await;
 
                         //We should update the message for syncing, so we will provide the latest info to the server
                         if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
@@ -537,7 +538,7 @@ impl TemplateApp {
                         }
 
                         //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                        connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
+                        connection_pair.send_message(dbg!(message.clone())).await.expect("Failed to send syncing request from client");
                     }
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender.send(None);
@@ -623,7 +624,7 @@ impl TemplateApp {
                                         self.client_ui
                                             .incoming_msg
                                             .struct_list
-                                            .push(dbg!(msg.message));
+                                            .push(msg.message);
                                     }
                                 }
                             }

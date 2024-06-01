@@ -50,10 +50,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: Discord like emoji :skull:
             TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-            TODO: fix mutexes locking
-            TODO: functions which only send a normal message (this excludes file req messages),
-                  wont need to wait for a server response becuase we will need a server message reader,
-                  which reads all the normal messages coming from the server, esentially solving autosyncing and its dogshit behavior.
+            TODO: rework and fix file sending
         */
 
         //For image loading
@@ -109,7 +106,7 @@ impl eframe::App for backend::TemplateApp {
 
                             let mut connection = self.client_connection.clone();
 
-                            let password = self.client_ui.client_password.clone();
+                            let password = self.client_connection.password.clone();
 
                             match &self.client_connection.state {
                                 ConnectionState::Connected(_) => {
@@ -363,7 +360,6 @@ impl backend::TemplateApp {
 
         self.client_ui.incoming_msg = ServerMaster::default();
 
-        //THIS IS NOT NEEDED ANYMORE, REMOVE THIS IN v5
         let _ = self.autosync_input_sender.send(());
 
         self.client_connection.state = ConnectionState::Disconnected;

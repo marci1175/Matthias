@@ -44,7 +44,8 @@ pub struct ServerReply {
 
 impl ServerReply {
     pub async fn wait_for_response(&self) -> anyhow::Result<String> {
-        let reader = &mut *self.reader.try_lock()?;
+        let reader = &mut *self.reader.lock().await;
+
         // Read the server reply lenght
         let msg_len = fetch_incoming_message_lenght(reader).await?;
 
