@@ -6,8 +6,10 @@ use super::backend::{
     encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType,
     ConnectedClient, MessageReaction, Reaction, ServerMessageType,
     ServerMessageTypeDiscriminants::{
-        self, Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Upload,
-    }, ServerSync,
+        self, Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
+        Upload,
+    },
+    ServerSync,
 };
 
 use rand::Rng;
@@ -177,15 +179,20 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 /// This creates a server_master message, with the message passed in being the only one in the list of the messages
 async fn sync_message_with_clients(
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
-    message: Vec<ServerOutput>,
+    user_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
+    message: ServerOutput,
     key: [u8; 32],
 ) -> anyhow::Result<()> {
-    let mut connected_clients_locked = connected_clients.try_lock().expect("msg");
+    let mut connected_clients_locked = connected_clients
+        .try_lock()
+        .expect("Failed to lock connected client's list");
 
-    let server_master = ServerMaster {
-        struct_list: message,
-        user_seen_list: vec![],
-        reaction_list: vec![],
+    let server_master = ServerSync {
+        message,
+        user_seen_list: user_seen_list
+            .try_lock()
+            .expect("Failed to lock user seen list")
+            .to_vec(),
     };
 
     let server_master_string = server_master.struct_into_string();
@@ -281,6 +288,14 @@ impl MessageService {
                                     hex::encode(self.decryption_key),
                                 )
                                 .await?;
+
+                                //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
+                                send_message_to_client(
+                                    &mut *client_handle.try_lock()?,
+                                    self.full_sync_client().await?,
+                                )
+                                .await?;
+                                return Ok(());
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -308,14 +323,6 @@ impl MessageService {
                         }
                     }
                 }
-
-                //Sync all messages, send all of the messages to the client
-                send_message_to_client(
-                    &mut *client_handle.try_lock()?,
-                    self.sync_client().await?,
-                )
-                .await?;
-                return Ok(());
             } else {
                 send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
                     .await?;
@@ -338,7 +345,7 @@ impl MessageService {
                 ClientNormalMessage(_msg) => self.NormalMessage(&req).await,
 
                 ClientSyncMessage(_msg) => {
-                    unimplemented!("How the fuck did you get here?");
+                    self.sync_message(&req).await;
                 }
 
                 ClientFileRequestType(request_type) => {
@@ -385,7 +392,8 @@ impl MessageService {
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
             sync_message_with_clients(
                 self.connected_clients.clone(),
-                vec![ServerOutput::convert_type_to_servermsg(
+                self.clients_last_seen_index.clone(),
+                ServerOutput::convert_type_to_servermsg(
                     req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.MessageType {
@@ -393,12 +401,12 @@ impl MessageService {
                         ClientFileRequestType(_) => unreachable!(),
 
                         ClientFileUpload(_) => {
-                            (self.generated_file_paths.lock().unwrap().len() - 1) as i32
+                            (self.generated_file_paths.lock().unwrap().len()) as i32
                         }
 
                         ClientNormalMessage(_) => -1,
 
-                        ClientSyncMessage(_) => panic!(),
+                        ClientSyncMessage(_) => -1,
 
                         //The client will update their own message
                         ClientReaction(_) => -1,
@@ -410,12 +418,12 @@ impl MessageService {
                         ClientFileRequestType(_) => unreachable!(),
                         ClientFileUpload(_) => Upload,
                         ClientNormalMessage(_) => Normal,
-                        ClientSyncMessage(_) => unreachable!(),
+                        ClientSyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         ClientMessageEdit(_) => Edit,
                     },
                     req.Uuid,
-                )],
+                ),
                 self.decryption_key,
             )
             .await
@@ -444,7 +452,8 @@ impl MessageService {
     }
 
     /// This function returns a message containing a full sync (all the messages etc)
-    async fn sync_client(&self) -> anyhow::Result<String> {
+    /// It reutrns a ```ServerMaster``` converted to an encrypted string
+    async fn full_sync_client(&self) -> anyhow::Result<String> {
         //Construct reply
         let server_master = ServerMaster {
             //Return an empty message list
@@ -463,8 +472,8 @@ impl MessageService {
         Ok(encrypted_msg)
     }
 
-    /// This function returns a message containing all the important info from all the clients
-    async fn sync_message(&self, req: &ClientMessage) -> anyhow::Result<String> {
+    /// This function has a side effect on the user_seen_list, modifying it according to the client
+    async fn sync_message(&self, req: &ClientMessage) {
         //Dont ask me why I did it this way
         if let ClientSyncMessage(inner) = &req.MessageType {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
@@ -491,20 +500,6 @@ impl MessageService {
                 }
             }
         };
-
-        //Construct reply
-        let server_reply = ServerSync {
-            user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
-        };
-
-        //convert reply into string
-        let final_msg: String = server_reply.struct_into_string();
-
-        //Encrypt string
-        let encrypted_msg = encrypt_aes256(final_msg, &self.decryption_key).unwrap();
-
-        //Reply with encrypted string
-        Ok(encrypted_msg)
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
         //500mb limit
@@ -716,7 +711,7 @@ impl MessageService {
     /// handle all the file uploads
     pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
         //Pattern match on upload tpye so we know how to handle the specific request
-        match upload_type.extension.clone().unwrap_or_default().as_str() {
+        match dbg!(upload_type.extension.clone().unwrap_or_default().as_str()) {
             "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,
             "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY

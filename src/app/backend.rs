@@ -174,7 +174,8 @@ impl Default for TemplateApp {
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
 
-        let (connection_sender, connection_reciver) = mpsc::channel::<Option<(ClientConnection, String)>>();
+        let (connection_sender, connection_reciver) =
+            mpsc::channel::<Option<(ClientConnection, String)>>();
 
         //Use the tokio sync crate for it to be async
         let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
@@ -874,17 +875,31 @@ impl ClientConnection {
         let connection_pair = ConnectionPair::new(writer, reader);
 
         //Sync with the server
-        let sync_message = ClientMessage::construct_sync_msg(&password.unwrap_or(String::from("")), &author, uuid, 0, None);
+        let sync_message = ClientMessage::construct_sync_msg(
+            &password.unwrap_or(String::from("")),
+            &author,
+            uuid,
+            0,
+            None,
+        );
 
-        let server_response = connection_pair.send_message(sync_message).await?.wait_for_response().await?;
+        let server_response = connection_pair
+            .send_message(sync_message)
+            .await?
+            .wait_for_response()
+            .await?;
 
         //This contains the sync string
-        let server_reply = decrypt_aes256(&server_response, &client_secret).expect("Failed to decrypt server sync packet");
+        let server_reply = decrypt_aes256(&server_response, &client_secret)
+            .expect("Failed to decrypt server sync packet");
 
-        Ok((Self {
-            client_secret,
-            state: ConnectionState::Connected(connection_pair),
-        }, server_reply))
+        Ok((
+            Self {
+                client_secret,
+                state: ConnectionState::Connected(connection_pair),
+            },
+            server_reply,
+        ))
     }
 
     pub fn reset_state(&mut self) {
@@ -1064,6 +1079,10 @@ pub struct ServerMessageReaction {
     pub char: char,
 }
 
+/// This struct is empty as its just a placeholder, because the info is provided in the struct which this message is wrapped in, and is provided directly when sending a message from the server to the client
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerMessageSync {}
+
 /// These are the possible server replies
 /// Why do we have to implement PartialEq for all of the structs? This is so funny
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
@@ -1092,6 +1111,10 @@ pub enum ServerMessageType {
     ///This message indicates an edit in the server's message list, therefor we need to send a message to the client so that the client will update its own list
     #[strum_discriminants(strum(message = "Reaction"))]
     Reaction(ServerMessageReaction),
+
+    /// This message is used to "sync" with the client, it provides useful information to the client about other clients (like last viewed message)
+    #[strum_discriminants(strum(message = "Sync"))]
+    Sync(ServerMessageSync),
 }
 
 ///This struct contains all the reactions of one message
@@ -1179,9 +1202,8 @@ impl ServerOutput {
                                     }
                                 )
                             },
-                            ServerMessageTypeDiscriminants::Deleted => {
-                                ServerMessageType::Deleted
-                            }
+                            ServerMessageTypeDiscriminants::Deleted => unreachable!(),
+                            ServerMessageTypeDiscriminants::Sync => unreachable!(),
                             ServerMessageTypeDiscriminants::Normal => unreachable!(),
                             ServerMessageTypeDiscriminants::Edit => unreachable!(),
                             ServerMessageTypeDiscriminants::Reaction => unreachable!(),
@@ -1196,7 +1218,9 @@ impl ServerOutput {
                             }
                         )
                     },
-                    ClientMessageType::ClientSyncMessage(_) => unimplemented!("Converting Sync packets isnt implemented, because they shouldnt be displayed to the client"),
+                    ClientMessageType::ClientSyncMessage(_) => {
+                        ServerMessageType::Sync(ServerMessageSync {  })
+                    },
                     //These messages also have a side effect on the server's list of the messages
                     //The client will interpret these messages and modify its own message list
                     ClientMessageType::ClientReaction(message) => {
@@ -1218,7 +1242,6 @@ impl ServerOutput {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
-    /// I will leave this field as a vec because I may have to implement syncing sometime in the future
     pub struct_list: Vec<ServerOutput>,
 
     ///All of the messages' reactions are
@@ -1246,11 +1269,14 @@ impl ServerMaster {
 
 ///This struct provides all the necessary information to keep the client and the server in sync
 /// Its struct contains ```Vec<ClientLastSeenMessage>``` which is for displaying which message has the user seen
+/// And the message the client has sent
 /// We dont need to provide any other information since, the ```ServerMaster``` struct ensures all the clients have the same field when connecting
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerSync {
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
+
+    pub message: ServerOutput,
 }
 
 impl ServerSync {

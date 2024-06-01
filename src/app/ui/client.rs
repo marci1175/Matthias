@@ -8,7 +8,7 @@ use rodio::Decoder;
 
 use crate::app::backend::{
     decrypt_aes256, display_error_message, write_image, ClientMessage, ClientMessageType,
-    ConnectionState, MessageReaction, ServerMaster,
+    ConnectionState, MessageReaction, Reaction, ServerMaster, ServerSync,
 };
 
 use crate::app::backend::{SearchType, ServerImageReply, ServerMessageType, TemplateApp};
@@ -560,22 +560,80 @@ impl TemplateApp {
                             decrypt_aes256(&message, &self.client_connection.client_secret)
                                 .unwrap();
 
-                        let incoming_struct: Result<ServerMaster, serde_json::Error> =
+                        let incoming_struct: Result<ServerSync, serde_json::Error> =
                             serde_json::from_str(&decrypted_message);
 
                         match incoming_struct {
-                            Ok(mut msg) => {
+                            Ok(msg) => {
                                 //Always make sure to store the latest user_seen list
                                 self.client_ui.incoming_msg.user_seen_list = msg.user_seen_list;
 
-                                //Allocate Message vec for the new message
-                                self.client_ui.incoming_msg.reaction_list = msg.reaction_list;
+                                //If its a sync message then we dont need to back it up
+                                if matches!(msg.message.MessageType, ServerMessageType::Sync(_)) {
+                                    return;
+                                }
 
-                                //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
-                                self.client_ui
-                                    .incoming_msg
-                                    .struct_list
-                                    .append(&mut msg.struct_list);
+                                match &msg.message.MessageType {
+                                    ServerMessageType::Edit(message) => {
+                                        if let ServerMessageType::Normal(inner) =
+                                            &mut self.client_ui.incoming_msg.struct_list
+                                                [message.index as usize]
+                                                .MessageType
+                                        {
+                                            match message.new_message.clone() {
+                                                //If the message is edited
+                                                Some(message) => {
+                                                    inner.message = message;
+                                                    inner.has_been_edited = true;
+                                                }
+                                                //If the message is deleted
+                                                None => {
+                                                    self.client_ui.incoming_msg.struct_list
+                                                        [message.index as usize]
+                                                        .MessageType = ServerMessageType::Deleted;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ServerMessageType::Reaction(message) => {
+                                        //Search if there has already been a reaction added
+                                        if let Some(index) =
+                                            self.client_ui.incoming_msg.reaction_list
+                                                [message.index as usize]
+                                                .message_reactions
+                                                .iter()
+                                                .position(|item| item.char == message.char)
+                                        {
+                                            //If yes, increment the reaction counter
+                                            self.client_ui.incoming_msg.reaction_list
+                                                [message.index as usize]
+                                                .message_reactions[index]
+                                                .times += 1;
+                                        } else {
+                                            //If no, add a new reaction counter
+                                            self.client_ui.incoming_msg.reaction_list
+                                                [message.index as usize]
+                                                .message_reactions
+                                                .push(Reaction {
+                                                    char: message.char,
+                                                    times: 1,
+                                                })
+                                        }
+                                    }
+                                    _ => {
+                                        //Allocate Message vec for the new message
+                                        self.client_ui
+                                            .incoming_msg
+                                            .reaction_list
+                                            .push(MessageReaction::default());
+
+                                        //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
+                                        self.client_ui
+                                            .incoming_msg
+                                            .struct_list
+                                            .push(dbg!(msg.message));
+                                    }
+                                }
                             }
                             Err(_err) => {
                                 // dbg!(_err);

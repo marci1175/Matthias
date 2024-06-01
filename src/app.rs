@@ -330,15 +330,13 @@ impl eframe::App for backend::TemplateApp {
 
                     //Modify local message list
                     let incoming_sync_message: Result<ServerMaster, serde_json::Error> =
-                    serde_json::from_str(&connection.1);
+                        serde_json::from_str(&connection.1);
 
                     if let Ok(incoming_message) = incoming_sync_message {
-                        self.client_ui.incoming_msg = incoming_message; 
-                    }
-                    else {
+                        self.client_ui.incoming_msg = incoming_message;
+                    } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
-
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;
@@ -359,9 +357,7 @@ impl backend::TemplateApp {
         tokio::spawn(async move {
             match connection.send_message(message).await {
                 //We dont need the server's reply since we dont handle it here
-                Ok(_server_reply) => {
-
-                }
+                Ok(_server_reply) => {}
                 Err(err) => {
                     dbg!(err.source());
                     dbg!(err);
