@@ -509,7 +509,7 @@ impl TemplateApp {
 
                 //Init sync message
                 let mut message = ClientMessage::construct_sync_msg(
-                    dbg!(&self.client_connection.password),
+                    &self.client_connection.password,
                     &self.login_username,
                     &self.opened_account.uuid,
                     //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
