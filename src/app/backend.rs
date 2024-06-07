@@ -836,7 +836,7 @@ impl ClientConnection {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
-                Ok(connection.send_message(message).await?)
+                Ok(connection.send_message(dbg!(message)).await?)
             }
         } else {
             bail!("There is no active connection to send the message on.")

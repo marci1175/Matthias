@@ -248,9 +248,7 @@ impl MessageService {
         let req: ClientMessage = req_result.unwrap();
 
         if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
-            dbg!(&sync_msg.password);
-            dbg!(&sync_msg);
-            if sync_msg.password == dbg!(self.passw.trim()) {
+            if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = sync_msg.sync_attribute {
                     //sync attr is true if its a connection message i.e a licnet is trying to connect to us
@@ -438,7 +436,14 @@ impl MessageService {
                     //Get message type
                     match &req.MessageType {
                         ClientFileRequestType(_) => unreachable!(),
-                        ClientFileUpload(_) => Upload,
+                        ClientFileUpload(inner) => {
+                            //We should match the upload type more specificly
+                            match inner.extension.clone().unwrap_or_default().as_str() {
+                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => Image,
+                                "wav" | "mp3" | "m4a" => Audio,
+                                _ => Upload,
+                            }
+                        },
                         ClientNormalMessage(_) => Normal,
                         ClientSyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
