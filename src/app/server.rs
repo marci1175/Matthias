@@ -3,9 +3,12 @@ use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 use anyhow::{Error, Result};
 
 use super::backend::{
-    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType, ServerMessageTypeDiscriminants::{
+    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
+    ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType,
+    ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    }, ServerSync
+    },
+    ServerReplyType, ServerSync,
 };
 
 use rand::Rng;
@@ -347,7 +350,12 @@ impl MessageService {
                 ClientFileRequestType(request_type) => {
                     send_message_to_client(
                         &mut *client_handle.try_lock()?,
-                        self.handle_request(request_type).await?,
+                        //Encrypt the request reply
+                        encrypt_aes256(
+                            self.handle_request(request_type).await?,
+                            &self.decryption_key,
+                        )
+                        .unwrap(),
                     )
                     .await?;
 
@@ -443,7 +451,7 @@ impl MessageService {
                                 "wav" | "mp3" | "m4a" => Audio,
                                 _ => Upload,
                             }
-                        },
+                        }
                         ClientNormalMessage(_) => Normal,
                         ClientSyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
@@ -701,21 +709,22 @@ impl MessageService {
             ClientRequestTypeStruct::ClientImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
 
-                let output = serde_json::to_string(&ServerImageReply {
-                    bytes: read_file,
-                    index: img_request.index,
-                })
-                .unwrap_or_default();
+                let output =
+                    serde_json::to_string(&ServerReplyType::ImageReply(ServerImageReply {
+                        bytes: read_file,
+                        index: img_request.index,
+                    }))
+                    .unwrap_or_default();
 
                 Ok(output)
             }
             ClientRequestTypeStruct::ClientFileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
 
-                let output = serde_json::to_string(&ServerFileReply {
+                let output = serde_json::to_string(&ServerReplyType::FileReply(ServerFileReply {
                     file_name: file_name.clone(),
                     bytes: file_bytes.clone(),
-                })
+                }))
                 .unwrap_or_default();
 
                 Ok(output)
@@ -723,12 +732,13 @@ impl MessageService {
             ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
 
-                let output = serde_json::to_string(&ServerAudioReply {
-                    bytes: file_bytes,
-                    index: audio_request.index,
-                    file_name: file_name.unwrap_or_default(),
-                })
-                .unwrap_or_default();
+                let output =
+                    serde_json::to_string(&ServerReplyType::AudioReply(ServerAudioReply {
+                        bytes: file_bytes,
+                        index: audio_request.index,
+                        file_name: file_name.unwrap_or_default(),
+                    }))
+                    .unwrap_or_default();
 
                 Ok(output)
             }

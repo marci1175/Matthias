@@ -820,7 +820,7 @@ impl ClientMessage {
 pub struct ClientConnection {
     #[serde(skip)]
     pub client_secret: Vec<u8>,
-    
+
     #[serde(skip)]
     ///This enum wraps the server handle ```Connected(_)```, it also functions as a Sort of Option wrapper
     pub state: ConnectionState,
@@ -836,7 +836,7 @@ impl ClientConnection {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
-                Ok(connection.send_message(dbg!(message)).await?)
+                Ok(connection.send_message(message).await?)
             }
         } else {
             bail!("There is no active connection to send the message on.")
@@ -882,13 +882,8 @@ impl ClientConnection {
         let connection_pair = ConnectionPair::new(writer, reader);
 
         //Sync with the server
-        let sync_message = ClientMessage::construct_sync_msg(
-            &hashed_password,
-            &author,
-            uuid,
-            0,
-            None,
-        );
+        let sync_message =
+            ClientMessage::construct_sync_msg(&hashed_password, &author, uuid, 0, None);
 
         let server_response = connection_pair
             .send_message(sync_message)
@@ -1025,17 +1020,12 @@ pub struct ServerFileUpload {
     pub index: i32,
 }
 
-///This is what the server sends back, when asked for a file (FIleRequest)
+/// This enum holds all the Server reply types so it can be decoded more easily on the client side
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerFileReply {
-    pub bytes: Vec<u8>,
-    pub file_name: PathBuf,
-}
-
-///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerImageUpload {
-    pub index: i32,
+pub enum ServerReplyType {
+    FileReply(ServerFileReply),
+    ImageReply(ServerImageReply),
+    AudioReply(ServerAudioReply),
 }
 
 ///When client asks for the image based on the provided index, reply with the image bytes
@@ -1043,6 +1033,21 @@ pub struct ServerImageUpload {
 pub struct ServerImageReply {
     pub bytes: Vec<u8>,
     pub index: i32,
+}
+
+///This is what the server sends back, when asked for a file (FIleRequest)
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerFileReply {
+    pub bytes: Vec<u8>,
+    pub file_name: PathBuf,
+}
+
+///When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerAudioReply {
+    pub bytes: Vec<u8>,
+    pub index: i32,
+    pub file_name: String,
 }
 
 ///This is what the server sends back (pushes to message vector), when reciving a normal message
@@ -1059,12 +1064,10 @@ pub struct ServerAudioUpload {
     pub file_name: String,
 }
 
-///When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerAudioReply {
-    pub bytes: Vec<u8>,
+///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerImageUpload {
     pub index: i32,
-    pub file_name: String,
 }
 
 /// This struct contains all the important information for the client to edit / update its own message list

@@ -1,14 +1,17 @@
+use std::fs;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
     Stroke,
 };
-use rodio::Decoder;
+use rodio::{Decoder, Sink};
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_image, ClientMessage, ClientMessageType,
-    ConnectionState, MessageReaction, Reaction, ServerSync,
+    decrypt_aes256, display_error_message, write_audio, write_file, write_image, ClientMessage,
+    ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
+    ServerSync,
 };
 
 use crate::app::backend::{SearchType, ServerImageReply, ServerMessageType, TemplateApp};
@@ -621,15 +624,72 @@ impl TemplateApp {
                                             .push(MessageReaction::default());
 
                                         //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
-                                        self.client_ui
-                                            .incoming_msg
-                                            .struct_list
-                                            .push(msg.message);
+                                        self.client_ui.incoming_msg.struct_list.push(msg.message);
                                     }
                                 }
                             }
+                            //If converting the message to a ServerSync then it was probably a ServerReplyType enum
                             Err(_err) => {
-                                // dbg!(_err);
+                                let incoming_reply: Result<ServerReplyType, serde_json::Error> =
+                                    serde_json::from_str(&decrypted_message);
+
+                                match incoming_reply {
+                                    Ok(inner) => {
+                                        match inner {
+                                            ServerReplyType::FileReply(file) => {
+                                                let _ = write_file(file);
+                                            }
+                                            ServerReplyType::ImageReply(image) => {
+                                                let _ = write_image(&image, self.client_ui.send_on_ip.clone());
+                                            }
+                                            ServerReplyType::AudioReply(audio) => {
+                                                let send_on_ip = self.client_ui.send_on_ip.clone();
+                                                let stream_handle = self
+                                                    .client_ui
+                                                    .audio_playback
+                                                    .stream_handle
+                                                    .clone();
+
+                                                let sender = self.audio_save_tx.clone();
+
+                                                //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
+                                                let path_to_audio = PathBuf::from(format!(
+                                                    "{}\\Matthias\\Client\\{}\\Audios\\{}",
+                                                    env!("APPDATA"),
+                                                    self.client_ui.send_on_ip_base64_encoded,
+                                                    audio.index
+                                                ));
+
+                                                let _ =
+                                                    write_audio(audio.clone(), self.client_ui.send_on_ip.clone());
+
+                                                while !path_to_audio.exists() {
+                                                    //Block until it exists, we can do this because we are in a different thread then main
+                                                }
+
+                                                let file_stream_to_be_read =
+                                                    fs::read(&path_to_audio).unwrap_or_default();
+                                                let cursor =
+                                                    PlaybackCursor::new(file_stream_to_be_read);
+                                                let sink =
+                                                    Some(Sink::try_new(&stream_handle).unwrap());
+
+                                                let _ = sender
+                                                    .send((
+                                                        sink,
+                                                        cursor,
+                                                        //Is this needed
+                                                        audio.index as usize,
+                                                        path_to_audio,
+                                                    ))
+                                                    .unwrap();
+                                            }
+                                        }
+                                    }
+                                    Err(_err) => {
+                                        dbg!(_err);
+                                    }
+                                }
                             }
                         }
                     } else {

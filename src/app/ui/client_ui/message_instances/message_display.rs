@@ -4,7 +4,7 @@ use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense,
 use regex::Regex;
 
 use crate::app::backend::{
-    write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
+    decrypt_aes256, write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
 };
 use rodio::{Decoder, Sink, Source};
 use tap::TapFallible;
@@ -36,19 +36,7 @@ impl TemplateApp {
                     let connection = self.client_connection.clone();
 
                     tokio::spawn(async move {
-                        match connection.send_message(message).await {
-                            Ok(ok) => {
-                                //If we cant wait for response, we should panic
-                                let msg = ok.wait_for_response().await.unwrap();
-
-                                let file_serve: Result<ServerFileReply, serde_json::Error> =
-                                    serde_json::from_str(&msg);
-                                let _ = write_file(file_serve.unwrap());
-                            }
-                            Err(err) => {
-                                println!("{err} ln 264")
-                            }
-                        }
+                        connection.send_message(message).await.unwrap();
                     });
                 }
             }
@@ -200,7 +188,6 @@ impl TemplateApp {
                             //We dont have file on our local system so we have to ask the server to provide it
                             let uuid = &self.opened_account.uuid;
                             let author = self.login_username.clone();
-                            let sender = self.itx.clone();
 
                             let message = ClientMessage::construct_image_request_msg(
                                 picture.index,
@@ -211,22 +198,8 @@ impl TemplateApp {
                             let connection = self.client_connection.clone();
 
                             tokio::spawn(async move {
-                                match connection.send_message(message).await {
-                                    Ok(ok) => {
-                                        //If a problem appeared whilst waiting for response its okay to panic since it is not the main thread
-                                        let msg = ok.wait_for_response().await.unwrap();
-
-                                        match sender.send(msg) {
-                                            Ok(_) => {}
-                                            Err(err) => {
-                                                println!("{}", err);
-                                            }
-                                        };
-                                    }
-                                    Err(err) => {
-                                        println!("{err} ln 264")
-                                    }
-                                }
+                                //We only have to send the message it will get recived in a diff place
+                                connection.clone().send_message(message).await.unwrap();
                             });
                         }
                     };
@@ -346,61 +319,8 @@ impl TemplateApp {
 
                                             tokio::spawn(async move {
                                                 match connection.send_message(message).await {
-                                                    Ok(response) => {
-                                                        let message = response
-                                                            .wait_for_response()
-                                                            .await
-                                                            .unwrap();
-
-                                                        let file_serve: Result<
-                                                            ServerAudioReply,
-                                                            serde_json::Error,
-                                                        > = serde_json::from_str(&message);
-                                                        let _ = write_audio(
-                                                            file_serve.unwrap(),
-                                                            send_on_ip,
-                                                        );
-
-                                                        let file_stream_to_be_read =
-                                                            fs::read(&path_to_audio)
-                                                                .unwrap_or_default();
-                                                        let cursor = PlaybackCursor::new(
-                                                            file_stream_to_be_read,
-                                                        );
-                                                        let sink = Some(
-                                                            Sink::try_new(&stream_handle).unwrap(),
-                                                        );
-
-                                                        let _ = sender
-                                                            .send((
-                                                                sink,
-                                                                cursor,
-                                                                current_index,
-                                                                path_to_audio,
-                                                            ))
-                                                            .tap_err_dbg(|dbg| {
-                                                                tracing::error!("{dbg:?}")
-                                                            });
-                                                    }
-                                                    Err(err) => {
-                                                        //The error will be logged
-                                                        tracing::error!("{err}");
-
-                                                        //The error will be displayed here
-                                                        display_error_message(err);
-
-                                                        //The error will be sent, we wont have to do anything when reciving it
-                                                        let _ = sender
-                                                            .send((
-                                                                None,
-                                                                PlaybackCursor::new(Vec::new()),
-                                                                current_index,
-                                                                path_to_audio,
-                                                            ))
-                                                            .tap_err_dbg(|dbg| {
-                                                                tracing::error!("{dbg:?}")
-                                                            });
-                                                    }
+                                                    Ok(response) => {}
+                                                    Err(_err) => {}
                                                 }
                                             });
 
