@@ -44,13 +44,11 @@ impl eframe::App for backend::TemplateApp {
         */
 
         /*devlog:
-            TODO: MAKE IT SO THAT THE CLIENT DOESNT SAVE THE FILE BASED ON ITS NAME, INSTEAD ON ITS INDEX OR UNIQUE IDENTIFIER, AND SHOULD USE THIS NAME TO DISPLAY IT
+            TODO: fix audio playback
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
-            TODO: IMPORTANT: HASH PASSOWRDS YOURE CONNECTING WITH!!!! ARGON2 IS ALREADY ADDED
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-            TODO: rework and fix file sending
         */
 
         //For image loading
