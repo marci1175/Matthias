@@ -643,7 +643,6 @@ impl TemplateApp {
                                                 let _ = write_image(&image, self.client_ui.send_on_ip.clone());
                                             }
                                             ServerReplyType::AudioReply(audio) => {
-                                                let send_on_ip = self.client_ui.send_on_ip.clone();
                                                 let stream_handle = self
                                                     .client_ui
                                                     .audio_playback

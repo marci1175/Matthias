@@ -302,8 +302,6 @@ impl TemplateApp {
                                     if ui.button("Play").clicked() {
                                         //If the user has clicked the play button only then we download the desirted audio file! Great optimisation
                                         if !path_to_audio.exists() {
-                                            let sender = self.audio_save_tx.clone();
-
                                             let message =
                                                 ClientMessage::construct_audio_request_msg(
                                                     audio.index,
@@ -312,16 +310,9 @@ impl TemplateApp {
                                                 );
 
                                             let connection = self.client_connection.clone();
-                                            let send_on_ip = self.client_ui.send_on_ip.clone();
-                                            let stream_handle =
-                                                self.client_ui.audio_playback.stream_handle.clone();
-                                            let current_index = current_index_in_message_list;
 
                                             tokio::spawn(async move {
-                                                match connection.send_message(message).await {
-                                                    Ok(response) => {}
-                                                    Err(_err) => {}
-                                                }
+                                                connection.send_message(message).await.unwrap();
                                             });
 
                                             //Set button to be disabled
