@@ -485,10 +485,6 @@ pub struct Main {
     ///Client mode main switch
     #[serde(skip)]
     pub client_mode: bool,
-
-    ///IMPORTANT: Opened account's file pathbuf
-    #[serde(skip)]
-    pub opened_account_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]

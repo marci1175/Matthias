@@ -249,14 +249,14 @@ impl eframe::App for backend::TemplateApp {
             .show(ctx, |ui| {
                 ui.label(RichText::from("Saved ip addresses"));
                 match UserInformation::deserialize(
-                    &fs::read_to_string(self.main.opened_account_path.clone()).unwrap(),
+                    &fs::read_to_string(self.opened_account.path.clone()).unwrap(),
                 ) {
                     Ok(mut user_info) => {
                         if ui.button("Save ip address").clicked() {
                             user_info.add_bookmark_entry(self.client_ui.send_on_ip.clone());
 
                             let _ = user_info
-                                .write_file(self.main.opened_account_path.clone())
+                                .write_file(self.opened_account.path.clone())
                                 .tap_err_dbg(|err| tracing::error!("{err}"));
                         };
 
@@ -284,9 +284,7 @@ impl eframe::App for backend::TemplateApp {
                                                         //Dont check if user already exists because we overwrite the file which was already there
                                                         let _ = user_info
                                                             .write_file(
-                                                                self.main
-                                                                    .opened_account_path
-                                                                    .clone(),
+                                                                self.opened_account.path.clone(),
                                                             )
                                                             .tap_err_dbg(|err| {
                                                                 tracing::error!("{err}")
