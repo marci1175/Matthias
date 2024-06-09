@@ -640,7 +640,16 @@ impl TemplateApp {
                                                 let _ = write_file(file);
                                             }
                                             ServerReplyType::ImageReply(image) => {
-                                                let _ = write_image(&image, self.client_ui.send_on_ip.clone());
+                                                let _ = write_image(
+                                                    &image,
+                                                    self.client_ui.send_on_ip.clone(),
+                                                );
+
+                                                //Forget image so itll be able to get displayed
+                                                ctx.forget_image(&format!(
+                                                    "bytes://{}",
+                                                    image.index
+                                                ));
                                             }
                                             ServerReplyType::AudioReply(audio) => {
                                                 let stream_handle = self
@@ -659,8 +668,10 @@ impl TemplateApp {
                                                     audio.index
                                                 ));
 
-                                                let _ =
-                                                    write_audio(audio.clone(), self.client_ui.send_on_ip.clone());
+                                                let _ = write_audio(
+                                                    audio.clone(),
+                                                    self.client_ui.send_on_ip.clone(),
+                                                );
 
                                                 while !path_to_audio.exists() {
                                                     //Block until it exists, we can do this because we are in a different thread then main

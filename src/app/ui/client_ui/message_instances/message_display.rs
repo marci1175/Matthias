@@ -24,7 +24,6 @@ impl TemplateApp {
             crate::app::backend::ServerMessageType::Upload(inner) => {
                 let button =
                     ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
-                button.paint_debug_info();
 
                 //If we want to download the file included in the message
                 if button.clicked() {
@@ -131,11 +130,12 @@ impl TemplateApp {
             }
             crate::app::backend::ServerMessageType::Image(picture) => {
                 let path = PathBuf::from(format!(
-                    "{}\\Matthias\\Client\\{}\\Images\\{}",
+                    "{}\\matthias\\Client\\{}\\Images\\{}",
                     env!("APPDATA"),
                     self.client_ui.send_on_ip_base64_encoded,
                     picture.index
                 ));
+
                 ui.allocate_ui(vec2(300., 300.), |ui| {
                     match fs::read(&path) {
                         Ok(image_bytes) => {
@@ -167,7 +167,7 @@ impl TemplateApp {
                         Err(_err) => {
                             //create decoy file, to manually create a race condition
                             let _ = fs::create_dir_all(PathBuf::from(format!(
-                                "{}\\Matthias\\Client\\{}\\Images",
+                                "{}\\matthias\\Client\\{}\\Images",
                                 env!("APPDATA"),
                                 self.client_ui.send_on_ip_base64_encoded,
                             )));
@@ -203,9 +203,7 @@ impl TemplateApp {
                             });
                         }
                     };
-                })
-                .response
-                .paint_debug_info();
+                });
             }
             crate::app::backend::ServerMessageType::Audio(audio) => {
                 //Create folder for audios for later problem avoidance

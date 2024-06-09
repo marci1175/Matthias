@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use egui::Color32;
 use rand::rngs::ThreadRng;
 
 use super::client::{connect_to_server, ServerReply};
@@ -301,10 +300,6 @@ pub struct Client {
     ///Search parameters set by user, to chose what to search for obviously
     pub search_parameter: SearchType,
 
-    ///Check if search panel settings panel (xd) is open
-    #[serde(skip)]
-    pub search_settings_panel: bool,
-
     ///Search buffer
     #[serde(skip)]
     pub search_buffer: String,
@@ -312,10 +307,6 @@ pub struct Client {
     ///Check if search panel is open
     #[serde(skip)]
     pub search_mode: bool,
-
-    ///Message highlighting function
-    #[serde(skip)]
-    pub message_highlight_color: Color32,
 
     ///audio playback
     #[serde(skip)]
@@ -425,11 +416,8 @@ impl Default for Client {
             display_user_list: false,
 
             search_parameter: SearchType::default(),
-            search_settings_panel: false,
             search_buffer: String::new(),
             search_mode: false,
-
-            message_highlight_color: Color32::WHITE,
             //audio playback
             audio_playback: AudioPlayback::default(),
             scroll_widget_rect: egui::Rect::NAN,
@@ -1688,11 +1676,13 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
 
     let path = format!(
-        "{}\\Matthias\\Client\\{}\\Images\\{}",
+        "{}\\matthias\\Client\\{}\\Images\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
     );
+
+    let _ = fs::create_dir(&path).inspect_err(|err| {dbg!(err);});
 
     fs::write(path, &file_response.bytes)?;
 
@@ -1704,11 +1694,13 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
     let path = format!(
-        "{}\\Matthias\\Client\\{}\\Audios\\{}",
+        "{}\\matthias\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
         file_response.index
     );
+
+    let _ = fs::create_dir(&path).inspect_err(|err| {dbg!(err);});
 
     fs::write(path, file_response.bytes)?;
 

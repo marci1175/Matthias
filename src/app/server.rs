@@ -50,7 +50,7 @@ pub struct MessageService {
 
     /// This is the list, which we will send the files from, these are generated file names, so names will rarely ever match (1 / 1.8446744e+19) chance
     /// The names are not relevant since when downloading them the client will always ask for a new name
-    pub generated_file_paths: Mutex<Vec<PathBuf>>,
+    pub file_list: Mutex<Vec<PathBuf>>,
 
     /// This list contains a list of the path to the stored images
     /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
@@ -429,8 +429,15 @@ impl MessageService {
                         //This is unreachable, as requests are handled elsewhere
                         ClientFileRequestType(_) => unreachable!(),
 
-                        ClientFileUpload(_) => {
-                            (self.generated_file_paths.lock().unwrap().len()) as i32
+                        ClientFileUpload(inner) => {
+                            match inner.extension.clone().unwrap_or_default().as_str() {
+                                //We have to subtract 1 from every len because of indexing on the client side (we check its lenght after processing the client's message therfor the lenght will be 1 altough the image is on the 0th index)
+                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.image_list.lock().unwrap().len() as i32 - 1,
+                                "wav" | "mp3" | "m4a" => self.audio_list.lock().unwrap().len() as i32 - 1,
+                                _ => {
+                                    self.file_list.lock().unwrap().len() as i32 - 1
+                                }
+                            }
                         }
 
                         ClientNormalMessage(_) => -1,
@@ -558,7 +565,7 @@ impl MessageService {
                             created_file.flush().unwrap();
                             //success
 
-                            match self.generated_file_paths.lock() {
+                            match self.file_list.lock() {
                                 Ok(mut ok) => {
                                     ok.push(PathBuf::from(format!(
                                         "{app_data}\\Matthias\\Server\\{}file.{}",
@@ -574,7 +581,7 @@ impl MessageService {
                             let mut messages = self.messages.lock().await;
                             messages.push(ServerOutput::convert_type_to_servermsg(
                                 request.clone(),
-                                self.generated_file_paths.lock().unwrap().len() as i32,
+                                self.file_list.lock().unwrap().len() as i32,
                                 Upload,
                                 request.Uuid.clone(),
                             ));
@@ -591,7 +598,7 @@ impl MessageService {
         }
     }
     async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
-        let path = &self.generated_file_paths.lock().unwrap()[index as usize];
+        let path = &self.file_list.lock().unwrap()[index as usize];
         (fs::read(path).unwrap_or_default(), path.clone())
     }
     async fn serve_image(&self, index: i32) -> Vec<u8> {
