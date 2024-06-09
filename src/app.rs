@@ -51,6 +51,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
+            TODO: make a loading wheek when loading a message / image / audio / etc
         */
 
         //For image loading
