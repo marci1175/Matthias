@@ -47,7 +47,6 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
-                            
                             let message_instances: Vec<Response> = Vec::new();
 
                             for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {

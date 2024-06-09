@@ -485,7 +485,6 @@ impl TemplateApp {
 
                 //Clone the sender so that 2 threads can each get a sender
                 let sender_clone = sender.clone();
-                
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {

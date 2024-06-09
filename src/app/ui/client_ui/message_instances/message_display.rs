@@ -28,8 +28,11 @@ impl TemplateApp {
                 //If we want to download the file included in the message
                 if button.clicked() {
                     let author = self.login_username.clone();
-                    let message =
-                        ClientMessage::construct_file_request_msg(inner.index, &self.opened_account.uuid, author);
+                    let message = ClientMessage::construct_file_request_msg(
+                        inner.index,
+                        &self.opened_account.uuid,
+                        author,
+                    );
 
                     let connection = self.client_connection.clone();
 
