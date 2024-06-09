@@ -67,7 +67,6 @@ impl eframe::App for backend::TemplateApp {
             TODO: Discord like emoji :skull:
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
             TODO: make a loading wheek when loading a message / image / audio / etc
-            TODO: fix server threading shutdown
         */
 
         //For image loading
