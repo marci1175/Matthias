@@ -1556,7 +1556,7 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> Result<String
     let cipher = Aes256Gcm::new(key);
     let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
 
-    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
+    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).inspect_err(|err| {dbg!(err);}).unwrap();
     String::from_utf8(plaintext)
 }
 

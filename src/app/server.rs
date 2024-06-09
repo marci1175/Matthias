@@ -1,6 +1,7 @@
 use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::{Error, Result};
+use tokio_util::sync::CancellationToken;
 
 use super::backend::{
     encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
@@ -16,7 +17,7 @@ use std::sync::Mutex;
 use tokio::{
     io::AsyncWrite,
     net::tcp::OwnedReadHalf,
-    sync::{broadcast, mpsc::Receiver},
+    sync::mpsc::Receiver,
 };
 
 use crate::app::backend::ServerMaster;
@@ -90,7 +91,8 @@ pub async fn server_main(
         ..Default::default()
     }));
 
-    let (thread_sender, thread_reciver) = broadcast::channel::<()>(1);
+    //This signals all the client recivers to be shut down
+    let cancellation_token = CancellationToken::new();
 
     //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
@@ -98,7 +100,7 @@ pub async fn server_main(
             //check if the server is supposed to run
             if signal.try_recv().is_ok() {
                 //send a shutdown signal to all of the client recivers using the broadcast channel
-                thread_sender.send(())?;
+                cancellation_token.cancel();
 
                 //shutdown server
                 break;
@@ -117,7 +119,7 @@ pub async fn server_main(
                 Arc::new(tokio::sync::Mutex::new(reader)),
                 Arc::new(tokio::sync::Mutex::new(writer)),
                 msg_service_clone,
-                thread_reciver.resubscribe(),
+                cancellation_token.clone(),
             );
         }
         Ok(())
@@ -126,6 +128,8 @@ pub async fn server_main(
     Ok(())
 }
 
+use tokio::select;
+
 /// This function does not need to be async since it spawn an async thread anyway
 /// Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
 #[inline]
@@ -133,25 +137,28 @@ fn spawn_client_reader(
     reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
     writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     msg_service: Arc<tokio::sync::Mutex<MessageService>>,
-    mut thread_reciver: broadcast::Receiver<()>,
+    cancellation_token: CancellationToken,
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //Check if the thread needs to be shut down
-            if thread_reciver.try_recv().is_ok() {
-                //Maybe we should implement sending a disconnection msg to all of the clients
-                break;
-            }
-
             let message_service = msg_service.lock().await;
+            
+            //Wait until client sends a message or thread gets cancelled
+            let incoming_message = select! {
+                _ = cancellation_token.cancelled() => {
+                    unimplemented!()
+                }
 
-            //the thread will block here waiting for client message, problem appears here
-            let incoming_message = recive_message(reader.clone()).await?;
-
+                msg = recive_message(reader.clone()) => {
+                    msg?
+                }
+            };
+            
             message_service
                 .message_main(incoming_message, writer.clone())
                 .await
-                .expect("Error occured while reciving a message");
+                .expect("Error occured while processing the message");
         }
         Ok(())
     });

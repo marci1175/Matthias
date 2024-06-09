@@ -21,7 +21,29 @@ impl eframe::App for backend::TemplateApp {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         //try to close connection if there is one
-        // &self.client_connection.
+        let username = self.login_username.clone();
+        let mut connection = self.client_connection.clone();
+        let password = self.client_connection.password.clone();
+        let uuid = self.opened_account.uuid.clone();
+
+        //Disconnect from server
+        tokio::task::spawn(async move {
+            match ClientConnection::disconnect(
+                &mut connection,
+                username,
+                password,
+                uuid,
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(err) => {
+                    display_error_message(err);
+                }
+            };
+        });
+
+        //We dont have to reset state, cuz the app has already exited
 
         //clean up after server, client
         match std::env::var("APPDATA") {
@@ -38,14 +60,7 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        /* NOTES:
-
-            - file_tray_main.rs contains reply_tray
-            - we use the self.client_ui.seen_list to get the list of all of the connected clients
-
-        */
-
-        /*devlog:
+        /* devlog:
             TODO: fix audio playback
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
