@@ -32,7 +32,7 @@ impl TemplateApp {
                         self.server_shutdown_token = CancellationToken::new();
 
                         let token = self.server_shutdown_token.child_token();
-                        
+
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
@@ -65,9 +65,6 @@ impl TemplateApp {
                         let token = self.server_shutdown_token.clone();
 
                         tokio::spawn(async move {
-                            
-                            println!("SENT SHUTDOWN");
-
                             //Throw away error, because we already inspect it
                             token.cancel();
                         });

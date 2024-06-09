@@ -1549,7 +1549,7 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> Result<String
     let cipher = Aes256Gcm::new(key);
     let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
 
-    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).inspect_err(|err| {dbg!(err);}).unwrap();
+    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
     String::from_utf8(plaintext)
 }
 
@@ -1675,7 +1675,9 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
         file_response.index
     );
 
-    let _ = fs::create_dir(&path).inspect_err(|err| {dbg!(err);});
+    let _ = fs::create_dir(&path).inspect_err(|err| {
+        dbg!(err);
+    });
 
     fs::write(path, &file_response.bytes)?;
 
@@ -1693,7 +1695,9 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
         file_response.index
     );
 
-    let _ = fs::create_dir(&path).inspect_err(|err| {dbg!(err);});
+    let _ = fs::create_dir(&path).inspect_err(|err| {
+        dbg!(err);
+    });
 
     fs::write(path, file_response.bytes)?;
 

@@ -24,13 +24,12 @@ impl TemplateApp {
             crate::app::backend::ServerMessageType::Upload(inner) => {
                 let button =
                     ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
-
+                button.paint_debug_info();
                 //If we want to download the file included in the message
                 if button.clicked() {
-                    let passw = self.client_connection.password.clone();
                     let author = self.login_username.clone();
                     let message =
-                        ClientMessage::construct_file_request_msg(inner.index, &passw, author);
+                        ClientMessage::construct_file_request_msg(inner.index, &self.opened_account.uuid, author);
 
                     let connection = self.client_connection.clone();
 

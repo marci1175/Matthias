@@ -28,14 +28,7 @@ impl eframe::App for backend::TemplateApp {
 
         //Disconnect from server
         tokio::task::spawn(async move {
-            match ClientConnection::disconnect(
-                &mut connection,
-                username,
-                password,
-                uuid,
-            )
-            .await
-            {
+            match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
                 Ok(_) => {}
                 Err(err) => {
                     display_error_message(err);
@@ -334,7 +327,8 @@ impl eframe::App for backend::TemplateApp {
                         serde_json::from_str(&connection.1);
 
                     //Modify the base64 encoded string of send on ip, so it can be used in different places without having to re-encode every frame
-                    self.client_ui.send_on_ip_base64_encoded = general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
+                    self.client_ui.send_on_ip_base64_encoded =
+                        general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
 
                     if let Ok(incoming_message) = incoming_sync_message {
                         self.client_ui.incoming_msg = incoming_message;

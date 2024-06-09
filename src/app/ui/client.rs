@@ -543,7 +543,7 @@ impl TemplateApp {
                         //We only have to send the sync message, since in the other thread we are reciving every message sent to us
                         connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
                     }
-                    
+
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender.send(None);
                 });
@@ -555,6 +555,10 @@ impl TemplateApp {
                 Ok(msg) => {
                     //show messages
                     if let Some(message) = msg {
+                        if message == "Invalid Password!" {
+                            display_error_message("The client has sent a message, with a possibly invalid uuid. Please open an issue on github!")
+                        }
+
                         ctx.request_repaint();
 
                         //Decrypt the server's reply

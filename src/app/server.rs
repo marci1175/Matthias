@@ -12,14 +12,6 @@ use super::backend::{
     ServerReplyType, ServerSync,
 };
 
-use rand::Rng;
-use std::sync::Mutex;
-use tokio::{
-    io::AsyncWrite,
-    net::tcp::OwnedReadHalf,
-    sync::mpsc::Receiver,
-};
-use tokio::select;
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
@@ -30,6 +22,10 @@ use crate::app::backend::{
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
+use rand::Rng;
+use std::sync::Mutex;
+use tokio::select;
+use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -97,7 +93,6 @@ pub async fn server_main(
     //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
-
             //Wait for incoming connections or wait till the server gets shut down
             let (stream, _address) = select! {
                 _ = cancellation_child.cancelled() => {
@@ -141,7 +136,7 @@ fn spawn_client_reader(
         loop {
             //Check if the thread needs to be shut down
             let message_service = msg_service.lock().await;
-            
+
             //Wait until client sends a message or thread gets cancelled
             let incoming_message = select! {
                 _ = cancellation_token.cancelled() => {
@@ -153,7 +148,7 @@ fn spawn_client_reader(
                     msg?
                 }
             };
-            
+
             message_service
                 .message_main(incoming_message, writer.clone())
                 .await
@@ -343,7 +338,7 @@ impl MessageService {
             .try_lock()
             .unwrap()
             .iter()
-            .any(|client| client.uuid == req.Uuid)
+            .any(|client| client.uuid == *dbg!(&req.Uuid))
         //Search through the list
         {
             match &req.MessageType {
@@ -438,11 +433,13 @@ impl MessageService {
                         ClientFileUpload(inner) => {
                             match inner.extension.clone().unwrap_or_default().as_str() {
                                 //We have to subtract 1 from every len because of indexing on the client side (we check its lenght after processing the client's message therfor the lenght will be 1 altough the image is on the 0th index)
-                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.image_list.lock().unwrap().len() as i32 - 1,
-                                "wav" | "mp3" | "m4a" => self.audio_list.lock().unwrap().len() as i32 - 1,
-                                _ => {
-                                    self.file_list.lock().unwrap().len() as i32 - 1
+                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
+                                    self.image_list.lock().unwrap().len() as i32 - 1
                                 }
+                                "wav" | "mp3" | "m4a" => {
+                                    self.audio_list.lock().unwrap().len() as i32 - 1
+                                }
+                                _ => self.file_list.lock().unwrap().len() as i32 - 1,
                             }
                         }
 
@@ -718,44 +715,38 @@ impl MessageService {
         &self,
         request_type: &ClientRequestTypeStruct,
     ) -> anyhow::Result<String> {
-        match request_type {
+        let reply = match request_type {
             ClientRequestTypeStruct::ClientImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
 
-                let output =
-                    serde_json::to_string(&ServerReplyType::ImageReply(ServerImageReply {
-                        bytes: read_file,
-                        index: img_request.index,
-                    }))
-                    .unwrap_or_default();
-
-                Ok(output)
+                serde_json::to_string(&ServerReplyType::ImageReply(ServerImageReply {
+                    bytes: read_file,
+                    index: img_request.index,
+                }))
+                .unwrap_or_default()
             }
             ClientRequestTypeStruct::ClientFileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
 
-                let output = serde_json::to_string(&ServerReplyType::FileReply(ServerFileReply {
+                serde_json::to_string(&ServerReplyType::FileReply(ServerFileReply {
                     file_name: file_name.clone(),
                     bytes: file_bytes.clone(),
                 }))
-                .unwrap_or_default();
-
-                Ok(output)
+                .unwrap_or_default()
             }
             ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
 
-                let output =
-                    serde_json::to_string(&ServerReplyType::AudioReply(ServerAudioReply {
-                        bytes: file_bytes,
-                        index: audio_request.index,
-                        file_name: file_name.unwrap_or_default(),
-                    }))
-                    .unwrap_or_default();
-
-                Ok(output)
+                serde_json::to_string(&ServerReplyType::AudioReply(ServerAudioReply {
+                    bytes: file_bytes,
+                    index: audio_request.index,
+                    file_name: file_name.unwrap_or_default(),
+                }))
+                .unwrap_or_default()
             }
-        }
+        };
+
+        Ok(reply)
     }
 
     /// handle all the file uploads
