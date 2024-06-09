@@ -4,6 +4,7 @@ use crate::app::server;
 use egui::{vec2, Align, Layout, RichText};
 use tap::Tap;
 use tokio::sync;
+use tokio_util::sync::CancellationToken;
 
 impl TemplateApp {
     pub fn server_setup_ui(&mut self, ui: &mut egui::Ui) {
@@ -27,16 +28,15 @@ impl TemplateApp {
                             false => "".to_string(),
                         };
 
-                        //Create a new pair of channels
-                        let (sender, reciver) = sync::mpsc::channel(1);
-
                         //Overwrite the channel we have in the TemplateApp struct
-                        self.server_shutdown_sender = sender;
+                        self.server_shutdown_token = CancellationToken::new();
 
+                        let token = self.server_shutdown_token.child_token();
+                        
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw, reciver)
+                                    match server::server_main(port.to_string(), server_pw, token)
                                         .await
                                     {
                                         Ok(_temp_stuff) => {}
@@ -62,13 +62,14 @@ impl TemplateApp {
                     }
                 } else {
                     if ui.button("Shutdown").clicked() {
-                        let sender = self.server_shutdown_sender.clone();
+                        let token = self.server_shutdown_token.clone();
 
                         tokio::spawn(async move {
+                            
+                            println!("SENT SHUTDOWN");
+
                             //Throw away error, because we already inspect it
-                            let _ = sender.send(()).await.tap_dbg(|func| {
-                                let _ = func.inspect_err(|e| tracing::error!("{e:?}"));
-                            });
+                            token.cancel();
                         });
 
                         //Reset server state

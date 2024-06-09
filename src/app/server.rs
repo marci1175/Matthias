@@ -19,7 +19,7 @@ use tokio::{
     net::tcp::OwnedReadHalf,
     sync::mpsc::Receiver,
 };
-
+use tokio::select;
 use crate::app::backend::ServerMaster;
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
@@ -79,7 +79,8 @@ pub struct MessageService {
 pub async fn server_main(
     port: String,
     password: String,
-    mut signal: Receiver<()>,
+    //This signals all the client recivers to be shut down
+    cancellation_token: CancellationToken,
 ) -> Result<(), Box<dyn std::error::Error>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
@@ -91,23 +92,22 @@ pub async fn server_main(
         ..Default::default()
     }));
 
-    //This signals all the client recivers to be shut down
-    let cancellation_token = CancellationToken::new();
+    let cancellation_child = cancellation_token.child_token();
 
     //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
-            //check if the server is supposed to run
-            if signal.try_recv().is_ok() {
-                //send a shutdown signal to all of the client recivers using the broadcast channel
-                cancellation_token.cancel();
 
-                //shutdown server
-                break;
-            }
-
-            //accept connection
-            let (stream, _address) = tcp_listener.accept().await?;
+            //Wait for incoming connections or wait till the server gets shut down
+            let (stream, _address) = select! {
+                _ = cancellation_child.cancelled() => {
+                    //shutdown server
+                    break;
+                }
+                connection = tcp_listener.accept() => {
+                    connection?
+                }
+            };
 
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
@@ -119,7 +119,7 @@ pub async fn server_main(
                 Arc::new(tokio::sync::Mutex::new(reader)),
                 Arc::new(tokio::sync::Mutex::new(writer)),
                 msg_service_clone,
-                cancellation_token.clone(),
+                cancellation_token.child_token(),
             );
         }
         Ok(())
@@ -127,8 +127,6 @@ pub async fn server_main(
 
     Ok(())
 }
-
-use tokio::select;
 
 /// This function does not need to be async since it spawn an async thread anyway
 /// Spawn reader thread, this will constantly listen to the client which was connected, this thread will only finish if the client disconnects
@@ -147,7 +145,8 @@ fn spawn_client_reader(
             //Wait until client sends a message or thread gets cancelled
             let incoming_message = select! {
                 _ = cancellation_token.cancelled() => {
-                    unimplemented!()
+                    //If thread has been cancelled break out of the loop
+                    break;
                 }
 
                 msg = recive_message(reader.clone()) => {

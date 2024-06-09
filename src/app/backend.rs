@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use rand::rngs::ThreadRng;
+use tokio_util::sync::CancellationToken;
 
 use super::client::{connect_to_server, ServerReply};
 use aes_gcm::aead::generic_array::GenericArray;
@@ -69,11 +70,7 @@ pub struct TemplateApp {
 
     ///Server shutdown handler channel
     #[serde(skip)]
-    pub server_shutdown_reciver: tokio::sync::mpsc::Receiver<()>,
-
-    ///Server shutdown handler channel
-    #[serde(skip)]
-    pub server_shutdown_sender: tokio::sync::mpsc::Sender<()>,
+    pub server_shutdown_token: CancellationToken,
 
     ///What is the server's password set to
     pub server_password: String,
@@ -176,9 +173,6 @@ impl Default for TemplateApp {
         let (connection_sender, connection_reciver) =
             mpsc::channel::<Option<(ClientConnection, String)>>();
 
-        //Use the tokio sync crate for it to be async
-        let (server_shutdown_sender, server_shutdown_reciver) = tokio::sync::mpsc::channel(1);
-
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
         let (autosync_input_sender, autosync_input_reciver) = tokio::sync::broadcast::channel(1);
@@ -217,10 +211,9 @@ impl Default for TemplateApp {
             irx,
             itx,
 
-            //These default values will get overwritten when crating the new server, so we can pass in the reciver to the thread
+            //This default value will get overwritten when crating the new server, so we can pass in the token to the thread
             //Also, the shutdown reciver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D
-            server_shutdown_reciver,
-            server_shutdown_sender,
+            server_shutdown_token: CancellationToken::new(),
 
             //thread communication for audio recording
             atx: None,

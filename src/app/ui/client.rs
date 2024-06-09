@@ -543,6 +543,7 @@ impl TemplateApp {
                         //We only have to send the sync message, since in the other thread we are reciving every message sent to us
                         connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
                     }
+                    
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender.send(None);
                 });
