@@ -485,6 +485,7 @@ impl TemplateApp {
 
                 //Clone the sender so that 2 threads can each get a sender
                 let sender_clone = sender.clone();
+                
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
@@ -501,6 +502,7 @@ impl TemplateApp {
                             Err(err) => {
                                 eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                 eprintln!("Early end of file error is a normal occurence after disconnecting");
+                                display_error_message(err);
                                 break;
                             },
                         };
@@ -688,7 +690,7 @@ impl TemplateApp {
                                                 let sink =
                                                     Some(Sink::try_new(&stream_handle).unwrap());
 
-                                                let _ = sender
+                                                sender
                                                     .send((
                                                         sink,
                                                         cursor,
@@ -713,7 +715,7 @@ impl TemplateApp {
                         });
 
                         //Then the thread got an error, we should reset the state
-                        self.server_sender_thread = None;
+                        // self.server_sender_thread = None;
                     }
                 }
                 Err(_err) => {

@@ -1,4 +1,4 @@
-use crate::app::backend::{ClientMessage, ConnectionState, TemplateApp};
+use crate::app::backend::{ClientMessage, ConnectionState, MessagingMode, TemplateApp};
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::epaint::text::cursor::Cursor;
@@ -158,12 +158,23 @@ impl TemplateApp {
                         if !(self.client_ui.usr_msg.trim().is_empty()
                             || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
                         {
-                            self.send_msg(ClientMessage::construct_normal_msg(
-                                &self.client_ui.usr_msg,
-                                &self.opened_account.uuid,
-                                &self.login_username,
-                                self.client_ui.replying_to,
-                            ))
+                            match self.client_ui.messaging_mode {
+                                MessagingMode::Edit(index) => {
+                                    self.send_msg(ClientMessage::construct_client_message_edit(
+                                        index,
+                                        Some(self.client_ui.usr_msg.clone()),
+                                        &self.opened_account.uuid,
+                                        &self.login_username,
+                                    ))
+                                }
+                                //If its reply or normal mode we can just send the message and call get_reply_index on it
+                                _ => self.send_msg(ClientMessage::construct_normal_msg(
+                                    &self.client_ui.usr_msg,
+                                    &self.opened_account.uuid,
+                                    &self.login_username,
+                                    dbg!(self.client_ui.messaging_mode.get_reply_index()),
+                                )),
+                            }
                         }
 
                         for file_path in &self.client_ui.files_to_send {
@@ -173,14 +184,14 @@ impl TemplateApp {
                                     file_path.clone(),
                                     &self.opened_account.uuid,
                                     &self.login_username,
-                                    self.client_ui.replying_to,
+                                    self.client_ui.messaging_mode.get_reply_index(),
                                 ));
                             }
                         }
 
                         //clear vectors
                         self.client_ui.files_to_send.clear();
-                        self.client_ui.replying_to = None;
+                        self.client_ui.messaging_mode = MessagingMode::Normal;
                         self.client_ui.usr_msg.clear();
                     }
 
@@ -266,7 +277,7 @@ impl TemplateApp {
                                             ok.to_path_buf().clone(),
                                             &self.opened_account.uuid,
                                             &self.login_username,
-                                            self.client_ui.replying_to,
+                                            self.client_ui.messaging_mode.get_reply_index(),
                                         ));
 
                                         let _ = fs::remove_file(ok.to_path_buf());

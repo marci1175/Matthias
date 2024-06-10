@@ -1,5 +1,5 @@
 use crate::app::backend::{
-    AudioSettings, ClientMessage, ScrollToMessage, ServerMessageType, TemplateApp,
+    AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
 };
 use egui::{vec2, Align, Color32, Layout, Response, RichText};
 
@@ -141,28 +141,25 @@ impl TemplateApp {
                                     //Client-side uuid check, there is a check in the server file
                                     if item.uuid == self.opened_account.uuid && item.MessageType != ServerMessageType::Deleted {
                                         ui.horizontal(|ui| {
-
-                                            //We should only thisplay the text edit widget if its on an editable message
-                                            if matches!(item.MessageType, ServerMessageType::Normal(_)) {
-                                                ui.text_edit_multiline(&mut self.client_ui.text_edit_buffer);
-                                            }
-
                                             ui.vertical(|ui| {
                                                 ui.allocate_ui(vec2(100., 10.), |ui| {
+                                                    if ui.button("Reply").clicked() {
+                                                        self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
+                                                    }
+
                                                     //We should only display the `edit` button if its anormal message thus its editable
-                                                    if matches!(item.MessageType, ServerMessageType::Normal(_)) && ui.button("Edit").clicked() {
-                                                        self.send_msg(
-                                                            ClientMessage::construct_client_message_edit(iter_index, Some(self.client_ui.text_edit_buffer.clone()), &self.opened_account.uuid, &self.opened_account.username)
-                                                        );
-                                                        self.client_ui.text_edit_buffer.clear();
-                                                        ui.close_menu();
+                                                    if let ServerMessageType::Normal(inner) = &item.MessageType {
+                                                        if ui.button("Edit").clicked() {
+                                                            self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
+                                                            self.client_ui.usr_msg = inner.message.to_string();
+                                                            ui.close_menu();
+                                                        }
                                                     }
 
                                                     if ui.button("Delete").clicked() {
                                                         self.send_msg(
                                                             ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_account.uuid, &self.opened_account.username)
                                                         );
-                                                        self.client_ui.text_edit_buffer.clear();
                                                         ui.close_menu();
                                                     }
                                                 });
@@ -217,10 +214,6 @@ impl TemplateApp {
                                             });
                                         });
                                     });
-
-                                    if ui.button("Reply").clicked() {
-                                        self.client_ui.replying_to = Some(iter_index);
-                                    }
                                     if let ServerMessageType::Normal(inner) = &item.MessageType {
                                         if ui.button("Copy text").clicked() {
                                             ctx.copy_text(inner.message.clone());

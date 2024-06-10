@@ -4,13 +4,12 @@ use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense,
 use regex::Regex;
 
 use crate::app::backend::{
-    decrypt_aes256, write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
+    write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
 };
-use rodio::{Decoder, Sink, Source};
-use tap::TapFallible;
+use rodio::{Decoder, Source};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{display_error_message, write_audio, PlaybackCursor, ServerAudioReply};
+use crate::app::backend::PlaybackCursor;
 impl TemplateApp {
     pub fn message_display(
         &mut self,

@@ -25,7 +25,7 @@ use crate::app::backend::{
 use rand::Rng;
 use std::sync::Mutex;
 use tokio::select;
-use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, sync::mpsc::Receiver};
+use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -338,7 +338,7 @@ impl MessageService {
             .try_lock()
             .unwrap()
             .iter()
-            .any(|client| client.uuid == *dbg!(&req.Uuid))
+            .any(|client| client.uuid == req.Uuid)
         //Search through the list
         {
             match &req.MessageType {

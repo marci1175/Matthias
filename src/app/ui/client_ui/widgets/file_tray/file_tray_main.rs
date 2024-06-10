@@ -1,11 +1,11 @@
 use egui::{vec2, Align, Color32, ImageButton, Layout, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{ServerMessageType, TemplateApp};
+use crate::app::backend::{MessagingMode, ServerMessageType, TemplateApp};
 
 impl TemplateApp {
     pub fn file_tray(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.client_ui.files_to_send.is_empty() || self.client_ui.replying_to.is_some()) && self.client_ui.usr_msg_expanded, |ui|{
+        egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.client_ui.files_to_send.is_empty() || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_)) || matches!(self.client_ui.messaging_mode, MessagingMode::Edit(_))) && self.client_ui.usr_msg_expanded, |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));
                 egui::ScrollArea::horizontal()
                         .id_source("file_to_send")
@@ -72,38 +72,78 @@ impl TemplateApp {
                                 }
                             });
                 });
-                if let Some(replying_to) = self.client_ui.replying_to {
-                    if !self.client_ui.files_to_send.is_empty() {
-                        ui.separator();
-                    }
-                    ui.horizontal(|ui| {
-                        ui.group(|ui|{
-                            //Replying to ui part
-                            ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                                //place them in one line
-                                //Selected message
-                                let selected_message = &self.client_ui.incoming_msg.struct_list[replying_to];
-                                ui.horizontal(|ui| {
-                                    //Replying to "{author}:"
-                                    ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
-                                    ui.label(RichText::from(match &selected_message.MessageType {
-                                        ServerMessageType::Deleted => "Deleted message".to_string(),
-                                        ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
-                                        ServerMessageType::Image(_img) => "Image".to_string(),
-                                        ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                        ServerMessageType::Normal(msg) => msg.message.clone(),
-                                        //These two enums shouldnt be displayed, thus are not supposed to be interacted with (by the user)
-                                        // ServerMessageType::Edit(_) => todo!(),
-                                        // ServerMessageType::Reaction(_) => todo!(),
-                                        _ => { unimplemented!() }
-                                    }).size(self.font_size).strong());
+                
+                match self.client_ui.messaging_mode {
+                    MessagingMode::Edit(edit_index) => {
+                        if !self.client_ui.files_to_send.is_empty() {
+                            ui.separator();
+                        }
+                        ui.horizontal(|ui| {
+                            ui.group(|ui|{
+                                //Replying to ui part
+                                ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                                    //place them in one line
+                                    //Selected message
+                                    let selected_message = &self.client_ui.incoming_msg.struct_list[edit_index];
+                                    ui.horizontal(|ui| {
+                                        //Replying to "{author}:"
+                                        ui.label(RichText::from(match &selected_message.MessageType {
+                                            //We only have to display this enum variant cuz thats the only one which can be edited
+                                            ServerMessageType::Normal(msg) => format!("Editing: {}", {
+                                                let mut msg = msg.message.clone();
+
+                                                //Truncate message if its too long
+                                                if msg.len() > 20 {
+                                                    msg.truncate(20);
+                                                    msg.push_str(". . .");
+                                                }
+
+                                                msg
+                                            }),
+                                            _ => { unimplemented!() }
+                                        }).size(self.font_size).strong());
+                                    });
                                 });
                             });
+                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
+                                self.client_ui.messaging_mode = MessagingMode::Normal;
+                            }
                         });
-                        if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
-                            self.client_ui.replying_to = None;
+                    }
+                    MessagingMode::Reply(replying_to) => {
+                        if !self.client_ui.files_to_send.is_empty() {
+                            ui.separator();
                         }
-                    });
+                        ui.horizontal(|ui| {
+                            ui.group(|ui|{
+                                //Replying to ui part
+                                ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
+                                    //place them in one line
+                                    //Selected message
+                                    let selected_message = &self.client_ui.incoming_msg.struct_list[replying_to];
+                                    ui.horizontal(|ui| {
+                                        //Replying to "{author}:"
+                                        ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
+                                        ui.label(RichText::from(match &selected_message.MessageType {
+                                            ServerMessageType::Deleted => "Deleted message".to_string(),
+                                            ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
+                                            ServerMessageType::Image(_img) => "Image".to_string(),
+                                            ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                            ServerMessageType::Normal(msg) => msg.message.clone(),
+                                            //These two enums shouldnt be displayed, thus are not supposed to be interacted with (by the user)
+                                            // ServerMessageType::Edit(_) => todo!(),
+                                            // ServerMessageType::Reaction(_) => todo!(),
+                                            _ => { unimplemented!() }
+                                        }).size(self.font_size).strong());
+                                    });
+                                });
+                            });
+                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
+                                self.client_ui.messaging_mode = MessagingMode::Normal;
+                            }
+                        });
+                    }
+                    MessagingMode::Normal => {},
                 }
                 ui.allocate_space(vec2(ui.available_width(), 10.));
             });

@@ -2,8 +2,6 @@ use crate::app::backend::{display_error_message, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
 use egui::{vec2, Align, Layout, RichText};
-use tap::Tap;
-use tokio::sync;
 use tokio_util::sync::CancellationToken;
 
 impl TemplateApp {

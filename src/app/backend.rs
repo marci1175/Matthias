@@ -359,9 +359,13 @@ pub struct Client {
     #[serde(skip)]
     pub drop_file_animation: bool,
 
-    //This indexes the user's selected messages for replying
+    /// This field sets the message edit mode
+    /// 3 Enums:
+    /// Normal
+    /// Reply(. . .)
+    /// Edit(. . .)
     #[serde(skip)]
-    pub replying_to: Option<usize>,
+    pub messaging_mode: MessagingMode,
 
     ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
@@ -370,10 +374,6 @@ pub struct Client {
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
     pub incoming_msg: ServerMaster,
-
-    /// Incoming messages len, its a mutex so it can sasfely sent between threads (for syncing)
-    #[serde(skip)]
-    pub incoming_msg_len: Arc<Mutex<usize>>,
 
     /// Last seen message's index, this will get sent
     #[serde(skip)]
@@ -393,16 +393,12 @@ pub struct Client {
     ///Log when the voice recording has been started so we know how long the recording is
     #[serde(skip)]
     pub voice_recording_start: Option<DateTime<Utc>>,
-
-    #[serde(skip)]
-    ///When editing a message this buffer gets overwritten, and this gets sent which will overwrite the original message
-    pub text_edit_buffer: String,
 }
 impl Default for Client {
     fn default() -> Self {
         Self {
             text_edit_cursor: None,
-
+            messaging_mode: MessagingMode::Normal,
             connected_users_display_rect: None,
 
             user_selector_index: 0,
@@ -441,12 +437,9 @@ impl Default for Client {
 
             //msg
             usr_msg: String::new(),
-            replying_to: None,
             incoming_msg: ServerMaster::default(),
 
             voice_recording_start: None,
-            text_edit_buffer: String::new(),
-            incoming_msg_len: Arc::new(Mutex::new(0)),
             last_seen_msg_index: Arc::new(Mutex::new(0)),
         }
     }
@@ -466,6 +459,25 @@ pub struct Main {
     ///Client mode main switch
     #[serde(skip)]
     pub client_mode: bool,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
+pub enum MessagingMode {
+    #[default]
+    Normal,
+    /// The inner value of this enum holds the index which this message is editing
+    Edit(usize),
+    /// The inner value of this enum holds the index which this message is replying to
+    Reply(usize),
+}
+
+impl MessagingMode {
+    pub fn get_reply_index(&self) -> Option<usize> {
+        match self {
+            MessagingMode::Reply(i) => Some(*i),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
