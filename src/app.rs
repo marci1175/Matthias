@@ -54,6 +54,7 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* devlog:
+            TODO: put more icons on buttons for better UX
             TODO: fix audio playback
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
