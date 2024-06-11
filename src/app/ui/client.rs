@@ -486,6 +486,9 @@ impl TemplateApp {
                 //Clone the sender so that 2 threads can each get a sender
                 let sender_clone = sender.clone();
                 
+                //We clone ctx, so we can call request_repaint from inside the thread
+                let context_clone = ctx.clone();
+
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
@@ -496,7 +499,11 @@ impl TemplateApp {
                         match ServerReply::wait_for_response(&ServerReply {
                             reader: reader.clone(),
                         }).await {
+                                //If we have a reponse from the server
                             Ok(response) => {
+                                //Request repaint
+                                context_clone.request_repaint();
+                                //Send to reciver
                                 sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
                             },
                             Err(err) => {

@@ -140,6 +140,7 @@ impl TemplateApp {
                                 message_group.response.context_menu(|ui|{
                                     if ui.button("Reply").clicked() {
                                         self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
+                                        ui.close_menu();
                                     }
                                     ui.separator();
                                     //Client-side uuid check, there is a check in the server file
@@ -147,8 +148,6 @@ impl TemplateApp {
                                         ui.horizontal(|ui| {
                                             ui.vertical(|ui| {
                                                 ui.allocate_ui(vec2(100., 10.), |ui| {
-                                                    
-
                                                     //We should only display the `edit` button if its anormal message thus its editable
                                                     if let ServerMessageType::Normal(inner) = &item.MessageType {
                                                         if ui.button("Edit").clicked() {
@@ -220,6 +219,7 @@ impl TemplateApp {
                                         if ui.button("Copy text").clicked() {
                                             ctx.copy_text(inner.message.clone());
                                         };
+                                        ui.close_menu();
                                     }
                                 });
                             };

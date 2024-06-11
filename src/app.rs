@@ -1,6 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Layout, RichText};
+use egui::{vec2, Align, Color32, Layout, RichText, Style, Visuals};
 use std::fs::{self};
 use tap::TapFallible;
 
@@ -53,6 +53,13 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_style(
+            Style {
+                visuals: Visuals::dark(),
+                ..Default::default()
+            }
+        );
+        
         /* devlog:
             TODO: optimize syncing by waiting for last seen message difference
             TODO: put more icons on buttons for better UX
