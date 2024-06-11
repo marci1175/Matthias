@@ -138,14 +138,16 @@ impl TemplateApp {
                                 });
 
                                 message_group.response.context_menu(|ui|{
+                                    if ui.button("Reply").clicked() {
+                                        self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
+                                    }
+                                    ui.separator();
                                     //Client-side uuid check, there is a check in the server file
                                     if item.uuid == self.opened_account.uuid && item.MessageType != ServerMessageType::Deleted {
                                         ui.horizontal(|ui| {
                                             ui.vertical(|ui| {
                                                 ui.allocate_ui(vec2(100., 10.), |ui| {
-                                                    if ui.button("Reply").clicked() {
-                                                        self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
-                                                    }
+                                                    
 
                                                     //We should only display the `edit` button if its anormal message thus its editable
                                                     if let ServerMessageType::Normal(inner) = &item.MessageType {
