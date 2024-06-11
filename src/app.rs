@@ -54,6 +54,7 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* devlog:
+            TODO: optimize syncing by waiting for last seen message difference
             TODO: put more icons on buttons for better UX
             TODO: fix audio playback
             TODO: add notfications
