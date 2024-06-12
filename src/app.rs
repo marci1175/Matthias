@@ -53,13 +53,11 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_style(
-            Style {
-                visuals: Visuals::dark(),
-                ..Default::default()
-            }
-        );
-        
+        ctx.set_style(Style {
+            visuals: Visuals::dark(),
+            ..Default::default()
+        });
+
         /* devlog:
             TODO: optimize syncing by waiting for last seen message difference
             TODO: put more icons on buttons for better UX
@@ -128,7 +126,7 @@ impl eframe::App for backend::TemplateApp {
                             let password = self.client_connection.password.clone();
 
                             match &self.client_connection.state {
-                                ConnectionState::Connected(_) => {
+                                ConnectionState::Connected(_) | &ConnectionState::Error => {
                                     if ui
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
@@ -181,6 +179,9 @@ impl eframe::App for backend::TemplateApp {
                                         let sender = self.connection_sender.clone();
                                         let uuid = self.opened_account.uuid.clone();
 
+                                        //Clone ctx so we can call request repaint from another thread
+                                        let ctx = ctx.clone();
+
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
                                                 ip, username, password, &uuid,
@@ -188,6 +189,7 @@ impl eframe::App for backend::TemplateApp {
                                             .await
                                             {
                                                 Ok(ok) => {
+                                                    ctx.request_repaint();
                                                     if let Err(err) = sender.send(Some(ok)) {
                                                         dbg!(err);
                                                     };

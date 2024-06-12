@@ -72,7 +72,6 @@ impl TemplateApp {
                                 }
                             });
                 });
-                
                 match self.client_ui.messaging_mode {
                     MessagingMode::Edit(edit_index) => {
                         if !self.client_ui.files_to_send.is_empty() {

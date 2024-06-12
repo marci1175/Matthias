@@ -485,7 +485,6 @@ impl TemplateApp {
 
                 //Clone the sender so that 2 threads can each get a sender
                 let sender_clone = sender.clone();
-                
                 //We clone ctx, so we can call request_repaint from inside the thread
                 let context_clone = ctx.clone();
 
@@ -527,29 +526,37 @@ impl TemplateApp {
                     self.client_ui.incoming_msg.struct_list.len(),
                     Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
                 );
+
                 let last_seen_message_index = self.client_ui.last_seen_msg_index.clone();
 
                 //Spawn server syncer thread
                 tokio::spawn(async move {
                     loop {
-                        // sleep when begining a new thread
-                        tokio::time::sleep(Duration::from_secs_f32(2.)).await;
-
                         //Recive input from main thread to shutdown
-                        if reciver_clone.try_recv().is_ok() {
-                            break;
-                        }
+                        // if reciver_clone.try_recv().is_ok() {
+                        //     break;
+                        // }
+
+                        //switch to tokio token
 
                         //We should update the message for syncing, so we will provide the latest info to the server
                         if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
-                            inner.last_seen_message_index = match last_seen_message_index.lock() {
-                                Ok(index) => Some(*index),
-                                Err(_err) => None,
+                            // inner.last_seen_message_index = match last_seen_message_index.lock() {
+                            //     Ok(index) => Some(*index),
+                            //     Err(_err) => None,
+                            // }
+
+                            let index = *last_seen_message_index.lock().unwrap();
+
+                            if inner.last_seen_message_index < Some(index) {
+                                inner.last_seen_message_index = Some(index);
+
+                                //We only send a sync packet if we need to
+                                //We only have to send the sync message, since in the other thread we are reciving every message sent to us
+                                connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
                             }
                         }
 
-                        //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                        connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
                     }
 
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
@@ -566,8 +573,6 @@ impl TemplateApp {
                         if message == "Invalid Password!" {
                             display_error_message("The client has sent a message, with a possibly invalid uuid. Please open an issue on github!")
                         }
-
-                        ctx.request_repaint();
 
                         //Decrypt the server's reply
                         let decrypted_message =

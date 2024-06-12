@@ -108,7 +108,7 @@ pub async fn server_main(
             let (reader, writer) = stream.into_split();
 
             let msg_service_clone = msg_service.clone();
-
+            println!("Connected client: {}", _address);
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),
@@ -134,11 +134,9 @@ fn spawn_client_reader(
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
-            //Check if the thread needs to be shut down
-            let message_service = msg_service.lock().await;
-
             //Wait until client sends a message or thread gets cancelled
             let incoming_message = select! {
+                //Check if the thread needs to be shut down
                 _ = cancellation_token.cancelled() => {
                     //If thread has been cancelled break out of the loop
                     break;
@@ -148,6 +146,8 @@ fn spawn_client_reader(
                     msg?
                 }
             };
+
+            let message_service = msg_service.lock().await;
 
             message_service
                 .message_main(incoming_message, writer.clone())

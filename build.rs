@@ -7,8 +7,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         res.compile().unwrap();
     }
 
-    tonic_build::compile_protos("proto/messages.proto")?;
-
     //This will always make build_info.matthias_build update, regardless if it has been compiled (because of cargo test)
     let date = Utc::now()
         .checked_add_signed(Duration::hours(1))
