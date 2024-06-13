@@ -14,12 +14,12 @@ async fn main() -> eframe::Result<()> {
 
     use egui::ViewportBuilder;
 
-    let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
-    let _ = std::fs::remove_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
+    let _ = std::fs::remove_dir_all(format!("{}\\matthias\\Client", env!("APPDATA")));
+    let _ = std::fs::remove_dir_all(format!("{}\\matthias\\Server", env!("APPDATA")));
 
     //Ensure main folders are existing
-    let _ = std::fs::create_dir_all(format!("{}\\Matthias\\Client", env!("APPDATA")));
-    let _ = std::fs::create_dir_all(format!("{}\\Matthias\\Server", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\matthias\\Client", env!("APPDATA")));
+    let _ = std::fs::create_dir_all(format!("{}\\matthias\\Server", env!("APPDATA")));
 
     env_logger::init();
 
@@ -41,7 +41,7 @@ async fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Matthias",
         native_options,
-        Box::new(|cc| Box::new(Matthias::app::backend::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(matthias::app::backend::TemplateApp::new(cc))),
     )
 }
 

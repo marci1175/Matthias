@@ -18,7 +18,7 @@ impl TemplateApp {
         ctx: &egui::Context,
         current_index_in_message_list: usize,
     ) {
-        match &message.MessageType {
+        match &message.message_type {
             //File upload
             crate::app::backend::ServerMessageType::Upload(inner) => {
                 let button =

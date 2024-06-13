@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'Matthias'",
+            "name": "Debug unit tests in library 'matthias'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=Matthias"
+                    "--package=matthias"
                 ],
                 "filter": {
-                    "name": "Matthias",
+                    "name": "matthias",
                     "kind": "lib"
                 }
             },
@@ -26,15 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'Matthias'",
+            "name": "Debug executable 'matthias'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=Matthias",
-                    "--package=Matthias"
+                    "--bin=matthias",
+                    "--package=matthias"
                 ],
                 "filter": {
-                    "name": "Matthias",
+                    "name": "matthias",
                     "kind": "bin"
                 }
             },
@@ -44,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'Matthias'",
+            "name": "Debug unit tests in executable 'matthias'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=Matthias",
-                    "--package=Matthias"
+                    "--bin=matthias",
+                    "--package=matthias"
                 ],
                 "filter": {
-                    "name": "Matthias",
+                    "name": "matthias",
                     "kind": "bin"
                 }
             },

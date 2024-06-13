@@ -86,7 +86,7 @@ impl TemplateApp {
                                     let selected_message = &self.client_ui.incoming_msg.struct_list[edit_index];
                                     ui.horizontal(|ui| {
                                         //Replying to "{author}:"
-                                        ui.label(RichText::from(match &selected_message.MessageType {
+                                        ui.label(RichText::from(match &selected_message.message_type {
                                             //We only have to display this enum variant cuz thats the only one which can be edited
                                             ServerMessageType::Normal(msg) => format!("Editing: {}", {
                                                 let mut msg = msg.message.clone();
@@ -122,8 +122,8 @@ impl TemplateApp {
                                     let selected_message = &self.client_ui.incoming_msg.struct_list[replying_to];
                                     ui.horizontal(|ui| {
                                         //Replying to "{author}:"
-                                        ui.label(RichText::from(format!("{}:", selected_message.Author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
-                                        ui.label(RichText::from(match &selected_message.MessageType {
+                                        ui.label(RichText::from(format!("{}:", selected_message.author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
+                                        ui.label(RichText::from(match &selected_message.message_type {
                                             ServerMessageType::Deleted => "Deleted message".to_string(),
                                             ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                             ServerMessageType::Image(_img) => "Image".to_string(),

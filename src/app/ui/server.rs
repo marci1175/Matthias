@@ -84,7 +84,7 @@ impl TemplateApp {
                         });
                         match self.drx.recv() {
                             Ok(ok) => {
-                                self.public_ip = ok.clone();
+                                self.public_ip.clone_from(&ok);
                                 //Set the ip we are connecting to so we dont need to paste it
                                 let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
 

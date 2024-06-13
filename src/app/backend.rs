@@ -148,11 +148,8 @@ pub struct TemplateApp {
     pub server_output_sender: Sender<Option<String>>,
 
     #[serde(skip)]
-    /// This is what the sync thread thread uses to recive a shutdown message from the main
-    pub autosync_input_reciver: tokio::sync::broadcast::Receiver<()>,
-    #[serde(skip)]
     /// This is what the main thread uses to send the shutdown message to the sync thread
-    pub autosync_input_sender: tokio::sync::broadcast::Sender<()>,
+    pub autosync_shutdown_token: CancellationToken,
 
     #[serde(skip)]
     pub audio_file: Arc<Mutex<PathBuf>>,
@@ -174,8 +171,6 @@ impl Default for TemplateApp {
             mpsc::channel::<Option<(ClientConnection, String)>>();
 
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
-
-        let (autosync_input_sender, autosync_input_reciver) = tokio::sync::broadcast::channel(1);
 
         Self {
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -251,8 +246,7 @@ impl Default for TemplateApp {
             server_output_reciver,
             server_output_sender,
 
-            autosync_input_reciver,
-            autosync_input_sender,
+            autosync_shutdown_token: CancellationToken::new(),
 
             opened_account: OpenedAccount::default(),
         }
@@ -595,10 +589,10 @@ pub enum ClientMessageType {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientMessage {
     pub replying_to: Option<usize>,
-    pub MessageType: ClientMessageType,
-    pub Uuid: String,
-    pub Author: String,
-    pub MessageDate: String,
+    pub message_type: ClientMessageType,
+    pub uuid: String,
+    pub author: String,
+    pub message_date: String,
 }
 
 impl ClientMessage {
@@ -616,13 +610,13 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to,
-            MessageType: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
+            message_type: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
             //If the password is set as None (Meaning the user didnt enter any password) just send the message with an empty string
-            Uuid: uuid.to_string(),
-            Author: author.to_string(),
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author: author.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -638,7 +632,7 @@ impl ClientMessage {
             //Dont execute me please :3 |
             //                          |
             //                          V
-            MessageType: ClientMessageType::ClientFileUpload(ClientFileUpload {
+            message_type: ClientMessageType::ClientFileUpload(ClientFileUpload {
                 extension: Some(file_path.extension().unwrap().to_str().unwrap().to_string()),
                 name: Some(
                     file_path
@@ -651,9 +645,9 @@ impl ClientMessage {
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
 
-            Uuid: uuid.to_string(),
-            Author: author.to_string(),
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author: author.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -665,13 +659,13 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientReaction(ClientReaction {
+            message_type: ClientMessageType::ClientReaction(ClientReaction {
                 char,
                 message_index: index,
             }),
-            Uuid: uuid.to_string(),
-            Author: author.to_string(),
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author: author.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -686,16 +680,16 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: None,
                 password: password.to_string(),
                 //This value is not ignored in this context
                 client_message_counter: Some(client_message_counter),
                 last_seen_message_index,
             }),
-            Uuid: uuid.to_string(),
-            Author: author.to_string(),
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author: author.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -708,16 +702,16 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(true),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
                 last_seen_message_index,
             }),
-            Uuid: uuid.to_string(),
-            Author: author,
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -730,16 +724,16 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
                 sync_attribute: Some(false),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
                 last_seen_message_index: None,
             }),
-            Uuid: uuid,
-            Author: author,
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid,
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -747,12 +741,12 @@ impl ClientMessage {
     pub fn construct_file_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientFileRequest(ClientFileRequest { index }),
             ),
-            Uuid: uuid.to_string(),
-            Author: author,
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -760,12 +754,12 @@ impl ClientMessage {
     pub fn construct_image_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientImageRequest(ClientImageRequest { index }),
             ),
-            Uuid: uuid.to_string(),
-            Author: author,
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -773,12 +767,12 @@ impl ClientMessage {
     pub fn construct_audio_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::ClientFileRequestType(
                 ClientFileRequestType::ClientAudioRequest(ClientAudioRequest { index }),
             ),
-            Uuid: uuid.to_string(),
-            Author: author,
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -790,13 +784,13 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            MessageType: ClientMessageType::ClientMessageEdit(ClientMessageEdit {
+            message_type: ClientMessageType::ClientMessageEdit(ClientMessageEdit {
                 index,
                 new_message,
             }),
-            Uuid: uuid.to_string(),
-            Author: author.to_string(),
-            MessageDate: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: uuid.to_string(),
+            author: author.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
@@ -1136,11 +1130,11 @@ pub struct ServerOutput {
     /// The server stores all messages in a vector so this index shows which message its a reply to (if it is)
     pub replying_to: Option<usize>,
     /// Inner message which is *wrapped* in the ServerOutput
-    pub MessageType: ServerMessageType,
+    pub message_type: ServerMessageType,
     /// The account's name who sent the message
-    pub Author: String,
+    pub author: String,
     /// The date when this message was sent
-    pub MessageDate: String,
+    pub message_date: String,
     /// The user who sent this message's uuid
     pub uuid: String,
 }
@@ -1161,8 +1155,8 @@ impl ServerOutput {
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
-            MessageType:
-                match normal_msg.MessageType {
+            message_type:
+                match normal_msg.message_type {
                     ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
                     ClientMessageType::ClientFileUpload(upload) => {
                         //The reason it doesnt panic if for example it a normal message because, an Upload can never be a:
@@ -1230,8 +1224,8 @@ impl ServerOutput {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
                     },
                 },
-            Author: normal_msg.Author,
-            MessageDate: normal_msg.MessageDate,
+            author: normal_msg.author,
+            message_date: normal_msg.message_date,
             uuid,
         }
     }

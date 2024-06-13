@@ -29,7 +29,8 @@ impl eframe::App for backend::TemplateApp {
         //Disconnect from server
         if let ConnectionState::Connected(_) = self.client_connection.state {
             tokio::task::spawn(async move {
-                match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
+                match ClientConnection::disconnect(&mut connection, username, password, uuid).await
+                {
                     Ok(_) => {}
                     Err(err) => {
                         display_error_message(err);
@@ -38,9 +39,7 @@ impl eframe::App for backend::TemplateApp {
             });
         }
 
-        //We dont have to reset state, cuz the app has already exited
-
-        //clean up after server, client
+        //clean up after server and client
         match std::env::var("APPDATA") {
             Ok(app_data) => {
                 if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
@@ -52,6 +51,10 @@ impl eframe::App for backend::TemplateApp {
             }
             Err(err) => println!("{err}"),
         }
+
+        //Shut down the server
+        self.server_shutdown_token.cancel();
+        self.autosync_shutdown_token.cancel();
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -385,7 +388,7 @@ impl backend::TemplateApp {
 
         self.client_ui.incoming_msg = ServerMaster::default();
 
-        let _ = self.autosync_input_sender.send(());
+        self.autosync_shutdown_token.cancel();
 
         self.client_connection.state = ConnectionState::Disconnected;
     }

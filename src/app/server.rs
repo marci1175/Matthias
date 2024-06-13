@@ -139,7 +139,8 @@ fn spawn_client_reader(
                 //Check if the thread needs to be shut down
                 _ = cancellation_token.cancelled() => {
                     //Send out shutdown messages to all the clients
-                    
+
+
                     //If thread has been cancelled break out of the loop, thus ending the thread
                     break;
                 }
@@ -151,10 +152,15 @@ fn spawn_client_reader(
 
             let message_service = msg_service.lock().await;
 
-            message_service
+            match message_service
                 .message_main(incoming_message, writer.clone())
                 .await
-                .expect("Error occured while processing the message");
+            {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("Error processing a message: {err}");
+                }
+            }
         }
         Ok(())
     });
@@ -253,56 +259,49 @@ impl MessageService {
 
         let req: ClientMessage = req_result.unwrap();
 
-        if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.MessageType {
+        if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.message_type {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = sync_msg.sync_attribute {
                     //sync attr is true if its a connection message i.e a licnet is trying to connect to us
                     if sync_attr {
-                        match self.connected_clients.try_lock() {
-                            Ok(mut clients) => {
-                                //Search for connected ip in all connected ips
-                                for client in clients.iter() {
-                                    //If found, then the client is already connected
-                                    if client.uuid == req.Uuid {
-                                        //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                        send_message_to_client(
-                                            &mut *client_handle.try_lock()?,
-                                            hex::encode(self.decryption_key),
-                                        )
-                                        .await?;
-
-                                        //If found return, and end execution
-                                        return Ok(());
-                                    }
-                                }
-
-                                //If the ip is not found then add it to connected clients
-                                clients.push(ConnectedClient::new(
-                                    req.Uuid.clone(),
-                                    req.Author.clone(),
-                                    client_handle.clone(),
-                                ));
-
-                                //Return custom key which the server's text will be encrypted with
+                        let mut clients = self.connected_clients.lock().await;
+                        for client in clients.iter() {
+                            //If found, then the client is already connected
+                            if client.uuid == req.uuid {
+                                //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
                                 send_message_to_client(
                                     &mut *client_handle.try_lock()?,
                                     hex::encode(self.decryption_key),
                                 )
                                 .await?;
 
-                                //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
-                                send_message_to_client(
-                                    &mut *client_handle.try_lock()?,
-                                    self.full_sync_client().await?,
-                                )
-                                .await?;
+                                //If found return, and end execution
                                 return Ok(());
                             }
-                            Err(err) => {
-                                dbg!(err);
-                            }
                         }
+
+                        //If the ip is not found then add it to connected clients
+                        clients.push(ConnectedClient::new(
+                            req.uuid.clone(),
+                            req.author.clone(),
+                            client_handle.clone(),
+                        ));
+
+                        //Return custom key which the server's text will be encrypted with
+                        send_message_to_client(
+                            &mut *client_handle.try_lock()?,
+                            hex::encode(self.decryption_key),
+                        )
+                        .await?;
+
+                        //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
+                        send_message_to_client(
+                            &mut *client_handle.try_lock()?,
+                            self.full_sync_client().await?,
+                        )
+                        .await?;
+                        return Ok(());
                     }
                     //Handle disconnections
                     else {
@@ -311,7 +310,7 @@ impl MessageService {
                                 //Search for connected ip in all connected ips
                                 for (index, client) in clients.clone().iter().enumerate() {
                                     //If found, then disconnect the client
-                                    if client.uuid == req.Uuid {
+                                    if client.uuid == req.uuid {
                                         clients.remove(index);
 
                                         //Break out of the loop, return an error so the client listener thread stops
@@ -340,11 +339,11 @@ impl MessageService {
             .try_lock()
             .unwrap()
             .iter()
-            .any(|client| client.uuid == req.Uuid)
+            .any(|client| client.uuid == req.uuid)
         //Search through the list
         {
-            match &req.MessageType {
-                ClientNormalMessage(_msg) => self.NormalMessage(&req).await,
+            match &req.message_type {
+                ClientNormalMessage(_msg) => self.normal_message(&req).await,
 
                 ClientSyncMessage(_msg) => {
                     self.sync_message(&req).await;
@@ -377,7 +376,7 @@ impl MessageService {
                     match &mut self.messages.try_lock() {
                         Ok(messages_vec) => {
                             //Server-side uuid check
-                            if messages_vec[edit.index].uuid != req.Uuid {
+                            if messages_vec[edit.index].uuid != req.uuid {
                                 //Nice try :)
                                 return Ok(());
                             }
@@ -385,11 +384,11 @@ impl MessageService {
                             //If its () then we can check for the index, because you can delete all messages, rest is ignored
                             if edit.new_message.is_none() {
                                 //Set as `Deleted`
-                                messages_vec[edit.index].MessageType = ServerMessageType::Deleted;
+                                messages_vec[edit.index].message_type = ServerMessageType::Deleted;
                             }
 
                             if let ServerMessageType::Normal(inner_msg) =
-                                &mut messages_vec[edit.index].MessageType
+                                &mut messages_vec[edit.index].message_type
                             {
                                 if let Some(new_msg) = edit.new_message.clone() {
                                     inner_msg.message = new_msg;
@@ -404,8 +403,8 @@ impl MessageService {
             };
 
             //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
-            if !(matches!(&req.MessageType, ClientReaction(_))
-                || matches!(&req.MessageType, ClientMessageEdit(_)))
+            if !(matches!(&req.message_type, ClientReaction(_))
+                || matches!(&req.message_type, ClientMessageEdit(_)))
             {
                 //Allocate a reaction after every type of message except a sync message
                 match self.reactions.try_lock() {
@@ -428,7 +427,7 @@ impl MessageService {
                 ServerOutput::convert_type_to_servermsg(
                     req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
-                    match &req.MessageType {
+                    match &req.message_type {
                         //This is unreachable, as requests are handled elsewhere
                         ClientFileRequestType(_) => unreachable!(),
 
@@ -454,7 +453,7 @@ impl MessageService {
                         ClientMessageEdit(_) => -1,
                     },
                     //Get message type
-                    match &req.MessageType {
+                    match &req.message_type {
                         ClientFileRequestType(_) => unreachable!(),
                         ClientFileUpload(inner) => {
                             //We should match the upload type more specificly
@@ -469,7 +468,7 @@ impl MessageService {
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         ClientMessageEdit(_) => Edit,
                     },
-                    req.Uuid,
+                    req.uuid,
                 ),
                 self.decryption_key,
             )
@@ -487,14 +486,14 @@ impl MessageService {
     }
 
     /// all the functions the server can do
-    async fn NormalMessage(&self, req: &ClientMessage) {
+    async fn normal_message(&self, req: &ClientMessage) {
         let mut messages = self.messages.lock().await;
         messages.push(ServerOutput::convert_type_to_servermsg(
             req.clone(),
             //Im not sure why I did that, Tf is this?
             -1,
             Normal,
-            req.Uuid.clone(),
+            req.uuid.clone(),
         ));
     }
 
@@ -522,22 +521,22 @@ impl MessageService {
     /// This function has a side effect on the user_seen_list, modifying it according to the client
     async fn sync_message(&self, req: &ClientMessage) {
         //Dont ask me why I did it this way
-        if let ClientSyncMessage(inner) = &req.MessageType {
+        if let ClientSyncMessage(inner) = &req.message_type {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
             if let Some(last_seen_message_index) = inner.last_seen_message_index {
                 match &mut self.clients_last_seen_index.try_lock() {
                     Ok(client_vec) => {
                         //Iter over the whole list so we can update the user's index if there is one
                         if let Some(client_index_pos) =
-                            client_vec.iter().position(|client| client.uuid == req.Uuid)
+                            client_vec.iter().position(|client| client.uuid == req.uuid)
                         {
                             //Update index
                             client_vec[client_index_pos].index = last_seen_message_index;
                         } else {
                             client_vec.push(ClientLastSeenMessage::new(
                                 last_seen_message_index,
-                                req.Uuid.clone(),
-                                req.Author.clone(),
+                                req.uuid.clone(),
+                                req.author.clone(),
                             ));
                         }
                     }
@@ -588,7 +587,7 @@ impl MessageService {
                                 request.clone(),
                                 self.file_list.lock().unwrap().len() as i32,
                                 Upload,
-                                request.Uuid.clone(),
+                                request.uuid.clone(),
                             ));
                         }
                         Err(err) => {
@@ -634,7 +633,7 @@ impl MessageService {
                                     req.clone(),
                                     image_path_lenght as i32,
                                     Image,
-                                    req.Uuid.clone(),
+                                    req.uuid.clone(),
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -680,7 +679,7 @@ impl MessageService {
                             req.clone(),
                             audio_paths_lenght as i32,
                             Audio,
-                            req.Uuid.clone(),
+                            req.uuid.clone(),
                         ));
                     }
                     Err(err) => println!("{err}"),

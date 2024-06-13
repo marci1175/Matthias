@@ -36,7 +36,7 @@ impl Default for Opt {
     }
 }
 
-pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: Arc<Mutex<PathBuf>>) {
+pub fn audio_recroding(receiver: mpsc::Receiver<bool>, path: Arc<Mutex<PathBuf>>) {
     std::thread::spawn(move || {
         let opt = Opt::default();
 
@@ -59,9 +59,9 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, PATH: Arc<Mutex<PathBuf>>
 
         let spec = wav_spec_from_config(&config);
 
-        let PATH = PATH.lock().unwrap().to_string_lossy().to_string().clone();
+        let path = path.lock().unwrap().to_string_lossy().to_string().clone();
 
-        let writer = hound::WavWriter::create(PATH, spec)?;
+        let writer = hound::WavWriter::create(path, spec)?;
 
         let writer = Arc::new(Mutex::new(Some(writer)));
 

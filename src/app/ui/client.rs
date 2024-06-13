@@ -1,12 +1,11 @@
-use std::fs;
-use std::path::PathBuf;
-use std::time::Duration;
-
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
     Stroke,
 };
 use rodio::{Decoder, Sink};
+use std::fs;
+use std::path::PathBuf;
+use tokio::select;
 
 use crate::app::backend::{
     decrypt_aes256, display_error_message, write_audio, write_file, write_image, ClientMessage,
@@ -37,7 +36,7 @@ impl TemplateApp {
                                 return;
                             }
 
-                            let _ = self.autosync_input_sender.send(());
+                            self.autosync_shutdown_token.cancel();
                             self.server_sender_thread = None;
 
                             self.main.client_mode = false;
@@ -95,7 +94,7 @@ impl TemplateApp {
                     },
                 );
             });
-        
+
         //We have to render the message area after everything else, because then we will be using the area whats left of the ui
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -226,12 +225,12 @@ impl TemplateApp {
                         for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
                             match self.client_ui.search_parameter {
                                 SearchType::Name => {
-                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                                        if message.Author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
+                                    if let ServerMessageType::Normal(inner_message) = &message.message_type {
+                                        if message.author.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
-                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
                                                 ui.label(RichText::from(inner_message.message.to_string()));
-                                                ui.small(&message.MessageDate);
+                                                ui.small(&message.message_date);
                                             });
 
                                             if group.response.interact(Sense::click()).clicked() {
@@ -245,12 +244,12 @@ impl TemplateApp {
                                     }
                                 },
                                 SearchType::Message => {
-                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                    if let ServerMessageType::Normal(inner_message) = &message.message_type {
                                         if inner_message.message.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
-                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
                                                 ui.label(RichText::from(inner_message.message.to_string()));
-                                                ui.small(&message.MessageDate);
+                                                ui.small(&message.message_date);
                                             });
 
                                             if group.response.interact(Sense::click()).clicked() {
@@ -264,12 +263,12 @@ impl TemplateApp {
                                     }
                                 },
                                 SearchType::Date => {
-                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
-                                        if message.MessageDate.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
+                                    if let ServerMessageType::Normal(inner_message) = &message.message_type {
+                                        if message.message_date.contains(self.client_ui.search_buffer.trim()) && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
-                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
                                                 ui.label(RichText::from(inner_message.message.to_string()));
-                                                ui.small(&message.MessageDate);
+                                                ui.small(&message.message_date);
                                             });
 
                                             if group.response.interact(Sense::click()).clicked() {
@@ -283,12 +282,12 @@ impl TemplateApp {
                                     }
                                 },
                                 SearchType::Reply => {
-                                    if let ServerMessageType::Normal(inner_message) = &message.MessageType {
+                                    if let ServerMessageType::Normal(inner_message) = &message.message_type {
                                         if message.replying_to.is_some() && !self.client_ui.search_buffer.trim().is_empty() {
                                             let group = ui.group(|ui|{
-                                                ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                                ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
                                                 ui.label(RichText::from(inner_message.message.to_string()));
-                                                ui.small(&message.MessageDate);
+                                                ui.small(&message.message_date);
                                             });
 
                                             if group.response.interact(Sense::click()).clicked() {
@@ -302,15 +301,15 @@ impl TemplateApp {
                                     }
                                 }
                                 SearchType::File => {
-                                    if let ServerMessageType::Upload(inner_message) = &message.MessageType {
+                                    if let ServerMessageType::Upload(inner_message) = &message.message_type {
                                         let group = ui.group(|ui|{
-                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                            ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                             //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
                                             if ui.small_button(inner_message.file_name.to_string()).clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            ui.small(&message.MessageDate);
+                                            ui.small(&message.message_date);
                                         });
 
                                         if group.response.interact(Sense::click()).clicked() {
@@ -322,15 +321,15 @@ impl TemplateApp {
                                         has_search = true;
                                     }
                                     /* Inner value shouldnt actaully be used since its only used for asking for a file, and to stay compact i wont implement image displaying in search mode */
-                                    if let ServerMessageType::Image( _ ) = &message.MessageType {
+                                    if let ServerMessageType::Image( _ ) = &message.message_type {
                                         let group = ui.group(|ui|{
-                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                            ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                             //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
                                             if ui.small_button("Image").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            ui.small(&message.MessageDate);
+                                            ui.small(&message.message_date);
                                         });
 
                                         if group.response.interact(Sense::click()).clicked() {
@@ -341,15 +340,15 @@ impl TemplateApp {
 
                                         has_search = true;
                                     }
-                                    if let ServerMessageType::Audio( _ ) = &message.MessageType {
+                                    if let ServerMessageType::Audio( _ ) = &message.message_type {
                                         let group = ui.group(|ui|{
-                                            ui.label(RichText::from(message.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                            ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                             //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
                                             if ui.small_button("Audio").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
-                                            ui.small(&message.MessageDate);
+                                            ui.small(&message.message_date);
                                         });
                                         if group.response.interact(Sense::click()).clicked() {
                                             self.client_ui.scroll_to_message_index = Some(index)
@@ -473,46 +472,51 @@ impl TemplateApp {
                 //Clone so we can move it into the closure
                 let sender = self.server_output_sender.clone();
 
-                let (input_sender, mut reciver) = tokio::sync::broadcast::channel(1);
-
-                //This is used to shut down the two threads later
-                self.autosync_input_sender = input_sender;
-
-                //This is used for server syncing
-                let mut reciver_clone = reciver.resubscribe();
-
                 //Clone the reader so we can move it in the closure
                 let reader = connection_pair.reader.clone();
 
                 //Clone the sender so that 2 threads can each get a sender
                 let sender_clone = sender.clone();
+
                 //We clone ctx, so we can call request_repaint from inside the thread
                 let context_clone = ctx.clone();
+
+                //Thread cancellation token
+                let shutdown_token = self.autosync_shutdown_token.child_token();
+
+                //We have to clone for the 2nd thread
+                let shutdown_token_clone = shutdown_token.clone();
 
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
-                        //Recive input from main thread to shutdown
-                        if reciver.try_recv().is_ok() {
-                            break;
-                        }
-                        match ServerReply::wait_for_response(&ServerReply {
+                        let server_reply_message = &ServerReply {
                             reader: reader.clone(),
-                        }).await {
-                                //If we have a reponse from the server
-                            Ok(response) => {
-                                //Request repaint
-                                context_clone.request_repaint();
-                                //Send to reciver
-                                sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
-                            },
-                            Err(err) => {
-                                eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
-                                eprintln!("Early end of file error is a normal occurence after disconnecting");
-                                display_error_message(err);
+                        };
+
+                        select! {
+                        //Recive input from main thread to shutdown
+                            _ = shutdown_token.cancelled() => {
                                 break;
                             },
-                        };
+                            reply = ServerReply::wait_for_response(server_reply_message) => {
+                                match reply {
+                                    //If we have a reponse from the server
+                                    Ok(response) => {
+                                        //Request repaint
+                                        context_clone.request_repaint();
+                                        //Send to reciver
+                                        sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
+                                    },
+                                    Err(err) => {
+                                        eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
+                                        eprintln!("Early end of file error is a normal occurence after disconnecting");
+                                        display_error_message(err);
+                                        break;
+                                    },
+                                }
+                            }
+                        }
                     }
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender_clone.send(None);
@@ -533,20 +537,13 @@ impl TemplateApp {
                 //Spawn server syncer thread
                 tokio::spawn(async move {
                     loop {
-                        //Recive input from main thread to shutdown
-                        // if reciver_clone.try_recv().is_ok() {
-                        //     break;
-                        // }
+                        if shutdown_token_clone.is_cancelled() {
+                            break;
+                        }
 
-                        //switch to tokio token
-
+                        //This patter match will always return true, the message were trying to pattern match is constructed above 
                         //We should update the message for syncing, so we will provide the latest info to the server
-                        if let ClientMessageType::ClientSyncMessage(inner) = &mut message.MessageType {
-                            // inner.last_seen_message_index = match last_seen_message_index.lock() {
-                            //     Ok(index) => Some(*index),
-                            //     Err(_err) => None,
-                            // }
-
+                        if let ClientMessageType::ClientSyncMessage(inner) = &mut message.message_type {
                             let index = *last_seen_message_index.lock().unwrap();
 
                             if inner.last_seen_message_index < Some(index) {
@@ -554,14 +551,23 @@ impl TemplateApp {
 
                                 //We only send a sync packet if we need to
                                 //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                                connection_pair.send_message(message.clone()).await.expect("Failed to send syncing request from client");
+                                match connection_pair.send_message(message.clone()).await {
+                                    Ok(_) => {},
+                                    Err(err) => {
+                                        dbg!(err);
+                                        //Error appeared, after this the tread quits, so there arent an inf amount of threads running
+                                        sender.send(None).expect("Failed to signal thread error");
+                                        break;
+                                    }
+                                };
                             }
                         }
-
+                        else
+                        {
+                            panic!("The message watning to be sent isnt a clientsyncmessage (as required), check what youve modified");
+                        }
                     }
 
-                    //Error appeared, after this the tread quits, so there arent an inf amount of threads running
-                    let _ = sender.send(None);
                 });
             });
 
@@ -589,17 +595,17 @@ impl TemplateApp {
                                 self.client_ui.incoming_msg.user_seen_list = msg.user_seen_list;
 
                                 //If its a sync message then we dont need to back it up
-                                if matches!(msg.message.MessageType, ServerMessageType::Sync(_)) {
+                                if matches!(msg.message.message_type, ServerMessageType::Sync(_)) {
                                     return;
                                 }
 
-                                match &msg.message.MessageType {
+                                match &msg.message.message_type {
                                     ServerMessageType::Edit(message) => {
                                         if let Some(new_message) = message.new_message.clone() {
                                             if let ServerMessageType::Normal(inner) =
                                                 &mut self.client_ui.incoming_msg.struct_list
                                                     [message.index as usize]
-                                                    .MessageType
+                                                    .message_type
                                             {
                                                 inner.message = new_message;
                                                 inner.has_been_edited = true;
@@ -607,7 +613,7 @@ impl TemplateApp {
                                         } else {
                                             self.client_ui.incoming_msg.struct_list
                                                 [message.index as usize]
-                                                .MessageType = ServerMessageType::Deleted;
+                                                .message_type = ServerMessageType::Deleted;
                                         }
                                     }
                                     ServerMessageType::Reaction(message) => {
@@ -723,12 +729,10 @@ impl TemplateApp {
                         }
                     } else {
                         //Signal the remaining thread to be shut down
-                        let _ = self.autosync_input_sender.send(()).inspect_err(|err| {
-                            dbg!(err);
-                        });
+                        self.autosync_shutdown_token.cancel();
 
                         //Then the thread got an error, we should reset the state
-                        // self.server_sender_thread = None;
+                        dbg!("Client reciver or sync thread panicked");
                     }
                 }
                 Err(_err) => {

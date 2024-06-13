@@ -55,8 +55,8 @@ impl TemplateApp {
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                                 if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
-                                                self.client_ui.incoming_msg.struct_list[replied_to].Author,
-                                                match &self.client_ui.incoming_msg.struct_list[replied_to].MessageType {
+                                                self.client_ui.incoming_msg.struct_list[replied_to].author,
+                                                match &self.client_ui.incoming_msg.struct_list[replied_to].message_type {
                                                     ServerMessageType::Deleted => "Deleted message".to_string(),
                                                     ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                     ServerMessageType::Image(_img) => "Image".to_string(),
@@ -84,15 +84,15 @@ impl TemplateApp {
                                             });
                                         }
                                         //Display author
-                                        ui.label(RichText::from(item.Author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                        ui.label(RichText::from(item.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
                                         self.message_display(item, ui, ctx, iter_index);
 
                                         //Display Message date
-                                        ui.label(RichText::from(item.MessageDate.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
+                                        ui.label(RichText::from(item.message_date.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
 
-                                        if let ServerMessageType::Normal(inner_msg) = &item.MessageType {
+                                        if let ServerMessageType::Normal(inner_msg) = &item.message_type {
                                             if inner_msg.has_been_edited {
                                                 ui.label(RichText::from("(Edited)").strong());
                                             }
@@ -144,9 +144,9 @@ impl TemplateApp {
                                     }
                                     ui.separator();
                                     //Client-side uuid check, there is a check in the server file
-                                    if item.uuid == self.opened_account.uuid && item.MessageType != ServerMessageType::Deleted {
+                                    if item.uuid == self.opened_account.uuid && item.message_type != ServerMessageType::Deleted {
                                         //We should only display the `edit` button if its anormal message thus its editable
-                                        if let ServerMessageType::Normal(inner) = &item.MessageType {
+                                        if let ServerMessageType::Normal(inner) = &item.message_type {
                                             if ui.button("Edit").clicked() {
                                                 self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
                                                 self.client_ui.usr_msg = inner.message.to_string();
@@ -209,7 +209,7 @@ impl TemplateApp {
                                             });
                                         });
                                     });
-                                    if let ServerMessageType::Normal(inner) = &item.MessageType {
+                                    if let ServerMessageType::Normal(inner) = &item.message_type {
                                         if ui.button("Copy text").clicked() {
                                             ctx.copy_text(inner.message.clone());
                                             ui.close_menu();
