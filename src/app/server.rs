@@ -138,7 +138,9 @@ fn spawn_client_reader(
             let incoming_message = select! {
                 //Check if the thread needs to be shut down
                 _ = cancellation_token.cancelled() => {
-                    //If thread has been cancelled break out of the loop
+                    //Send out shutdown messages to all the clients
+                    
+                    //If thread has been cancelled break out of the loop, thus ending the thread
                     break;
                 }
 

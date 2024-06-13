@@ -128,7 +128,7 @@ impl TemplateApp {
         Area::new("msg_action_tray".into())
             .anchor(
                 Align2::RIGHT_BOTTOM,
-                vec2(-30., -msg_scroll.content_size.y / 2. - 4.),
+                vec2(-30., -msg_scroll.inner_rect.size().y / 2. + 4.),
             )
             .show(ctx, |ui| {
                 //We should also pass in whether it should be enabled
@@ -172,7 +172,7 @@ impl TemplateApp {
                                     &self.client_ui.usr_msg,
                                     &self.opened_account.uuid,
                                     &self.login_username,
-                                    dbg!(self.client_ui.messaging_mode.get_reply_index()),
+                                    self.client_ui.messaging_mode.get_reply_index(),
                                 )),
                             }
                         }

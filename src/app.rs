@@ -27,14 +27,16 @@ impl eframe::App for backend::TemplateApp {
         let uuid = self.opened_account.uuid.clone();
 
         //Disconnect from server
-        tokio::task::spawn(async move {
-            match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
-                Ok(_) => {}
-                Err(err) => {
-                    display_error_message(err);
-                }
-            };
-        });
+        if let ConnectionState::Connected(_) = self.client_connection.state {
+            tokio::task::spawn(async move {
+                match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        display_error_message(err);
+                    }
+                };
+            });
+        }
 
         //We dont have to reset state, cuz the app has already exited
 

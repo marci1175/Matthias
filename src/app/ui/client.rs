@@ -80,6 +80,23 @@ impl TemplateApp {
             },
         );
 
+        //Message input panel
+        let usr_panel = egui::TopBottomPanel::bottom("usr_input")
+            .max_height(ctx.used_size().y / 2.)
+            .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
+                ui.add_enabled_ui(
+                    matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                    |ui| {
+                        let msg_tray = self.message_tray(ui, ctx);
+
+                        self.client_ui.text_widget_offset = msg_tray.response.rect.width();
+
+                        ui.allocate_space(vec2(ui.available_width(), 5.));
+                    },
+                );
+            });
+        
+        //We have to render the message area after everything else, because then we will be using the area whats left of the ui
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
             //Drop file warning
@@ -173,22 +190,6 @@ impl TemplateApp {
                 },
             );
         });
-
-        //Message input panel
-        let usr_panel = egui::TopBottomPanel::bottom("usr_input")
-            .max_height(ctx.used_size().y / 2.)
-            .show_animated(ctx, self.client_ui.usr_msg_expanded, |ui| {
-                ui.add_enabled_ui(
-                    matches!(self.client_connection.state, ConnectionState::Connected(_)),
-                    |ui| {
-                        let msg_tray = self.message_tray(ui, ctx);
-
-                        self.client_ui.text_widget_offset = msg_tray.response.rect.width();
-
-                        ui.allocate_space(vec2(ui.available_width(), 5.));
-                    },
-                );
-            });
 
         //search area
         if self.client_ui.search_mode {
@@ -377,7 +378,7 @@ impl TemplateApp {
         self.file_tray(ctx);
 
         let panel_height = match usr_panel {
-            Some(panel) => panel.response.rect.size()[1],
+            Some(panel) => panel.response.interact_rect.size()[1],
             None => 0.,
         };
 
