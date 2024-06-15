@@ -1,11 +1,12 @@
-use std::{env, fs, io::Write, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::{Error, Result};
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
     encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
-    ClientMessageType, ConnectedClient, MessageReaction, Reaction, ServerMessageType,
+    ClientMessageType, ClientProfile, ConnectedClient, MessageReaction, Reaction,
+    ServerMessageType,
     ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
     },
@@ -69,6 +70,10 @@ pub struct MessageService {
 
     ///Client last seen message
     pub clients_last_seen_index: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
+
+    ///This hashmap contains the connected clients' profiles
+    /// In this hashmap the key is the connecting client's uuid, and the value is the CLientProfile struct (which will later get converted to string with serde_json)
+    pub connected_clients_profile: HashMap<String, ClientProfile>,
 }
 
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
@@ -108,7 +113,7 @@ pub async fn server_main(
             let (reader, writer) = stream.into_split();
 
             let msg_service_clone = msg_service.clone();
-            println!("Connected client: {}", _address);
+
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),

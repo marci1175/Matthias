@@ -49,16 +49,8 @@ impl TemplateApp {
 
                 ui.separator();
                 ui.label(RichText::from("You dont have an account yet?").weak());
-                if ui.button("Register").clicked()
-                    && !self.login_username.is_empty()
-                    && !self.login_password.is_empty()
-                {
-                    match register(self.login_username.clone(), self.login_password.clone()) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            display_error_message(err);
-                        }
-                    };
+                if ui.button("Register").clicked() {
+                    self.main.register_mode = true;
                 };
             });
         });

@@ -58,12 +58,9 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_style(Style {
-            visuals: Visuals::dark(),
-            ..Default::default()
-        });
-
         /* devlog:
+            TODO: add scripting
+            TODO: add image part selection in registration
             TODO: optimize syncing by waiting for last seen message difference
             TODO: put more icons on buttons for better UX
             TODO: fix audio playback
@@ -75,8 +72,10 @@ impl eframe::App for backend::TemplateApp {
             TODO: impl disconnection msg for server to client
         */
 
-        //For image loading
-        egui_extras::install_image_loaders(ctx);
+        if self.main.register_mode {
+            self.state_register(_frame, ctx);
+            return;
+        }
 
         //Login Page
         if !self.main.client_mode {

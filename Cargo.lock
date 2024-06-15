@@ -836,6 +836,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-targets 0.52.4",
 ]
@@ -1324,6 +1325,7 @@ version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b78779f35ded1a853786c9ce0b43fe1053e10a21ea3b23ebea411805ce41593"
 dependencies = [
+ "chrono",
  "egui",
  "ehttp",
  "enum-map",
@@ -2566,7 +2568,7 @@ dependencies = [
 
 [[package]]
 name = "matthias"
-version = "4.0.0"
+version = "5.0.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

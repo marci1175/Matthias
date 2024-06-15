@@ -1,4 +1,6 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+use egui::Rect;
+use image::DynamicImage;
 use rand::rngs::ThreadRng;
 use tokio_util::sync::CancellationToken;
 
@@ -105,12 +107,18 @@ pub struct TemplateApp {
     pub audio_save_tx: mpsc::Sender<(Option<Sink>, PlaybackCursor, usize, PathBuf)>,
 
     /*
-        main
+        Register
+    */
+    #[serde(skip)]
+    pub register: Register,
+
+    /*
+        Main
     */
     pub main: Main,
 
     /*
-        client main
+        Client main
     */
     pub client_ui: Client,
 
@@ -173,6 +181,8 @@ impl Default for TemplateApp {
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
         Self {
+            register: Register::default(),
+
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_recording.wav",
                 env!("APPDATA")
@@ -439,7 +449,7 @@ impl Default for Client {
     }
 }
 
-///Main, Global stuff
+///Main, Global stuff for the Ui
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 pub struct Main {
     ///Checks if the emoji tray is on
@@ -453,6 +463,93 @@ pub struct Main {
     ///Client mode main switch
     #[serde(skip)]
     pub client_mode: bool,
+
+    #[serde(skip)]
+    pub register_mode: bool,
+}
+
+///All the stuff important to the registration process
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug)]
+pub struct Register {
+    /// client's username
+    pub username: String,
+
+    /// client's password
+    pub password: String,
+    /// Client's gender:
+    /// false: Male
+    /// true: Female
+    /// None: Rather not answer
+    pub gender: Option<bool>,
+    /// Birth date entered by the client
+    pub birth_date: NaiveDate,
+    /// The client's optional full name
+    pub full_name: String,
+    /// This entry hold the profile's 64x64 profile picture
+    #[serde(skip)]
+    pub small_profile_picture: Vec<u8>,
+    /// This entry hold the profile's 256x256 profile picture
+    #[serde(skip)]
+    pub normal_profile_picture: Vec<u8>,
+
+    /// This entry hold all the temp stuff for creating a profile
+    pub image: ProfileImage,
+}
+
+/// Holds additional information for the ui
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+pub struct ProfileImage {
+    #[serde(skip)]
+    /// This shows whether the image selector should be displayed (If its Some), and also contains the path the image is accessed on
+    pub image_path: PathBuf,
+
+    #[serde(skip)]
+    /// The selected image's parsed bytes
+    pub selected_image_bytes: Option<DynamicImage>,
+
+    /// Image's size
+    pub image_size: f32,
+
+    pub image_rect: Rect,
+}
+
+impl Default for ProfileImage {
+    fn default() -> Self {
+        Self {
+            image_path: PathBuf::new(),
+            selected_image_bytes: None,
+            image_size: 100.,
+            image_rect: Rect::EVERYTHING,
+        }
+    }
+}
+
+///The clients profile, this struct should be sent at a server connection
+/// It hold everything which needs to be displayed when viewing someone's profile
+/// This struct might look similar too ```Register```, but that one contains more information, and is only made to control the ui
+/// This struct is sent to the server upon successful connection
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
+pub struct ClientProfile {
+    ///The client's username
+    username: String,
+
+    /// The client's optional full name
+    full_name: Option<String>,
+
+    /// The client's gender
+    /// false: Male
+    /// true: Female
+    /// None: Rather not answer
+    gender: Option<bool>,
+
+    /// The client's birthdate
+    birth_date: NaiveDate,
+
+    /// This entry hold the profile's 64x64 profile picture
+    small_profile_picture: Vec<u8>,
+
+    /// This entry hold the profile's 256x256 profile picture
+    normal_profile_picture: Vec<u8>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
@@ -1477,10 +1574,29 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
 }
 
 /// Account management
+/// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct UserInformation {
-    /// username
+    /// The client's optional full name
+    full_name: String,
+
+    /// The client's gender
+    /// false: Male
+    /// true: Female
+    /// None: Rather not answer
+    gender: Option<bool>,
+
+    /// The client's birthdate
+    birth_date: NaiveDate,
+
+    /// This entry hold the profile's 64x64 profile picture
+    small_profile_picture: Vec<u8>,
+
+    /// This entry hold the profile's 256x256 profile picture
+    normal_profile_picture: Vec<u8>,
+
+    /// the client's username
     pub username: String,
     /// IMPORTANT: PASSWORD *IS* ENCRYPTED BY FUNCTIONS IMPLEMENTED BY THIS TYPE
     pub password: String,
@@ -1492,12 +1608,26 @@ pub struct UserInformation {
 
 impl UserInformation {
     ///All of the args are encrypted
-    pub fn new(username: String, password: String, uuid: String) -> Self {
+    pub fn new(
+        username: String,
+        password: String,
+        uuid: String,
+        full_name: String,
+        gender: Option<bool>,
+        birth_date: NaiveDate,
+        normal_profile_picture: Vec<u8>,
+        small_profile_picture: Vec<u8>,
+    ) -> Self {
         Self {
             username,
             password: encrypt(password),
             uuid,
             bookmarked_ips: Vec::new(),
+            full_name,
+            gender,
+            birth_date,
+            normal_profile_picture,
+            small_profile_picture
         }
     }
 
@@ -1616,14 +1746,17 @@ pub fn login(username: String, password: String) -> Result<PathBuf> {
 }
 
 ///Register a new profile
-pub fn register(username: String, passw: String) -> anyhow::Result<()> {
-    if username.contains(' ') || username.contains('@') || username.contains(' ') {
+pub fn register(register: Register) -> anyhow::Result<()> {
+    if register.username.contains(' ')
+        || register.username.contains('@')
+        || register.username.contains(' ')
+    {
         return Err(anyhow::Error::msg("Cant use special characters in name"));
     }
 
     let app_data = env::var("APPDATA")?;
 
-    let user_path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
+    let user_path = PathBuf::from(format!("{app_data}\\Matthias\\{}.szch", register.username));
 
     //Check if user already exists
     if std::fs::metadata(&user_path).is_ok() {
@@ -1632,16 +1765,21 @@ pub fn register(username: String, passw: String) -> anyhow::Result<()> {
 
     //Construct user info struct then write it to the appdata matthias folder
     UserInformation::new(
-        username,
-        passw,
+        register.username,
+        register.password,
         encrypt_aes256(generate_uuid(), &[42; 32]).unwrap(),
+        register.full_name,
+        register.gender,
+        register.birth_date,
+        register.normal_profile_picture,
+        register.small_profile_picture,
     )
     .write_file(user_path)?;
 
     Ok(())
 }
 
-///Write general file, this function takes in a custom path
+///Write general file, this function takes in a custom pathsrc/app/backend.rs
 pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     let files = FileDialog::new()
         .set_title("Save to")

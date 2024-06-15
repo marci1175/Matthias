@@ -4,7 +4,8 @@
 #![feature(cursor_remaining)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
-#[cfg(not(target_arch = "wasm32"))]
+
+use egui::{Style, Visuals};
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
     // use crate::app::backend::display_toast_notification;
@@ -41,7 +42,19 @@ async fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Matthias",
         native_options,
-        Box::new(|cc| Box::new(matthias::app::backend::TemplateApp::new(cc))),
+        Box::new(|cc| {
+            //Set app style
+            cc.egui_ctx.set_style(Style {
+                visuals: Visuals::dark(),
+                ..Default::default()
+            });
+
+            //Load image loaders
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+
+            //Create application
+            Box::new(matthias::app::backend::TemplateApp::new(cc))
+        }),
     )
 }
 

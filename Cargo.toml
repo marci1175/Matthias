@@ -1,13 +1,13 @@
 [package]
 name = "matthias"
-version = "4.0.0"
+version = "5.0.0"
 authors = ["Varga Marcell <v.marcell4000@gmail.com>"]
 edition = "2021"
 rust-version = "1.71"
 
 [dependencies]
 egui = "0.27.2"
-egui_extras = { version = "0.27.2", features = ["all_loaders"] }
+egui_extras = { version = "0.27.2", features = ["all_loaders", "datepicker"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
 
 prost = "0.10"
@@ -23,7 +23,7 @@ log = "0.4"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
-chrono = "0.4.31"
+chrono = {version = "0.4.31", features = ["serde"]}
 reqwest = {version = "0.11.22", features = ["blocking"]}
 winres = "0.1.12"
 hex = "0.4.3"
