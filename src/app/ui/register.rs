@@ -1,10 +1,8 @@
 use std::{env, fs, io::Cursor};
 
 use crate::app::backend::{display_error_message, register, ProfileImage, TemplateApp};
-use egui::{
-    load::ImageLoader, vec2, Area, Color32, ComboBox, Id, Image, LayerId, Pos2, Rect, RichText,
-    Slider, Stroke,
-};
+use anyhow::bail;
+use egui::{vec2, Area, Color32, Id, Image, LayerId, Pos2, Rect, RichText, Slider, Stroke};
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};
 
@@ -12,186 +10,331 @@ impl TemplateApp {
     pub fn state_register(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         if let Ok(path) = env::var("APPDATA") {
             egui::CentralPanel::default().show(ctx, |ui| {
-            //Main title
-            ui.vertical_centered(|ui| ui.label(RichText::from("Create a Matthias account").strong().size(35.)));
+                //Main title
+                ui.vertical_centered(|ui| {
+                    ui.label(
+                        RichText::from("Create a Matthias account")
+                            .strong()
+                            .size(35.),
+                    )
+                });
 
-            //Username and password
-            ui.columns(2, |columns| {
-                columns[0].vertical(|ui| {
-                    ui.label(RichText::from("Enter credentials").size(20.).strong());
+                //Username and password
+                ui.columns(2, |columns| {
+                    columns[0].vertical(|ui| {
+                        ui.label(RichText::from("Enter credentials").size(20.).strong());
                         ui.label("Username");
                         ui.text_edit_singleline(&mut self.register.username);
                         ui.label("Password");
                         ui.text_edit_singleline(&mut self.register.password);
 
-                    ui.separator();
+                        ui.separator();
 
-                    ui.horizontal(|ui| {
-                        ui.label("Birthdate:");
-                        ui.add(DatePickerButton::new(&mut self.register.birth_date));
-                    });
+                        ui.horizontal(|ui| {
+                            ui.label("Birthdate:");
+                            ui.add(DatePickerButton::new(&mut self.register.birth_date));
+                        });
 
-                    ui.separator();
+                        ui.separator();
 
-                    ui.horizontal(|ui| {
-                        ui.label("Gender");
-                        egui::ComboBox::from_label("Select one")
-                            .selected_text(format!("{}", match self.register.gender {
-                                Some(false) => "Male",
-                                Some(true) => "Female",
-                                None => "Rather not answer"
-                            }))
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut self.register.gender, Some(false), "Male");
-                                ui.selectable_value(&mut self.register.gender, Some(true), "Female");
-                                ui.selectable_value(&mut self.register.gender, None, "Rather not answer");
-                            }
+                        ui.horizontal(|ui| {
+                            ui.label("Gender");
+                            egui::ComboBox::from_label("Select one")
+                                .selected_text(format!(
+                                    "{}",
+                                    match self.register.gender {
+                                        Some(false) => "Male",
+                                        Some(true) => "Female",
+                                        None => "Rather not answer",
+                                    }
+                                ))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.register.gender,
+                                        Some(false),
+                                        "Male",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.register.gender,
+                                        Some(true),
+                                        "Female",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.register.gender,
+                                        None,
+                                        "Rather not answer",
+                                    );
+                                });
+                        });
+
+                        ui.separator();
+
+                        ui.add_enabled_ui(
+                            self.register.gender.is_some()
+                                && !(self.register.normal_profile_picture.is_empty()
+                                    || self.register.small_profile_picture.is_empty()
+                                    || self.register.password.is_empty()
+                                    || self.register.username.is_empty()),
+                            |ui| {
+                                if ui.button(RichText::from("Register").strong()).clicked() {
+                                    if let Err(err) = register(self.register.clone()) {
+                                        display_error_message(err);
+                                    }
+                                };
+                            },
                         );
                     });
-
-                    ui.separator();
-
-                    ui.add_enabled_ui(self.register.gender.is_some() && !(self.register.normal_profile_picture.is_empty() || self.register.small_profile_picture.is_empty() || self.register.password.is_empty() || self.register.username.is_empty()), |ui| {
-                        if ui.button(RichText::from("Register").strong()).clicked() {
-                            if let Err(err) = register(dbg!(self.register.clone())) {
-                                display_error_message(err);
-                            }
-                            dbg!(self.register.normal_profile_picture.len());
-
-                        };
-                    });
-            });
-                columns[1].vertical_centered(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Upload profile picture");
-                        if !self.register.normal_profile_picture.is_empty() {
-                            ui.label(RichText::from("Success!").color(Color32::GREEN));
-                        }
-                    });
-
-                // ui.label(RichText::from("You can only set pngs as profile pictures right now, this will be fixed in a later release").weak());
-                if let Some(image) = self.register.image.selected_image_bytes.clone() {
-                    let center_pos = Pos2::new(ui.available_width() / 2. * 3., ui.available_height() / 2.);
-
-                    //I dont know why it needs to be a 100 to work, please dont ever touch ever touch this again
-                    let size_of_side = 100.;
-                    //I dont know why it needs to be a 100 to work, please dont ever touch ever touch this again
-
-                    let left_top = Pos2::new(center_pos.x - (size_of_side / 2.), center_pos.y + (size_of_side / 2.));
-                    let right_bottom = Pos2::new(center_pos.x + (size_of_side / 2.), center_pos.y - (size_of_side / 2.));
-
-                    //Create rect
-                    let rectangle_rect = Rect { min: left_top, max: right_bottom };
-                    draw_rect(ui, Stroke::new(1., Color32::WHITE), center_pos, self.register.image.image_size);
-
-                    //Draw background
-                    ui.painter().rect_filled(Rect::everything_right_of(ui.available_width()), 0., Color32::from_black_alpha(160));
-                    Area::new(Id::new("IMAGE_SELECTOR_CONTROLS")).fixed_pos(Pos2::new(rectangle_rect.min.x, rectangle_rect.min.y)).show(ctx, |ui| {
+                    columns[1].vertical_centered(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label("Zoom");
-                            if image.height() > image.width() {
-                                ui.add(Slider::new(&mut self.register.image.image_size, 0.0..=image.height() as f32));
-                            }
-                            else {
-                                ui.add(Slider::new(&mut self.register.image.image_size, 0.0..=image.width() as f32));
+                            ui.label("Upload profile picture");
+                            if !self.register.normal_profile_picture.is_empty() {
+                                ui.label(RichText::from("Success!").color(Color32::GREEN));
                             }
                         });
-                        if ui.button("Save").clicked() {
-                            //Ensure we have already deleted the pictures from the previous "saves" / errors
 
-                            //This may not be as accurate but I dont care anymore
-                            let cropped_img: DynamicImage = image.crop_imm((rectangle_rect.left() - self.register.image.image_rect.left() + (100. - self.register.image.image_size)) as u32, (rectangle_rect.max.y - self.register.image.image_rect.min.y + (100. - self.register.image.image_size) / 2.) as u32, self.register.image.image_size as u32, self.register.image.image_size as u32);
+                        // ui.label(RichText::from("You can only set pngs as profile pictures right now, this will be fixed in a later release").weak());
+                        if let Some(image) = self.register.image.selected_image_bytes.clone() {
+                            let center_pos = Pos2::new(
+                                ui.available_width() / 2. * 3.,
+                                ui.available_height() / 2.,
+                            );
 
-                            let _ = cropped_img.resize(256, 256, image::imageops::FilterType::CatmullRom).save(format!("{}\\matthias\\{}_temp_pfp256.png", path, self.register.username)).inspect_err(|err| {
-                                dbg!(err);
-                            } );
-                            let _ = cropped_img.resize(64, 64, image::imageops::FilterType::CatmullRom).save(format!("{}\\matthias\\{}_temp_pfp64.png", path, self.register.username)).inspect_err(|err| {
-                                dbg!(err);
-                            } );
+                            //I dont know why it needs to be a 100 to work, please dont ever touch ever touch this again
+                            let size_of_side = 100.;
+                            //I dont know why it needs to be a 100 to work, please dont ever touch ever touch this again
 
-                            //Reset image entries to default
-                            self.register.image = ProfileImage::default();
+                            let left_top = Pos2::new(
+                                center_pos.x - (size_of_side / 2.),
+                                center_pos.y + (size_of_side / 2.),
+                            );
+                            let right_bottom = Pos2::new(
+                                center_pos.x + (size_of_side / 2.),
+                                center_pos.y - (size_of_side / 2.),
+                            );
 
-                            //Load both images to memory
-                            match (fs::read(format!("{}\\matthias\\{}_temp_pfp256.png", path, self.register.username)), fs::read(format!("{}\\matthias\\{}_temp_pfp64.png", path, self.register.username))) {
-                                (Ok(bytes256), Ok(bytes64)) => {
-                                    
-                                    //clear image cache
-                                    ctx.forget_image("bytes://profile_picture_preview_small");
-                                    ctx.forget_image("bytes://profile_picture_preview_normal");
+                            //Create rect
+                            let rectangle_rect = Rect {
+                                min: left_top,
+                                max: right_bottom,
+                            };
+                            draw_rect(
+                                ui,
+                                Stroke::new(1., Color32::WHITE),
+                                center_pos,
+                                self.register.image.image_size,
+                            );
 
-                                    //We will load both files into memory and delete them after it
-                                    self.register.normal_profile_picture = bytes256;
-                                    self.register.small_profile_picture = bytes64;
+                            //Draw background
+                            ui.painter().rect_filled(
+                                Rect::everything_right_of(ui.available_width()),
+                                0.,
+                                Color32::from_black_alpha(160),
+                            );
+                            Area::new(Id::new("IMAGE_SELECTOR_CONTROLS"))
+                                .fixed_pos(Pos2::new(rectangle_rect.min.x, rectangle_rect.min.y))
+                                .show(ctx, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Zoom");
+                                        if image.height() > image.width() {
+                                            ui.add(Slider::new(
+                                                &mut self.register.image.image_size,
+                                                0.0..=image.height() as f32,
+                                            ));
+                                        } else {
+                                            ui.add(Slider::new(
+                                                &mut self.register.image.image_size,
+                                                0.0..=image.width() as f32,
+                                            ));
+                                        }
+                                    });
+                                    if ui.button("Save").clicked() {
+                                        //Ensure we have already deleted the pictures from the previous "saves" / errors
 
-                                    let _ = fs::remove_file(format!("{}\\matthias\\{}_temp_pfp256.png", path, self.register.username));
-                                    let _ = fs::remove_file(format!("{}\\matthias\\{}_temp_pfp64.png", path, self.register.username));
-                                },
-                                (Ok(_), Err(err)) => {
-                                    println!("Successfully read 256 file, but failed to read 64 file: {:?}", err);
-                                }
-                                (Err(err), Ok(_)) => {
-                                    println!("Successfully read 64 file, but failed to read 256 file: {:?}", err);
-                                }
-                                (Err(err256), Err(err64)) => {
-                                    println!("Failed to read both files:\n256: {:?}\n64: {:?}", err256, err64);
-                                }
+                                        //This may not be as accurate but I dont care anymore
+                                        let cropped_img: DynamicImage = image.crop_imm(
+                                            (rectangle_rect.left()
+                                                - self.register.image.image_rect.left()
+                                                + (100. - self.register.image.image_size))
+                                                as u32,
+                                            (rectangle_rect.max.y
+                                                - self.register.image.image_rect.min.y
+                                                + (100. - self.register.image.image_size) / 2.)
+                                                as u32,
+                                            self.register.image.image_size as u32,
+                                            self.register.image.image_size as u32,
+                                        );
+
+                                        if let Err(err) = self.save_image(cropped_img, path, ctx) {
+                                            display_error_message(err);
+                                        };
+                                    }
+                                });
+
+                            //Do not ever touch this
+                            let image_bounds = Rect::from_two_pos(
+                                Pos2::new(
+                                    rectangle_rect.min.x - image.width() as f32
+                                        + self.register.image.image_size
+                                        - (self.register.image.image_size - 100.) * 0.5,
+                                    rectangle_rect.min.y - image.height() as f32
+                                        + (self.register.image.image_size - 100.) * 0.5,
+                                ),
+                                Pos2::new(
+                                    rectangle_rect.max.x + image.width() as f32
+                                        - self.register.image.image_size
+                                        + (self.register.image.image_size - 100.) * 0.5,
+                                    rectangle_rect.max.y + image.height() as f32
+                                        - (self.register.image.image_size - 100.) * 0.5,
+                                ),
+                            );
+                            //Do not ever touch this
+
+                            //Put picture into an Area, so it can be moved
+                            //This might be a bit buggy especially with huge images, but it gets the job done
+                            Area::new(Id::new("REGISTER_IMAGE_SELECTOR"))
+                                .order(egui::Order::Background)
+                                .constrain_to(image_bounds)
+                                .show(ctx, |ui| {
+                                    let allocated_img = ui.allocate_ui(
+                                        vec2(image.width() as f32, image.height() as f32),
+                                        |ui| {
+                                            if let Ok(read_bytes) =
+                                                fs::read(self.register.image.image_path.clone())
+                                            {
+                                                ui.add(Image::from_bytes(
+                                                    "bytes://register_image",
+                                                    read_bytes,
+                                                ));
+                                            }
+                                        },
+                                    );
+                                    self.register.image.image_rect = allocated_img.response.rect;
+                                });
+                        } else if ui.button("Upload picture").clicked() {
+                            let path = rfd::FileDialog::new()
+                                .add_filter("Supported formats", &["png"])
+                                .pick_file();
+
+                            if let Some(path) = path {
+                                //This shouldnt panic as we limit the types of file which can be seletected as a pfp
+                                self.register.image.selected_image_bytes = Some(
+                                    ImageReader::new(Cursor::new(fs::read(&path).unwrap()))
+                                        .with_guessed_format()
+                                        .unwrap()
+                                        .decode()
+                                        .unwrap(),
+                                );
+                                self.register.image.image_path = dbg!(path);
+                                ctx.forget_image("bytes://register_image");
                             }
                         }
-                    });
 
-                    //Do not ever touch this
-                    let image_bounds = Rect::from_two_pos(
-                        Pos2::new(rectangle_rect.min.x - image.width() as f32 + self.register.image.image_size - (self.register.image.image_size - 100.) * 0.5, rectangle_rect.min.y - image.height() as f32 + (self.register.image.image_size - 100.) * 0.5),
-                        Pos2::new(rectangle_rect.max.x + image.width() as f32 - self.register.image.image_size + (self.register.image.image_size - 100.) * 0.5, rectangle_rect.max.y + image.height() as f32 - (self.register.image.image_size - 100.) * 0.5)
-                    );
-                    //Do not ever touch this
-
-                    //Put picture into an Area, so it can be moved
-                    //This might be a bit buggy especially with huge images, but it gets the job done
-                    Area::new(Id::new("REGISTER_IMAGE_SELECTOR")).order(egui::Order::Background).constrain_to(image_bounds).show(ctx, |ui| {
-                        let allocated_img = ui.allocate_ui(vec2(image.width() as f32, image.height() as f32), |ui| {
-                            if let Ok(read_bytes) = fs::read(self.register.image.image_path.clone()) {
-                                ui.add(Image::from_bytes("bytes://register_image", read_bytes));
-                            }
-                        });
-                        self.register.image.image_rect = allocated_img.response.rect;
-                    });
-                }
-                else if ui.button("Upload picture").clicked() {
-                    let path = rfd::FileDialog::new()
-                        .add_filter("Supported formats", &["png"])
-                        .pick_file();
-
-                    if let Some(path) = path {
-                        //This shouldnt panic as we limit the types of file which can be seletected as a pfp
-                        self.register.image.selected_image_bytes = Some(ImageReader::new(Cursor::new(fs::read(&path).unwrap())).with_guessed_format().unwrap().decode().unwrap());
-                        self.register.image.image_path = dbg!(path);
-                        ctx.forget_image("bytes://register_image");
-                    }
-                }
-
-                if !(self.register.normal_profile_picture.is_empty() && self.register.small_profile_picture.is_empty()) {
-                    //Display profile picure preview
-                    ui.horizontal_centered(|ui| {
-                        ui.vertical(|ui| {
-                            ui.allocate_ui(vec2(256., 256.), |ui| {
-                                ui.add(Image::from_bytes("bytes://profile_picture_preview_normal", self.register.normal_profile_picture.clone()));
+                        if !(self.register.normal_profile_picture.is_empty()
+                            && self.register.small_profile_picture.is_empty())
+                        {
+                            //Display profile picure preview
+                            ui.horizontal_centered(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.allocate_ui(vec2(256., 256.), |ui| {
+                                        ui.add(Image::from_bytes(
+                                            "bytes://profile_picture_preview_normal",
+                                            self.register.normal_profile_picture.clone(),
+                                        ));
+                                    });
+                                    ui.label(RichText::from("256px").weak());
+                                });
+                                ui.vertical(|ui| {
+                                    ui.allocate_ui(vec2(64., 64.), |ui| {
+                                        ui.add(Image::from_bytes(
+                                            "bytes://profile_picture_preview_small",
+                                            self.register.small_profile_picture.clone(),
+                                        ));
+                                    });
+                                    ui.label(RichText::from("64px").weak());
+                                });
                             });
-                            ui.label(RichText::from("256px").weak());
-                        });
-                        ui.vertical(|ui| {
-                            ui.allocate_ui(vec2(64., 64.), |ui| {
-                                ui.add(Image::from_bytes("bytes://profile_picture_preview_small", self.register.small_profile_picture.clone()));
-                            });
-                            ui.label(RichText::from("64px").weak());
-                        });
+                        }
                     });
-                }
-                });
-            })
-        });
+                })
+            });
         }
+    }
+
+    fn save_image(
+        &mut self,
+        cropped_img: DynamicImage,
+        path: String,
+        ctx: &egui::Context,
+    ) -> anyhow::Result<()> {
+        cropped_img
+            .resize(256, 256, image::imageops::FilterType::CatmullRom)
+            .save(format!(
+                "{}\\matthias\\{}_temp_pfp256.png",
+                path, self.register.username
+            ))?;
+
+        cropped_img
+            .resize(64, 64, image::imageops::FilterType::CatmullRom)
+            .save(format!(
+                "{}\\matthias\\{}_temp_pfp64.png",
+                path, self.register.username
+            ))?;
+
+        //Reset image entries to default
+        self.register.image = ProfileImage::default();
+
+        //Load both images to memory
+        match (
+            fs::read(format!(
+                "{}\\matthias\\{}_temp_pfp256.png",
+                path, self.register.username
+            )),
+            fs::read(format!(
+                "{}\\matthias\\{}_temp_pfp64.png",
+                path, self.register.username
+            )),
+        ) {
+            (Ok(bytes256), Ok(bytes64)) => {
+                //clear image cache
+                ctx.forget_image("bytes://profile_picture_preview_small");
+                ctx.forget_image("bytes://profile_picture_preview_normal");
+
+                //We will load both files into memory and delete them after it
+                self.register.normal_profile_picture = bytes256;
+                self.register.small_profile_picture = bytes64;
+
+                fs::remove_file(format!(
+                    "{}\\matthias\\{}_temp_pfp256.png",
+                    path, self.register.username
+                ))?;
+
+                fs::remove_file(format!(
+                    "{}\\matthias\\{}_temp_pfp64.png",
+                    path, self.register.username
+                ))?;
+            }
+            (Ok(_), Err(err)) => {
+                bail!(
+                    "Successfully read 256 file, but failed to read 64 file: {:?}",
+                    err
+                );
+            }
+            (Err(err), Ok(_)) => {
+                bail!(
+                    "Successfully read 64 file, but failed to read 256 file: {:?}",
+                    err
+                );
+            }
+            (Err(err256), Err(err64)) => {
+                bail!(
+                    "Failed to read both files:\n256: {:?}\n64: {:?}",
+                    err256,
+                    err64
+                );
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -1627,7 +1627,7 @@ impl UserInformation {
             gender,
             birth_date,
             normal_profile_picture,
-            small_profile_picture
+            small_profile_picture,
         }
     }
 
