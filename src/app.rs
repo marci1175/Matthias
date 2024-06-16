@@ -102,11 +102,9 @@ impl eframe::App for backend::TemplateApp {
             .show(ctx, |ui| {
                 //show client mode settings
                 if self.main.client_mode {
-                    ui.label("Message editor text size");
-
-                    ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
-
-                    ui.separator();
+                    // ui.label("Message editor text size");
+                    // ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
+                    // ui.separator();
 
                     ui.label("Connect to an ip address");
 

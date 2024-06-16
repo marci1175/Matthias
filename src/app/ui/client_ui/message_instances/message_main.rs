@@ -3,7 +3,7 @@ use crate::app::backend::{
 };
 use egui::{
     load::{BytesPoll, LoadError},
-    vec2, Align, Color32, ImageSource, Layout, Response, RichText,
+    vec2, Align, Color32, Layout, Response, RichText,
 };
 
 impl TemplateApp {
@@ -21,7 +21,8 @@ impl TemplateApp {
 
                         //Scroll to reply logic
                         if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
-                            scroll_to_instance.messages[scroll_to_instance.index].scroll_to_me(Some(Align::Center));
+                            scroll_to_instance.messages[dbg!(scroll_to_instance.index)].scroll_to_me(Some(Align::Center));
+                            
                             //Destroy instance
                             self.client_ui.scroll_to_message = None;
                             self.client_ui.scroll_to_message_index = None;
@@ -51,7 +52,7 @@ impl TemplateApp {
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
 
-                            let message_instances: Vec<Response> = Vec::new();
+                            let mut message_instances: Vec<Response> = Vec::new();
 
                             for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
@@ -73,10 +74,7 @@ impl TemplateApp {
                                                         }
                                                         message_clone.to_string()
                                                     },
-                                                    //These message enums (described below), are supposed to have a side effect on messages which we are already storing
-                                                    //ServerMessageType::Deleted gets displayed thats why that not here
-                                                    //ServerMessageType::Edit(_)
-                                                    //ServerMessageType::Reaction(())
+
                                                     _ => { unreachable!() }
                                             })
                                             ).size(self.font_size / 1.5))
@@ -91,44 +89,7 @@ impl TemplateApp {
                                         //Display author
                                         ui.horizontal(|ui| {
                                             //Profile picture
-                                            match ctx.try_load_bytes(&format!("bytes://{}", &item.uuid)) {
-                                                //If the image was found on the URI
-                                                Ok(bytes) => {
-                                                    //We want to wait until all the bytes are ready to display the image
-                                                    if let BytesPoll::Ready { bytes, size: _, mime: _ } = bytes {
-                                                        //If there is only a 0 in the bytes that indicates its a placeholder, thus we can display the spinner
-                                                        if bytes.to_vec() == vec![0] {
-                                                            ui.spinner();
-                                                        } else {
-                                                            ui.add(egui::Image::from_uri(format!("bytes://{}", &item.uuid)));
-                                                        }
-                                                    }
-                                                },
-                                                //If the image was not found on the URI
-                                                Err(err) => {
-                                                    ui.spinner();
-                                                    if let LoadError::Loading(inner) = err {
-                                                        if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
-                                                            //check if we are visible, so there are no unnecessary requests
-                                                            if !ui.is_rect_visible(ui.min_rect()) {
-                                                                return;
-                                                            }
-
-                                                            //Ask the server for the specified client's profile picture
-                                                            self.send_msg(ClientMessage::construct_client_request_msg(item.uuid.clone(), &self.opened_user_information.uuid, self.opened_user_information.username.clone()));
-                                                            //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
-                                                            //We will forget this URI when loading in the real image
-                                                            ctx.include_bytes(format!("bytes://{}", &item.uuid), vec![0]);
-                                                        }
-                                                        else {
-                                                            dbg!(inner);
-                                                        }
-                                                    }
-                                                    else {
-                                                        dbg!(err);
-                                                    }
-                                                },
-                                            };
+                                            self.display_icon_from_server(ctx, item.uuid.clone(), ui);
                                             //Client name
                                             ui.label(RichText::from(item.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
                                         });
@@ -144,10 +105,9 @@ impl TemplateApp {
                                                 ui.label(RichText::from("(Edited)").strong());
                                             }
                                         }
-
+                                        
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
-
                                                 //Check if there is a reaction list vector already allocated non the index of the specific message
                                                 match &self.client_ui.incoming_msg.reaction_list.get(iter_index) {
                                                     Some(reactions) => {
@@ -174,17 +134,69 @@ impl TemplateApp {
 
                                 //Display where the users seen their last message
                                 ui.horizontal(|ui| {
-                                    for client in &self.client_ui.incoming_msg.user_seen_list {
+                                    for client in self.client_ui.incoming_msg.user_seen_list.clone() {
                                         if iter_index == client.index {
                                             //Make it more visible
                                             ui.group(|ui| {
-                                                ui.label(RichText::from(&client.username));
+                                                //Profile picture
+                                                ui.allocate_ui(vec2(18., 18.), |ui| {
+                                                    self.display_icon_from_server(ctx, client.uuid.clone(), ui);
+                                                });
+
+                                                //Client name
+                                                ui.label(RichText::from(&client.username).size(self.font_size / 1.3));
                                             });
                                         }
                                     }
                                 });
+                                
+                                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+                                message_instances.push(message_group.response.clone());
 
                                 message_group.response.context_menu(|ui|{
+                                    let profile_menu_button = ui.menu_button("Profile", |ui| {
+                                        //We can safely unwrap here
+                                        let user_profile = self.client_ui.incoming_msg.connected_clients_profile.get(&item.uuid).unwrap();
+                                        
+                                        //Include full profile picture so it can be displayed
+                                        ctx.include_bytes(
+                                            "bytes://profile_picture",
+                                            user_profile.normal_profile_picture.clone(),
+                                        );
+
+                                        //Display 256px profile picture
+                                        ui.image("bytes://profile_picture");
+
+                                        ui.label(RichText::from(item.author.clone()).size(25.).strong());
+
+                                        if !user_profile.full_name.is_empty() {
+                                            ui.separator();
+
+                                            ui.label(format!("Full name: {}", user_profile.full_name));
+                                        };
+
+                                        ui.separator();
+
+
+                                        ui.label(format!("Birtdate: {}", user_profile.birth_date));
+
+                                        ui.separator();
+
+                                        if let Some(gender) = &user_profile.gender {
+                                            ui.label(format!("Gender: {}", match gender { 
+                                                true => "Female",
+                                                false => "Male",
+                                            }));
+                                        }
+                                    });
+
+                                    //If profile_menu_button.inner.is_none() it is closed, so we can deallocate / forget the before loaded image
+                                    if profile_menu_button.inner.is_none() {
+                                        ctx.forget_image("bytes://profile_picture");
+                                    }
+                                    
+                                    ui.separator();
+                                    
                                     if ui.button("Reply").clicked() {
                                         self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
                                         ui.close_menu();
@@ -262,8 +274,11 @@ impl TemplateApp {
                                             ui.close_menu();
                                         };
                                     }
+
+                                    
                                 });
                             };
+
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
                             }
@@ -273,5 +288,48 @@ impl TemplateApp {
                         }
                     });
         })
+    }
+
+/// This function displays the 64x64 icon of a client based on their uuid
+/// This function also requests the server for the image if the image isnt available on the given URI
+fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
+        match ctx.try_load_bytes(&format!("bytes://{}", &uuid)) {
+            //If the image was found on the URI
+            Ok(bytes) => {
+                //We want to wait until all the bytes are ready to display the image
+                if let BytesPoll::Ready { bytes, size: _, mime: _ } = bytes {
+                    //If there is only a 0 in the bytes that indicates its a placeholder, thus we can display the spinner
+                    if bytes.to_vec() == vec![0] {
+                        ui.spinner();
+                    } else {
+                        ui.add(egui::Image::from_uri(format!("bytes://{}", &uuid)));
+                    }
+                }
+            },
+            //If the image was not found on the URI
+            Err(err) => {
+                ui.spinner();
+                if let LoadError::Loading(inner) = err {
+                    if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                        //check if we are visible, so there are no unnecessary requests
+                        if !ui.is_rect_visible(ui.min_rect()) {
+                            return;
+                        }
+    
+                        //Ask the server for the specified client's profile picture
+                        self.send_msg(ClientMessage::construct_client_request_msg(uuid.clone(), &self.opened_user_information.uuid, self.opened_user_information.username.clone()));
+                        //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
+                        //We will forget this URI when loading in the real image
+                        ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);
+                    }
+                    else {
+                        dbg!(inner);
+                    }
+                }
+                else {
+                    dbg!(err);
+                }
+            },
+        };
     }
 }

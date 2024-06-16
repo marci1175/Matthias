@@ -539,6 +539,7 @@ pub struct ClientProfile {
     /// false: Male
     /// true: Female
     /// None: Rather not answer
+    /// Rework this
     pub gender: Option<bool>,
 
     /// The client's birthdate
