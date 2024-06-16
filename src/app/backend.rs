@@ -1746,7 +1746,7 @@ pub fn login(username: String, password: String) -> Result<PathBuf> {
 }
 
 ///Register a new profile
-pub fn register(register: Register) -> anyhow::Result<()> {
+pub fn register(register: Register) -> anyhow::Result<UserInformation> {
     if register.username.contains(' ')
         || register.username.contains('@')
         || register.username.contains(' ')
@@ -1764,7 +1764,7 @@ pub fn register(register: Register) -> anyhow::Result<()> {
     }
 
     //Construct user info struct then write it to the appdata matthias folder
-    UserInformation::new(
+    let user_info = UserInformation::new(
         register.username,
         register.password,
         encrypt_aes256(generate_uuid(), &[42; 32]).unwrap(),
@@ -1773,10 +1773,11 @@ pub fn register(register: Register) -> anyhow::Result<()> {
         register.birth_date,
         register.normal_profile_picture,
         register.small_profile_picture,
-    )
-    .write_file(user_path)?;
+    );
+    
+    user_info.write_file(user_path)?;
 
-    Ok(())
+    Ok(user_info)
 }
 
 ///Write general file, this function takes in a custom pathsrc/app/backend.rs

@@ -1,24 +1,37 @@
-use std::{env, fs, io::Cursor};
+use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{display_error_message, register, ProfileImage, TemplateApp};
+use crate::app::backend::{display_error_message, login, register, OpenedAccount, ProfileImage, Register, TemplateApp};
 use anyhow::bail;
-use egui::{vec2, Area, Color32, Id, Image, LayerId, Pos2, Rect, RichText, Slider, Stroke};
+use egui::{vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke};
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};
 
 impl TemplateApp {
     pub fn state_register(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
-        if let Ok(path) = env::var("APPDATA") {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                //Main title
-                ui.vertical_centered(|ui| {
-                    ui.label(
-                        RichText::from("Create a Matthias account")
-                            .strong()
-                            .size(35.),
-                    )
+        egui::TopBottomPanel::top("register_menu").show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.horizontal(|ui| {
+                    ui.allocate_ui(vec2(40., 50.), |ui| {
+                        if ui.add(ImageButton::new(egui::include_image!("../../../icons/logout.png"))).clicked() {
+                            self.main.register_mode = false;
+                            
+                            //Reset register state 
+                            self.register = Register::default();
+                        };
+                    });
+                    ui.centered_and_justified(|ui| {
+                        ui.label(
+                            RichText::from("Create a Matthias account")
+                                .strong()
+                                .size(35.),
+                        )
+                    });
                 });
+            });
+        });
 
+        if let Ok(app_data_path) = env::var("APPDATA") {
+            egui::CentralPanel::default().show(ctx, |ui| {
                 //Username and password
                 ui.columns(2, |columns| {
                     columns[0].vertical(|ui| {
@@ -77,9 +90,23 @@ impl TemplateApp {
                                     || self.register.username.is_empty()),
                             |ui| {
                                 if ui.button(RichText::from("Register").strong()).clicked() {
-                                    if let Err(err) = register(self.register.clone()) {
-                                        display_error_message(err);
+                                    match register(self.register.clone()) {
+                                        Ok(user_information) => {
+                                            //Redirect the user immediately after registering
+                                            self.main.client_mode = true;
+                                            self.main.register_mode = false;
+                                            
+                                            self.opened_account = OpenedAccount::new(
+                                                user_information.uuid,
+                                                user_information.username.clone(),
+                                                PathBuf::from(format!("{app_data_path}\\Matthias\\{}.szch", user_information.username)),
+                                            );
+                                        },
+                                        Err(err) => {
+                                            display_error_message(err);
+                                        },
                                     }
+                                    
                                 };
                             },
                         );
@@ -117,6 +144,7 @@ impl TemplateApp {
                                 min: left_top,
                                 max: right_bottom,
                             };
+
                             draw_rect(
                                 ui,
                                 Stroke::new(1., Color32::WHITE),
@@ -133,6 +161,7 @@ impl TemplateApp {
                             Area::new(Id::new("IMAGE_SELECTOR_CONTROLS"))
                                 .fixed_pos(Pos2::new(rectangle_rect.min.x, rectangle_rect.min.y))
                                 .show(ctx, |ui| {
+
                                     ui.horizontal(|ui| {
                                         ui.label("Zoom");
                                         if image.height() > image.width() {
@@ -147,10 +176,8 @@ impl TemplateApp {
                                             ));
                                         }
                                     });
+                                    
                                     if ui.button("Save").clicked() {
-                                        //Ensure we have already deleted the pictures from the previous "saves" / errors
-
-                                        //This may not be as accurate but I dont care anymore
                                         let cropped_img: DynamicImage = image.crop_imm(
                                             (rectangle_rect.left()
                                                 - self.register.image.image_rect.left()
@@ -164,13 +191,12 @@ impl TemplateApp {
                                             self.register.image.image_size as u32,
                                         );
 
-                                        if let Err(err) = self.save_image(cropped_img, path, ctx) {
+                                        if let Err(err) = self.save_image(cropped_img, app_data_path, ctx) {
                                             display_error_message(err);
                                         };
                                     }
                                 });
 
-                            //Do not ever touch this
                             let image_bounds = Rect::from_two_pos(
                                 Pos2::new(
                                     rectangle_rect.min.x - image.width() as f32
@@ -187,7 +213,6 @@ impl TemplateApp {
                                         - (self.register.image.image_size - 100.) * 0.5,
                                 ),
                             );
-                            //Do not ever touch this
 
                             //Put picture into an Area, so it can be moved
                             //This might be a bit buggy especially with huge images, but it gets the job done
@@ -211,20 +236,20 @@ impl TemplateApp {
                                     self.register.image.image_rect = allocated_img.response.rect;
                                 });
                         } else if ui.button("Upload picture").clicked() {
-                            let path = rfd::FileDialog::new()
+                            let app_data_path = rfd::FileDialog::new()
                                 .add_filter("Supported formats", &["png"])
                                 .pick_file();
 
-                            if let Some(path) = path {
+                            if let Some(app_data_path) = app_data_path {
                                 //This shouldnt panic as we limit the types of file which can be seletected as a pfp
                                 self.register.image.selected_image_bytes = Some(
-                                    ImageReader::new(Cursor::new(fs::read(&path).unwrap()))
+                                    ImageReader::new(Cursor::new(fs::read(&app_data_path).unwrap()))
                                         .with_guessed_format()
                                         .unwrap()
                                         .decode()
                                         .unwrap(),
                                 );
-                                self.register.image.image_path = dbg!(path);
+                                self.register.image.image_path = app_data_path;
                                 ctx.forget_image("bytes://register_image");
                             }
                         }
@@ -262,22 +287,22 @@ impl TemplateApp {
 
     fn save_image(
         &mut self,
-        cropped_img: DynamicImage,
-        path: String,
+        image: DynamicImage,
+        app_data_path: String,
         ctx: &egui::Context,
     ) -> anyhow::Result<()> {
-        cropped_img
+        image
             .resize(256, 256, image::imageops::FilterType::CatmullRom)
             .save(format!(
                 "{}\\matthias\\{}_temp_pfp256.png",
-                path, self.register.username
+                app_data_path, self.register.username
             ))?;
 
-        cropped_img
+        image
             .resize(64, 64, image::imageops::FilterType::CatmullRom)
             .save(format!(
                 "{}\\matthias\\{}_temp_pfp64.png",
-                path, self.register.username
+                app_data_path, self.register.username
             ))?;
 
         //Reset image entries to default
@@ -287,15 +312,15 @@ impl TemplateApp {
         match (
             fs::read(format!(
                 "{}\\matthias\\{}_temp_pfp256.png",
-                path, self.register.username
+                app_data_path, self.register.username
             )),
             fs::read(format!(
                 "{}\\matthias\\{}_temp_pfp64.png",
-                path, self.register.username
+                app_data_path, self.register.username
             )),
         ) {
             (Ok(bytes256), Ok(bytes64)) => {
-                //clear image cache
+                //Clear image cache so we will display the latest image
                 ctx.forget_image("bytes://profile_picture_preview_small");
                 ctx.forget_image("bytes://profile_picture_preview_normal");
 
@@ -305,12 +330,12 @@ impl TemplateApp {
 
                 fs::remove_file(format!(
                     "{}\\matthias\\{}_temp_pfp256.png",
-                    path, self.register.username
+                    app_data_path, self.register.username
                 ))?;
 
                 fs::remove_file(format!(
                     "{}\\matthias\\{}_temp_pfp64.png",
-                    path, self.register.username
+                    app_data_path, self.register.username
                 ))?;
             }
             (Ok(_), Err(err)) => {
