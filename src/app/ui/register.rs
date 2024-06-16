@@ -5,7 +5,8 @@ use crate::app::backend::{
 };
 use anyhow::bail;
 use egui::{
-    vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke, TextEdit,
+    vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke,
+    TextEdit,
 };
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};

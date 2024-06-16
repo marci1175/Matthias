@@ -1,7 +1,10 @@
 use crate::app::backend::{
     AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
 };
-use egui::{load::{BytesPoll, LoadError}, vec2, Align, Color32, ImageSource, Layout, Response, RichText};
+use egui::{
+    load::{BytesPoll, LoadError},
+    vec2, Align, Color32, ImageSource, Layout, Response, RichText,
+};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -113,7 +116,6 @@ impl TemplateApp {
 
                                                             //Ask the server for the specified client's profile picture
                                                             self.send_msg(ClientMessage::construct_client_request_msg(item.uuid.clone(), &self.opened_user_information.uuid, self.opened_user_information.username.clone()));
-                                                        
                                                             //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
                                                             //We will forget this URI when loading in the real image
                                                             ctx.include_bytes(format!("bytes://{}", &item.uuid), vec![0]);

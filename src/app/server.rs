@@ -4,9 +4,13 @@ use anyhow::{Error, Result};
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
-    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction, ServerClientReply, ServerMessageType, ServerMessageTypeDiscriminants::{
+    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
+    ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
+    ServerClientReply, ServerMessageType,
+    ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    }, ServerReplyType, ServerSync
+    },
+    ServerReplyType, ServerSync,
 };
 
 use crate::app::backend::ServerMaster;
@@ -190,10 +194,10 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 async fn sync_message_with_clients(
     //The connected clients
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
-    
+
     //The connected clients' seen list (the last message's index theyve last seen)
     user_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
-    
+
     //The message sent by the owner
     //This struct contains the owner of this message (by name & uuid)
     message: ServerOutput,
@@ -299,7 +303,10 @@ impl MessageService {
 
                             //Store connected client's profile
                             //TODO: swap out try_lock
-                            self.connected_clients_profile.try_lock().unwrap().insert(req.uuid, profile.clone());
+                            self.connected_clients_profile
+                                .try_lock()
+                                .unwrap()
+                                .insert(req.uuid, profile.clone());
 
                             //Return custom key which the server's text will be encrypted with
                             send_message_to_client(
@@ -315,7 +322,7 @@ impl MessageService {
                             )
                             .await?;
                             return Ok(());
-                        },
+                        }
                         //Handle disconnections
                         ConnectionType::Disconnect => {
                             match self.connected_clients.try_lock() {
@@ -325,22 +332,21 @@ impl MessageService {
                                         //If found, then disconnect the client
                                         if client.uuid == req.uuid {
                                             clients.remove(index);
-                                            
+
                                             //Remove disconnected client from profile list
                                             //TODO: swap out try_lock
                                             // self.connected_clients_profile.try_lock().unwrap().remove(&client.uuid);
-                                            
+
                                             //Break out of the loop, return an error so the client listener thread stops
                                             return Err(Error::msg("Client disconnected!"));
                                         }
                                     }
-
                                 }
                                 Err(err) => {
                                     dbg!(err);
                                 }
                             }
-                        },
+                        }
                     }
                 }
             } else {
@@ -767,16 +773,15 @@ impl MessageService {
             }
             ClientRequestTypeStruct::ClientRequest(client_request_uuid) => {
                 let connected_clients = self.connected_clients_profile.try_lock().unwrap();
-                
+
                 let client = connected_clients.get(client_request_uuid).unwrap();
 
-                serde_json::to_string(&ServerReplyType::ClientReply(
-                    ServerClientReply {
-                        uuid: client_request_uuid.to_string(),
-                        profile: client.clone(),
-                    }
-                )).unwrap_or_default()
-            },
+                serde_json::to_string(&ServerReplyType::ClientReply(ServerClientReply {
+                    uuid: client_request_uuid.to_string(),
+                    profile: client.clone(),
+                }))
+                .unwrap_or_default()
+            }
         };
 
         Ok(reply)

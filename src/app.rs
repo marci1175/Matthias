@@ -190,7 +190,11 @@ impl eframe::App for backend::TemplateApp {
 
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
-                                                ip, username, password, &user_information.uuid, user_information.profile,
+                                                ip,
+                                                username,
+                                                password,
+                                                &user_information.uuid,
+                                                user_information.profile,
                                             )
                                             .await
                                             {
@@ -313,7 +317,9 @@ impl eframe::App for backend::TemplateApp {
                                                         //Dont check if user already exists because we overwrite the file which was already there
                                                         let _ = user_info
                                                             .write_file(
-                                                                self.opened_user_information.path.clone(),
+                                                                self.opened_user_information
+                                                                    .path
+                                                                    .clone(),
                                                             )
                                                             .tap_err_dbg(|err| {
                                                                 tracing::error!("{err}")

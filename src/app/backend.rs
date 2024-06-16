@@ -671,7 +671,7 @@ pub enum ClientFileRequestType {
 
     /// This enum is used when the client is requesting another client's information (```ClientProfile``` struct)
     /// The wrapped value in this enum is an encrypted (aes256: ```fn encrypt_aes256()```) uuid (In string)
-    ClientRequest(String)
+    ClientRequest(String),
 }
 
 ///Client outgoing message types
@@ -849,9 +849,9 @@ impl ClientMessage {
     pub fn construct_file_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::FileRequest(ClientFileRequest { index }),
-            ),
+            message_type: ClientMessageType::FileRequestType(ClientFileRequestType::FileRequest(
+                ClientFileRequest { index },
+            )),
             uuid: uuid.to_string(),
             author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -862,9 +862,9 @@ impl ClientMessage {
     pub fn construct_image_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::ImageRequest(ClientImageRequest { index }),
-            ),
+            message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ImageRequest(
+                ClientImageRequest { index },
+            )),
             uuid: uuid.to_string(),
             author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -875,21 +875,25 @@ impl ClientMessage {
     pub fn construct_audio_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::AudioRequest(ClientAudioRequest { index }),
-            ),
+            message_type: ClientMessageType::FileRequestType(ClientFileRequestType::AudioRequest(
+                ClientAudioRequest { index },
+            )),
             uuid: uuid.to_string(),
             author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
-    pub fn construct_client_request_msg(uuid_of_requested_client: String, uuid: &str, author: String) -> ClientMessage {
+    pub fn construct_client_request_msg(
+        uuid_of_requested_client: String,
+        uuid: &str,
+        author: String,
+    ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::ClientRequest(uuid_of_requested_client),
-            ),
+            message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ClientRequest(
+                uuid_of_requested_client,
+            )),
             uuid: uuid.to_string(),
             author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1128,7 +1132,7 @@ pub enum ServerReplyType {
     FileReply(ServerFileReply),
 
     ImageReply(ServerImageReply),
-    
+
     AudioReply(ServerAudioReply),
 
     /// The requested client's profile
@@ -1632,8 +1636,8 @@ pub struct UserInformation {
     pub uuid: String,
     /// bookmarked ips are empty by default, IMPORTANT: THESE ARE *NOT* ENCRYPTED BY DEFAULT
     pub bookmarked_ips: Vec<String>,
-    /// The path to the logged in user's file 
-    pub path: PathBuf
+    /// The path to the logged in user's file
+    pub path: PathBuf,
 }
 
 impl UserInformation {

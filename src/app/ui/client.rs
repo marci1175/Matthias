@@ -1,5 +1,6 @@
 use egui::{
-    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, ImageSource, Layout, Pos2, RichText, Sense, Stroke
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, ImageSource, Layout, Pos2,
+    RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
 use std::fs;
@@ -722,14 +723,26 @@ impl TemplateApp {
                                                     .unwrap();
                                             }
                                             ServerReplyType::ClientReply(client_reply) => {
-                                                self.client_ui.incoming_msg.connected_clients_profile.insert(client_reply.uuid.clone(), client_reply.profile.clone());
+                                                self.client_ui
+                                                    .incoming_msg
+                                                    .connected_clients_profile
+                                                    .insert(
+                                                        client_reply.uuid.clone(),
+                                                        client_reply.profile.clone(),
+                                                    );
 
                                                 //Forget old placeholder bytes
-                                                ctx.forget_image(&format!("bytes://{}", client_reply.uuid));
+                                                ctx.forget_image(&format!(
+                                                    "bytes://{}",
+                                                    client_reply.uuid
+                                                ));
 
                                                 //Pair URI with profile image
-                                                ctx.include_bytes(format!("bytes://{}", client_reply.uuid), client_reply.profile.small_profile_picture);
-                                            },
+                                                ctx.include_bytes(
+                                                    format!("bytes://{}", client_reply.uuid),
+                                                    client_reply.profile.small_profile_picture,
+                                                );
+                                            }
                                         }
                                     }
                                     Err(_err) => {
