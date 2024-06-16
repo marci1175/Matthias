@@ -1,8 +1,12 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{display_error_message, login, register, OpenedAccount, ProfileImage, Register, TemplateApp};
+use crate::app::backend::{
+    display_error_message, login, register, OpenedAccount, ProfileImage, Register, TemplateApp,
+};
 use anyhow::bail;
-use egui::{vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke};
+use egui::{
+    vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke, TextEdit,
+};
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};
 
@@ -12,10 +16,15 @@ impl TemplateApp {
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
                     ui.allocate_ui(vec2(40., 50.), |ui| {
-                        if ui.add(ImageButton::new(egui::include_image!("../../../icons/logout.png"))).clicked() {
+                        if ui
+                            .add(ImageButton::new(egui::include_image!(
+                                "../../../icons/logout.png"
+                            )))
+                            .clicked()
+                        {
                             self.main.register_mode = false;
-                            
-                            //Reset register state 
+
+                            //Reset register state
                             self.register = Register::default();
                         };
                     });
@@ -39,7 +48,7 @@ impl TemplateApp {
                         ui.label("Username");
                         ui.text_edit_singleline(&mut self.register.username);
                         ui.label("Password");
-                        ui.text_edit_singleline(&mut self.register.password);
+                        ui.add(TextEdit::singleline(&mut self.register.password).password(true));
 
                         ui.separator();
 
@@ -92,18 +101,13 @@ impl TemplateApp {
                                             //Redirect the user immediately after registering
                                             self.main.client_mode = true;
                                             self.main.register_mode = false;
-                                            
-                                            self.opened_account = OpenedAccount::new(
-                                                user_information.uuid,
-                                                user_information.username.clone(),
-                                                PathBuf::from(format!("{app_data_path}\\Matthias\\{}.szch", user_information.username)),
-                                            );
-                                        },
+
+                                            self.opened_user_information = user_information;
+                                        }
                                         Err(err) => {
                                             display_error_message(err);
-                                        },
+                                        }
                                     }
-                                    
                                 };
                             },
                         );
@@ -158,7 +162,6 @@ impl TemplateApp {
                             Area::new(Id::new("IMAGE_SELECTOR_CONTROLS"))
                                 .fixed_pos(Pos2::new(rectangle_rect.min.x, rectangle_rect.min.y))
                                 .show(ctx, |ui| {
-
                                     ui.horizontal(|ui| {
                                         ui.label("Zoom");
                                         if image.height() > image.width() {
@@ -173,7 +176,7 @@ impl TemplateApp {
                                             ));
                                         }
                                     });
-                                    
+
                                     if ui.button("Save").clicked() {
                                         let cropped_img: DynamicImage = image.crop_imm(
                                             (rectangle_rect.left()
@@ -188,7 +191,9 @@ impl TemplateApp {
                                             self.register.image.image_size as u32,
                                         );
 
-                                        if let Err(err) = self.save_image(cropped_img, app_data_path, ctx) {
+                                        if let Err(err) =
+                                            self.save_image(cropped_img, app_data_path, ctx)
+                                        {
                                             display_error_message(err);
                                         };
                                     }
@@ -240,11 +245,13 @@ impl TemplateApp {
                             if let Some(app_data_path) = app_data_path {
                                 //This shouldnt panic as we limit the types of file which can be seletected as a pfp
                                 self.register.image.selected_image_bytes = Some(
-                                    ImageReader::new(Cursor::new(fs::read(&app_data_path).unwrap()))
-                                        .with_guessed_format()
-                                        .unwrap()
-                                        .decode()
-                                        .unwrap(),
+                                    ImageReader::new(Cursor::new(
+                                        fs::read(&app_data_path).unwrap(),
+                                    ))
+                                    .with_guessed_format()
+                                    .unwrap()
+                                    .decode()
+                                    .unwrap(),
                                 );
                                 self.register.image.image_path = app_data_path;
                                 ctx.forget_image("bytes://register_image");

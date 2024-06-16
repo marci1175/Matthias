@@ -32,11 +32,8 @@ impl TemplateApp {
                                 )
                                 .unwrap();
 
-                                self.opened_account = OpenedAccount::new(
-                                    account.uuid,
-                                    account.username,
-                                    path_to_file,
-                                );
+                                //Load the parsed text into the variable
+                                self.opened_user_information = account;
 
                                 true
                             }

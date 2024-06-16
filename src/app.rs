@@ -1,3 +1,4 @@
+use backend::ClientProfile;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText, Style, Visuals};
@@ -24,7 +25,7 @@ impl eframe::App for backend::TemplateApp {
         let username = self.login_username.clone();
         let mut connection = self.client_connection.clone();
         let password = self.client_connection.password.clone();
-        let uuid = self.opened_account.uuid.clone();
+        let uuid = self.opened_user_information.uuid.clone();
 
         //Disconnect from server
         if let ConnectionState::Connected(_) = self.client_connection.state {
@@ -135,7 +136,7 @@ impl eframe::App for backend::TemplateApp {
                                         .button(RichText::from("Disconnect").color(Color32::RED))
                                         .clicked()
                                     {
-                                        let uuid = self.opened_account.uuid.clone();
+                                        let uuid = self.opened_user_information.uuid.clone();
                                         //Disconnect from server
                                         tokio::task::spawn(async move {
                                             match ClientConnection::disconnect(
@@ -181,14 +182,15 @@ impl eframe::App for backend::TemplateApp {
                                             .cloned();
 
                                         let sender = self.connection_sender.clone();
-                                        let uuid = self.opened_account.uuid.clone();
 
                                         //Clone ctx so we can call request repaint from another thread
                                         let ctx = ctx.clone();
 
+                                        let user_information = self.opened_user_information.clone();
+
                                         tokio::task::spawn(async move {
                                             match ClientConnection::connect(
-                                                ip, username, password, &uuid,
+                                                ip, username, password, &user_information.uuid, user_information.profile,
                                             )
                                             .await
                                             {
@@ -276,14 +278,14 @@ impl eframe::App for backend::TemplateApp {
             .show(ctx, |ui| {
                 ui.label(RichText::from("Saved ip addresses"));
                 match UserInformation::deserialize(
-                    &fs::read_to_string(self.opened_account.path.clone()).unwrap(),
+                    &fs::read_to_string(self.opened_user_information.path.clone()).unwrap(),
                 ) {
                     Ok(mut user_info) => {
                         if ui.button("Save ip address").clicked() {
                             user_info.add_bookmark_entry(self.client_ui.send_on_ip.clone());
 
                             let _ = user_info
-                                .write_file(self.opened_account.path.clone())
+                                .write_file(self.opened_user_information.path.clone())
                                 .tap_err_dbg(|err| tracing::error!("{err}"));
                         };
 
@@ -311,7 +313,7 @@ impl eframe::App for backend::TemplateApp {
                                                         //Dont check if user already exists because we overwrite the file which was already there
                                                         let _ = user_info
                                                             .write_file(
-                                                                self.opened_account.path.clone(),
+                                                                self.opened_user_information.path.clone(),
                                                             )
                                                             .tap_err_dbg(|err| {
                                                                 tracing::error!("{err}")

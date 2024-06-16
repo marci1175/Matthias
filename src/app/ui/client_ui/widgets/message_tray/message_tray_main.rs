@@ -163,15 +163,15 @@ impl TemplateApp {
                                     self.send_msg(ClientMessage::construct_client_message_edit(
                                         index,
                                         Some(self.client_ui.usr_msg.clone()),
-                                        &self.opened_account.uuid,
-                                        &self.opened_account.username,
+                                        &self.opened_user_information.uuid,
+                                        &self.opened_user_information.username,
                                     ))
                                 }
                                 //If its reply or normal mode we can just send the message and call get_reply_index on it
                                 _ => self.send_msg(ClientMessage::construct_normal_msg(
                                     &self.client_ui.usr_msg,
-                                    &self.opened_account.uuid,
-                                    &self.opened_account.username,
+                                    &self.opened_user_information.uuid,
+                                    &self.opened_user_information.username,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 )),
                             }
@@ -182,8 +182,8 @@ impl TemplateApp {
                             if file_path.exists() {
                                 self.send_msg(ClientMessage::construct_file_msg(
                                     file_path.clone(),
-                                    &self.opened_account.uuid,
-                                    &self.opened_account.username,
+                                    &self.opened_user_information.uuid,
+                                    &self.opened_user_information.username,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 ));
                             }
@@ -275,8 +275,8 @@ impl TemplateApp {
                                     Ok(ok) => {
                                         self.send_msg(ClientMessage::construct_file_msg(
                                             ok.to_path_buf().clone(),
-                                            &self.opened_account.uuid,
-                                            &self.opened_account.username,
+                                            &self.opened_user_information.uuid,
+                                            &self.opened_user_information.username,
                                             self.client_ui.messaging_mode.get_reply_index(),
                                         ));
 

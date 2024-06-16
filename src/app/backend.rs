@@ -3,6 +3,7 @@ use egui::Rect;
 use image::DynamicImage;
 use rand::rngs::ThreadRng;
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 use super::client::{connect_to_server, ServerReply};
 use aes_gcm::aead::generic_array::GenericArray;
@@ -16,7 +17,7 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
@@ -163,7 +164,7 @@ pub struct TemplateApp {
     pub audio_file: Arc<Mutex<PathBuf>>,
 
     #[serde(skip)]
-    pub opened_account: OpenedAccount,
+    pub opened_user_information: UserInformation,
 }
 
 impl Default for TemplateApp {
@@ -258,7 +259,7 @@ impl Default for TemplateApp {
 
             autosync_shutdown_token: CancellationToken::new(),
 
-            opened_account: OpenedAccount::default(),
+            opened_user_information: UserInformation::default(),
         }
     }
 }
@@ -530,26 +531,24 @@ impl Default for ProfileImage {
 /// This struct is sent to the server upon successful connection
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
 pub struct ClientProfile {
-    ///The client's username
-    username: String,
-
-    /// The client's optional full name
-    full_name: Option<String>,
+    /// The client's full name
+    /// If its empty it means the client did not agree to share it
+    pub full_name: String,
 
     /// The client's gender
     /// false: Male
     /// true: Female
     /// None: Rather not answer
-    gender: Option<bool>,
+    pub gender: Option<bool>,
 
     /// The client's birthdate
-    birth_date: NaiveDate,
+    pub birth_date: NaiveDate,
 
     /// This entry hold the profile's 64x64 profile picture
-    small_profile_picture: Vec<u8>,
+    pub small_profile_picture: Vec<u8>,
 
     /// This entry hold the profile's 256x256 profile picture
-    normal_profile_picture: Vec<u8>,
+    pub normal_profile_picture: Vec<u8>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
@@ -608,7 +607,7 @@ pub struct ClientNormalMessage {
 pub struct ClientSnycMessage {
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// If you have already registered the client with the server then the true value will be ignored
-    pub sync_attribute: Option<bool>,
+    pub sync_attribute: Option<ConnectionType>,
 
     ///This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
     /// This value is ignored if the `sync_attribute` field is Some(_)
@@ -619,6 +618,13 @@ pub struct ClientSnycMessage {
 
     ///Contain password in the sync message, so we will send the password when authenticating
     pub password: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ConnectionType {
+    #[default]
+    Disconnect,
+    Connect(ClientProfile),
 }
 
 ///This is used by the client for requesting file
@@ -659,9 +665,13 @@ pub struct ClientMessageEdit {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientFileRequestType {
     ///this is when you want to display an image and you have to make a request to the server file
-    ClientImageRequest(ClientImageRequest),
-    ClientFileRequest(ClientFileRequest),
-    ClientAudioRequest(ClientAudioRequest),
+    ImageRequest(ClientImageRequest),
+    FileRequest(ClientFileRequest),
+    AudioRequest(ClientAudioRequest),
+
+    /// This enum is used when the client is requesting another client's information (```ClientProfile``` struct)
+    /// The wrapped value in this enum is an encrypted (aes256: ```fn encrypt_aes256()```) uuid (In string)
+    ClientRequest(String)
 }
 
 ///Client outgoing message types
@@ -796,11 +806,12 @@ impl ClientMessage {
         author: String,
         uuid: &str,
         last_seen_message_index: Option<usize>,
+        profile: ClientProfile,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
-                sync_attribute: Some(true),
+                sync_attribute: Some(ConnectionType::Connect(profile)),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
@@ -822,7 +833,7 @@ impl ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
-                sync_attribute: Some(false),
+                sync_attribute: Some(ConnectionType::Disconnect),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
@@ -839,7 +850,7 @@ impl ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::ClientFileRequest(ClientFileRequest { index }),
+                ClientFileRequestType::FileRequest(ClientFileRequest { index }),
             ),
             uuid: uuid.to_string(),
             author,
@@ -852,7 +863,7 @@ impl ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::ClientImageRequest(ClientImageRequest { index }),
+                ClientFileRequestType::ImageRequest(ClientImageRequest { index }),
             ),
             uuid: uuid.to_string(),
             author,
@@ -865,7 +876,19 @@ impl ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(
-                ClientFileRequestType::ClientAudioRequest(ClientAudioRequest { index }),
+                ClientFileRequestType::AudioRequest(ClientAudioRequest { index }),
+            ),
+            uuid: uuid.to_string(),
+            author,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
+
+    pub fn construct_client_request_msg(uuid_of_requested_client: String, uuid: &str, author: String) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            message_type: ClientMessageType::FileRequestType(
+                ClientFileRequestType::ClientRequest(uuid_of_requested_client),
             ),
             uuid: uuid.to_string(),
             author,
@@ -881,10 +904,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::MessageEdit(ClientMessageEdit {
-                index,
-                new_message,
-            }),
+            message_type: ClientMessageType::MessageEdit(ClientMessageEdit { index, new_message }),
             uuid: uuid.to_string(),
             author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -931,6 +951,7 @@ impl ClientConnection {
         author: String,
         password: Option<String>,
         uuid: &str,
+        profile: ClientProfile,
     ) -> anyhow::Result<(Self, String)> {
         let hashed_password = encrypt(password.clone().unwrap_or(String::from("")));
         let connection_msg = ClientMessage::construct_connection_msg(
@@ -938,6 +959,7 @@ impl ClientConnection {
             author.clone(),
             uuid,
             None,
+            profile,
         );
 
         //Ping server to recive custom uuid, and to also get if server ip is valid
@@ -1104,8 +1126,21 @@ pub struct ServerFileUpload {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerReplyType {
     FileReply(ServerFileReply),
+
     ImageReply(ServerImageReply),
+    
     AudioReply(ServerAudioReply),
+
+    /// The requested client's profile
+    /// The first value is the encrypted uuid
+    ClientReply(ServerClientReply),
+}
+
+/// This struct holds everything important so the client can save and handle client profiles
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerClientReply {
+    pub uuid: String,
+    pub profile: ClientProfile,
 }
 
 ///When client asks for the image based on the provided index, reply with the image bytes
@@ -1328,7 +1363,7 @@ impl ServerOutput {
     }
 }
 
-///Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
+/// Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 /// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
@@ -1340,6 +1375,9 @@ pub struct ServerMaster {
 
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
+
+    ///This entry holds all the connected user's profile
+    pub connected_clients_profile: HashMap<String, ClientProfile>,
 }
 
 impl ServerMaster {
@@ -1577,25 +1615,15 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
 /// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+
+/*
+full_name: user_information.full_name,
+                                            gender: user_information.gender,
+                                            birth_date: user_information.birth_date,
+                                            small_profile_picture: user_information.small_profile_picture,
+                                            normal_profile_picture: user_information.normal_profile_picture, */
 pub struct UserInformation {
-    /// The client's optional full name
-    full_name: String,
-
-    /// The client's gender
-    /// false: Male
-    /// true: Female
-    /// None: Rather not answer
-    gender: Option<bool>,
-
-    /// The client's birthdate
-    birth_date: NaiveDate,
-
-    /// This entry hold the profile's 64x64 profile picture
-    small_profile_picture: Vec<u8>,
-
-    /// This entry hold the profile's 256x256 profile picture
-    normal_profile_picture: Vec<u8>,
-
+    pub profile: ClientProfile,
     /// the client's username
     pub username: String,
     /// IMPORTANT: PASSWORD *IS* ENCRYPTED BY FUNCTIONS IMPLEMENTED BY THIS TYPE
@@ -1604,6 +1632,8 @@ pub struct UserInformation {
     pub uuid: String,
     /// bookmarked ips are empty by default, IMPORTANT: THESE ARE *NOT* ENCRYPTED BY DEFAULT
     pub bookmarked_ips: Vec<String>,
+    /// The path to the logged in user's file 
+    pub path: PathBuf
 }
 
 impl UserInformation {
@@ -1617,17 +1647,21 @@ impl UserInformation {
         birth_date: NaiveDate,
         normal_profile_picture: Vec<u8>,
         small_profile_picture: Vec<u8>,
+        path: PathBuf,
     ) -> Self {
         Self {
             username,
             password: encrypt(password),
             uuid,
             bookmarked_ips: Vec::new(),
-            full_name,
-            gender,
-            birth_date,
-            normal_profile_picture,
-            small_profile_picture,
+            profile: ClientProfile {
+                full_name,
+                gender,
+                birth_date,
+                normal_profile_picture,
+                small_profile_picture,
+            },
+            path,
         }
     }
 
@@ -1767,14 +1801,15 @@ pub fn register(register: Register) -> anyhow::Result<UserInformation> {
     let user_info = UserInformation::new(
         register.username,
         register.password,
-        encrypt_aes256(generate_uuid(), &[42; 32]).unwrap(),
+        encrypt_aes256(generate_uuid().to_string(), &[42; 32]).unwrap(),
         register.full_name,
         register.gender,
         register.birth_date,
         register.normal_profile_picture,
         register.small_profile_picture,
+        user_path.clone(),
     );
-    
+
     user_info.write_file(user_path)?;
 
     Ok(user_info)
@@ -1850,8 +1885,8 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
 }
 
 ///Generate uuid
-pub fn generate_uuid() -> String {
-    uuid::Uuid::new_v4().to_string()
+pub fn generate_uuid() -> Uuid {
+    uuid::Uuid::new_v4()
 }
 
 ///Display Error message with a messagebox

@@ -29,7 +29,7 @@ impl TemplateApp {
                     let author = self.login_username.clone();
                     let message = ClientMessage::construct_file_request_msg(
                         inner.index,
-                        &self.opened_account.uuid,
+                        &self.opened_user_information.uuid,
                         author,
                     );
 
@@ -88,7 +88,7 @@ impl TemplateApp {
                             .size(self.font_size)
                             .color({
                                 if let Some(tagged_name) = name_sent_to {
-                                    if *tagged_name == self.opened_account.username {
+                                    if *tagged_name == self.opened_user_information.username {
                                         Color32::YELLOW
                                     } else {
                                         Color32::GRAY
@@ -187,7 +187,7 @@ impl TemplateApp {
                             }
 
                             //We dont have file on our local system so we have to ask the server to provide it
-                            let uuid = &self.opened_account.uuid;
+                            let uuid = &self.opened_user_information.uuid;
                             let author = self.login_username.clone();
 
                             let message = ClientMessage::construct_image_request_msg(
@@ -304,7 +304,7 @@ impl TemplateApp {
                                             let message =
                                                 ClientMessage::construct_audio_request_msg(
                                                     audio.index,
-                                                    &self.opened_account.uuid,
+                                                    &self.opened_user_information.uuid,
                                                     self.login_username.clone(),
                                                 );
 

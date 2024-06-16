@@ -1,7 +1,7 @@
 use crate::app::backend::{
     AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
 };
-use egui::{vec2, Align, Color32, Layout, Response, RichText};
+use egui::{load::{BytesPoll, LoadError}, vec2, Align, Color32, ImageSource, Layout, Response, RichText};
 
 impl TemplateApp {
     pub fn client_ui_message_main(
@@ -47,6 +47,7 @@ impl TemplateApp {
                                 //Define defaults, for speed and volume based on the same logic as above ^
                                 self.client_ui.audio_playback.settings_list.push(AudioSettings::default());
                             }
+
                             let message_instances: Vec<Response> = Vec::new();
 
                             for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
@@ -83,8 +84,52 @@ impl TemplateApp {
                                                     }
                                             });
                                         }
+
                                         //Display author
-                                        ui.label(RichText::from(item.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                        ui.horizontal(|ui| {
+                                            //Profile picture
+                                            match ctx.try_load_bytes(&format!("bytes://{}", &item.uuid)) {
+                                                //If the image was found on the URI
+                                                Ok(bytes) => {
+                                                    //We want to wait until all the bytes are ready to display the image
+                                                    if let BytesPoll::Ready { bytes, size: _, mime: _ } = bytes {
+                                                        //If there is only a 0 in the bytes that indicates its a placeholder, thus we can display the spinner
+                                                        if bytes.to_vec() == vec![0] {
+                                                            ui.spinner();
+                                                        } else {
+                                                            ui.add(egui::Image::from_uri(format!("bytes://{}", &item.uuid)));
+                                                        }
+                                                    }
+                                                },
+                                                //If the image was not found on the URI
+                                                Err(err) => {
+                                                    ui.spinner();
+                                                    if let LoadError::Loading(inner) = err {
+                                                        if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                            //check if we are visible, so there are no unnecessary requests
+                                                            if !ui.is_rect_visible(ui.min_rect()) {
+                                                                return;
+                                                            }
+
+                                                            //Ask the server for the specified client's profile picture
+                                                            self.send_msg(ClientMessage::construct_client_request_msg(item.uuid.clone(), &self.opened_user_information.uuid, self.opened_user_information.username.clone()));
+                                                        
+                                                            //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
+                                                            //We will forget this URI when loading in the real image
+                                                            ctx.include_bytes(format!("bytes://{}", &item.uuid), vec![0]);
+                                                        }
+                                                        else {
+                                                            dbg!(inner);
+                                                        }
+                                                    }
+                                                    else {
+                                                        dbg!(err);
+                                                    }
+                                                },
+                                            };
+                                            //Client name
+                                            ui.label(RichText::from(item.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
+                                        });
 
                                         //IMPORTANT: Each of these functions have logic inside them for displaying
                                         self.message_display(item, ui, ctx, iter_index);
@@ -144,7 +189,7 @@ impl TemplateApp {
                                     }
                                     ui.separator();
                                     //Client-side uuid check, there is a check in the server file
-                                    if item.uuid == self.opened_account.uuid && item.message_type != ServerMessageType::Deleted {
+                                    if item.uuid == self.opened_user_information.uuid && item.message_type != ServerMessageType::Deleted {
                                         //We should only display the `edit` button if its anormal message thus its editable
                                         if let ServerMessageType::Normal(inner) = &item.message_type {
                                             if ui.button("Edit").clicked() {
@@ -156,7 +201,7 @@ impl TemplateApp {
 
                                         if ui.button("Delete").clicked() {
                                             self.send_msg(
-                                                ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_account.uuid, &self.opened_account.username)
+                                                ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_user_information.uuid, &self.opened_user_information.username)
                                             );
                                             ui.close_menu();
                                         }
@@ -189,7 +234,7 @@ impl TemplateApp {
                                                             .frame(false);
                                                             if ui.add(button).clicked() {
 
-                                                                let uuid = self.opened_account.uuid.clone();
+                                                                let uuid = self.opened_user_information.uuid.clone();
 
                                                                 let message = ClientMessage::construct_reaction_msg(
                                                                     chr, iter_index, &self.login_username, &uuid,

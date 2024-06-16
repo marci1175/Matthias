@@ -1,10 +1,10 @@
 use egui::{
-    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
-    Stroke,
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, ImageSource, Layout, Pos2, RichText, Sense, Stroke
 };
 use rodio::{Decoder, Sink};
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
@@ -68,7 +68,7 @@ impl TemplateApp {
                     ui.allocate_ui(vec2(300., 50.), |ui| {
                         ui.label(RichText::from("Welcome,").weak().size(20.));
                         ui.label(
-                            RichText::from(self.opened_account.username.to_string())
+                            RichText::from(self.opened_user_information.username.to_string())
                                 .strong()
                                 .size(20.),
                         );
@@ -526,7 +526,7 @@ impl TemplateApp {
                 let mut message = ClientMessage::construct_sync_msg(
                     &self.client_connection.password,
                     &self.login_username,
-                    &self.opened_account.uuid,
+                    &self.opened_user_information.uuid,
                     //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
                     self.client_ui.incoming_msg.struct_list.len(),
                     Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
@@ -544,6 +544,8 @@ impl TemplateApp {
                         //This patter match will always return true, the message were trying to pattern match is constructed above 
                         //We should update the message for syncing, so we will provide the latest info to the server
                         if let ClientMessageType::SyncMessage(inner) = &mut message.message_type {
+                            tokio::time::sleep(Duration::from_secs(2)).await;
+
                             let index = *last_seen_message_index.lock().unwrap();
 
                             if inner.last_seen_message_index < Some(index) {
@@ -719,6 +721,15 @@ impl TemplateApp {
                                                     ))
                                                     .unwrap();
                                             }
+                                            ServerReplyType::ClientReply(client_reply) => {
+                                                self.client_ui.incoming_msg.connected_clients_profile.insert(client_reply.uuid.clone(), client_reply.profile.clone());
+
+                                                //Forget old placeholder bytes
+                                                ctx.forget_image(&format!("bytes://{}", client_reply.uuid));
+
+                                                //Pair URI with profile image
+                                                ctx.include_bytes(format!("bytes://{}", client_reply.uuid), client_reply.profile.small_profile_picture);
+                                            },
                                         }
                                     }
                                     Err(_err) => {

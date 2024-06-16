@@ -4,13 +4,9 @@ use anyhow::{Error, Result};
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
-    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
-    ClientMessageType, ClientProfile, ConnectedClient, MessageReaction, Reaction,
-    ServerMessageType,
-    ServerMessageTypeDiscriminants::{
+    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction, ServerClientReply, ServerMessageType, ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    },
-    ServerReplyType, ServerSync,
+    }, ServerReplyType, ServerSync
 };
 
 use crate::app::backend::ServerMaster;
@@ -18,8 +14,8 @@ use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
     ClientMessageType::{
-        FileRequestType, FileUpload, MessageEdit, NormalMessage,
-        Reaction as ClientReaction, SyncMessage,
+        FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
+        SyncMessage,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
@@ -73,7 +69,7 @@ pub struct MessageService {
 
     ///This hashmap contains the connected clients' profiles
     /// In this hashmap the key is the connecting client's uuid, and the value is the CLientProfile struct (which will later get converted to string with serde_json)
-    pub connected_clients_profile: HashMap<String, ClientProfile>,
+    pub connected_clients_profile: Arc<tokio::sync::Mutex<HashMap<String, ClientProfile>>>,
 }
 
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
@@ -164,6 +160,7 @@ fn spawn_client_reader(
                 Ok(_) => {}
                 Err(err) => {
                     println!("Error processing a message: {err}");
+                    break;
                 }
             }
         }
@@ -191,9 +188,16 @@ async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Resul
 /// This function iterates over all the connected clients and all the messages, and sends writes them all to their designated ```OwnedWriteHalf``` (All of the users see all of the messages)
 /// This creates a server_master message, with the message passed in being the only one in the list of the messages
 async fn sync_message_with_clients(
+    //The connected clients
     connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
+    
+    //The connected clients' seen list (the last message's index theyve last seen)
     user_seen_list: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
+    
+    //The message sent by the owner
+    //This struct contains the owner of this message (by name & uuid)
     message: ServerOutput,
+
     key: [u8; 32],
 ) -> anyhow::Result<()> {
     let mut connected_clients_locked = connected_clients
@@ -267,66 +271,76 @@ impl MessageService {
         if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
-                if let Some(sync_attr) = sync_msg.sync_attribute {
-                    //sync attr is true if its a connection message i.e a licnet is trying to connect to us
-                    if sync_attr {
-                        let mut clients = self.connected_clients.lock().await;
-                        for client in clients.iter() {
-                            //If found, then the client is already connected
-                            if client.uuid == req.uuid {
-                                //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                send_message_to_client(
-                                    &mut *client_handle.try_lock()?,
-                                    hex::encode(self.decryption_key),
-                                )
-                                .await?;
+                if let Some(sync_attr) = &sync_msg.sync_attribute {
+                    match sync_attr {
+                        ConnectionType::Connect(profile) => {
+                            let mut clients = self.connected_clients.lock().await;
+                            for client in clients.iter() {
+                                //If found, then the client is already connected
+                                if client.uuid == req.uuid {
+                                    //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
+                                    send_message_to_client(
+                                        &mut *client_handle.try_lock()?,
+                                        hex::encode(self.decryption_key),
+                                    )
+                                    .await?;
 
-                                //If found return, and end execution
-                                return Ok(());
-                            }
-                        }
-
-                        //If the ip is not found then add it to connected clients
-                        clients.push(ConnectedClient::new(
-                            req.uuid.clone(),
-                            req.author.clone(),
-                            client_handle.clone(),
-                        ));
-
-                        //Return custom key which the server's text will be encrypted with
-                        send_message_to_client(
-                            &mut *client_handle.try_lock()?,
-                            hex::encode(self.decryption_key),
-                        )
-                        .await?;
-
-                        //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
-                        send_message_to_client(
-                            &mut *client_handle.try_lock()?,
-                            self.full_sync_client().await?,
-                        )
-                        .await?;
-                        return Ok(());
-                    }
-                    //Handle disconnections
-                    else {
-                        match self.connected_clients.try_lock() {
-                            Ok(mut clients) => {
-                                //Search for connected ip in all connected ips
-                                for (index, client) in clients.clone().iter().enumerate() {
-                                    //If found, then disconnect the client
-                                    if client.uuid == req.uuid {
-                                        clients.remove(index);
-
-                                        //Break out of the loop, return an error so the client listener thread stops
-                                        return Err(Error::msg("Client disconnected!"));
-                                    }
+                                    //If found return, and end execution
+                                    return Ok(());
                                 }
                             }
-                            Err(err) => {
-                                dbg!(err);
+
+                            //If the ip is not found then add it to connected clients
+                            clients.push(ConnectedClient::new(
+                                req.uuid.clone(),
+                                req.author.clone(),
+                                client_handle.clone(),
+                            ));
+
+                            //Store connected client's profile
+                            //TODO: swap out try_lock
+                            self.connected_clients_profile.try_lock().unwrap().insert(req.uuid, profile.clone());
+
+                            //Return custom key which the server's text will be encrypted with
+                            send_message_to_client(
+                                &mut *client_handle.try_lock()?,
+                                hex::encode(self.decryption_key),
+                            )
+                            .await?;
+
+                            //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
+                            send_message_to_client(
+                                &mut *client_handle.try_lock()?,
+                                self.full_sync_client().await?,
+                            )
+                            .await?;
+                            return Ok(());
+                        },
+                        //Handle disconnections
+                        ConnectionType::Disconnect => {
+                            match self.connected_clients.try_lock() {
+                                Ok(mut clients) => {
+                                    //Search for connected ip in all connected ips
+                                    for (index, client) in clients.clone().iter().enumerate() {
+                                        //If found, then disconnect the client
+                                        if client.uuid == req.uuid {
+                                            clients.remove(index);
+                                            
+                                            //Remove disconnected client from profile list
+                                            //TODO: swap out try_lock
+                                            // self.connected_clients_profile.try_lock().unwrap().remove(&client.uuid);
+                                            
+                                            //Break out of the loop, return an error so the client listener thread stops
+                                            return Err(Error::msg("Client disconnected!"));
+                                        }
+                                    }
+
+                                }
+                                Err(err) => {
+                                    dbg!(err);
+                                }
                             }
-                        }
+                        },
                     }
                 }
             } else {
@@ -511,6 +525,7 @@ impl MessageService {
             struct_list: self.messages.try_lock().unwrap().clone(),
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
             reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
+            connected_clients_profile: self.connected_clients_profile.try_lock().unwrap().clone(),
         };
 
         //convert reply into string
@@ -722,7 +737,7 @@ impl MessageService {
         request_type: &ClientRequestTypeStruct,
     ) -> anyhow::Result<String> {
         let reply = match request_type {
-            ClientRequestTypeStruct::ClientImageRequest(img_request) => {
+            ClientRequestTypeStruct::ImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
 
                 serde_json::to_string(&ServerReplyType::ImageReply(ServerImageReply {
@@ -731,7 +746,7 @@ impl MessageService {
                 }))
                 .unwrap_or_default()
             }
-            ClientRequestTypeStruct::ClientFileRequest(file_request) => {
+            ClientRequestTypeStruct::FileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
 
                 serde_json::to_string(&ServerReplyType::FileReply(ServerFileReply {
@@ -740,7 +755,7 @@ impl MessageService {
                 }))
                 .unwrap_or_default()
             }
-            ClientRequestTypeStruct::ClientAudioRequest(audio_request) => {
+            ClientRequestTypeStruct::AudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
 
                 serde_json::to_string(&ServerReplyType::AudioReply(ServerAudioReply {
@@ -750,6 +765,18 @@ impl MessageService {
                 }))
                 .unwrap_or_default()
             }
+            ClientRequestTypeStruct::ClientRequest(client_request_uuid) => {
+                let connected_clients = self.connected_clients_profile.try_lock().unwrap();
+                
+                let client = connected_clients.get(client_request_uuid).unwrap();
+
+                serde_json::to_string(&ServerReplyType::ClientReply(
+                    ServerClientReply {
+                        uuid: client_request_uuid.to_string(),
+                        profile: client.clone(),
+                    }
+                )).unwrap_or_default()
+            },
         };
 
         Ok(reply)

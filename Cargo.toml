@@ -48,7 +48,7 @@ tokio-util = "0.7.11"
 
 [dependencies.uuid]
 version = "1.6.1"
-features = ["v4", "fast-rng", "macro-diagnostics"]
+features = ["v4", "fast-rng", "macro-diagnostics", "serde"]
 
 [dependencies.windows-sys]
 version = "0.52.0"
