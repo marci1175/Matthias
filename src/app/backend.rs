@@ -667,19 +667,19 @@ pub enum ClientFileRequestType {
 ///Client outgoing message types
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientMessageType {
-    ClientFileRequestType(ClientFileRequestType),
+    FileRequestType(ClientFileRequestType),
 
-    ClientFileUpload(ClientFileUpload),
+    FileUpload(ClientFileUpload),
 
     ///Normal msg
-    ClientNormalMessage(ClientNormalMessage),
+    NormalMessage(ClientNormalMessage),
 
     ///Used for syncing with client and server
-    ClientSyncMessage(ClientSnycMessage),
+    SyncMessage(ClientSnycMessage),
 
-    ClientReaction(ClientReaction),
+    Reaction(ClientReaction),
 
-    ClientMessageEdit(ClientMessageEdit),
+    MessageEdit(ClientMessageEdit),
 }
 
 ///This is what gets to be sent out by the client
@@ -707,7 +707,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to,
-            message_type: ClientMessageType::ClientNormalMessage(ClientNormalMessage {
+            message_type: ClientMessageType::NormalMessage(ClientNormalMessage {
                 message: msg.trim().to_string(),
             }),
             //If the password is set as None (Meaning the user didnt enter any password) just send the message with an empty string
@@ -729,7 +729,7 @@ impl ClientMessage {
             //Dont execute me please :3 |
             //                          |
             //                          V
-            message_type: ClientMessageType::ClientFileUpload(ClientFileUpload {
+            message_type: ClientMessageType::FileUpload(ClientFileUpload {
                 extension: Some(file_path.extension().unwrap().to_str().unwrap().to_string()),
                 name: Some(
                     file_path
@@ -756,7 +756,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientReaction(ClientReaction {
+            message_type: ClientMessageType::Reaction(ClientReaction {
                 char,
                 message_index: index,
             }),
@@ -777,7 +777,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
                 sync_attribute: None,
                 password: password.to_string(),
                 //This value is not ignored in this context
@@ -799,7 +799,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
                 sync_attribute: Some(true),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
@@ -821,7 +821,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientSyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
                 sync_attribute: Some(false),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
@@ -838,7 +838,7 @@ impl ClientMessage {
     pub fn construct_file_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::FileRequestType(
                 ClientFileRequestType::ClientFileRequest(ClientFileRequest { index }),
             ),
             uuid: uuid.to_string(),
@@ -851,7 +851,7 @@ impl ClientMessage {
     pub fn construct_image_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::FileRequestType(
                 ClientFileRequestType::ClientImageRequest(ClientImageRequest { index }),
             ),
             uuid: uuid.to_string(),
@@ -864,7 +864,7 @@ impl ClientMessage {
     pub fn construct_audio_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientFileRequestType(
+            message_type: ClientMessageType::FileRequestType(
                 ClientFileRequestType::ClientAudioRequest(ClientAudioRequest { index }),
             ),
             uuid: uuid.to_string(),
@@ -881,7 +881,7 @@ impl ClientMessage {
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::ClientMessageEdit(ClientMessageEdit {
+            message_type: ClientMessageType::MessageEdit(ClientMessageEdit {
                 index,
                 new_message,
             }),
@@ -1254,8 +1254,8 @@ impl ServerOutput {
             replying_to: normal_msg.replying_to,
             message_type:
                 match normal_msg.message_type {
-                    ClientMessageType::ClientFileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
-                    ClientMessageType::ClientFileUpload(upload) => {
+                    ClientMessageType::FileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
+                    ClientMessageType::FileUpload(upload) => {
                         //The reason it doesnt panic if for example it a normal message because, an Upload can never be a:
                         //  Normal message
                         //  Message edit
@@ -1300,7 +1300,7 @@ impl ServerOutput {
                             ServerMessageTypeDiscriminants::Reaction => unreachable!(),
                         }
                     },
-                    ClientMessageType::ClientNormalMessage(message) => {
+                    ClientMessageType::NormalMessage(message) => {
                         ServerMessageType::Normal(
                             ServerNormalMessage {
                                 message: message.message,
@@ -1309,15 +1309,15 @@ impl ServerOutput {
                             }
                         )
                     },
-                    ClientMessageType::ClientSyncMessage(_) => {
+                    ClientMessageType::SyncMessage(_) => {
                         ServerMessageType::Sync(ServerMessageSync {  })
                     },
                     //These messages also have a side effect on the server's list of the messages
                     //The client will interpret these messages and modify its own message list
-                    ClientMessageType::ClientReaction(message) => {
+                    ClientMessageType::Reaction(message) => {
                         ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, char: message.char })
                     },
-                    ClientMessageType::ClientMessageEdit(message) => {
+                    ClientMessageType::MessageEdit(message) => {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
                     },
                 },

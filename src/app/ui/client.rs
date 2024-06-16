@@ -543,7 +543,7 @@ impl TemplateApp {
 
                         //This patter match will always return true, the message were trying to pattern match is constructed above 
                         //We should update the message for syncing, so we will provide the latest info to the server
-                        if let ClientMessageType::ClientSyncMessage(inner) = &mut message.message_type {
+                        if let ClientMessageType::SyncMessage(inner) = &mut message.message_type {
                             let index = *last_seen_message_index.lock().unwrap();
 
                             if inner.last_seen_message_index < Some(index) {

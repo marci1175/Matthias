@@ -53,14 +53,11 @@ impl TemplateApp {
                         ui.horizontal(|ui| {
                             ui.label("Gender");
                             egui::ComboBox::from_label("Select one")
-                                .selected_text(format!(
-                                    "{}",
-                                    match self.register.gender {
-                                        Some(false) => "Male",
-                                        Some(true) => "Female",
-                                        None => "Rather not answer",
-                                    }
-                                ))
+                                .selected_text(match self.register.gender {
+                                    Some(false) => "Male",
+                                    Some(true) => "Female",
+                                    None => "Rather not answer",
+                                })
                                 .show_ui(ui, |ui| {
                                     ui.selectable_value(
                                         &mut self.register.gender,

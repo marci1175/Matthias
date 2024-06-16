@@ -18,8 +18,8 @@ use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
     ClientMessageType::{
-        ClientFileRequestType, ClientFileUpload, ClientMessageEdit, ClientNormalMessage,
-        ClientReaction, ClientSyncMessage,
+        FileRequestType, FileUpload, MessageEdit, NormalMessage,
+        Reaction as ClientReaction, SyncMessage,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
@@ -264,7 +264,7 @@ impl MessageService {
 
         let req: ClientMessage = req_result.unwrap();
 
-        if let ClientMessageType::ClientSyncMessage(sync_msg) = &req.message_type {
+        if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = sync_msg.sync_attribute {
@@ -348,13 +348,13 @@ impl MessageService {
         //Search through the list
         {
             match &req.message_type {
-                ClientNormalMessage(_msg) => self.normal_message(&req).await,
+                NormalMessage(_msg) => self.normal_message(&req).await,
 
-                ClientSyncMessage(_msg) => {
+                SyncMessage(_msg) => {
                     self.sync_message(&req).await;
                 }
 
-                ClientFileRequestType(request_type) => {
+                FileRequestType(request_type) => {
                     send_message_to_client(
                         &mut *client_handle.try_lock()?,
                         //Encrypt the request reply
@@ -369,7 +369,7 @@ impl MessageService {
                     return Ok(());
                 }
 
-                ClientFileUpload(upload_type) => {
+                FileUpload(upload_type) => {
                     self.handle_upload(req.clone(), upload_type).await;
                 }
 
@@ -377,7 +377,7 @@ impl MessageService {
                     self.handle_reaction(reaction).await;
                 }
 
-                ClientMessageEdit(edit) => {
+                MessageEdit(edit) => {
                     match &mut self.messages.try_lock() {
                         Ok(messages_vec) => {
                             //Server-side uuid check
@@ -409,7 +409,7 @@ impl MessageService {
 
             //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
             if !(matches!(&req.message_type, ClientReaction(_))
-                || matches!(&req.message_type, ClientMessageEdit(_)))
+                || matches!(&req.message_type, MessageEdit(_)))
             {
                 //Allocate a reaction after every type of message except a sync message
                 match self.reactions.try_lock() {
@@ -434,9 +434,9 @@ impl MessageService {
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
                         //This is unreachable, as requests are handled elsewhere
-                        ClientFileRequestType(_) => unreachable!(),
+                        FileRequestType(_) => unreachable!(),
 
-                        ClientFileUpload(inner) => {
+                        FileUpload(inner) => {
                             match inner.extension.clone().unwrap_or_default().as_str() {
                                 //We have to subtract 1 from every len because of indexing on the client side (we check its lenght after processing the client's message therfor the lenght will be 1 altough the image is on the 0th index)
                                 "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
@@ -449,18 +449,18 @@ impl MessageService {
                             }
                         }
 
-                        ClientNormalMessage(_) => -1,
+                        NormalMessage(_) => -1,
 
-                        ClientSyncMessage(_) => -1,
+                        SyncMessage(_) => -1,
 
                         ClientReaction(_) => -1,
 
-                        ClientMessageEdit(_) => -1,
+                        MessageEdit(_) => -1,
                     },
                     //Get message type
                     match &req.message_type {
-                        ClientFileRequestType(_) => unreachable!(),
-                        ClientFileUpload(inner) => {
+                        FileRequestType(_) => unreachable!(),
+                        FileUpload(inner) => {
                             //We should match the upload type more specificly
                             match inner.extension.clone().unwrap_or_default().as_str() {
                                 "png" | "jpeg" | "bmp" | "tiff" | "webp" => Image,
@@ -468,10 +468,10 @@ impl MessageService {
                                 _ => Upload,
                             }
                         }
-                        ClientNormalMessage(_) => Normal,
-                        ClientSyncMessage(_) => Sync,
+                        NormalMessage(_) => Normal,
+                        SyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
-                        ClientMessageEdit(_) => Edit,
+                        MessageEdit(_) => Edit,
                     },
                     req.uuid,
                 ),
@@ -526,7 +526,7 @@ impl MessageService {
     /// This function has a side effect on the user_seen_list, modifying it according to the client
     async fn sync_message(&self, req: &ClientMessage) {
         //Dont ask me why I did it this way
-        if let ClientSyncMessage(inner) = &req.message_type {
+        if let SyncMessage(inner) = &req.message_type {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
             if let Some(last_seen_message_index) = inner.last_seen_message_index {
                 match &mut self.clients_last_seen_index.try_lock() {
