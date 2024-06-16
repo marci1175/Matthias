@@ -22,7 +22,6 @@ impl TemplateApp {
                         //Scroll to reply logic
                         if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
                             scroll_to_instance.messages[dbg!(scroll_to_instance.index)].scroll_to_me(Some(Align::Center));
-                            
                             //Destroy instance
                             self.client_ui.scroll_to_message = None;
                             self.client_ui.scroll_to_message_index = None;
@@ -105,7 +104,6 @@ impl TemplateApp {
                                                 ui.label(RichText::from("(Edited)").strong());
                                             }
                                         }
-                                        
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
                                                 //Check if there is a reaction list vector already allocated non the index of the specific message
@@ -149,7 +147,6 @@ impl TemplateApp {
                                         }
                                     }
                                 });
-                                
                                 //Back up reponse of message group, so we can scroll to it later if the user thinks like it
                                 message_instances.push(message_group.response.clone());
 
@@ -157,7 +154,6 @@ impl TemplateApp {
                                     let profile_menu_button = ui.menu_button("Profile", |ui| {
                                         //We can safely unwrap here
                                         let user_profile = self.client_ui.incoming_msg.connected_clients_profile.get(&item.uuid).unwrap();
-                                        
                                         //Include full profile picture so it can be displayed
                                         ctx.include_bytes(
                                             "bytes://profile_picture",
@@ -194,9 +190,7 @@ impl TemplateApp {
                                     if profile_menu_button.inner.is_none() {
                                         ctx.forget_image("bytes://profile_picture");
                                     }
-                                    
                                     ui.separator();
-                                    
                                     if ui.button("Reply").clicked() {
                                         self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
                                         ui.close_menu();
@@ -275,7 +269,6 @@ impl TemplateApp {
                                         };
                                     }
 
-                                    
                                 });
                             };
 
@@ -290,14 +283,19 @@ impl TemplateApp {
         })
     }
 
-/// This function displays the 64x64 icon of a client based on their uuid
-/// This function also requests the server for the image if the image isnt available on the given URI
-fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
+    /// This function displays the 64x64 icon of a client based on their uuid
+    /// This function also requests the server for the image if the image isnt available on the given URI
+    fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
         match ctx.try_load_bytes(&format!("bytes://{}", &uuid)) {
             //If the image was found on the URI
             Ok(bytes) => {
                 //We want to wait until all the bytes are ready to display the image
-                if let BytesPoll::Ready { bytes, size: _, mime: _ } = bytes {
+                if let BytesPoll::Ready {
+                    bytes,
+                    size: _,
+                    mime: _,
+                } = bytes
+                {
                     //If there is only a 0 in the bytes that indicates its a placeholder, thus we can display the spinner
                     if bytes.to_vec() == vec![0] {
                         ui.spinner();
@@ -305,7 +303,7 @@ fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &m
                         ui.add(egui::Image::from_uri(format!("bytes://{}", &uuid)));
                     }
                 }
-            },
+            }
             //If the image was not found on the URI
             Err(err) => {
                 ui.spinner();
@@ -315,21 +313,23 @@ fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &m
                         if !ui.is_rect_visible(ui.min_rect()) {
                             return;
                         }
-    
+
                         //Ask the server for the specified client's profile picture
-                        self.send_msg(ClientMessage::construct_client_request_msg(uuid.clone(), &self.opened_user_information.uuid, self.opened_user_information.username.clone()));
+                        self.send_msg(ClientMessage::construct_client_request_msg(
+                            uuid.clone(),
+                            &self.opened_user_information.uuid,
+                            self.opened_user_information.username.clone(),
+                        ));
                         //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
                         //We will forget this URI when loading in the real image
                         ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);
-                    }
-                    else {
+                    } else {
                         dbg!(inner);
                     }
-                }
-                else {
+                } else {
                     dbg!(err);
                 }
-            },
+            }
         };
     }
 }
