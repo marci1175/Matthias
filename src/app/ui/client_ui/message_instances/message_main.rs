@@ -2,8 +2,7 @@ use crate::app::backend::{
     AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
 };
 use egui::{
-    load::{BytesPoll, LoadError},
-    vec2, Align, Color32, Layout, Response, RichText,
+    load::{BytesPoll, LoadError}, vec2, Align, Button, Color32, Layout, Response, RichText
 };
 
 impl TemplateApp {
@@ -190,8 +189,10 @@ impl TemplateApp {
                                     if profile_menu_button.inner.is_none() {
                                         ctx.forget_image("bytes://profile_picture");
                                     }
+
                                     ui.separator();
-                                    if ui.button("Reply").clicked() {
+                                    
+                                    if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/reply.png"), "Reply")).clicked() {
                                         self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
                                         ui.close_menu();
                                     }
@@ -200,14 +201,14 @@ impl TemplateApp {
                                     if item.uuid == self.opened_user_information.uuid && item.message_type != ServerMessageType::Deleted {
                                         //We should only display the `edit` button if its anormal message thus its editable
                                         if let ServerMessageType::Normal(inner) = &item.message_type {
-                                            if ui.button("Edit").clicked() {
+                                            if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/edit.png"), "Edit")).clicked() {
                                                 self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
                                                 self.client_ui.usr_msg = inner.message.to_string();
                                                 ui.close_menu();
                                             }
                                         }
 
-                                        if ui.button("Delete").clicked() {
+                                        if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/delete.png"), "Delete")).clicked() {
                                             self.send_msg(
                                                 ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_user_information.uuid, &self.opened_user_information.username)
                                             );
@@ -263,7 +264,7 @@ impl TemplateApp {
                                         });
                                     });
                                     if let ServerMessageType::Normal(inner) = &item.message_type {
-                                        if ui.button("Copy text").clicked() {
+                                        if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/copy.png"), "Copy message")).clicked() {
                                             ctx.copy_text(inner.message.clone());
                                             ui.close_menu();
                                         };

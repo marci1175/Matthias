@@ -59,18 +59,18 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        /* devlog:
+        /* TODOS:
             TODO: add scripting
             TODO: add image part selection in registration
             TODO: optimize syncing by waiting for last seen message difference
-            TODO: put more icons on buttons for better UX
             TODO: fix audio playback
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
             TODO: make an installer for this app so there wouldnt be so many huge binary sizes
-            TODO: make a loading wheek when loading a message / image / audio / etc
+            TODO: make a loading wheel when loading a message / image / audio / etc
             TODO: impl disconnection msg for server to client
+            TODO: modify image downloading so theyre arent saved in a file
         */
 
         if self.main.register_mode {

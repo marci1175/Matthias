@@ -60,7 +60,7 @@ impl TemplateApp {
                                                 ui.allocate_ui(vec2(30., 30.), |ui|{
                                                     if ui.add(
                                                         ImageButton::new(
-                                                            egui::include_image!("../../../../../../icons/bin.png")
+                                                            egui::include_image!("../../../../../../icons/delete.png")
                                                         )
                                                     ).clicked() {
                                                         self.client_ui.files_to_send.remove(index);

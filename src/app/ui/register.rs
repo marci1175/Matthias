@@ -163,6 +163,14 @@ impl TemplateApp {
                             Area::new(Id::new("IMAGE_SELECTOR_CONTROLS"))
                                 .fixed_pos(Pos2::new(rectangle_rect.min.x, rectangle_rect.min.y))
                                 .show(ctx, |ui| {
+                                    //Format it
+                                    ui.allocate_space(vec2(ui.available_width(), 5.));
+
+                                    if ui.button("Cancel").clicked() {
+                                        //Reset state
+                                        self.register.image = ProfileImage::default();
+                                    }
+
                                     ui.horizontal(|ui| {
                                         ui.label("Zoom");
                                         if image.height() > image.width() {
@@ -244,16 +252,15 @@ impl TemplateApp {
                                 .pick_file();
 
                             if let Some(app_data_path) = app_data_path {
-                                //This shouldnt panic as we limit the types of file which can be seletected as a pfp
-                                self.register.image.selected_image_bytes = Some(
-                                    ImageReader::new(Cursor::new(
-                                        fs::read(&app_data_path).unwrap(),
-                                    ))
-                                    .with_guessed_format()
-                                    .unwrap()
-                                    .decode()
-                                    .unwrap(),
-                                );
+                                match read_image(&app_data_path) {
+                                    Ok(image) => {
+                                        //This shouldnt panic as we limit the types of file which can be seletected as a pfp
+                                        self.register.image.selected_image_bytes = Some(image);
+                                    }
+                                    Err(err) => {
+                                        display_error_message(err);
+                                    }
+                                }
                                 self.register.image.image_path = app_data_path;
                                 ctx.forget_image("bytes://register_image");
                             }
@@ -366,6 +373,14 @@ impl TemplateApp {
 
         Ok(())
     }
+}
+
+fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage> {
+    let image_reader = ImageReader::new(Cursor::new(fs::read(app_data_path)?))
+        .with_guessed_format()?
+        .decode()?;
+
+    Ok(image_reader)
 }
 
 fn draw_rect(ui: &mut egui::Ui, stroke: Stroke, center_pos: Pos2, size_of_side: f32) {

@@ -27,15 +27,19 @@ impl TemplateApp {
                     self.main.client_mode =
                         match login(self.login_username.clone(), self.login_password.clone()) {
                             Ok(path_to_file) => {
-                                let account = UserInformation::deserialize(
-                                    &std::fs::read_to_string(&path_to_file).unwrap(),
-                                )
-                                .unwrap();
+                                match fetch_account(path_to_file) {
+                                    Ok(account) => {
+                                        //Load the parsed text into the variable
+                                        self.opened_user_information = account;
 
-                                //Load the parsed text into the variable
-                                self.opened_user_information = account;
+                                        true
+                                    },
+                                    Err(err) => {
+                                        display_error_message(err); 
 
-                                true
+                                        false
+                                    },
+                                }
                             }
                             Err(err) => {
                                 display_error_message(err);
@@ -52,4 +56,12 @@ impl TemplateApp {
             });
         });
     }
+}
+
+fn fetch_account(path_to_file: std::path::PathBuf) -> anyhow::Result<UserInformation> {
+    let account = UserInformation::deserialize(
+        &std::fs::read_to_string(&path_to_file)?,
+    )?;
+   
+    Ok(account)
 }
