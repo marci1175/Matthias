@@ -571,24 +571,6 @@ impl MessagingMode {
     }
 }
 
-#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
-///Opened account attributes, doesnt contain anything which might change at runtime
-pub struct OpenedAccount {
-    pub uuid: String,
-    pub username: String,
-    pub path: PathBuf,
-}
-
-impl OpenedAccount {
-    pub fn new(uuid: String, username: String, path: PathBuf) -> Self {
-        Self {
-            uuid,
-            username,
-            path,
-        }
-    }
-}
-
 ///When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileUpload {

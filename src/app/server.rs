@@ -1,6 +1,7 @@
-use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{Error, Result};
+use egui::mutex::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
@@ -25,8 +26,7 @@ use crate::app::backend::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tokio::select;
-use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf};
+use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, select};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -37,7 +37,7 @@ use super::backend::{ServerAudioReply, ServerOutput};
 
 #[derive(Debug, Default)]
 pub struct MessageService {
-    ///Contains all the messages
+    /// Contains all the messages
     pub messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
 
     ///Contains all of the reactions added to the messages
@@ -65,15 +65,18 @@ pub struct MessageService {
     ///connected clients
     pub connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
 
-    ///Client secret
+    /// Client secret
     pub decryption_key: [u8; 32],
 
-    ///Client last seen message
+    /// Client last seen message
     pub clients_last_seen_index: Arc<tokio::sync::Mutex<Vec<ClientLastSeenMessage>>>,
 
-    ///This hashmap contains the connected clients' profiles
-    /// In this hashmap the key is the connecting client's uuid, and the value is the CLientProfile struct (which will later get converted to string with serde_json)
+    /// This hashmap contains the connected clients' profiles
+    /// In this hashmap the key is the connecting client's uuid, and the value is the ClientProfile struct (which will later get converted to string with serde_json)
     pub connected_clients_profile: Arc<tokio::sync::Mutex<HashMap<String, ClientProfile>>>,
+
+    /// This list contains the banned uuids
+    pub banned_uuids: tokio::sync::RwLock<Vec<String>>,
 }
 
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
@@ -82,7 +85,7 @@ pub async fn server_main(
     password: String,
     //This signals all the client recivers to be shut down
     cancellation_token: CancellationToken,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<Arc<RwLock<HashMap<String, ClientProfile>>>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
@@ -94,6 +97,9 @@ pub async fn server_main(
     }));
 
     let cancellation_child = cancellation_token.child_token();
+
+    //We have to clone here to be able to move this into the thread
+    let msg_service_clone = msg_service.clone();
 
     //Server thread
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
@@ -112,20 +118,50 @@ pub async fn server_main(
             //split client stream, so we will be able to store these seperately
             let (reader, writer) = stream.into_split();
 
-            let msg_service_clone = msg_service.clone();
+            //We need to clone here too, to pass it into the listener thread
+            let message_service_clone = msg_service_clone.clone();
 
             //Listen for future client messages (IF the client stays connected)
             spawn_client_reader(
                 Arc::new(tokio::sync::Mutex::new(reader)),
                 Arc::new(tokio::sync::Mutex::new(writer)),
-                msg_service_clone,
+                message_service_clone,
                 cancellation_token.child_token(),
             );
         }
         Ok(())
     });
+    
+    //We have to clone here to be able to move it into the thread
+    let message_service_clone = msg_service.clone();
 
-    Ok(())
+    //This value will reference an entry in the message_service, and it functions as a way for the server thread and the main thread to communicate
+    let connected_clients_list: Arc<RwLock<HashMap<String, ClientProfile>>> = Arc::new(RwLock::new(HashMap::new()));
+    
+    let connected_clients_list_clone = connected_clients_list.clone();
+
+    //This thread keeps in sync with the ui, so the user can interact with the servers settings
+    let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        loop {
+            //Sleep this thread
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let message_service_lock = message_service_clone.lock().await;
+            //The original client list contained by the server
+            let connected_clients_server = message_service_lock.connected_clients_profile.lock().await;
+
+            //The Rwlock we are sending to the UI (User)
+            let connected_clients = &mut *connected_clients_list_clone.write();
+
+            connected_clients.clear();
+
+            for (key, value) in connected_clients_server.iter() {
+                connected_clients.insert(key.clone(), value.clone());
+            };
+        }
+        Ok(())
+    });
+
+    Ok(connected_clients_list)
 }
 
 /// This function does not need to be async since it spawn an async thread anyway

@@ -2,7 +2,8 @@ use crate::app::backend::{
     AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
 };
 use egui::{
-    load::{BytesPoll, LoadError}, vec2, Align, Button, Color32, Layout, Response, RichText
+    load::{BytesPoll, LoadError},
+    vec2, Align, Button, Color32, Layout, Response, RichText,
 };
 
 impl TemplateApp {

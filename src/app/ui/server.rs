@@ -1,65 +1,76 @@
 use crate::app::backend::{display_error_message, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
-use egui::{vec2, Align, Layout, RichText};
+use egui::{vec2, Align, Context, Layout, RichText};
+use egui_extras::{Column, TableBuilder};
 use tokio_util::sync::CancellationToken;
 
 impl TemplateApp {
-    pub fn server_setup_ui(&mut self, ui: &mut egui::Ui) {
-        ui.collapsing("Host a server!", |ui| {
+    pub fn server_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &Context) {
+        ui.collapsing("Server", |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
                 if !self.server_has_started {
-                    ui.label(RichText::from("Server setup"));
+                    ui.label("Start a server!")
+                        .on_hover_text("Starting hosting a server with a click of a button!");
 
-                    ui.allocate_ui(vec2(100., 30.), |ui| {
-                        ui.horizontal_centered(|ui| {
-                            ui.label(RichText::from("Port"));
-                            ui.text_edit_singleline(&mut self.open_on_port);
+                        ui.allocate_ui(vec2(100., 30.), |ui| {
+                            ui.horizontal_centered(|ui| {
+                                ui.label(RichText::from("Port"));
+                                ui.text_edit_singleline(&mut self.open_on_port);
+                            });
                         });
-                    });
 
-                    let temp_open_on_port = &self.open_on_port;
+                        let temp_open_on_port = &self.open_on_port;
 
-                    if ui.button("Start server").clicked() {
-                        let server_pw = match self.server_req_password {
-                            true => self.server_password.clone(),
-                            false => "".to_string(),
-                        };
+                        if ui.button("Start").clicked() {
+                            let server_pw = match self.server_req_password {
+                                true => self.server_password.clone(),
+                                false => "".to_string(),
+                            };
 
-                        //Overwrite the channel we have in the TemplateApp struct
-                        self.server_shutdown_token = CancellationToken::new();
+                            //Overwrite the channel we have in the TemplateApp struct
+                            self.server_shutdown_token = CancellationToken::new();
 
-                        let token = self.server_shutdown_token.child_token();
+                            let token = self.server_shutdown_token.child_token();
 
-                        self.server_has_started = match temp_open_on_port.parse::<i32>() {
-                            Ok(port) => {
-                                tokio::spawn(async move {
-                                    match server::server_main(port.to_string(), server_pw, token)
+                            self.server_has_started = match temp_open_on_port.parse::<i32>() {
+                                Ok(port) => {
+                                    tokio::spawn(async move {
+                                        match server::server_main(
+                                            port.to_string(),
+                                            server_pw,
+                                            token,
+                                        )
                                         .await
-                                    {
-                                        Ok(_temp_stuff) => {}
-                                        Err(err) => {
-                                            println!("ln 208 {:?}", err);
-                                        }
-                                    };
-                                });
-                                true
-                            }
-                            Err(err) => {
-                                display_error_message(err);
+                                        {
+                                            Ok(connected_clients) => {
+                                                loop {
+                                                    dbg!(connected_clients.read().clone());
+                                                }
+                                            }
+                                            Err(err) => {
+                                                println!("ln 208 {:?}", err);
+                                            }
+                                        };
+                                    });
+                                    true
+                                }
+                                Err(err) => {
+                                    display_error_message(err);
 
-                                false
-                            }
-                        };
-                    }
+                                    false
+                                }
+                            };
+                        }
 
-                    ui.checkbox(&mut self.server_req_password, "Server requires password");
+                    ui.checkbox(&mut self.server_req_password, "Set password for server");
 
                     if self.server_req_password {
                         ui.text_edit_singleline(&mut self.server_password);
                     }
                 } else {
-                    if ui.button("Shutdown").clicked() {
+                    ui.label("Server settings");
+                    if ui.button("Shutdown server").clicked() {
                         let token = self.server_shutdown_token.clone();
 
                         tokio::spawn(async move {
@@ -113,6 +124,40 @@ impl TemplateApp {
                             self.server_password
                         )));
                     }
+                
+                    //Display connected users, with a Table
+                    TableBuilder::new(ui)
+                        .resizable(true)
+                        .auto_shrink([false, false])
+                        .striped(true)
+                        .columns(Column::remainder().at_most(ctx.available_rect().width()), 5)
+                        .header(25., |mut row| {
+                            row.col(|ui| {ui.label("Username");});
+                            row.col(|ui| {ui.label("Uuid").on_hover_text("Universally unique identifier");});
+                            row.col(|ui| {ui.label("Profile picture");});
+                        })
+                        .body(|body| {
+                            body.rows(25., 100, |mut row| {
+                                let row_idx = row.index();
+
+                                //Display username
+                                row.col(|ui| {
+
+                                });
+                                
+                                //Display uuid
+                                row.col(|ui| {
+
+                                });
+                                
+                                //Display profile picture
+                                row.col(|ui| {
+
+                                });
+                            });
+                        });
+                        
+                        
                 }
             });
         });

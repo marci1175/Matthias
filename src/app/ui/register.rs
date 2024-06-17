@@ -1,7 +1,7 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
 use crate::app::backend::{
-    display_error_message, login, register, OpenedAccount, ProfileImage, Register, TemplateApp,
+    display_error_message, login, register, ProfileImage, Register, TemplateApp,
 };
 use anyhow::bail;
 use egui::{
