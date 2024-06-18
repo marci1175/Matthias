@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
+use dashmap::DashMap;
 use egui::Rect;
 use image::DynamicImage;
 use rand::rngs::ThreadRng;
@@ -6,12 +7,13 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::client::{connect_to_server, ServerReply};
+use super::server::SharedFields;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Error, Result};
 use argon2::{Config, Variant, Version};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -26,7 +28,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, RwLock};
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
@@ -60,9 +62,16 @@ pub struct TemplateApp {
     /*
         server main
     */
-    ///SChecks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
+    ///Checks whether server is already started TODO: FIX DUMB STUFF LIKE THIS, INSTEAD USE AN OPTION
     #[serde(skip)]
     pub server_has_started: bool,
+
+    #[serde(skip)]
+    /// This is used to store the connected client profile
+    /// The field get modified by the server_main function (When a server is started this is passed in and is later modified by the server)
+    /// This might seem very similar to ```self.client_ui.incoming_msg.connected_clients_profile```, but that field is only modifed when connecting to a server, so when we start a server but dont connect to it, we wont have the fields
+    /// This field gets directly modified by the server thread
+    pub server_connected_clients_profile: Arc<DashMap<String, ClientProfile>>,
 
     ///Public ip address, checked by pinging external website
     #[serde(skip)]
@@ -258,7 +267,7 @@ impl Default for TemplateApp {
             server_output_sender,
 
             autosync_shutdown_token: CancellationToken::new(),
-
+            server_connected_clients_profile: Arc::new(DashMap::new()),
             opened_user_information: UserInformation::default(),
         }
     }
@@ -280,6 +289,10 @@ impl TemplateApp {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+    #[serde(skip)]
+    ///Fields shared with the client
+    pub shared_fields: Arc<Mutex<SharedFields>>,
+
     ///When a text_edit_cursor move has been requested this value is a Some
     #[serde(skip)]
     pub text_edit_cursor: Option<usize>,
@@ -402,6 +415,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            shared_fields: Default::default(),
             text_edit_cursor: None,
             messaging_mode: MessagingMode::Normal,
             connected_users_display_rect: None,
@@ -525,12 +539,17 @@ impl Default for ProfileImage {
     }
 }
 
-///The clients profile, this struct should be sent at a server connection
+/// The clients profile, this struct should be sent at a server connection
 /// It hold everything which needs to be displayed when viewing someone's profile
 /// This struct might look similar too ```Register```, but that one contains more information, and is only made to control the ui
 /// This struct is sent to the server upon successful connection
+/// If you are searching for the uuid in this struct, please note that most of the times this struct is used in a hashmap where the key is the uuid
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
 pub struct ClientProfile {
+    /// The client's username
+    /// We might not need it in some contexts
+    pub username: String,
+
     /// The client's full name
     /// If its empty it means the client did not agree to share it
     pub full_name: String,
@@ -1637,11 +1656,12 @@ impl UserInformation {
         path: PathBuf,
     ) -> Self {
         Self {
-            username,
+            username: username.clone(),
             password: encrypt(password),
             uuid,
             bookmarked_ips: Vec::new(),
             profile: ClientProfile {
+                username,
                 full_name,
                 gender,
                 birth_date,
@@ -1698,16 +1718,16 @@ impl UserInformation {
 
 #[inline]
 /// aes256 is decrypted by this function by a fixed key
-pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> Result<String, FromUtf8Error> {
-    let ciphertext = hex::decode(string_to_be_decrypted).unwrap();
+pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Result<String> {
+    let ciphertext = hex::decode(string_to_be_decrypted)?;
 
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
     let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
 
-    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
-    String::from_utf8(plaintext)
+    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).map_err(|_| Error::msg("OddLength"))?;
+    Ok(String::from_utf8(plaintext)?)
 }
 
 /// aes256 is encrypted by this function by a fixed key
@@ -1906,3 +1926,14 @@ where
 
     Ok(u32::from_be_bytes(buf[..4].try_into()?))
 }
+
+// /// This struct contains the important info for the server's listener to modify the SharedFields
+// pub struct ModifySharedFields {
+//     pub action_type: ActionType,
+
+// }
+
+// pub enum ActionType {
+//     Add(Option<usize>),
+//     Remove(Option<usize>)
+// }

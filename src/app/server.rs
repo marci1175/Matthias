@@ -1,13 +1,24 @@
-use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    env, fs,
+    io::Write,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use anyhow::{Error, Result};
-use egui::mutex::RwLock;
+use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
-    display_error_message, encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction, ServerClientReply, ServerMessageType, ServerMessageTypeDiscriminants::{
+    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
+    ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
+    ServerClientReply, ServerMessageType,
+    ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    }, ServerReplyType, ServerSync
+    },
+    ServerReplyType, ServerSync,
 };
 
 use crate::app::backend::ServerMaster;
@@ -71,8 +82,14 @@ pub struct MessageService {
     /// In this hashmap the key is the connecting client's uuid, and the value is the ClientProfile struct (which will later get converted to string with serde_json)
     pub connected_clients_profile: Arc<tokio::sync::Mutex<HashMap<String, ClientProfile>>>,
 
+    pub shared_fields: Arc<Mutex<SharedFields>>,
+}
+
+/// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system
+#[derive(Debug, Clone, Default)]
+pub struct SharedFields {
     /// This list contains the banned uuids
-    pub banned_uuids: tokio::sync::RwLock<Vec<String>>,
+    pub banned_uuids: Arc<Mutex<Vec<String>>>,
 }
 
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
@@ -81,7 +98,8 @@ pub async fn server_main(
     password: String,
     //This signals all the client recivers to be shut down
     cancellation_token: CancellationToken,
-) -> /*You can only modify the wrapped value of the result please dont do anything else*/ Result<Arc<RwLock<HashMap<String, ClientProfile>>>, Box<dyn std::error::Error>>{
+    connected_clients_list: Arc<DashMap<String, ClientProfile>>,
+) -> Result<Arc<Mutex<SharedFields>>, Box<dyn std::error::Error>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
@@ -132,45 +150,40 @@ pub async fn server_main(
         Ok(())
     });
 
-    //This value will reference an entry in the message_service, and it functions as a way for the server thread and the main thread to communicate
-    let connected_clients_list: Arc<RwLock<HashMap<String, ClientProfile>>> = Arc::new(RwLock::new(HashMap::new()));
-    
-    // //We have to clone here to be able to move it into the thread
+    //We have to clone here to be able to move it into the thread
     let message_service_clone = msg_service.clone();
 
-    let connected_clients_list_clone = connected_clients_list.clone();
-
     //This thread keeps in sync with the ui, so the user can interact with the servers settings
-    let sync_thread = tokio::spawn(async move {
+    tokio::spawn(async move {
         loop {
             select! {
                 //We should only init a sync 3 secs
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {
                     let message_service_lock = message_service_clone.lock().await;
-                    //The original client list contained by the server
-                    let connected_clients_server = message_service_lock.connected_clients_profile.lock().await;
 
-                    //The Rwlock we are sending to the UI (User)
-                    let connected_clients = &mut *connected_clients_list_clone.write();
+                    //The original client list contained by the server
+                    let connected_clients_server = message_service_lock.connected_clients_profile.lock().await.clone();
 
                     //Since we cant just rewrite the connected_clients we clear and then insert every
-                    connected_clients.clone_from(&connected_clients_server);  
+                    for (key, value) in connected_clients_server.into_iter() {
+                        connected_clients_list.insert(key, value);
+                    }
                 },
 
                 _ = cancellation_child_clone.cancelled() => {
+
                     //shutdown sync thread
                     break;
                 },
             }
-            
         }
     });
 
-    // if let Err(err) = sync_thread.await {
-    //     display_error_message(err);
-    // };
+    //Lock message service so we can access the fields
+    let msg_svc = msg_service.lock().await;
 
-    Ok(connected_clients_list)
+    //We return an Arc<Rwlock> handle to the banned uuids, which can be later modified by the Ui
+    Ok(msg_svc.shared_fields.clone())
 }
 
 /// This function does not need to be async since it spawn an async thread anyway
@@ -323,6 +336,26 @@ impl MessageService {
                 if let Some(sync_attr) = &sync_msg.sync_attribute {
                     match sync_attr {
                         ConnectionType::Connect(profile) => {
+                            //Check if user has been banned
+                            if self
+                                .shared_fields
+                                .lock()
+                                .unwrap()
+                                .banned_uuids
+                                .lock()
+                                .unwrap()
+                                .iter()
+                                .any(|item| *item == req.uuid)
+                            {
+                                send_message_to_client(
+                                    &mut *client_handle.try_lock()?,
+                                    "You have been banned!".to_string(),
+                                )
+                                .await?;
+
+                                return Err(Error::msg("Client has been banned!"));
+                            }
+
                             let mut clients = self.connected_clients.lock().await;
                             for client in clients.iter() {
                                 //If found, then the client is already connected
@@ -347,10 +380,9 @@ impl MessageService {
                             ));
 
                             //Store connected client's profile
-                            //TODO: swap out try_lock
                             self.connected_clients_profile
-                                .try_lock()
-                                .unwrap()
+                                .lock()
+                                .await
                                 .insert(req.uuid, profile.clone());
 
                             //Return custom key which the server's text will be encrypted with
@@ -378,11 +410,6 @@ impl MessageService {
                                         if client.uuid == req.uuid {
                                             clients.remove(index);
 
-                                            //Remove disconnected client from profile list
-                                            //TODO: swap out try_lock
-                                            // self.connected_clients_profile.try_lock().unwrap().remove(&client.uuid);
-
-                                            //Break out of the loop, return an error so the client listener thread stops
                                             return Err(Error::msg("Client disconnected!"));
                                         }
                                     }
@@ -401,6 +428,22 @@ impl MessageService {
                 //return an error so the client listener thread stops
                 return Err(Error::msg("Invalid password entered by client!"));
             }
+        }
+
+        //Check if user has been banned
+        if self
+            .shared_fields
+            .lock()
+            .unwrap()
+            .banned_uuids
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|item| *item == req.uuid)
+        {
+            send_message_to_client(&mut *client_handle.try_lock()?, "Banned!".to_string()).await?;
+
+            return Err(Error::msg("Client has been banned!"));
         }
 
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)

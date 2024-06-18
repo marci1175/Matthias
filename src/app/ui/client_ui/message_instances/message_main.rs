@@ -1,5 +1,6 @@
 use crate::app::backend::{
-    AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType, TemplateApp,
+    decrypt_aes256, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
+    ServerMessageType, TemplateApp,
 };
 use egui::{
     load::{BytesPoll, LoadError},
@@ -163,7 +164,11 @@ impl TemplateApp {
                                         //Display 256px profile picture
                                         ui.image("bytes://profile_picture");
 
-                                        ui.label(RichText::from(item.author.clone()).size(25.).strong());
+                                        ui.label(RichText::from(user_profile.username.clone()).size(25.).strong());
+
+                                        ui.separator();
+
+                                        ui.label(format!("Uuid: {}", decrypt_aes256(&item.uuid, &[42; 32]).unwrap()));
 
                                         if !user_profile.full_name.is_empty() {
                                             ui.separator();
@@ -172,7 +177,6 @@ impl TemplateApp {
                                         };
 
                                         ui.separator();
-
 
                                         ui.label(format!("Birtdate: {}", user_profile.birth_date));
 

@@ -1,4 +1,3 @@
-use backend::ClientProfile;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText, Style, Visuals};
@@ -72,6 +71,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: impl disconnection msg for server to client
             TODO: modify image downloading so theyre arent saved in a file
             TODO: implement banning in servers
+            TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message
         */
 
         if self.main.register_mode {
@@ -254,37 +254,13 @@ impl backend::TemplateApp {
                     },
                 );
 
-                let username = self.login_username.clone();
-
-                let mut connection = self.client_connection.clone();
-
-                let password = self.client_connection.password.clone();
-
                 match &self.client_connection.state {
                     ConnectionState::Connected(_) | &ConnectionState::Error => {
                         if ui
                             .button(RichText::from("Disconnect").color(Color32::RED))
                             .clicked()
                         {
-                            let uuid = self.opened_user_information.uuid.clone();
-                            //Disconnect from server
-                            tokio::task::spawn(async move {
-                                match ClientConnection::disconnect(
-                                    &mut connection,
-                                    username,
-                                    password,
-                                    uuid,
-                                )
-                                .await
-                                {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        display_error_message(err);
-                                    }
-                                };
-                            });
-
-                            self.reset_client_connection();
+                            self.disconnect_from_server();
                         }
                     }
                     ConnectionState::Connecting => {
@@ -394,5 +370,26 @@ impl backend::TemplateApp {
         }
 
         ui.separator();
+    }
+
+    fn disconnect_from_server(&mut self) {
+        let username = self.login_username.clone();
+
+        let mut connection = self.client_connection.clone();
+
+        let password = self.client_connection.password.clone();
+
+        let uuid = self.opened_user_information.uuid.clone();
+        //Disconnect from server
+        tokio::task::spawn(async move {
+            match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
+                Ok(_) => {}
+                Err(err) => {
+                    display_error_message(err);
+                }
+            };
+        });
+
+        self.reset_client_connection();
     }
 }

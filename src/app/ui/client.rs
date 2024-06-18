@@ -580,175 +580,194 @@ impl TemplateApp {
                 Ok(msg) => {
                     //show messages
                     if let Some(message) = msg {
-                        if message == "Invalid Password!" {
-                            display_error_message("The client has sent a message, with a possibly invalid uuid. Please open an issue on github!")
-                        }
-
                         //Decrypt the server's reply
-                        let decrypted_message =
-                            decrypt_aes256(&message, &self.client_connection.client_secret)
-                                .unwrap();
+                        match decrypt_aes256(&message, &self.client_connection.client_secret) {
+                            Ok(decrypted_message) => {
+                                let incoming_struct: Result<ServerSync, serde_json::Error> =
+                                    serde_json::from_str(&decrypted_message);
 
-                        let incoming_struct: Result<ServerSync, serde_json::Error> =
-                            serde_json::from_str(&decrypted_message);
+                                match incoming_struct {
+                                    Ok(msg) => {
+                                        //Always make sure to store the latest user_seen list
+                                        self.client_ui.incoming_msg.user_seen_list =
+                                            msg.user_seen_list;
 
-                        match incoming_struct {
-                            Ok(msg) => {
-                                //Always make sure to store the latest user_seen list
-                                self.client_ui.incoming_msg.user_seen_list = msg.user_seen_list;
+                                        //If its a sync message then we dont need to back it up
+                                        if matches!(
+                                            msg.message.message_type,
+                                            ServerMessageType::Sync(_)
+                                        ) {
+                                            return;
+                                        }
 
-                                //If its a sync message then we dont need to back it up
-                                if matches!(msg.message.message_type, ServerMessageType::Sync(_)) {
-                                    return;
-                                }
-
-                                match &msg.message.message_type {
-                                    ServerMessageType::Edit(message) => {
-                                        if let Some(new_message) = message.new_message.clone() {
-                                            if let ServerMessageType::Normal(inner) =
-                                                &mut self.client_ui.incoming_msg.struct_list
-                                                    [message.index as usize]
-                                                    .message_type
-                                            {
-                                                inner.message = new_message;
-                                                inner.has_been_edited = true;
+                                        match &msg.message.message_type {
+                                            ServerMessageType::Edit(message) => {
+                                                if let Some(new_message) =
+                                                    message.new_message.clone()
+                                                {
+                                                    if let ServerMessageType::Normal(inner) =
+                                                        &mut self.client_ui.incoming_msg.struct_list
+                                                            [message.index as usize]
+                                                            .message_type
+                                                    {
+                                                        inner.message = new_message;
+                                                        inner.has_been_edited = true;
+                                                    }
+                                                } else {
+                                                    self.client_ui.incoming_msg.struct_list
+                                                        [message.index as usize]
+                                                        .message_type = ServerMessageType::Deleted;
+                                                }
                                             }
-                                        } else {
-                                            self.client_ui.incoming_msg.struct_list
-                                                [message.index as usize]
-                                                .message_type = ServerMessageType::Deleted;
-                                        }
-                                    }
-                                    ServerMessageType::Reaction(message) => {
-                                        //Search if there has already been a reaction added
-                                        if let Some(index) =
-                                            self.client_ui.incoming_msg.reaction_list
-                                                [message.index as usize]
-                                                .message_reactions
-                                                .iter()
-                                                .position(|item| item.char == message.char)
-                                        {
-                                            //If yes, increment the reaction counter
-                                            self.client_ui.incoming_msg.reaction_list
-                                                [message.index as usize]
-                                                .message_reactions[index]
-                                                .times += 1;
-                                        } else {
-                                            //If no, add a new reaction counter
-                                            self.client_ui.incoming_msg.reaction_list
-                                                [message.index as usize]
-                                                .message_reactions
-                                                .push(Reaction {
-                                                    char: message.char,
-                                                    times: 1,
-                                                })
-                                        }
-                                    }
-                                    _ => {
-                                        //Allocate Message vec for the new message
-                                        self.client_ui
-                                            .incoming_msg
-                                            .reaction_list
-                                            .push(MessageReaction::default());
+                                            ServerMessageType::Reaction(message) => {
+                                                //Search if there has already been a reaction added
+                                                if let Some(index) =
+                                                    self.client_ui.incoming_msg.reaction_list
+                                                        [message.index as usize]
+                                                        .message_reactions
+                                                        .iter()
+                                                        .position(|item| item.char == message.char)
+                                                {
+                                                    //If yes, increment the reaction counter
+                                                    self.client_ui.incoming_msg.reaction_list
+                                                        [message.index as usize]
+                                                        .message_reactions[index]
+                                                        .times += 1;
+                                                } else {
+                                                    //If no, add a new reaction counter
+                                                    self.client_ui.incoming_msg.reaction_list
+                                                        [message.index as usize]
+                                                        .message_reactions
+                                                        .push(Reaction {
+                                                            char: message.char,
+                                                            times: 1,
+                                                        })
+                                                }
+                                            }
+                                            _ => {
+                                                //Allocate Message vec for the new message
+                                                self.client_ui
+                                                    .incoming_msg
+                                                    .reaction_list
+                                                    .push(MessageReaction::default());
 
-                                        //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
-                                        self.client_ui.incoming_msg.struct_list.push(msg.message);
+                                                //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
+                                                self.client_ui
+                                                    .incoming_msg
+                                                    .struct_list
+                                                    .push(msg.message);
+                                            }
+                                        }
+                                    }
+                                    //If converting the message to a ServerSync then it was probably a ServerReplyType enum
+                                    Err(_err) => {
+                                        let incoming_reply: Result<
+                                            ServerReplyType,
+                                            serde_json::Error,
+                                        > = serde_json::from_str(&decrypted_message);
+
+                                        match incoming_reply {
+                                            Ok(inner) => {
+                                                match inner {
+                                                    ServerReplyType::FileReply(file) => {
+                                                        let _ = write_file(file);
+                                                    }
+                                                    ServerReplyType::ImageReply(image) => {
+                                                        let _ = write_image(
+                                                            &image,
+                                                            self.client_ui.send_on_ip.clone(),
+                                                        );
+
+                                                        //Forget image so itll be able to get displayed
+                                                        ctx.forget_image(&format!(
+                                                            "bytes://{}",
+                                                            image.index
+                                                        ));
+                                                    }
+                                                    ServerReplyType::AudioReply(audio) => {
+                                                        let stream_handle = self
+                                                            .client_ui
+                                                            .audio_playback
+                                                            .stream_handle
+                                                            .clone();
+
+                                                        let sender = self.audio_save_tx.clone();
+
+                                                        //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
+                                                        let path_to_audio = PathBuf::from(format!(
+                                                            "{}\\Matthias\\Client\\{}\\Audios\\{}",
+                                                            env!("APPDATA"),
+                                                            self.client_ui
+                                                                .send_on_ip_base64_encoded,
+                                                            audio.index
+                                                        ));
+
+                                                        let _ = write_audio(
+                                                            audio.clone(),
+                                                            self.client_ui.send_on_ip.clone(),
+                                                        );
+
+                                                        while !path_to_audio.exists() {
+                                                            //Block until it exists, we can do this because we are in a different thread then main
+                                                        }
+
+                                                        let file_stream_to_be_read =
+                                                            fs::read(&path_to_audio)
+                                                                .unwrap_or_default();
+                                                        let cursor = PlaybackCursor::new(
+                                                            file_stream_to_be_read,
+                                                        );
+                                                        let sink = Some(
+                                                            Sink::try_new(&stream_handle).unwrap(),
+                                                        );
+
+                                                        sender
+                                                            .send((
+                                                                sink,
+                                                                cursor,
+                                                                //Is this needed
+                                                                audio.index as usize,
+                                                                path_to_audio,
+                                                            ))
+                                                            .unwrap();
+                                                    }
+                                                    ServerReplyType::ClientReply(client_reply) => {
+                                                        self.client_ui
+                                                            .incoming_msg
+                                                            .connected_clients_profile
+                                                            .insert(
+                                                                client_reply.uuid.clone(),
+                                                                client_reply.profile.clone(),
+                                                            );
+
+                                                        //Forget old placeholder bytes
+                                                        ctx.forget_image(&format!(
+                                                            "bytes://{}",
+                                                            client_reply.uuid
+                                                        ));
+
+                                                        //Pair URI with profile image
+                                                        ctx.include_bytes(
+                                                            format!(
+                                                                "bytes://{}",
+                                                                client_reply.uuid
+                                                            ),
+                                                            client_reply
+                                                                .profile
+                                                                .small_profile_picture,
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            Err(_err) => {
+                                                dbg!(_err);
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            //If converting the message to a ServerSync then it was probably a ServerReplyType enum
                             Err(_err) => {
-                                let incoming_reply: Result<ServerReplyType, serde_json::Error> =
-                                    serde_json::from_str(&decrypted_message);
-
-                                match incoming_reply {
-                                    Ok(inner) => {
-                                        match inner {
-                                            ServerReplyType::FileReply(file) => {
-                                                let _ = write_file(file);
-                                            }
-                                            ServerReplyType::ImageReply(image) => {
-                                                let _ = write_image(
-                                                    &image,
-                                                    self.client_ui.send_on_ip.clone(),
-                                                );
-
-                                                //Forget image so itll be able to get displayed
-                                                ctx.forget_image(&format!(
-                                                    "bytes://{}",
-                                                    image.index
-                                                ));
-                                            }
-                                            ServerReplyType::AudioReply(audio) => {
-                                                let stream_handle = self
-                                                    .client_ui
-                                                    .audio_playback
-                                                    .stream_handle
-                                                    .clone();
-
-                                                let sender = self.audio_save_tx.clone();
-
-                                                //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
-                                                let path_to_audio = PathBuf::from(format!(
-                                                    "{}\\Matthias\\Client\\{}\\Audios\\{}",
-                                                    env!("APPDATA"),
-                                                    self.client_ui.send_on_ip_base64_encoded,
-                                                    audio.index
-                                                ));
-
-                                                let _ = write_audio(
-                                                    audio.clone(),
-                                                    self.client_ui.send_on_ip.clone(),
-                                                );
-
-                                                while !path_to_audio.exists() {
-                                                    //Block until it exists, we can do this because we are in a different thread then main
-                                                }
-
-                                                let file_stream_to_be_read =
-                                                    fs::read(&path_to_audio).unwrap_or_default();
-                                                let cursor =
-                                                    PlaybackCursor::new(file_stream_to_be_read);
-                                                let sink =
-                                                    Some(Sink::try_new(&stream_handle).unwrap());
-
-                                                sender
-                                                    .send((
-                                                        sink,
-                                                        cursor,
-                                                        //Is this needed
-                                                        audio.index as usize,
-                                                        path_to_audio,
-                                                    ))
-                                                    .unwrap();
-                                            }
-                                            ServerReplyType::ClientReply(client_reply) => {
-                                                self.client_ui
-                                                    .incoming_msg
-                                                    .connected_clients_profile
-                                                    .insert(
-                                                        client_reply.uuid.clone(),
-                                                        client_reply.profile.clone(),
-                                                    );
-
-                                                //Forget old placeholder bytes
-                                                ctx.forget_image(&format!(
-                                                    "bytes://{}",
-                                                    client_reply.uuid
-                                                ));
-
-                                                //Pair URI with profile image
-                                                ctx.include_bytes(
-                                                    format!("bytes://{}", client_reply.uuid),
-                                                    client_reply.profile.small_profile_picture,
-                                                );
-                                            }
-                                        }
-                                    }
-                                    Err(_err) => {
-                                        dbg!(_err);
-                                    }
-                                }
+                                display_error_message(message);
                             }
                         }
                     } else {

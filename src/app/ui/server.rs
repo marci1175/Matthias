@@ -1,7 +1,8 @@
-use crate::app::backend::{display_error_message, TemplateApp};
+use crate::app::backend::{decrypt_aes256, display_error_message, ClientProfile, TemplateApp};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
-use egui::{vec2, Align, Context, Layout, RichText};
+use dashmap::DashMap;
+use egui::{vec2, Align, Color32, Context, Image, Layout, RichText};
 use egui_extras::{Column, TableBuilder};
 use tokio_util::sync::CancellationToken;
 
@@ -13,61 +14,62 @@ impl TemplateApp {
                     ui.label("Start a server!")
                         .on_hover_text("Starting hosting a server with a click of a button!");
 
-                        ui.allocate_ui(vec2(100., 30.), |ui| {
-                            ui.horizontal_centered(|ui| {
-                                ui.label(RichText::from("Port"));
-                                ui.text_edit_singleline(&mut self.open_on_port);
-                            });
+                    ui.allocate_ui(vec2(100., 30.), |ui| {
+                        ui.horizontal_centered(|ui| {
+                            ui.label(RichText::from("Port"));
+                            ui.text_edit_singleline(&mut self.open_on_port);
                         });
+                    });
 
-                        let temp_open_on_port = &self.open_on_port;
+                    let temp_open_on_port = &self.open_on_port;
 
-                        if ui.button("Start").clicked() {
-                            let server_pw = match self.server_req_password {
-                                true => self.server_password.clone(),
-                                false => "".to_string(),
-                            };
+                    if ui.button("Start").clicked() {
+                        let server_pw = match self.server_req_password {
+                            true => self.server_password.clone(),
+                            false => "".to_string(),
+                        };
 
-                            //Overwrite the channel we have in the TemplateApp struct
-                            self.server_shutdown_token = CancellationToken::new();
+                        //Overwrite the channel we have in the TemplateApp struct
+                        self.server_shutdown_token = CancellationToken::new();
 
-                            let token = self.server_shutdown_token.child_token();
+                        let token = self.server_shutdown_token.child_token();
 
-                            let user_list = self.client_ui.incoming_msg.user_seen_list.clone();
+                        //We pass in this dashmap to the server as way for the server to modify it, so that we can read it later from the ui
+                        let connected_clients: std::sync::Arc<DashMap<String, ClientProfile>> =
+                            self.server_connected_clients_profile.clone();
 
-                            self.server_has_started = match temp_open_on_port.parse::<i32>() {
-                                Ok(port) => {
-                                    tokio::spawn(async move {
-                                        match server::server_main(
-                                            port.to_string(),
-                                            server_pw,
-                                            token,
-                                        )
-                                        .await
-                                        {
-                                            Ok(connected_clients) => {
-                                                loop {
-                                                    let asd = connected_clients.read();
+                        let shared_fileds_clone = self.client_ui.shared_fields.clone();
 
-                                                    for (key, value) in asd.iter() {
-                                                        println!("Uuid: {key}, {}", user_list.iter().find(|item| item.uuid == *key).unwrap().username);
-                                                    }
-                                                }
-                                            }
-                                            Err(err) => {
-                                                println!("ln 208 {:?}", err);
-                                            }
-                                        };
-                                    });
-                                    true
-                                }
-                                Err(err) => {
-                                    display_error_message(err);
+                        self.server_has_started = match temp_open_on_port.parse::<i32>() {
+                            Ok(port) => {
+                                tokio::spawn(async move {
+                                    match server::server_main(
+                                        port.to_string(),
+                                        server_pw,
+                                        token,
+                                        connected_clients,
+                                    )
+                                    .await
+                                    {
+                                        Ok(shared_fields) => {
+                                            //Assign shared fields
+                                            *shared_fileds_clone.lock().unwrap() =
+                                                shared_fields.lock().unwrap().clone();
+                                        }
+                                        Err(err) => {
+                                            println!("ln 208 {:?}", err);
+                                        }
+                                    };
+                                });
+                                true
+                            }
+                            Err(err) => {
+                                display_error_message(err);
 
-                                    false
-                                }
-                            };
-                        }
+                                false
+                            }
+                        };
+                    }
 
                     ui.checkbox(&mut self.server_req_password, "Set password for server");
 
@@ -130,40 +132,109 @@ impl TemplateApp {
                             self.server_password
                         )));
                     }
-                
+
+                    ui.label("Connected users");
+
                     //Display connected users, with a Table
-                    TableBuilder::new(ui)
-                        .resizable(true)
-                        .auto_shrink([false, false])
-                        .striped(true)
-                        .columns(Column::remainder().at_most(ctx.available_rect().width()), 5)
-                        .header(25., |mut row| {
-                            row.col(|ui| {ui.label("Username");});
-                            row.col(|ui| {ui.label("Uuid").on_hover_text("Universally unique identifier");});
-                            row.col(|ui| {ui.label("Profile picture");});
-                        })
-                        .body(|body| {
-                            body.rows(25., 100, |mut row| {
-                                let row_idx = row.index();
-
-                                //Display username
+                    ui.allocate_ui(vec2(ui.available_width(), 200.), |ui| {
+                        TableBuilder::new(ui)
+                            .resizable(true)
+                            .auto_shrink([false, false])
+                            .striped(true)
+                            .columns(Column::remainder().at_most(ctx.available_rect().width()), 5)
+                            .header(25., |mut row| {
                                 row.col(|ui| {
-
+                                    ui.label("Username");
                                 });
-                                
-                                //Display uuid
                                 row.col(|ui| {
-
+                                    ui.label("Uuid")
+                                        .on_hover_text("Universally unique identifier");
                                 });
-                                
-                                //Display profile picture
                                 row.col(|ui| {
-
+                                    ui.label("Profile picture");
                                 });
+                            })
+                            .body(|mut body| {
+                                for (key, value) in
+                                    <DashMap<std::string::String, ClientProfile> as Clone>::clone(
+                                        &self.server_connected_clients_profile,
+                                    )
+                                    .into_read_only()
+                                    .iter()
+                                {
+                                    body.row(25., |mut row| {
+                                        //Username
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                ui.label(value.username.clone());
+                                            });
+                                        });
+                                        //Uuid
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                ui.label(
+                                                    decrypt_aes256(&key, &[42; 32])
+                                                        .unwrap_or_default(),
+                                                );
+                                            });
+                                        });
+                                        //Profile picture
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                ui.add(Image::from_bytes(
+                                                    format!(
+                                                        "bytes://server_connect_preview_{}",
+                                                        key.clone()
+                                                    ),
+                                                    value.small_profile_picture.clone(),
+                                                ));
+                                            });
+                                        });
+                                        //Ban button
+                                        row.col(|ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                if ui.button("Ban").clicked() {
+                                                    let shared_files = self
+                                                        .client_ui
+                                                        .shared_fields
+                                                        .lock()
+                                                        .unwrap();
+
+                                                    let mut banned_uuids =
+                                                        shared_files.banned_uuids.lock().unwrap();
+
+                                                    if !banned_uuids
+                                                        .clone()
+                                                        .iter()
+                                                        .any(|item| item == key)
+                                                    {
+                                                        banned_uuids.push(key.clone());
+                                                    };
+                                                }
+                                            });
+                                        });
+                                    });
+                                }
                             });
+                    });
+
+                    ui.label("Banneds uuids");
+
+                    let shared_fields = self.client_ui.shared_fields.lock().unwrap();
+
+                    let mut banned_uuids = shared_fields.banned_uuids.lock().unwrap();
+
+                    for (index, item) in banned_uuids.clone().iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(decrypt_aes256(&item, &[42; 32]).unwrap());
+                            if ui
+                                .button(RichText::from("Unban").color(Color32::RED))
+                                .clicked()
+                            {
+                                banned_uuids.remove(index);
+                            }
                         });
-                        
-                        
+                    }
                 }
             });
         });
