@@ -33,6 +33,8 @@ impl TemplateApp {
 
                             let token = self.server_shutdown_token.child_token();
 
+                            let user_list = self.client_ui.incoming_msg.user_seen_list.clone();
+
                             self.server_has_started = match temp_open_on_port.parse::<i32>() {
                                 Ok(port) => {
                                     tokio::spawn(async move {
@@ -45,7 +47,11 @@ impl TemplateApp {
                                         {
                                             Ok(connected_clients) => {
                                                 loop {
-                                                    dbg!(connected_clients.read().clone());
+                                                    let asd = connected_clients.read();
+
+                                                    for (key, value) in asd.iter() {
+                                                        println!("Uuid: {key}, {}", user_list.iter().find(|item| item.uuid == *key).unwrap().username);
+                                                    }
                                                 }
                                             }
                                             Err(err) => {

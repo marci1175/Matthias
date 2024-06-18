@@ -5,13 +5,9 @@ use egui::mutex::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
-    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
-    ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
-    ServerClientReply, ServerMessageType,
-    ServerMessageTypeDiscriminants::{
+    display_error_message, encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage, ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction, ServerClientReply, ServerMessageType, ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
-    },
-    ServerReplyType, ServerSync,
+    }, ServerReplyType, ServerSync
 };
 
 use crate::app::backend::ServerMaster;
@@ -85,7 +81,7 @@ pub async fn server_main(
     password: String,
     //This signals all the client recivers to be shut down
     cancellation_token: CancellationToken,
-) -> anyhow::Result<Arc<RwLock<HashMap<String, ClientProfile>>>> {
+) -> /*You can only modify the wrapped value of the result please dont do anything else*/ Result<Arc<RwLock<HashMap<String, ClientProfile>>>, Box<dyn std::error::Error>>{
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
@@ -96,7 +92,11 @@ pub async fn server_main(
         ..Default::default()
     }));
 
+    //This is used to shutdown the main server thread
     let cancellation_child = cancellation_token.child_token();
+
+    //This is used to shutdown the Ui-Server sync thread
+    let cancellation_child_clone = cancellation_child.clone();
 
     //We have to clone here to be able to move this into the thread
     let msg_service_clone = msg_service.clone();
@@ -131,35 +131,44 @@ pub async fn server_main(
         }
         Ok(())
     });
-    
-    //We have to clone here to be able to move it into the thread
-    let message_service_clone = msg_service.clone();
 
     //This value will reference an entry in the message_service, and it functions as a way for the server thread and the main thread to communicate
     let connected_clients_list: Arc<RwLock<HashMap<String, ClientProfile>>> = Arc::new(RwLock::new(HashMap::new()));
     
+    // //We have to clone here to be able to move it into the thread
+    let message_service_clone = msg_service.clone();
+
     let connected_clients_list_clone = connected_clients_list.clone();
 
     //This thread keeps in sync with the ui, so the user can interact with the servers settings
-    let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+    let sync_thread = tokio::spawn(async move {
         loop {
-            //Sleep this thread
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            let message_service_lock = message_service_clone.lock().await;
-            //The original client list contained by the server
-            let connected_clients_server = message_service_lock.connected_clients_profile.lock().await;
+            select! {
+                //We should only init a sync 3 secs
+                _ = tokio::time::sleep(Duration::from_secs(3)) => {
+                    let message_service_lock = message_service_clone.lock().await;
+                    //The original client list contained by the server
+                    let connected_clients_server = message_service_lock.connected_clients_profile.lock().await;
 
-            //The Rwlock we are sending to the UI (User)
-            let connected_clients = &mut *connected_clients_list_clone.write();
+                    //The Rwlock we are sending to the UI (User)
+                    let connected_clients = &mut *connected_clients_list_clone.write();
 
-            connected_clients.clear();
+                    //Since we cant just rewrite the connected_clients we clear and then insert every
+                    connected_clients.clone_from(&connected_clients_server);  
+                },
 
-            for (key, value) in connected_clients_server.iter() {
-                connected_clients.insert(key.clone(), value.clone());
-            };
+                _ = cancellation_child_clone.cancelled() => {
+                    //shutdown sync thread
+                    break;
+                },
+            }
+            
         }
-        Ok(())
     });
+
+    // if let Err(err) = sync_thread.await {
+    //     display_error_message(err);
+    // };
 
     Ok(connected_clients_list)
 }
