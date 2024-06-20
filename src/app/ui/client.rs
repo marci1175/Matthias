@@ -504,6 +504,11 @@ impl TemplateApp {
                                 match reply {
                                     //If we have a reponse from the server
                                     Ok(response) => {
+                                        //Check for special cases like server disconnecting
+                                        if response == "Server disconnecting from client." {
+                                            break;
+                                        }
+
                                         //Request repaint
                                         context_clone.request_repaint();
                                         //Send to reciver
@@ -522,7 +527,6 @@ impl TemplateApp {
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender_clone.send(None);
                 });
-
                 //Init sync message
                 let mut message = ClientMessage::construct_sync_msg(
                     &self.client_connection.password,

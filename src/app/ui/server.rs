@@ -53,8 +53,10 @@ impl TemplateApp {
                                     {
                                         Ok(shared_fields) => {
                                             //Assign shared fields
-                                            *shared_fileds_clone.lock().unwrap() =
-                                                shared_fields.lock().unwrap().clone();
+                                            tokio::spawn(async move {
+                                                *shared_fileds_clone.lock().unwrap() =
+                                                    shared_fields.lock().await.clone();
+                                            });
                                         }
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
@@ -134,7 +136,6 @@ impl TemplateApp {
                     }
 
                     ui.label("Connected users");
-
                     //Display connected users, with a Table
                     ui.allocate_ui(vec2(ui.available_width(), 200.), |ui| {
                         TableBuilder::new(ui)
@@ -153,14 +154,16 @@ impl TemplateApp {
                                 row.col(|ui| {
                                     ui.label("Profile picture");
                                 });
+                                row.col(|ui| {
+                                    ui.label("Actions");
+                                });
                             })
                             .body(|mut body| {
                                 for (key, value) in
                                     <DashMap<std::string::String, ClientProfile> as Clone>::clone(
                                         &self.server_connected_clients_profile,
                                     )
-                                    .into_read_only()
-                                    .iter()
+                                    .into_iter()
                                 {
                                     body.row(25., |mut row| {
                                         //Username
@@ -200,13 +203,15 @@ impl TemplateApp {
                                                         .lock()
                                                         .unwrap();
 
-                                                    let mut banned_uuids =
-                                                        shared_files.banned_uuids.lock().unwrap();
+                                                    let mut banned_uuids = shared_files
+                                                        .banned_uuids
+                                                        .try_lock()
+                                                        .unwrap();
 
                                                     if !banned_uuids
                                                         .clone()
                                                         .iter()
-                                                        .any(|item| item == key)
+                                                        .any(|item| *item == key)
                                                     {
                                                         banned_uuids.push(key.clone());
                                                     };
@@ -218,11 +223,13 @@ impl TemplateApp {
                             });
                     });
 
+                    ui.separator();
+
                     ui.label("Banneds uuids");
 
                     let shared_fields = self.client_ui.shared_fields.lock().unwrap();
 
-                    let mut banned_uuids = shared_fields.banned_uuids.lock().unwrap();
+                    let mut banned_uuids = shared_fields.banned_uuids.try_lock().unwrap();
 
                     for (index, item) in banned_uuids.clone().iter().enumerate() {
                         ui.horizontal(|ui| {

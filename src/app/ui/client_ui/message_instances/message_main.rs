@@ -3,8 +3,7 @@ use crate::app::backend::{
     ServerMessageType, TemplateApp,
 };
 use egui::{
-    load::{BytesPoll, LoadError},
-    vec2, Align, Button, Color32, Layout, Response, RichText,
+    load::{BytesPoll, LoadError}, vec2, Align, Button, Color32, Image, Layout, Response, RichText
 };
 
 impl TemplateApp {
@@ -153,40 +152,51 @@ impl TemplateApp {
 
                                 message_group.response.context_menu(|ui|{
                                     let profile_menu_button = ui.menu_button("Profile", |ui| {
-                                        //We can safely unwrap here
-                                        let user_profile = self.client_ui.incoming_msg.connected_clients_profile.get(&item.uuid).unwrap();
-                                        //Include full profile picture so it can be displayed
-                                        ctx.include_bytes(
-                                            "bytes://profile_picture",
-                                            user_profile.normal_profile_picture.clone(),
-                                        );
+                                        //Check if the message was sent by the server, create a custom profile for it
+                                        if item.uuid.trim() == "00000000-0000-0000-0000-000000000000" {
+                                            //Add verification or somthing like that
+                                            ui.horizontal(|ui| {
+                                                ui.label("This message was sent by the host server");
+                                                ui.allocate_ui(vec2(50., 50.), |ui| {});
+                                            });
+                                        }
+                                        //If the message was sent by a normal user
+                                        else {
+                                            //We can safely unwrap here
+                                            let user_profile = self.client_ui.incoming_msg.connected_clients_profile.get(&item.uuid).unwrap();
+                                            //Include full profile picture so it can be displayed
+                                            ctx.include_bytes(
+                                                "bytes://profile_picture",
+                                                user_profile.normal_profile_picture.clone(),
+                                            );
 
-                                        //Display 256px profile picture
-                                        ui.image("bytes://profile_picture");
+                                            //Display 256px profile picture
+                                            ui.image("bytes://profile_picture");
 
-                                        ui.label(RichText::from(user_profile.username.clone()).size(25.).strong());
+                                            ui.label(RichText::from(user_profile.username.clone()).size(25.).strong());
 
-                                        ui.separator();
-
-                                        ui.label(format!("Uuid: {}", decrypt_aes256(&item.uuid, &[42; 32]).unwrap()));
-
-                                        if !user_profile.full_name.is_empty() {
                                             ui.separator();
 
-                                            ui.label(format!("Full name: {}", user_profile.full_name));
-                                        };
+                                            ui.label(format!("Uuid: {}", decrypt_aes256(&item.uuid, &[42; 32]).unwrap()));
 
-                                        ui.separator();
+                                            if !user_profile.full_name.is_empty() {
+                                                ui.separator();
 
-                                        ui.label(format!("Birtdate: {}", user_profile.birth_date));
+                                                ui.label(format!("Full name: {}", user_profile.full_name));
+                                            };
 
-                                        ui.separator();
+                                            ui.separator();
 
-                                        if let Some(gender) = &user_profile.gender {
-                                            ui.label(format!("Gender: {}", match gender { 
-                                                true => "Female",
-                                                false => "Male",
-                                            }));
+                                            ui.label(format!("Birtdate: {}", user_profile.birth_date));
+
+                                            ui.separator();
+
+                                            if let Some(gender) = &user_profile.gender {
+                                                ui.label(format!("Gender: {}", match gender { 
+                                                    true => "Female",
+                                                    false => "Male",
+                                                }));
+                                            }
                                         }
                                     });
 
@@ -196,12 +206,13 @@ impl TemplateApp {
                                     }
 
                                     ui.separator();
-                                    
+
                                     if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/reply.png"), "Reply")).clicked() {
                                         self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
                                         ui.close_menu();
                                     }
                                     ui.separator();
+
                                     //Client-side uuid check, there is a check in the server file
                                     if item.uuid == self.opened_user_information.uuid && item.message_type != ServerMessageType::Deleted {
                                         //We should only display the `edit` button if its anormal message thus its editable

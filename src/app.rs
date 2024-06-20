@@ -1,6 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Layout, RichText, Style, Visuals};
+use egui::{vec2, Align, Color32, Layout, RichText};
 use std::fs::{self};
 use tap::TapFallible;
 
@@ -70,7 +70,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: make a loading wheel when loading a message / image / audio / etc
             TODO: impl disconnection msg for server to client
             TODO: modify image downloading so theyre arent saved in a file
-            TODO: implement banning in servers
+            TODO: implement instant banning in servers
             TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message
         */
 
@@ -255,7 +255,7 @@ impl backend::TemplateApp {
                 );
 
                 match &self.client_connection.state {
-                    ConnectionState::Connected(_) | &ConnectionState::Error => {
+                    ConnectionState::Connected(_) => {
                         if ui
                             .button(RichText::from("Disconnect").color(Color32::RED))
                             .clicked()
@@ -273,6 +273,7 @@ impl backend::TemplateApp {
                         }
                     }
                     //this is what will get displayed if there sint a connection or the last connection attempt failed
+                    //Everything else (ConnectionState::Error)
                     _ => {
                         if ui.button("Connect").clicked() {
                             let ip = self.client_ui.send_on_ip.clone();

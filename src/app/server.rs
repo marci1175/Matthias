@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{Error, Result};
+use chrono::Utc;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 
@@ -82,14 +83,14 @@ pub struct MessageService {
     /// In this hashmap the key is the connecting client's uuid, and the value is the ClientProfile struct (which will later get converted to string with serde_json)
     pub connected_clients_profile: Arc<tokio::sync::Mutex<HashMap<String, ClientProfile>>>,
 
-    pub shared_fields: Arc<Mutex<SharedFields>>,
+    pub shared_fields: Arc<tokio::sync::Mutex<SharedFields>>,
 }
 
 /// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system
 #[derive(Debug, Clone, Default)]
 pub struct SharedFields {
     /// This list contains the banned uuids
-    pub banned_uuids: Arc<Mutex<Vec<String>>>,
+    pub banned_uuids: Arc<tokio::sync::Mutex<Vec<String>>>,
 }
 
 /// Shutting down server also doesnt work we will have to figure a way out on how to stop client readers (probably a broadcast channel)
@@ -98,8 +99,8 @@ pub async fn server_main(
     password: String,
     //This signals all the client recivers to be shut down
     cancellation_token: CancellationToken,
-    connected_clients_list: Arc<DashMap<String, ClientProfile>>,
-) -> Result<Arc<Mutex<SharedFields>>, Box<dyn std::error::Error>> {
+    connected_clients_profile_list: Arc<DashMap<String, ClientProfile>>,
+) -> Result<Arc<tokio::sync::Mutex<SharedFields>>, Box<dyn std::error::Error>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
@@ -164,9 +165,11 @@ pub async fn server_main(
                     //The original client list contained by the server
                     let connected_clients_server = message_service_lock.connected_clients_profile.lock().await.clone();
 
+                    connected_clients_profile_list.clear();
+
                     //Since we cant just rewrite the connected_clients we clear and then insert every
                     for (key, value) in connected_clients_server.into_iter() {
-                        connected_clients_list.insert(key, value);
+                        connected_clients_profile_list.insert(key, value);
                     }
                 },
 
@@ -202,7 +205,6 @@ fn spawn_client_reader(
                 //Check if the thread needs to be shut down
                 _ = cancellation_token.cancelled() => {
                     //Send out shutdown messages to all the clients
-
 
                     //If thread has been cancelled break out of the loop, thus ending the thread
                     break;
@@ -340,10 +342,10 @@ impl MessageService {
                             if self
                                 .shared_fields
                                 .lock()
-                                .unwrap()
+                                .await
                                 .banned_uuids
                                 .lock()
-                                .unwrap()
+                                .await
                                 .iter()
                                 .any(|item| *item == req.uuid)
                             {
@@ -354,51 +356,67 @@ impl MessageService {
                                 .await?;
 
                                 return Err(Error::msg("Client has been banned!"));
-                            }
+                            } else {
+                                let mut clients = self.connected_clients.lock().await;
+                                for client in clients.iter() {
+                                    //If found, then the client is already connected
+                                    if client.uuid == req.uuid {
+                                        //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
+                                        send_message_to_client(
+                                            &mut *client_handle.try_lock()?,
+                                            hex::encode(self.decryption_key),
+                                        )
+                                        .await?;
 
-                            let mut clients = self.connected_clients.lock().await;
-                            for client in clients.iter() {
-                                //If found, then the client is already connected
-                                if client.uuid == req.uuid {
-                                    //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
-                                    send_message_to_client(
-                                        &mut *client_handle.try_lock()?,
-                                        hex::encode(self.decryption_key),
-                                    )
-                                    .await?;
-
-                                    //If found return, and end execution
-                                    return Ok(());
+                                        //If found return, and end execution
+                                        return Ok(());
+                                    }
                                 }
+
+                                //When spawning a client reader, we should announce it to the whole chat group (Adding a Server(UserConnect) enum to the messages list)
+                                self.messages.lock().await.push(ServerOutput {
+                                    replying_to: None,
+                                    message_type: ServerMessageType::Server(
+                                        super::backend::ServerMessage::UserConnect(profile.clone()),
+                                    ),
+                                    author: "Server".to_string(),
+                                    message_date: {
+                                        Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                    },
+                                    uuid: String::from(
+                                        "00000000-0000-0000-0000-000000000000
+",
+                                    ),
+                                });
+
+                                //If the ip is not found then add it to connected clients
+                                clients.push(ConnectedClient::new(
+                                    req.uuid.clone(),
+                                    req.author.clone(),
+                                    client_handle.clone(),
+                                ));
+
+                                //Store connected client's profile
+                                self.connected_clients_profile
+                                    .lock()
+                                    .await
+                                    .insert(req.uuid, profile.clone());
+
+                                //Return custom key which the server's text will be encrypted with
+                                send_message_to_client(
+                                    &mut *client_handle.try_lock()?,
+                                    hex::encode(self.decryption_key),
+                                )
+                                .await?;
+
+                                //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
+                                send_message_to_client(
+                                    &mut *client_handle.try_lock()?,
+                                    self.full_sync_client().await?,
+                                )
+                                .await?;
+                                return Ok(());
                             }
-
-                            //If the ip is not found then add it to connected clients
-                            clients.push(ConnectedClient::new(
-                                req.uuid.clone(),
-                                req.author.clone(),
-                                client_handle.clone(),
-                            ));
-
-                            //Store connected client's profile
-                            self.connected_clients_profile
-                                .lock()
-                                .await
-                                .insert(req.uuid, profile.clone());
-
-                            //Return custom key which the server's text will be encrypted with
-                            send_message_to_client(
-                                &mut *client_handle.try_lock()?,
-                                hex::encode(self.decryption_key),
-                            )
-                            .await?;
-
-                            //Sync all messages, send all of the messages to the client, because we have already provided the decryption key
-                            send_message_to_client(
-                                &mut *client_handle.try_lock()?,
-                                self.full_sync_client().await?,
-                            )
-                            .await?;
-                            return Ok(());
                         }
                         //Handle disconnections
                         ConnectionType::Disconnect => {
@@ -408,6 +426,33 @@ impl MessageService {
                                     for (index, client) in clients.clone().iter().enumerate() {
                                         //If found, then disconnect the client
                                         if client.uuid == req.uuid {
+                                            send_message_to_client(
+                                                &mut *client.handle.clone().unwrap().lock().await,
+                                                "Server disconnecting from client.".to_owned(),
+                                            )
+                                            .await?;
+
+                                            self.messages.lock().await.push(ServerOutput {
+                                                replying_to: None,
+                                                message_type: ServerMessageType::Server(
+                                                    super::backend::ServerMessage::UserDisconnect(
+                                                        self.connected_clients_profile
+                                                            .lock()
+                                                            .await
+                                                            .get(&client.uuid)
+                                                            .unwrap()
+                                                            .clone(),
+                                                    ),
+                                                ),
+                                                author: "Server".to_string(),
+                                                message_date: {
+                                                    Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                                },
+                                                uuid: String::from(
+                                                    "00000000-0000-0000-0000-000000000000",
+                                                ),
+                                            });
+
                                             clients.remove(index);
 
                                             return Err(Error::msg("Client disconnected!"));
@@ -431,17 +476,32 @@ impl MessageService {
         }
 
         //Check if user has been banned
-        if self
+        if let Some(idx) = self
             .shared_fields
             .lock()
-            .unwrap()
+            .await
             .banned_uuids
             .lock()
-            .unwrap()
+            .await
             .iter()
-            .any(|item| *item == req.uuid)
+            .position(|item| *item == req.uuid)
         {
-            send_message_to_client(&mut *client_handle.try_lock()?, "Banned!".to_string()).await?;
+            let mut client_handle = &mut *client_handle.try_lock()?;
+
+            send_message_to_client(&mut client_handle, "You have been banned!".to_string()).await?;
+
+            self.connected_clients.lock().await.remove(idx);
+            self.connected_clients_profile
+                .lock()
+                .await
+                .remove(&req.uuid);
+
+            //Signal disconnection
+            send_message_to_client(
+                client_handle,
+                "Server disconnecting from client.".to_owned(),
+            )
+            .await?;
 
             return Err(Error::msg("Client has been banned!"));
         }
@@ -537,7 +597,7 @@ impl MessageService {
             sync_message_with_clients(
                 self.connected_clients.clone(),
                 self.clients_last_seen_index.clone(),
-                ServerOutput::convert_type_to_servermsg(
+                ServerOutput::convert_clientmsg_to_servermsg(
                     req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
@@ -601,7 +661,7 @@ impl MessageService {
     /// all the functions the server can do
     async fn normal_message(&self, req: &ClientMessage) {
         let mut messages = self.messages.lock().await;
-        messages.push(ServerOutput::convert_type_to_servermsg(
+        messages.push(ServerOutput::convert_clientmsg_to_servermsg(
             req.clone(),
             //Im not sure why I did that, Tf is this?
             -1,
@@ -697,7 +757,7 @@ impl MessageService {
                             };
 
                             let mut messages = self.messages.lock().await;
-                            messages.push(ServerOutput::convert_type_to_servermsg(
+                            messages.push(ServerOutput::convert_clientmsg_to_servermsg(
                                 request.clone(),
                                 self.file_list.lock().unwrap().len() as i32,
                                 Upload,
@@ -743,7 +803,7 @@ impl MessageService {
 
                         match self.messages.try_lock() {
                             Ok(mut ok) => {
-                                ok.push(ServerOutput::convert_type_to_servermsg(
+                                ok.push(ServerOutput::convert_clientmsg_to_servermsg(
                                     req.clone(),
                                     image_path_lenght as i32,
                                     Image,
@@ -789,7 +849,7 @@ impl MessageService {
 
                 match self.messages.try_lock() {
                     Ok(mut ok) => {
-                        ok.push(ServerOutput::convert_type_to_servermsg(
+                        ok.push(ServerOutput::convert_clientmsg_to_servermsg(
                             req.clone(),
                             audio_paths_lenght as i32,
                             Audio,

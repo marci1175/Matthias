@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::client::{connect_to_server, ServerReply};
-use super::server::SharedFields;
+use super::server::{send_message_to_client, SharedFields};
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -544,7 +544,7 @@ impl Default for ProfileImage {
 /// This struct might look similar too ```Register```, but that one contains more information, and is only made to control the ui
 /// This struct is sent to the server upon successful connection
 /// If you are searching for the uuid in this struct, please note that most of the times this struct is used in a hashmap where the key is the uuid
-#[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug, PartialEq)]
 pub struct ClientProfile {
     /// The client's username
     /// We might not need it in some contexts
@@ -980,6 +980,10 @@ impl ClientConnection {
             server_reply != "Invalid Client!",
             "Outdated client or connection!"
         );
+        ensure!(
+            server_reply != "You have been banned!",
+            "You have been banned from this server!"
+        );
 
         //This the key the server replied, and this is what well need to decrypt the messages, overwrite the client_secret variable
         let client_secret = hex::decode(server_reply)?;
@@ -1247,6 +1251,16 @@ pub enum ServerMessageType {
     /// This message is used to "sync" with the client, it provides useful information to the client about other clients (like last viewed message)
     #[strum_discriminants(strum(message = "Sync"))]
     Sync(ServerMessageSync),
+
+    /// This message type can only be produced by the server, and hold useful information to the user(s)
+    #[strum_discriminants(strum(message = "Server"))]
+    Server(ServerMessage),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum ServerMessage {
+    UserConnect(ClientProfile),
+    UserDisconnect(ClientProfile),
 }
 
 ///This struct contains all the reactions of one message
@@ -1282,8 +1296,8 @@ impl ServerOutput {
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    /// This function convert a client message to a ServerOutput, which gets sent to all the clients (Its basicly a simplified client message)
-    pub fn convert_type_to_servermsg(
+    /// This function converts a client message to a ServerOutput, which gets sent to all the clients (Its basicly a simplified client message)
+    pub fn convert_clientmsg_to_servermsg(
         normal_msg: ClientMessage,
         // The index is used to ask bytes from the server, for example in a image message this index will be used to get the image's byte
         index: i32,
@@ -1339,6 +1353,7 @@ impl ServerOutput {
                             ServerMessageTypeDiscriminants::Normal => unreachable!(),
                             ServerMessageTypeDiscriminants::Edit => unreachable!(),
                             ServerMessageTypeDiscriminants::Reaction => unreachable!(),
+                            ServerMessageTypeDiscriminants::Server => unreachable!(),
                         }
                     },
                     ClientMessageType::NormalMessage(message) => {
@@ -1413,7 +1428,8 @@ impl ServerSync {
 //When a client is connected this is where the client gets saved
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ConnectedClient {
-    ///This handle wouldnt have to be sent so its all okay, its only present on the server's side
+    /// The reason one gets EOF when disconnecting is because this field is dropped (With this struct)
+    /// This handle wouldnt have to be sent so its all okay, its only present on the server's side
     #[serde(skip)]
     pub handle: Option<Arc<tokio::sync::Mutex<OwnedWriteHalf>>>,
     pub uuid: String,
@@ -1726,7 +1742,9 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
     let cipher = Aes256Gcm::new(key);
     let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
 
-    let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).map_err(|_| Error::msg("OddLength"))?;
+    let plaintext = cipher
+        .decrypt(&nonce, ciphertext.as_ref())
+        .map_err(|_| Error::msg("OddLength"))?;
     Ok(String::from_utf8(plaintext)?)
 }
 

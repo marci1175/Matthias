@@ -49,6 +49,9 @@ async fn main() -> eframe::Result<()> {
                 ..Default::default()
             });
 
+            //Automaticly load in server image bytes
+            cc.egui_ctx.include_bytes("bytes://00000000-0000-0000-0000-000000000000\n", include_bytes!("../icons/server_white64.png"));
+
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 

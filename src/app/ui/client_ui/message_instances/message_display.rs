@@ -11,6 +11,7 @@ use rodio::{Decoder, Source};
 //use crate::app::account_manager::write_file;
 use crate::app::backend::PlaybackCursor;
 impl TemplateApp {
+    /// This function is used to displayed the messages wrapped information (The message itself)
     pub fn message_display(
         &mut self,
         message: &crate::app::backend::ServerOutput,
@@ -401,13 +402,58 @@ impl TemplateApp {
                         .size(self.font_size),
                 );
             }
+            crate::app::backend::ServerMessageType::Server(server_msg) => match server_msg {
+                crate::app::backend::ServerMessage::UserConnect(profile) => {
+                    let message = format!("@{} has connected to the server.", profile.username);
 
-            //These are supposed to be removed
-            //When reciving messages which have this enum, they are supposed to be interpreted and cause a side effect on the messages list (ie modify it according to the messages)
-            // crate::app::backend::ServerMessageType::Edit(_)
-            // crate::app::backend::ServerMessageType::Reaction(_)
-            _ => {
-                unimplemented!("ServerMessageType::Edit(_) and ServerMessageType::Reaction(_) should not be displayed")
+                    //We can safely unwrap here since the message is defined above
+                    let message_tag_tdx = message.find('@').unwrap();
+                    let whole_tag = message[message_tag_tdx + 1..]
+                        .split_whitespace()
+                        .collect::<Vec<&str>>();
+
+                    let name_sent_to = whole_tag.first();
+                    ui.label(RichText::from(&message).size(self.font_size).color({
+                        if let Some(tagged_name) = name_sent_to {
+                            if *tagged_name == self.opened_user_information.username {
+                                Color32::YELLOW
+                            } else {
+                                Color32::GRAY
+                            }
+                        } else {
+                            Color32::GRAY
+                        }
+                    }));
+                }
+                crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                    let message =
+                        format!("@{} has disconnected from the server.", profile.username);
+
+                    //We can safely unwrap here since the message is defined above
+                    let message_tag_tdx = message.find('@').unwrap();
+                    let whole_tag = message[message_tag_tdx + 1..]
+                        .split_whitespace()
+                        .collect::<Vec<&str>>();
+
+                    let name_sent_to = whole_tag.first();
+                    ui.label(RichText::from(&message).size(self.font_size).color({
+                        if let Some(tagged_name) = name_sent_to {
+                            if *tagged_name == self.opened_user_information.username {
+                                Color32::YELLOW
+                            } else {
+                                Color32::GRAY
+                            }
+                        } else {
+                            Color32::GRAY
+                        }
+                    }));
+                }
+            },
+
+            crate::app::backend::ServerMessageType::Edit(_)
+            | crate::app::backend::ServerMessageType::Reaction(_)
+            | crate::app::backend::ServerMessageType::Sync(_) => {
+                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) should not be displayed")
             }
         }
     }
