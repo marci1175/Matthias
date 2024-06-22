@@ -40,6 +40,9 @@ impl TemplateApp {
 
                         let shared_fileds_clone = self.client_ui.shared_fields.clone();
 
+                        //Move context so we can request_repaint
+                        let ctx = ctx.clone();
+
                         self.server_has_started = match temp_open_on_port.parse::<i32>() {
                             Ok(port) => {
                                 tokio::spawn(async move {
@@ -48,6 +51,7 @@ impl TemplateApp {
                                         server_pw,
                                         token,
                                         connected_clients,
+                                        ctx,
                                     )
                                     .await
                                     {

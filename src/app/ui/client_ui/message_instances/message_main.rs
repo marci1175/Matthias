@@ -3,7 +3,8 @@ use crate::app::backend::{
     ServerMessageType, TemplateApp,
 };
 use egui::{
-    load::{BytesPoll, LoadError}, vec2, Align, Button, Color32, Image, Layout, Response, RichText
+    load::{BytesPoll, LoadError},
+    vec2, Align, Button, Color32, Image, Layout, Response, RichText,
 };
 
 impl TemplateApp {
@@ -21,7 +22,7 @@ impl TemplateApp {
 
                         //Scroll to reply logic
                         if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
-                            scroll_to_instance.messages[dbg!(scroll_to_instance.index)].scroll_to_me(Some(Align::Center));
+                            scroll_to_instance.messages[scroll_to_instance.index].scroll_to_me(Some(Align::Center));
                             //Destroy instance
                             self.client_ui.scroll_to_message = None;
                             self.client_ui.scroll_to_message_index = None;
@@ -73,8 +74,17 @@ impl TemplateApp {
                                                         }
                                                         message_clone.to_string()
                                                     },
-
-                                                    _ => { unreachable!() }
+                                                    ServerMessageType::Server(server) => match server {
+                                                        crate::app::backend::ServerMessage::UserConnect(profile) => {
+                                                            format!("{} has connected", profile.username)
+                                                        },
+                                                        crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                                                            format!("{} has disconnected", profile.username)
+                                                        },
+                                                    },
+                                                    ServerMessageType::Edit(_) => unreachable!(),
+                                                    ServerMessageType::Reaction(_) => unreachable!(),
+                                                    ServerMessageType::Sync(_) => unreachable!(),
                                             })
                                             ).size(self.font_size / 1.5))
                                                 .frame(false))
@@ -155,9 +165,13 @@ impl TemplateApp {
                                         //Check if the message was sent by the server, create a custom profile for it
                                         if item.uuid.trim() == "00000000-0000-0000-0000-000000000000" {
                                             //Add verification or somthing like that
-                                            ui.horizontal(|ui| {
-                                                ui.label("This message was sent by the host server");
-                                                ui.allocate_ui(vec2(50., 50.), |ui| {});
+                                            ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
+                                                ui.horizontal_centered(|ui| {
+                                                    ui.label("This message was sent by the host server");
+                                                    ui.allocate_ui(vec2(25., 25.), |ui| {
+                                                        ui.add(Image::new(egui::include_image!("../../../../../icons/tick.png")));
+                                                    })
+                                                });
                                             });
                                         }
                                         //If the message was sent by a normal user

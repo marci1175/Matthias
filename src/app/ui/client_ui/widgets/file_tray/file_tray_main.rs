@@ -129,8 +129,17 @@ impl TemplateApp {
                                             ServerMessageType::Image(_img) => "Image".to_string(),
                                             ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
                                             ServerMessageType::Normal(msg) => msg.message.clone(),
-
-                                            _ => { unimplemented!() }
+                                            ServerMessageType::Server(server) => match server {
+                                                crate::app::backend::ServerMessage::UserConnect(profile) => {
+                                                    format!("{} has connected", profile.username)
+                                                },
+                                                crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                                                    format!("{} has disconnected", profile.username)
+                                                },
+                                            },
+                                            ServerMessageType::Edit(_) => unreachable!(),
+                                            ServerMessageType::Reaction(_) => unreachable!(),
+                                            ServerMessageType::Sync(_) => unreachable!(),
                                         }).size(self.font_size).strong());
                                     });
                                 });

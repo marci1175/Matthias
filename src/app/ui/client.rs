@@ -589,7 +589,6 @@ impl TemplateApp {
                             Ok(decrypted_message) => {
                                 let incoming_struct: Result<ServerSync, serde_json::Error> =
                                     serde_json::from_str(&decrypted_message);
-
                                 match incoming_struct {
                                     Ok(msg) => {
                                         //Always make sure to store the latest user_seen list

@@ -71,9 +71,12 @@ impl TemplateApp {
                                     // capture[0] combined
                                     // capture[1] disp
                                     // capture[2] URL
-                                    ui.hyperlink_to(capture[1].to_string(), capture[2].to_string());
+                                    ui.hyperlink_to(
+                                        RichText::from(capture[1].to_string()).size(self.font_size),
+                                        capture[2].to_string(),
+                                    );
                                 } else {
-                                    ui.label(*item);
+                                    ui.label(RichText::from(*item).size(self.font_size));
                                 }
                             }
                         });

@@ -10,6 +10,7 @@ use std::{
 use anyhow::{Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
+use egui::Context;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
@@ -100,6 +101,8 @@ pub async fn server_main(
     //This signals all the client recivers to be shut down
     cancellation_token: CancellationToken,
     connected_clients_profile_list: Arc<DashMap<String, ClientProfile>>,
+    //We pass in ctx so we can request repaint when someone connects
+    ctx: Context,
 ) -> Result<Arc<tokio::sync::Mutex<SharedFields>>, Box<dyn std::error::Error>> {
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
@@ -160,6 +163,8 @@ pub async fn server_main(
             select! {
                 //We should only init a sync 3 secs
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {
+                    ctx.request_repaint();
+
                     let message_service_lock = message_service_clone.lock().await;
 
                     //The original client list contained by the server
@@ -332,6 +337,37 @@ impl MessageService {
 
         let req: ClientMessage = req_result.unwrap();
 
+        //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actual messages
+        //HOWEVER, if theyre client connection or disconnection messages a reaction should be allocated because people can react to those
+        if !(matches!(&req.message_type, ClientReaction(_))
+            || matches!(&req.message_type, MessageEdit(_)) || {
+                if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
+                    //If this is true (if sync_attribute is none) that means the client is syncing its last seen message index, thefor we shouldnt allocate a new reaction
+                    if sync_msg.sync_attribute.is_none() {
+                        true
+                    }
+                    else {
+                        false
+                    }
+                }
+                else {
+                    false
+                }
+            })
+        {
+            //Allocate a reaction after every type of message except a sync message
+            match self.reactions.try_lock() {
+                Ok(mut ok) => {
+                    ok.push(MessageReaction {
+                        message_reactions: Vec::new(),
+                    });
+                }
+                Err(err) => {
+                    println!("{err}")
+                }
+            };
+        }
+
         if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
             if sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
@@ -374,7 +410,7 @@ impl MessageService {
                                 }
 
                                 //When spawning a client reader, we should announce it to the whole chat group (Adding a Server(UserConnect) enum to the messages list)
-                                self.messages.lock().await.push(ServerOutput {
+                                let server_msg = ServerOutput {
                                     replying_to: None,
                                     message_type: ServerMessageType::Server(
                                         super::backend::ServerMessage::UserConnect(profile.clone()),
@@ -383,11 +419,19 @@ impl MessageService {
                                     message_date: {
                                         Utc::now().format("%Y.%m.%d. %H:%M").to_string()
                                     },
-                                    uuid: String::from(
-                                        "00000000-0000-0000-0000-000000000000
-",
-                                    ),
-                                });
+                                    uuid: String::from("00000000-0000-0000-0000-000000000000"),
+                                };
+
+                                self.messages.lock().await.push(server_msg.clone());
+
+                                //We should sync the connection message with all the clients except the connecting one, therefor we only pus hback the connected client after we have syncted this message with all the clients
+                                sync_message_with_clients(
+                                    Arc::new(tokio::sync::Mutex::new(clients.clone())),
+                                    self.clients_last_seen_index.clone(),
+                                    server_msg,
+                                    self.decryption_key,
+                                )
+                                .await?;
 
                                 //If the ip is not found then add it to connected clients
                                 clients.push(ConnectedClient::new(
@@ -432,7 +476,9 @@ impl MessageService {
                                             )
                                             .await?;
 
-                                            self.messages.lock().await.push(ServerOutput {
+                                            clients.remove(index);
+
+                                            let server_msg = ServerOutput {
                                                 replying_to: None,
                                                 message_type: ServerMessageType::Server(
                                                     super::backend::ServerMessage::UserDisconnect(
@@ -451,9 +497,17 @@ impl MessageService {
                                                 uuid: String::from(
                                                     "00000000-0000-0000-0000-000000000000",
                                                 ),
-                                            });
+                                            };
 
-                                            clients.remove(index);
+                                            self.messages.lock().await.push(server_msg.clone());
+
+                                            sync_message_with_clients(
+                                                Arc::new(tokio::sync::Mutex::new(clients.clone())),
+                                                self.clients_last_seen_index.clone(),
+                                                server_msg,
+                                                self.decryption_key,
+                                            )
+                                            .await?;
 
                                             return Err(Error::msg("Client disconnected!"));
                                         }
@@ -476,35 +530,7 @@ impl MessageService {
         }
 
         //Check if user has been banned
-        if let Some(idx) = self
-            .shared_fields
-            .lock()
-            .await
-            .banned_uuids
-            .lock()
-            .await
-            .iter()
-            .position(|item| *item == req.uuid)
-        {
-            let mut client_handle = &mut *client_handle.try_lock()?;
-
-            send_message_to_client(&mut client_handle, "You have been banned!".to_string()).await?;
-
-            self.connected_clients.lock().await.remove(idx);
-            self.connected_clients_profile
-                .lock()
-                .await
-                .remove(&req.uuid);
-
-            //Signal disconnection
-            send_message_to_client(
-                client_handle,
-                "Server disconnecting from client.".to_owned(),
-            )
-            .await?;
-
-            return Err(Error::msg("Client has been banned!"));
-        }
+        self.handle_banned_uuid(&req, &client_handle).await?;
 
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
@@ -575,23 +601,6 @@ impl MessageService {
                 }
             };
 
-            //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actually messages
-            if !(matches!(&req.message_type, ClientReaction(_))
-                || matches!(&req.message_type, MessageEdit(_)))
-            {
-                //Allocate a reaction after every type of message except a sync message
-                match self.reactions.try_lock() {
-                    Ok(mut ok) => {
-                        ok.push(MessageReaction {
-                            message_reactions: Vec::new(),
-                        });
-                    }
-                    Err(err) => {
-                        println!("{err}")
-                    }
-                };
-            }
-
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
             sync_message_with_clients(
@@ -656,6 +665,45 @@ impl MessageService {
 
             Err(Error::msg("Invalid password entered by client!"))
         }
+    }
+
+    async fn handle_banned_uuid(
+        &self,
+        req: &ClientMessage,
+        client_handle: &Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+    ) -> Result<(), Error> {
+        Ok(
+            if let Some(idx) = self
+                .shared_fields
+                .lock()
+                .await
+                .banned_uuids
+                .lock()
+                .await
+                .iter()
+                .position(|item| *item == req.uuid)
+            {
+                let mut client_handle = &mut *client_handle.try_lock()?;
+
+                send_message_to_client(&mut client_handle, "You have been banned!".to_string())
+                    .await?;
+
+                self.connected_clients.lock().await.remove(idx);
+                self.connected_clients_profile
+                    .lock()
+                    .await
+                    .remove(&req.uuid);
+
+                //Signal disconnection
+                send_message_to_client(
+                    client_handle,
+                    "Server disconnecting from client.".to_owned(),
+                )
+                .await?;
+
+                return Err(Error::msg("Client has been banned!"));
+            },
+        )
     }
 
     /// all the functions the server can do

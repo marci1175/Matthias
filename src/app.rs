@@ -1,3 +1,4 @@
+use backend::MessageReaction;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
@@ -189,7 +190,6 @@ impl eframe::App for backend::TemplateApp {
                     //Modify the base64 encoded string of send on ip, so it can be used in different places without having to re-encode every frame
                     self.client_ui.send_on_ip_base64_encoded =
                         general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
-
                     if let Ok(incoming_message) = incoming_sync_message {
                         self.client_ui.incoming_msg = incoming_message;
                     } else {
