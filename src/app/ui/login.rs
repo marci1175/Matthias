@@ -1,4 +1,4 @@
-use crate::app::backend::{display_error_message, login, register, UserInformation};
+use crate::app::backend::{display_error_message, login, UserInformation};
 
 use crate::app::backend::TemplateApp;
 use egui::{Align, Layout, RichText};
@@ -59,7 +59,7 @@ impl TemplateApp {
 }
 
 fn fetch_account(path_to_file: std::path::PathBuf) -> anyhow::Result<UserInformation> {
-    let account = UserInformation::deserialize(&std::fs::read_to_string(&path_to_file)?)?;
+    let account = UserInformation::deserialize(&std::fs::read_to_string(path_to_file)?)?;
 
     Ok(account)
 }

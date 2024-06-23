@@ -58,8 +58,17 @@ impl TemplateApp {
                         if let Some(buffer) = split.last_mut() {
                             //If we have already typed in the full username OR there are no username matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
                             for seen in &self.client_ui.incoming_msg.user_seen_list {
-                                if !(seen.username.contains(*buffer) && *buffer != seen.username) {
-                                    return;
+                                let profile = self
+                                    .client_ui
+                                    .incoming_msg
+                                    .connected_clients_profile
+                                    .get(&seen.uuid);
+                                if let Some(profile) = profile {
+                                    let username = profile.username.clone();
+
+                                    if !(username.contains(*buffer) && *buffer != username) {
+                                        return;
+                                    }
                                 }
                             }
 
@@ -68,18 +77,23 @@ impl TemplateApp {
                                 && !self.client_ui.incoming_msg.user_seen_list.is_empty()
                             {
                                 //format the string so the @ stays
-                                let formatted_string = self.client_ui.incoming_msg.user_seen_list
-                                    [self.client_ui.user_selector_index as usize]
-                                    .username
-                                    .to_string();
+                                if let Some(profile) =
+                                    self.client_ui.incoming_msg.connected_clients_profile.get(
+                                        &self.client_ui.incoming_msg.user_seen_list
+                                            [self.client_ui.user_selector_index as usize]
+                                            .uuid,
+                                    )
+                                {
+                                    let formatted_string = profile.username.clone();
 
-                                *buffer = &formatted_string;
+                                    *buffer = &formatted_string;
 
-                                //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
-                                let split_concat = split.join("@");
+                                    //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
+                                    let split_concat = split.join("@");
 
-                                //Set the buffer to the concatenated vector, append the @ to the 0th index
-                                self.client_ui.usr_msg = split_concat;
+                                    //Set the buffer to the concatenated vector, append the @ to the 0th index
+                                    self.client_ui.usr_msg = split_concat;
+                                }
                             };
                         }
                     });
@@ -164,14 +178,12 @@ impl TemplateApp {
                                         index,
                                         Some(self.client_ui.usr_msg.clone()),
                                         &self.opened_user_information.uuid,
-                                        &self.opened_user_information.username,
                                     ))
                                 }
                                 //If its reply or normal mode we can just send the message and call get_reply_index on it
                                 _ => self.send_msg(ClientMessage::construct_normal_msg(
                                     &self.client_ui.usr_msg,
                                     &self.opened_user_information.uuid,
-                                    &self.opened_user_information.username,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 )),
                             }
@@ -183,7 +195,6 @@ impl TemplateApp {
                                 self.send_msg(ClientMessage::construct_file_msg(
                                     file_path.clone(),
                                     &self.opened_user_information.uuid,
-                                    &self.opened_user_information.username,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 ));
                             }
@@ -276,7 +287,6 @@ impl TemplateApp {
                                         self.send_msg(ClientMessage::construct_file_msg(
                                             ok.to_path_buf().clone(),
                                             &self.opened_user_information.uuid,
-                                            &self.opened_user_information.username,
                                             self.client_ui.messaging_mode.get_reply_index(),
                                         ));
 
@@ -342,17 +352,31 @@ impl TemplateApp {
                             .iter()
                             .enumerate()
                         {
+                            // self.client_ui.incoming_msg.connected_clients_profile.get(client.uuid).unwrap().username;
                             //If the search buffer is contained in the clients' username
-                            if client.username.contains(last_str) {
-                                if index == self.client_ui.user_selector_index as usize {
-                                    ui.group(|ui| {
-                                        ui.label(
-                                            RichText::from(&client.username).color(Color32::YELLOW),
-                                        );
-                                    });
-                                } else {
-                                    ui.label(RichText::from(&client.username));
+                            if let Some(profile) = self
+                                .client_ui
+                                .incoming_msg
+                                .connected_clients_profile
+                                .get(&client.uuid)
+                            {
+                                let username = profile.username.clone();
+
+                                if username.contains(last_str) {
+                                    if index == self.client_ui.user_selector_index as usize {
+                                        ui.group(|ui| {
+                                            ui.label(
+                                                RichText::from(&username).color(Color32::YELLOW),
+                                            );
+                                        });
+                                    } else {
+                                        ui.label(RichText::from(&username));
+                                    }
                                 }
+                            }
+                            //If the profile was not found then we can ask for it
+                            else {
+                                ui.spinner();
                             }
                         }
                     }

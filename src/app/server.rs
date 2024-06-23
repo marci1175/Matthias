@@ -1,11 +1,4 @@
-use std::{
-    collections::HashMap,
-    env, fs,
-    io::Write,
-    path::PathBuf,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{Error, Result};
 use chrono::Utc;
@@ -52,7 +45,7 @@ pub struct MessageService {
     ///Contains all of the reactions added to the messages
     pub reactions: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
 
-    ///This is the required password by the server
+    ///This is the required password by the server this password is hashed with argon2, and is compared with the hashed client password
     pub passw: String,
 
     /// This is the list, which we will send the files from, these are generated file names, so names will rarely ever match (1 / 1.8446744e+19) chance
@@ -340,17 +333,12 @@ impl MessageService {
         //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actual messages
         //HOWEVER, if theyre client connection or disconnection messages a reaction should be allocated because people can react to those
         if !(matches!(&req.message_type, ClientReaction(_))
-            || matches!(&req.message_type, MessageEdit(_)) || {
+            || matches!(&req.message_type, MessageEdit(_))
+            || {
                 if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
                     //If this is true (if sync_attribute is none) that means the client is syncing its last seen message index, thefor we shouldnt allocate a new reaction
-                    if sync_msg.sync_attribute.is_none() {
-                        true
-                    }
-                    else {
-                        false
-                    }
-                }
-                else {
+                    sync_msg.sync_attribute.is_none()
+                } else {
                     false
                 }
             })
@@ -436,7 +424,7 @@ impl MessageService {
                                 //If the ip is not found then add it to connected clients
                                 clients.push(ConnectedClient::new(
                                     req.uuid.clone(),
-                                    req.author.clone(),
+                                    profile.username.clone(),
                                     client_handle.clone(),
                                 ));
 
@@ -650,7 +638,14 @@ impl MessageService {
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         MessageEdit(_) => Edit,
                     },
-                    req.uuid,
+                    req.uuid.clone(),
+                    self.connected_clients_profile
+                        .lock()
+                        .await
+                        .get(&req.uuid)
+                        .unwrap()
+                        .clone()
+                        .username,
                 ),
                 self.decryption_key,
             )
@@ -672,38 +667,36 @@ impl MessageService {
         req: &ClientMessage,
         client_handle: &Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     ) -> Result<(), Error> {
-        Ok(
-            if let Some(idx) = self
-                .shared_fields
+        if let Some(idx) = self
+            .shared_fields
+            .lock()
+            .await
+            .banned_uuids
+            .lock()
+            .await
+            .iter()
+            .position(|item| *item == req.uuid)
+        {
+            let mut client_handle = &mut *client_handle.try_lock()?;
+
+            send_message_to_client(&mut client_handle, "You have been banned!".to_string()).await?;
+
+            self.connected_clients.lock().await.remove(idx);
+            self.connected_clients_profile
                 .lock()
                 .await
-                .banned_uuids
-                .lock()
-                .await
-                .iter()
-                .position(|item| *item == req.uuid)
-            {
-                let mut client_handle = &mut *client_handle.try_lock()?;
+                .remove(&req.uuid);
 
-                send_message_to_client(&mut client_handle, "You have been banned!".to_string())
-                    .await?;
+            //Signal disconnection
+            send_message_to_client(
+                client_handle,
+                "Server disconnecting from client.".to_owned(),
+            )
+            .await?;
 
-                self.connected_clients.lock().await.remove(idx);
-                self.connected_clients_profile
-                    .lock()
-                    .await
-                    .remove(&req.uuid);
-
-                //Signal disconnection
-                send_message_to_client(
-                    client_handle,
-                    "Server disconnecting from client.".to_owned(),
-                )
-                .await?;
-
-                return Err(Error::msg("Client has been banned!"));
-            },
-        )
+            return Err(Error::msg("Client has been banned!"));
+        };
+        Ok(())
     }
 
     /// all the functions the server can do
@@ -715,6 +708,13 @@ impl MessageService {
             -1,
             Normal,
             req.uuid.clone(),
+            self.connected_clients_profile
+                .lock()
+                .await
+                .get(&req.uuid)
+                .unwrap()
+                .clone()
+                .username,
         ));
     }
 
@@ -758,7 +758,6 @@ impl MessageService {
                             client_vec.push(ClientLastSeenMessage::new(
                                 last_seen_message_index,
                                 req.uuid.clone(),
-                                req.author.clone(),
                             ));
                         }
                     }
@@ -770,6 +769,15 @@ impl MessageService {
         };
     }
     async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
+        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        let file_author = self
+            .connected_clients_profile
+            .lock()
+            .await
+            .get(&request.uuid)
+            .unwrap()
+            .clone()
+            .username;
         //500mb limit
         if !req.bytes.len() > 500000000 {
             match env::var("APPDATA") {
@@ -810,6 +818,7 @@ impl MessageService {
                                 self.file_list.lock().unwrap().len() as i32,
                                 Upload,
                                 request.uuid.clone(),
+                                file_author,
                             ));
                         }
                         Err(err) => {
@@ -831,6 +840,16 @@ impl MessageService {
         fs::read(&self.image_list.lock().unwrap()[index as usize]).unwrap_or_default()
     }
     async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
+        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        let file_author = self
+            .connected_clients_profile
+            .lock()
+            .await
+            .get(&req.uuid)
+            .unwrap()
+            .clone()
+            .username;
+
         match env::var("APPDATA") {
             Ok(app_data) => {
                 let mut image_path = self.image_list.lock().unwrap();
@@ -856,6 +875,7 @@ impl MessageService {
                                     image_path_lenght as i32,
                                     Image,
                                     req.uuid.clone(),
+                                    file_author,
                                 ));
                             }
                             Err(err) => println!("{err}"),
@@ -878,6 +898,15 @@ impl MessageService {
         }
     }
     async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct) {
+        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        let file_author = self
+            .connected_clients_profile
+            .lock()
+            .await
+            .get(&req.uuid)
+            .unwrap()
+            .clone()
+            .username;
         let mut audio_paths = self.audio_list.lock().unwrap();
 
         let audio_paths_lenght = audio_paths.len();
@@ -902,6 +931,7 @@ impl MessageService {
                             audio_paths_lenght as i32,
                             Audio,
                             req.uuid.clone(),
+                            file_author,
                         ));
                     }
                     Err(err) => println!("{err}"),

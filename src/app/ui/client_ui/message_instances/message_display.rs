@@ -27,11 +27,9 @@ impl TemplateApp {
                 button.paint_debug_info();
                 //If we want to download the file included in the message
                 if button.clicked() {
-                    let author = self.login_username.clone();
                     let message = ClientMessage::construct_file_request_msg(
                         inner.index,
                         &self.opened_user_information.uuid,
-                        author,
                     );
 
                     let connection = self.client_connection.clone();
@@ -192,13 +190,9 @@ impl TemplateApp {
 
                             //We dont have file on our local system so we have to ask the server to provide it
                             let uuid = &self.opened_user_information.uuid;
-                            let author = self.login_username.clone();
 
-                            let message = ClientMessage::construct_image_request_msg(
-                                picture.index,
-                                uuid,
-                                author,
-                            );
+                            let message =
+                                ClientMessage::construct_image_request_msg(picture.index, uuid);
 
                             let connection = self.client_connection.clone();
 
@@ -309,7 +303,6 @@ impl TemplateApp {
                                                 ClientMessage::construct_audio_request_msg(
                                                     audio.index,
                                                     &self.opened_user_information.uuid,
-                                                    self.login_username.clone(),
                                                 );
 
                                             let connection = self.client_connection.clone();

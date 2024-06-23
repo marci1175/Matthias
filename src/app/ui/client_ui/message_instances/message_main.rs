@@ -152,7 +152,17 @@ impl TemplateApp {
                                                 });
 
                                                 //Client name
-                                                ui.label(RichText::from(&client.username).size(self.font_size / 1.3));
+                                                if let Some(profile) = self.client_ui.incoming_msg.connected_clients_profile.get(&client.uuid) {
+                                                    let username = profile.username.clone();
+
+                                                    ui.label(RichText::from(&username).size(self.font_size / 1.3));
+                                                }
+                                                //If the profile was not found then we can ask for it 
+                                                else {
+                                                    ui.spinner();
+
+                                                    self.request_client(client.uuid.clone());
+                                                };
                                             });
                                         }
                                     }
@@ -240,7 +250,7 @@ impl TemplateApp {
 
                                         if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/delete.png"), "Delete")).clicked() {
                                             self.send_msg(
-                                                ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_user_information.uuid, &self.opened_user_information.username)
+                                                ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_user_information.uuid)
                                             );
                                             ui.close_menu();
                                         }
@@ -276,7 +286,7 @@ impl TemplateApp {
                                                                 let uuid = self.opened_user_information.uuid.clone();
 
                                                                 let message = ClientMessage::construct_reaction_msg(
-                                                                    chr, iter_index, &self.login_username, &uuid,
+                                                                    chr, iter_index,  &uuid,
                                                                 );
                                                                 let connection = self.client_connection.clone();
 
@@ -314,6 +324,14 @@ impl TemplateApp {
         })
     }
 
+    pub fn request_client(&mut self, uuid: String) {
+        //Ask the server for the specified client's profile picture
+        self.send_msg(ClientMessage::construct_client_request_msg(
+            uuid.clone(),
+            &self.opened_user_information.uuid,
+        ));
+    }
+
     /// This function displays the 64x64 icon of a client based on their uuid
     /// This function also requests the server for the image if the image isnt available on the given URI
     fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
@@ -349,7 +367,6 @@ impl TemplateApp {
                         self.send_msg(ClientMessage::construct_client_request_msg(
                             uuid.clone(),
                             &self.opened_user_information.uuid,
-                            self.opened_user_information.username.clone(),
                         ));
                         //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
                         //We will forget this URI when loading in the real image

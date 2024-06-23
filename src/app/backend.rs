@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::client::{connect_to_server, ServerReply};
-use super::server::{send_message_to_client, SharedFields};
+use super::server::SharedFields;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -610,15 +610,19 @@ pub struct ClientSnycMessage {
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<ConnectionType>,
 
-    ///This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
+    /// This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
     /// This value is ignored if the `sync_attribute` field is Some(_)
     pub client_message_counter: Option<usize>,
 
     /// The index of the last seen message by the user, this is sent so we can display which was the last message the user has seen, if its None we ignore the value
     pub last_seen_message_index: Option<usize>,
 
-    ///Contain password in the sync message, so we will send the password when authenticating
+    /// Contains password in the sync message, so we will send the password when authenticating
     pub password: String,
+
+    /// This field is used when connecting, the server will save the uuid and the username pair
+    /// The client will not send their username except here, and the server is expected to pair the name to the message
+    pub username: String,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -699,7 +703,6 @@ pub struct ClientMessage {
     pub replying_to: Option<usize>,
     pub message_type: ClientMessageType,
     pub uuid: String,
-    pub author: String,
     pub message_date: String,
 }
 
@@ -713,7 +716,6 @@ impl ClientMessage {
     pub fn construct_normal_msg(
         msg: &str,
         uuid: &str,
-        author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
@@ -723,7 +725,6 @@ impl ClientMessage {
             }),
             //If the password is set as None (Meaning the user didnt enter any password) just send the message with an empty string
             uuid: uuid.to_string(),
-            author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -732,7 +733,6 @@ impl ClientMessage {
     pub fn construct_file_msg(
         file_path: PathBuf,
         uuid: &str,
-        author: &str,
         replying_to: Option<usize>,
     ) -> ClientMessage {
         ClientMessage {
@@ -754,17 +754,11 @@ impl ClientMessage {
             }),
 
             uuid: uuid.to_string(),
-            author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
-    pub fn construct_reaction_msg(
-        char: char,
-        index: usize,
-        author: &str,
-        uuid: &str,
-    ) -> ClientMessage {
+    pub fn construct_reaction_msg(char: char, index: usize, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::Reaction(ClientReaction {
@@ -772,7 +766,6 @@ impl ClientMessage {
                 message_index: index,
             }),
             uuid: uuid.to_string(),
-            author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -794,9 +787,9 @@ impl ClientMessage {
                 //This value is not ignored in this context
                 client_message_counter: Some(client_message_counter),
                 last_seen_message_index,
+                username: author.to_string(),
             }),
             uuid: uuid.to_string(),
-            author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -817,9 +810,9 @@ impl ClientMessage {
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
                 last_seen_message_index,
+                username: author,
             }),
             uuid: uuid.to_string(),
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -839,48 +832,45 @@ impl ClientMessage {
                 //If its used for connecting / disconnecting this value is ignored
                 client_message_counter: None,
                 last_seen_message_index: None,
+                username: author,
             }),
             uuid,
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
     ///this is used for asking for a file
-    pub fn construct_file_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
+    pub fn construct_file_request_msg(index: i32, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::FileRequest(
                 ClientFileRequest { index },
             )),
             uuid: uuid.to_string(),
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
     ///this is used for asking for an image
-    pub fn construct_image_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
+    pub fn construct_image_request_msg(index: i32, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ImageRequest(
                 ClientImageRequest { index },
             )),
             uuid: uuid.to_string(),
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
 
     ///this is used for asking for an image
-    pub fn construct_audio_request_msg(index: i32, uuid: &str, author: String) -> ClientMessage {
+    pub fn construct_audio_request_msg(index: i32, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::AudioRequest(
                 ClientAudioRequest { index },
             )),
             uuid: uuid.to_string(),
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -888,7 +878,6 @@ impl ClientMessage {
     pub fn construct_client_request_msg(
         uuid_of_requested_client: String,
         uuid: &str,
-        author: String,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
@@ -896,7 +885,6 @@ impl ClientMessage {
                 uuid_of_requested_client,
             )),
             uuid: uuid.to_string(),
-            author,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -905,13 +893,11 @@ impl ClientMessage {
         index: usize,
         new_message: Option<String>,
         uuid: &str,
-        author: &str,
     ) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::MessageEdit(ClientMessageEdit { index, new_message }),
             uuid: uuid.to_string(),
-            author: author.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
@@ -1303,6 +1289,7 @@ impl ServerOutput {
         //Automaticly generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
         uuid: String,
+        username: String,
     ) -> ServerOutput {
         ServerOutput {
             replying_to: normal_msg.replying_to,
@@ -1376,7 +1363,7 @@ impl ServerOutput {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
                     },
                 },
-            author: normal_msg.author,
+            author: username,
             message_date: normal_msg.message_date,
             uuid,
         }
@@ -1453,17 +1440,12 @@ impl ConnectedClient {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientLastSeenMessage {
     pub index: usize,
-    pub username: String,
     pub uuid: String,
 }
 
 impl ClientLastSeenMessage {
-    pub fn new(index: usize, uuid: String, username: String) -> Self {
-        Self {
-            index,
-            username,
-            uuid,
-        }
+    pub fn new(index: usize, uuid: String) -> Self {
+        Self { index, uuid }
     }
 }
 

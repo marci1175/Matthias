@@ -237,7 +237,7 @@ impl TemplateApp {
 
                     for (index, item) in banned_uuids.clone().iter().enumerate() {
                         ui.horizontal(|ui| {
-                            ui.label(decrypt_aes256(&item, &[42; 32]).unwrap());
+                            ui.label(decrypt_aes256(item, &[42; 32]).unwrap());
                             if ui
                                 .button(RichText::from("Unban").color(Color32::RED))
                                 .clicked()

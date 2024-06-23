@@ -1,8 +1,6 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{
-    display_error_message, login, register, ProfileImage, Register, TemplateApp,
-};
+use crate::app::backend::{display_error_message, register, ProfileImage, Register, TemplateApp};
 use anyhow::bail;
 use egui::{
     vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke,

@@ -1,4 +1,3 @@
-use backend::MessageReaction;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
@@ -61,15 +60,12 @@ impl eframe::App for backend::TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
             TODO: add scripting
-            TODO: add image part selection in registration
-            TODO: optimize syncing by waiting for last seen message difference
             TODO: fix audio playback
             TODO: add notfications
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Discord like emoji :skull:
-            TODO: make an installer for this app so there wouldnt be so many huge binary sizes
+            TODO: Restructure files
             TODO: make a loading wheel when loading a message / image / audio / etc
-            TODO: impl disconnection msg for server to client
             TODO: modify image downloading so theyre arent saved in a file
             TODO: implement instant banning in servers
             TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message

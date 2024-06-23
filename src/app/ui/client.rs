@@ -1,6 +1,6 @@
 use egui::{
-    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, ImageSource, Layout, Pos2,
-    RichText, Sense, Stroke,
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
+    Stroke,
 };
 use rodio::{Decoder, Sink};
 use std::fs;
