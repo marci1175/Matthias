@@ -233,10 +233,6 @@ impl backend::TemplateApp {
     }
 
     fn client_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        // ui.label("Message editor text size");
-        // ui.add(egui::Slider::new(&mut self.font_size, 1.0..=100.0).text("Text size"));
-        // ui.separator();
-
         ui.label("Connect to an ip address");
 
         let compare_ip = self.client_ui.send_on_ip.clone();
@@ -287,6 +283,12 @@ impl backend::TemplateApp {
                             let ctx = ctx.clone();
 
                             let user_information = self.opened_user_information.clone();
+
+                            //Reset all messages and everything else
+                            self.client_ui.incoming_msg = ServerMaster::default();
+                            
+                            //Forget all imaes so the cahced imges will be deleted
+                            ctx.forget_all_images();
 
                             tokio::task::spawn(async move {
                                 match ClientConnection::connect(

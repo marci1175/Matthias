@@ -99,12 +99,6 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub settings_window: bool,
 
-    ///thread communication for image requesting
-    #[serde(skip)]
-    pub irx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub itx: mpsc::Sender<String>,
-
     ///thread communication for audio recording
     #[serde(skip)]
     pub atx: Option<mpsc::Sender<bool>>,
@@ -180,7 +174,6 @@ impl Default for TemplateApp {
         let (tx, rx) = mpsc::channel::<String>();
         let (stx, srx) = mpsc::channel::<String>();
         let (dtx, drx) = mpsc::channel::<String>();
-        let (itx, irx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
 
@@ -220,10 +213,6 @@ impl Default for TemplateApp {
 
             //child windows
             settings_window: false,
-
-            //thread communication for image requesting
-            irx,
-            itx,
 
             //This default value will get overwritten when crating the new server, so we can pass in the token to the thread
             //Also, the shutdown reciver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D

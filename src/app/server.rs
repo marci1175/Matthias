@@ -1016,7 +1016,7 @@ impl MessageService {
     /// handle all the file uploads
     pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
         //Pattern match on upload tpye so we know how to handle the specific request
-        match dbg!(upload_type.extension.clone().unwrap_or_default().as_str()) {
+        match upload_type.extension.clone().unwrap_or_default().as_str() {
             "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,
             "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY

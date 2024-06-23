@@ -167,13 +167,14 @@ impl TemplateApp {
                                         }
                                     }
                                 });
+                                
                                 //Back up reponse of message group, so we can scroll to it later if the user thinks like it
                                 message_instances.push(message_group.response.clone());
 
                                 message_group.response.context_menu(|ui|{
                                     let profile_menu_button = ui.menu_button("Profile", |ui| {
                                         //Check if the message was sent by the server, create a custom profile for it
-                                        if item.uuid.trim() == "00000000-0000-0000-0000-000000000000" {
+                                        if item.uuid == "00000000-0000-0000-0000-000000000000" {
                                             //Add verification or somthing like that
                                             ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                                                 ui.horizontal_centered(|ui| {
@@ -335,6 +336,12 @@ impl TemplateApp {
     /// This function displays the 64x64 icon of a client based on their uuid
     /// This function also requests the server for the image if the image isnt available on the given URI
     fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
+        //If uuid is the server's we just include the image of the server
+        if uuid == "00000000-0000-0000-0000-000000000000" {
+            ui.add(Image::new(egui::include_image!("../../../../../icons/server_white64.png")));
+
+            return;
+        }
         match ctx.try_load_bytes(&format!("bytes://{}", &uuid)) {
             //If the image was found on the URI
             Ok(bytes) => {
@@ -368,6 +375,7 @@ impl TemplateApp {
                             uuid.clone(),
                             &self.opened_user_information.uuid,
                         ));
+
                         //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
                         //We will forget this URI when loading in the real image
                         ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);

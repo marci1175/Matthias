@@ -407,22 +407,6 @@ impl TemplateApp {
         //Server reciver
         self.client_recv(ctx);
 
-        match self.irx.try_recv() {
-            Ok(msg) => {
-                let file_serve: Result<ServerImageReply, serde_json::Error> =
-                    serde_json::from_str(&msg);
-
-                let _ = write_image(
-                    file_serve.as_ref().unwrap(),
-                    self.client_ui.send_on_ip.clone(),
-                );
-
-                //The default uri is => "bytes://{index}", we need to forget said image to clear it from cache, therefor load the corrected file. becuase it has cached the placeholder
-                ctx.forget_image(&format!("bytes://{}", file_serve.unwrap().index));
-            }
-            Err(_err) => {}
-        }
-
         match self.audio_save_rx.try_recv() {
             Ok((sink, cursor, index, path_to_audio)) => {
                 //Check if the request was unsuccesful, so we can reset the states
@@ -676,16 +660,19 @@ impl TemplateApp {
                                                         let _ = write_file(file);
                                                     }
                                                     ServerReplyType::ImageReply(image) => {
-                                                        let _ = write_image(
-                                                            &image,
-                                                            self.client_ui.send_on_ip.clone(),
-                                                        );
+                                                        // let _ = write_image(
+                                                        //     &image,
+                                                        //     self.client_ui.send_on_ip.clone(),
+                                                        // );
 
                                                         //Forget image so itll be able to get displayed
                                                         ctx.forget_image(&format!(
                                                             "bytes://{}",
                                                             image.index
                                                         ));
+                                                        
+                                                        //load image to the said URI
+                                                        ctx.include_bytes(format!("bytes://{}", image.index), image.bytes);
                                                     }
                                                     ServerReplyType::AudioReply(audio) => {
                                                         let stream_handle = self

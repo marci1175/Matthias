@@ -132,74 +132,67 @@ impl TemplateApp {
                 }
             }
             crate::app::backend::ServerMessageType::Image(picture) => {
-                let path = PathBuf::from(format!(
-                    "{}\\matthias\\Client\\{}\\Images\\{}",
-                    env!("APPDATA"),
-                    self.client_ui.send_on_ip_base64_encoded,
-                    picture.index
-                ));
-
                 ui.allocate_ui(vec2(300., 300.), |ui| {
-                    match fs::read(&path) {
-                        Ok(image_bytes) => {
+                    match ctx.try_load_bytes(&format!("bytes://{}", picture.index)) {
+                        Ok(bytes_poll) => {
                             //display picture from bytes
-                            let image_widget = ui.add(egui::widgets::Image::from_bytes(
-                                format!("bytes://{}", picture.index),
-                                image_bytes.clone(),
-                            ));
-
-                            if image_widget.interact(Sense::click()).clicked() {
-                                self.client_ui.image_overlay = true;
-                            }
-
-                            image_widget.context_menu(|ui| {
-                                if ui.button("Save").clicked() {
-                                    //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
-                                    let image_save = ServerFileReply {
-                                        bytes: image_bytes.clone(),
-                                        file_name: PathBuf::from("image.png"),
-                                    };
-                                    let _ = crate::app::backend::write_file(image_save);
+                            if let egui::load::BytesPoll::Ready {bytes, ..} = bytes_poll {
+                                let image_widget = ui.add(egui::widgets::Image::from_uri(
+                                    format!("bytes://{}", picture.index),
+                                ));
+    
+                                if image_widget.interact(Sense::click()).clicked() {
+                                    self.client_ui.image_overlay = true;
                                 }
-                            });
-
-                            if self.client_ui.image_overlay {
-                                self.image_overlay_draw(ui, ctx, image_bytes, picture);
+    
+                                image_widget.context_menu(|ui| {
+                                    if ui.button("Save").clicked() {
+                                        //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
+                                        let image_save = ServerFileReply {
+                                            bytes: bytes.to_vec(),
+                                            file_name: PathBuf::from("image.png"),
+                                        };
+                                        let _ = crate::app::backend::write_file(image_save);
+                                    }
+                                });
+    
+                                if self.client_ui.image_overlay {
+                                    self.image_overlay_draw(ui, ctx, bytes.to_vec(), picture);
+                                }
                             }
                         }
-                        Err(_err) => {
-                            //create decoy file, to manually create a race condition
-                            let _ = fs::create_dir_all(PathBuf::from(format!(
-                                "{}\\matthias\\Client\\{}\\Images",
-                                env!("APPDATA"),
-                                self.client_ui.send_on_ip_base64_encoded,
-                            )));
+                        Err(load_error) => {
+                            match load_error {
+                                egui::load::LoadError::Loading(inner) => {
+                                    if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                        //check if we are visible
+                                        if !ui.is_rect_visible(ui.min_rect()) {
+                                            return;
+                                        }
 
-                            if let Err(err) = std::fs::write(
-                                path,
-                                "This is a placeholder file, this will get overwritten (hopefully)",
-                            ) {
-                                println!("Error when creating a decoy: {err}");
-                                return;
-                            };
+                                        //Load an empty byte to the said URI
+                                        ctx.include_bytes(format!("bytes://{}", picture.index), vec![0]);
 
-                            //check if we are visible
-                            if !ui.is_rect_visible(ui.min_rect()) {
-                                return;
+                                        //We dont have file on our local system so we have to ask the server to provide it
+                                        let uuid = &self.opened_user_information.uuid;
+
+                                        let message =
+                                            ClientMessage::construct_image_request_msg(picture.index, uuid);
+
+                                        let connection = self.client_connection.clone();
+
+                                        tokio::spawn(async move {
+                                            //We only have to send the message it will get recived in a diff place
+                                            connection.clone().send_message(message).await.unwrap();
+                                        });
+                                    }
+                                    else {
+                                        dbg!(inner);
+                                    }
+                                },
+
+                                _ => {}
                             }
-
-                            //We dont have file on our local system so we have to ask the server to provide it
-                            let uuid = &self.opened_user_information.uuid;
-
-                            let message =
-                                ClientMessage::construct_image_request_msg(picture.index, uuid);
-
-                            let connection = self.client_connection.clone();
-
-                            tokio::spawn(async move {
-                                //We only have to send the message it will get recived in a diff place
-                                connection.clone().send_message(message).await.unwrap();
-                            });
                         }
                     };
                 });
