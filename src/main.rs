@@ -4,7 +4,6 @@
 #![feature(cursor_remaining)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
-use std::fs;
 
 use egui::{Style, Visuals};
 use egui::ViewportBuilder;
@@ -15,8 +14,19 @@ async fn main() -> eframe::Result<()> {
     env_logger::init();
 
     //set custom panic hook
+    #[cfg(not(debug_assertions))]
     std::panic::set_hook(Box::new(|info| {
-        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: {:?}", info.payload().downcast_ref::<&str>()));
+        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: {:?}\n", {
+            match info.payload().downcast_ref::<&str>() {
+                Some(msg) => msg,
+                None => {
+                    match info.payload().downcast_ref::<String>() {
+                        Some(msg) => msg,
+                        None => "Failed to display panic message",
+                    }
+                },
+            }
+        }));
 
         let appdata_path = std::env!("APPDATA");
         

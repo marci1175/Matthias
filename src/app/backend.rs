@@ -1665,13 +1665,20 @@ impl UserInformation {
 
     /// This serializer function automaticly encrypts the struct with the *encrypt_aes256* fn to string
     pub fn serialize(&self) -> anyhow::Result<String> {
-        Ok(encrypt_aes256(serde_json::to_string(&self)?, &[42; 32]).unwrap())
+        //Hash password so it can be used to encrypt a file
+        let hashed_password = sha256::digest(self.password.clone());
+        let encryption_key = hex::decode(hashed_password)?;
+
+        Ok(encrypt_aes256(serde_json::to_string(&self)?, &encryption_key)?)
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
-    pub fn deserialize(serialized_struct: &str) -> anyhow::Result<Self> {
+    pub fn deserialize(serialized_struct: &str, password: String) -> anyhow::Result<Self> {
+        let hashed_password = sha256::digest(password);
+        let encryption_key = hex::decode(hashed_password)?;
+
         Ok(serde_json::from_str::<Self>(
-            &decrypt_aes256(serialized_struct, &[42; 32]).unwrap(),
+            &decrypt_aes256(serialized_struct, &encryption_key)?,
         )?)
     }
 
@@ -1710,22 +1717,25 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
-    let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
+
+    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
 
     let plaintext = cipher
         .decrypt(&nonce, ciphertext.as_ref())
-        .map_err(|_| Error::msg("OddLength"))?;
+        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+
     Ok(String::from_utf8(plaintext)?)
 }
 
 /// aes256 is encrypted by this function by a fixed key
-pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> aes_gcm::aead::Result<String> {
+pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Result<String> {
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
-    let nonce = GenericArray::from([69u8; 12]); // funny encryption key hehehe
 
-    let ciphertext = cipher.encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref())?;
+    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+
+    let ciphertext = cipher.encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref()).map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
     let ciphertext = hex::encode(ciphertext);
 
     Ok(ciphertext)
@@ -1756,22 +1766,22 @@ fn pass_hash_match(to_be_verified: String, encoded: String) -> bool {
 }
 
 ///Check login
-pub fn login(username: String, password: String) -> Result<PathBuf> {
+pub fn login(username: String, password: String) -> Result<(UserInformation, PathBuf)> {
     let app_data = env::var("APPDATA")?;
 
     let path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
 
-    let file_contents: UserInformation = UserInformation::deserialize(&fs::read_to_string(&path)?)?;
+    let file_contents: UserInformation = UserInformation::deserialize(&fs::read_to_string(&path)?, encrypt(password.clone()))?;
 
     let user_check = username == file_contents.username;
 
     ensure!(user_check, "File corrupted at the username entry");
 
-    let password_check = file_contents.verify_password(password);
+    //Password is "checked" twice, first is when we try to decrypt the file
+    // let password_check = file_contents.verify_password(password);
+    // ensure!(password_check, "Invalid password");
 
-    ensure!(password_check, "Invalid password");
-
-    Ok(path)
+    Ok((file_contents, path))
 }
 
 ///Register a new profile

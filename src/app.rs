@@ -45,9 +45,6 @@ impl eframe::App for backend::TemplateApp {
                 if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
                     println!("{err}");
                 };
-                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
-                    println!("{err}");
-                };
             }
             Err(err) => println!("{err}"),
         }
@@ -69,6 +66,7 @@ impl eframe::App for backend::TemplateApp {
             TODO: modify image downloading so theyre arent saved in a file
             TODO: implement instant banning in servers
             TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message
+            TODO: replace fixed key encryption, hash passwords
         */
 
         if self.main.register_mode {
@@ -116,6 +114,7 @@ impl eframe::App for backend::TemplateApp {
                 ui.label(RichText::from("Saved ip addresses"));
                 match UserInformation::deserialize(
                     &fs::read_to_string(self.opened_user_information.path.clone()).unwrap(),
+                    self.opened_user_information.password.clone()
                 ) {
                     Ok(mut user_info) => {
                         if ui.button("Save ip address").clicked() {
