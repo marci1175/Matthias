@@ -4,25 +4,25 @@
 #![feature(cursor_remaining)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
+use std::fs;
 
 use egui::{Style, Visuals};
+use egui::ViewportBuilder;
+use windows_sys::{w, Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR}};
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
-    // use crate::app::backend::display_toast_notification;
-    // display_toast_notification();
-
-    //Ensure all temporary folders are deleted
-
-    use egui::ViewportBuilder;
-
-    let _ = std::fs::remove_dir_all(format!("{}\\matthias\\Client", env!("APPDATA")));
-    let _ = std::fs::remove_dir_all(format!("{}\\matthias\\Server", env!("APPDATA")));
-
-    //Ensure main folders are existing
-    let _ = std::fs::create_dir_all(format!("{}\\matthias\\Client", env!("APPDATA")));
-    let _ = std::fs::create_dir_all(format!("{}\\matthias\\Server", env!("APPDATA")));
 
     env_logger::init();
+
+    //set custom panic hook
+    std::panic::set_hook(Box::new(|info| {
+        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: {:?}", info.payload().downcast_ref::<&str>()));
+
+        let appdata_path = std::env!("APPDATA");
+        
+        // Write error message
+        fs::write(format!("{appdata_path}/matthias/error.log"), format!("[DATE]\n{:?}\n[PANIC]\n{:?}\n[STACK_BACKTRACE]\n{}\n", chrono::Local::now(), info.to_string(), std::backtrace::Backtrace::force_capture().to_string())).unwrap();
+    }));
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
@@ -58,6 +58,20 @@ async fn main() -> eframe::Result<()> {
     )
 }
 
+pub fn display_panic_message<T>(display: T)
+where
+    T: ToString + std::marker::Send + 'static,
+{
+    unsafe { MessageBoxW(
+        0,
+        str::encode_utf16(display.to_string().as_str())
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>()
+            .as_ptr(),
+        w!("Panic!"),
+        MB_ICONERROR,
+    ) };
+}
 /*  Gulyásleves recept
 
     Heat the oil or lard in a large pot (preferably a Dutch oven). Add the onions along with a few spoonfuls of water (so they don’t brown) and a pinch of the salt. Cook slowly over very low heat for about 15 to 20 minutes, or until the onions are clear and glassy.
