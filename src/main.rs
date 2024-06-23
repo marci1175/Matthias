@@ -16,7 +16,12 @@ async fn main() -> eframe::Result<()> {
     //set custom panic hook
     #[cfg(not(debug_assertions))]
     std::panic::set_hook(Box::new(|info| {
-        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: {:?}\n", {
+        let appdata_path = std::env!("APPDATA");
+        // Write error message
+        std::fs::write(format!("{appdata_path}/matthias/error.log"), format!("[DATE]\n{:?}\n[PANIC]\n{:?}\n[STACK_BACKTRACE]\n{}\n", chrono::Local::now(), info.to_string(), std::backtrace::Backtrace::force_capture().to_string())).unwrap();
+
+        //Display error message
+        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: \n{:?}\nLocation: \n{:?}", {
             match info.payload().downcast_ref::<&str>() {
                 Some(msg) => msg,
                 None => {
@@ -26,12 +31,7 @@ async fn main() -> eframe::Result<()> {
                     }
                 },
             }
-        }));
-
-        let appdata_path = std::env!("APPDATA");
-        
-        // Write error message
-        fs::write(format!("{appdata_path}/matthias/error.log"), format!("[DATE]\n{:?}\n[PANIC]\n{:?}\n[STACK_BACKTRACE]\n{}\n", chrono::Local::now(), info.to_string(), std::backtrace::Backtrace::force_capture().to_string())).unwrap();
+        }, info.location()));
     }));
 
     let native_options = eframe::NativeOptions {
