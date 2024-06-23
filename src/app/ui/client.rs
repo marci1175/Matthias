@@ -660,19 +660,17 @@ impl TemplateApp {
                                                         let _ = write_file(file);
                                                     }
                                                     ServerReplyType::ImageReply(image) => {
-                                                        // let _ = write_image(
-                                                        //     &image,
-                                                        //     self.client_ui.send_on_ip.clone(),
-                                                        // );
-
                                                         //Forget image so itll be able to get displayed
                                                         ctx.forget_image(&format!(
                                                             "bytes://{}",
                                                             image.index
                                                         ));
-                                                        
+
                                                         //load image to the said URI
-                                                        ctx.include_bytes(format!("bytes://{}", image.index), image.bytes);
+                                                        ctx.include_bytes(
+                                                            format!("bytes://{}", image.index),
+                                                            image.bytes,
+                                                        );
                                                     }
                                                     ServerReplyType::AudioReply(audio) => {
                                                         let stream_handle = self

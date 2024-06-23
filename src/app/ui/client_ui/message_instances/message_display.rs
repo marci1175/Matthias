@@ -137,14 +137,17 @@ impl TemplateApp {
                         Ok(bytes_poll) => {
                             //display picture from bytes
                             if let egui::load::BytesPoll::Ready {bytes, ..} = bytes_poll {
+                                //If the bytes are indicated as being requested we can put there a spinner
+                                if bytes.to_vec() == vec![0] {
+                                    ui.spinner();
+                                    return;
+                                }
                                 let image_widget = ui.add(egui::widgets::Image::from_uri(
                                     format!("bytes://{}", picture.index),
                                 ));
-    
                                 if image_widget.interact(Sense::click()).clicked() {
                                     self.client_ui.image_overlay = true;
                                 }
-    
                                 image_widget.context_menu(|ui| {
                                     if ui.button("Save").clicked() {
                                         //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
@@ -155,7 +158,6 @@ impl TemplateApp {
                                         let _ = crate::app::backend::write_file(image_save);
                                     }
                                 });
-    
                                 if self.client_ui.image_overlay {
                                     self.image_overlay_draw(ui, ctx, bytes.to_vec(), picture);
                                 }

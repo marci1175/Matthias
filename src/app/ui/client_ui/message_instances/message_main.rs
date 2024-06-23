@@ -167,7 +167,6 @@ impl TemplateApp {
                                         }
                                     }
                                 });
-                                
                                 //Back up reponse of message group, so we can scroll to it later if the user thinks like it
                                 message_instances.push(message_group.response.clone());
 
@@ -338,7 +337,9 @@ impl TemplateApp {
     fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
         //If uuid is the server's we just include the image of the server
         if uuid == "00000000-0000-0000-0000-000000000000" {
-            ui.add(Image::new(egui::include_image!("../../../../../icons/server_white64.png")));
+            ui.add(Image::new(egui::include_image!(
+                "../../../../../icons/server_white64.png"
+            )));
 
             return;
         }

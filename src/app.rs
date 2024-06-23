@@ -286,7 +286,7 @@ impl backend::TemplateApp {
 
                             //Reset all messages and everything else
                             self.client_ui.incoming_msg = ServerMaster::default();
-                            
+
                             //Forget all imaes so the cahced imges will be deleted
                             ctx.forget_all_images();
 
