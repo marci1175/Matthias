@@ -14,7 +14,7 @@ use aes_gcm::{
     Aes256Gcm, Key,
 };
 use anyhow::{bail, ensure, Error, Result};
-use argon2::{Config, Variant, Version};
+use argon2::Config;
 use base64::engine::general_purpose;
 use base64::Engine;
 use rfd::FileDialog;
@@ -1746,16 +1746,7 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
 pub fn encrypt(string_to_be_encrypted: String) -> String {
     let password = string_to_be_encrypted.as_bytes();
     let salt = b"c1eaa94ec38ab7aa16e9c41d029256d3e423f01defb0a2760b27117ad513ccd2";
-    let config = Config {
-        variant: Variant::Argon2i,
-        version: Version::Version13,
-        mem_cost: 65536,
-        time_cost: 12,
-        lanes: 5,
-        secret: &[],
-        ad: &[],
-        hash_length: 64,
-    };
+    let config = Config::owasp1();
 
     argon2::hash_encoded(password, salt, &config).unwrap()
 }

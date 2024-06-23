@@ -57,16 +57,16 @@ impl eframe::App for backend::TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
             TODO: add scripting
-            TODO: fix audio playback
-            TODO: add notfications
-            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
+            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306: {
+                    TODO: fix audio playback
+                    TODO: add notfications
+                }
+            
+
             TODO: Discord like emoji :skull:
             TODO: Restructure files
-            TODO: make a loading wheel when loading a message / image / audio / etc
-            TODO: modify image downloading so theyre arent saved in a file
             TODO: implement instant banning in servers
             TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message
-            TODO: replace fixed key encryption, hash passwords
         */
 
         if self.main.register_mode {
