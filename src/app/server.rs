@@ -203,7 +203,6 @@ fn spawn_client_reader(
                 //Check if the thread needs to be shut down
                 _ = cancellation_token.cancelled() => {
                     //Send out shutdown messages to all the clients
-
                     //If thread has been cancelled break out of the loop, thus ending the thread
                     break;
                 }
@@ -263,15 +262,12 @@ async fn sync_message_with_clients(
     key: [u8; 32],
 ) -> anyhow::Result<()> {
     let mut connected_clients_locked = connected_clients
-        .try_lock()
-        .expect("Failed to lock connected client's list");
+    .lock().await;
 
     let server_master = ServerSync {
         message,
         user_seen_list: user_seen_list
-            .try_lock()
-            .expect("Failed to lock user seen list")
-            .to_vec(),
+        .lock().await.to_vec(),
     };
 
     let server_master_string = server_master.struct_into_string();
@@ -284,7 +280,7 @@ async fn sync_message_with_clients(
 
     for client in connected_clients_locked.iter_mut() {
         if let Some(client_handle) = &mut client.handle {
-            let mut client_handle = client_handle.try_lock()?;
+            let mut client_handle = dbg!(client_handle.lock().await);
 
             client_handle
                 .write_all(&message_lenght.to_be_bytes())
@@ -374,7 +370,7 @@ impl MessageService {
                                 .any(|item| *item == req.uuid)
                             {
                                 send_message_to_client(
-                                    &mut *client_handle.try_lock()?,
+                                    &mut *client_handle.lock().await,
                                     "You have been banned!".to_string(),
                                 )
                                 .await?;
@@ -387,7 +383,7 @@ impl MessageService {
                                     if client.uuid == req.uuid {
                                         //This can only happen if the connection closed unexpectedly (If the client was stopped unexpectedly)
                                         send_message_to_client(
-                                            &mut *client_handle.try_lock()?,
+                                            &mut *client_handle.lock().await,
                                             hex::encode(self.decryption_key),
                                         )
                                         .await?;
@@ -514,6 +510,8 @@ impl MessageService {
         //Check if user has been banned
         self.handle_banned_uuid(&req, &client_handle).await?;
 
+        println!("Handling msg!");
+        
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
             .connected_clients

@@ -454,8 +454,6 @@ impl TemplateApp {
         //This should only run when the connection is valid
         if let ConnectionState::Connected(connection_pair) = self.client_connection.state.clone() {
             self.server_sender_thread.get_or_insert_with(|| {
-                println!("Server sender thread");
-
                 //Clone so we can move it into the closure
                 let sender = self.server_output_sender.clone();
 
@@ -492,7 +490,6 @@ impl TemplateApp {
                                     Ok(response) => {
                                         //Check for special cases like server disconnecting
                                         if response == "Server disconnecting from client." {
-                                            println!("Server disconnected from client");
                                             break;
                                         }
 
@@ -549,7 +546,7 @@ impl TemplateApp {
 
                                 //We only send a sync packet if we need to
                                 //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                                match connection_pair.send_message(message.clone()).await {
+                                match dbg!(&connection_pair).send_message(message.clone()).await {
                                     Ok(_) => {},
                                     Err(err) => {
                                         dbg!(err);
