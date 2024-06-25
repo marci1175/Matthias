@@ -1,6 +1,7 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
+use tokio_util::sync::CancellationToken;
 use std::fs::{self};
 use tap::TapFallible;
 
@@ -55,6 +56,9 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if dbg!(self.autosync_shutdown_token.is_cancelled()) {
+
+        }
         /* TODOS:
             TODO: add scripting
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306: {
@@ -278,6 +282,9 @@ impl backend::TemplateApp {
 
                             let sender = self.connection_sender.clone();
 
+                            //Reset shutdown token
+                            self.autosync_shutdown_token = CancellationToken::new();
+                            
                             //Clone ctx so we can call request repaint from another thread
                             let ctx = ctx.clone();
 
@@ -378,7 +385,7 @@ impl backend::TemplateApp {
         let password = self.client_connection.password.clone();
 
         let uuid = self.opened_user_information.uuid.clone();
-        
+
         //Disconnect from server
         tokio::task::spawn(async move {
             match ClientConnection::disconnect(&mut connection, username, password, uuid).await {

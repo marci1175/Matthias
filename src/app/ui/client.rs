@@ -3,6 +3,7 @@ use egui::{
     Stroke,
 };
 use rodio::{Decoder, Sink};
+use tokio_util::sync::CancellationToken;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -482,8 +483,10 @@ impl TemplateApp {
                         select! {
                         //Recive input from main thread to shutdown
                             _ = shutdown_token.cancelled() => {
+                                println!("Reciver shut down");
                                 break;
                             },
+
                             reply = ServerReply::wait_for_response(server_reply_handle) => {
                                 match reply {
                                     //If we have a reponse from the server
@@ -530,7 +533,7 @@ impl TemplateApp {
                 //Spawn server syncer thread
                 tokio::spawn(async move {
                     loop {
-                        if shutdown_token_clone.is_cancelled() {
+                        if dbg!(shutdown_token_clone.is_cancelled()) {
                             break;
                         }
 
@@ -562,7 +565,6 @@ impl TemplateApp {
                             panic!("The message watning to be sent isnt a clientsyncmessage (as required), check what youve modified");
                         }
                     }
-
                 });
             });
 
@@ -764,8 +766,9 @@ impl TemplateApp {
                         }
                     } else {
                         //Signal the remaining thread to be shut down
-                        self.autosync_shutdown_token.cancel();
-
+                        // self.autosync_shutdown_token.cancel();
+                        // wtf? investigate
+                        
                         //Then the thread got an error, we should reset the state
                         dbg!("Client reciver or sync thread panicked");
                     }
