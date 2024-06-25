@@ -52,7 +52,8 @@ impl TemplateApp {
 }
 
 fn fetch_account(path_to_file: PathBuf, password: String) -> anyhow::Result<UserInformation> {
-    Ok(
-        UserInformation::deserialize(&std::fs::read_to_string(path_to_file)?, password)?
-    )
+    Ok(UserInformation::deserialize(
+        &std::fs::read_to_string(path_to_file)?,
+        password,
+    )?)
 }

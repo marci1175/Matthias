@@ -126,6 +126,7 @@ pub async fn server_main(
                     break;
                 }
                 connection = tcp_listener.accept() => {
+                    println!("Connection accepted");
                     connection?
                 }
             };
@@ -172,7 +173,6 @@ pub async fn server_main(
                 },
 
                 _ = cancellation_child_clone.cancelled() => {
-
                     //shutdown sync thread
                     break;
                 },
@@ -452,57 +452,51 @@ impl MessageService {
                         }
                         //Handle disconnections
                         ConnectionType::Disconnect => {
-                            match self.connected_clients.try_lock() {
-                                Ok(mut clients) => {
-                                    //Search for connected ip in all connected ips
-                                    for (index, client) in clients.clone().iter().enumerate() {
-                                        //If found, then disconnect the client
-                                        if client.uuid == req.uuid {
-                                            send_message_to_client(
-                                                &mut *client.handle.clone().unwrap().lock().await,
-                                                "Server disconnecting from client.".to_owned(),
-                                            )
-                                            .await?;
+                            let mut clients = self.connected_clients.lock().await;
+                            //Search for connected ip in all connected ips
+                            for (index, client) in clients.clone().iter().enumerate() {
+                                //If found, then disconnect the client
+                                if client.uuid == req.uuid {
+                                    send_message_to_client(
+                                        &mut *client.handle.clone().unwrap().lock().await,
+                                        "Server disconnecting from client.".to_owned(),
+                                    )
+                                    .await?;
 
-                                            clients.remove(index);
+                                    let client_handle = clients.remove(index);
+                                    
+                                    drop(client_handle);
 
-                                            let server_msg = ServerOutput {
-                                                replying_to: None,
-                                                message_type: ServerMessageType::Server(
-                                                    super::backend::ServerMessage::UserDisconnect(
-                                                        self.connected_clients_profile
-                                                            .lock()
-                                                            .await
-                                                            .get(&client.uuid)
-                                                            .unwrap()
-                                                            .clone(),
-                                                    ),
-                                                ),
-                                                author: "Server".to_string(),
-                                                message_date: {
-                                                    Utc::now().format("%Y.%m.%d. %H:%M").to_string()
-                                                },
-                                                uuid: String::from(
-                                                    "00000000-0000-0000-0000-000000000000",
-                                                ),
-                                            };
+                                    let server_msg = ServerOutput {
+                                        replying_to: None,
+                                        message_type: ServerMessageType::Server(
+                                            super::backend::ServerMessage::UserDisconnect(
+                                                self.connected_clients_profile
+                                                    .lock()
+                                                    .await
+                                                    .get(&client.uuid)
+                                                    .unwrap()
+                                                    .clone(),
+                                            ),
+                                        ),
+                                        author: "Server".to_string(),
+                                        message_date: {
+                                            Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                        },
+                                        uuid: String::from("00000000-0000-0000-0000-000000000000"),
+                                    };
 
-                                            self.messages.lock().await.push(server_msg.clone());
+                                    self.messages.lock().await.push(server_msg.clone());
 
-                                            sync_message_with_clients(
-                                                Arc::new(tokio::sync::Mutex::new(clients.clone())),
-                                                self.clients_last_seen_index.clone(),
-                                                server_msg,
-                                                self.decryption_key,
-                                            )
-                                            .await?;
+                                    sync_message_with_clients(
+                                        Arc::new(tokio::sync::Mutex::new(clients.clone())),
+                                        self.clients_last_seen_index.clone(),
+                                        server_msg,
+                                        self.decryption_key,
+                                    )
+                                    .await?;
 
-                                            return Err(Error::msg("Client disconnected!"));
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    dbg!(err);
+                                    return Err(Error::msg("Client disconnected!"));
                                 }
                             }
                         }
@@ -1017,7 +1011,7 @@ impl MessageService {
     pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
         //Create server folder, so we will have a place to put our uploads
         let _ = fs::create_dir(format!("{}\\matthias\\Server", env!("APPDATA")));
-        
+
         //Pattern match on upload tpye so we know how to handle the specific request
         match upload_type.extension.clone().unwrap_or_default().as_str() {
             "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,

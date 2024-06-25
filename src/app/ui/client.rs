@@ -454,6 +454,8 @@ impl TemplateApp {
         //This should only run when the connection is valid
         if let ConnectionState::Connected(connection_pair) = self.client_connection.state.clone() {
             self.server_sender_thread.get_or_insert_with(|| {
+                println!("Server sender thread");
+
                 //Clone so we can move it into the closure
                 let sender = self.server_output_sender.clone();
 
@@ -475,7 +477,7 @@ impl TemplateApp {
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
-                        let server_reply_message = &ServerReply {
+                        let server_reply_handle = &ServerReply {
                             reader: reader.clone(),
                         };
 
@@ -484,21 +486,24 @@ impl TemplateApp {
                             _ = shutdown_token.cancelled() => {
                                 break;
                             },
-                            reply = ServerReply::wait_for_response(server_reply_message) => {
+                            reply = ServerReply::wait_for_response(server_reply_handle) => {
                                 match reply {
                                     //If we have a reponse from the server
                                     Ok(response) => {
                                         //Check for special cases like server disconnecting
                                         if response == "Server disconnecting from client." {
+                                            println!("Server disconnected from client");
                                             break;
                                         }
 
                                         //Request repaint
                                         context_clone.request_repaint();
+                                        
                                         //Send to reciver
                                         sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
                                     },
                                     Err(err) => {
+                                        dbg!(&err);
                                         eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                         eprintln!("Early end of file error is a normal occurence after disconnecting");
                                         display_error_message(err);
@@ -508,9 +513,11 @@ impl TemplateApp {
                             }
                         }
                     }
+                    
                     //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                     let _ = sender_clone.send(None);
                 });
+
                 //Init sync message
                 let mut message = ClientMessage::construct_sync_msg(
                     &self.client_connection.password,

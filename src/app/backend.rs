@@ -1669,7 +1669,10 @@ impl UserInformation {
         let hashed_password = sha256::digest(self.password.clone());
         let encryption_key = hex::decode(hashed_password)?;
 
-        Ok(encrypt_aes256(serde_json::to_string(&self)?, &encryption_key)?)
+        Ok(encrypt_aes256(
+            serde_json::to_string(&self)?,
+            &encryption_key,
+        )?)
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
@@ -1677,9 +1680,10 @@ impl UserInformation {
         let hashed_password = sha256::digest(password);
         let encryption_key = hex::decode(hashed_password)?;
 
-        Ok(serde_json::from_str::<Self>(
-            &decrypt_aes256(serialized_struct, &encryption_key)?,
-        )?)
+        Ok(serde_json::from_str::<Self>(&decrypt_aes256(
+            serialized_struct,
+            &encryption_key,
+        )?)?)
     }
 
     /// Write file to the specified path
@@ -1735,7 +1739,9 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
 
     let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
 
-    let ciphertext = cipher.encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref()).map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+    let ciphertext = cipher
+        .encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref())
+        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
     let ciphertext = hex::encode(ciphertext);
 
     Ok(ciphertext)
@@ -1762,7 +1768,8 @@ pub fn login(username: String, password: String) -> Result<(UserInformation, Pat
 
     let path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
 
-    let file_contents: UserInformation = UserInformation::deserialize(&fs::read_to_string(&path)?, encrypt(password.clone()))?;
+    let file_contents: UserInformation =
+        UserInformation::deserialize(&fs::read_to_string(&path)?, encrypt(password.clone()))?;
 
     let user_check = username == file_contents.username;
 

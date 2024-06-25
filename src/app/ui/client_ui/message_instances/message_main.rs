@@ -59,42 +59,52 @@ impl TemplateApp {
                                 let message_group = ui.group(|ui| {
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-                                                if ui.add(egui::widgets::Button::new(RichText::from(format!("{}: {}",
-                                                self.client_ui.incoming_msg.struct_list[replied_to].author,
-                                                match &self.client_ui.incoming_msg.struct_list[replied_to].message_type {
-                                                    ServerMessageType::Deleted => "Deleted message".to_string(),
-                                                    ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
-                                                    ServerMessageType::Image(_img) => "Image".to_string(),
-                                                    ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                                    ServerMessageType::Normal(msg) => {
-                                                        let mut message_clone = msg.message.clone();
-                                                        if message_clone.clone().len() > 20 {
-                                                            message_clone.truncate(20);
-                                                            message_clone.push_str(" ...");
-                                                        }
-                                                        message_clone.to_string()
-                                                    },
-                                                    ServerMessageType::Server(server) => match server {
-                                                        crate::app::backend::ServerMessage::UserConnect(profile) => {
-                                                            format!("{} has connected", profile.username)
-                                                        },
-                                                        crate::app::backend::ServerMessage::UserDisconnect(profile) => {
-                                                            format!("{} has disconnected", profile.username)
-                                                        },
-                                                    },
-                                                    ServerMessageType::Edit(_) => unreachable!(),
-                                                    ServerMessageType::Reaction(_) => unreachable!(),
-                                                    ServerMessageType::Sync(_) => unreachable!(),
-                                            })
-                                            ).size(self.font_size / 1.5))
-                                                .frame(false))
-                                                    .clicked() {
-                                                        //implement scrolling to message
-                                                        self.client_ui.scroll_to_message_index = Some(replied_to);
-                                                    }
+
+                                                ui.horizontal(|ui| {
+                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_msg.struct_list[replied_to].uuid.clone(), ui);
+
+
+                                                if ui.add(egui::widgets::Button::new(
+                                                    RichText::from(
+                                                        format!("{}: {}",
+                                                            self.client_ui.incoming_msg.struct_list[replied_to].author,
+                                                            match &self.client_ui.incoming_msg.struct_list[replied_to].message_type {
+                                                                ServerMessageType::Deleted => "Deleted message".to_string(),
+                                                                ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
+                                                                ServerMessageType::Image(_img) => "Image".to_string(),
+                                                                ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
+                                                                ServerMessageType::Normal(msg) => {
+                                                                    let mut message_clone = msg.message.clone();
+                                                                    if message_clone.clone().len() > 20 {
+                                                                        message_clone.truncate(20);
+                                                                        message_clone.push_str(" ...");
+                                                                    }
+                                                                    message_clone.to_string()
+                                                                },
+                                                                ServerMessageType::Server(server) => match server {
+                                                                    crate::app::backend::ServerMessage::UserConnect(profile) => {
+                                                                        format!("{} has connected", profile.username)
+                                                                    },
+                                                                    crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                                                                        format!("{} has disconnected", profile.username)
+                                                                    },
+                                                                },
+                                                                ServerMessageType::Edit(_) => unreachable!(),
+                                                                ServerMessageType::Reaction(_) => unreachable!(),
+                                                                ServerMessageType::Sync(_) => unreachable!(),
+                                                            }
+                                                        )
+                                                    )
+                                                    .size(self.font_size / 1.5))
+                                                        .frame(false))
+                                                            .clicked() {
+                                                                //implement scrolling to message
+                                                                self.client_ui.scroll_to_message_index = Some(replied_to);
+                                                            }
+                                                });
+
                                             });
                                         }
-
                                         //Display author
                                         ui.horizontal(|ui| {
                                             //Profile picture
@@ -114,6 +124,7 @@ impl TemplateApp {
                                                 ui.label(RichText::from("(Edited)").strong());
                                             }
                                         }
+
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
                                                 //Check if there is a reaction list vector already allocated non the index of the specific message

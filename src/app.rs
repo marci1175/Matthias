@@ -61,7 +61,7 @@ impl eframe::App for backend::TemplateApp {
                     TODO: fix audio playback
                     TODO: add notfications
                 }
-            
+
 
             TODO: Discord like emoji :skull:
             TODO: Restructure files
@@ -114,7 +114,7 @@ impl eframe::App for backend::TemplateApp {
                 ui.label(RichText::from("Saved ip addresses"));
                 match UserInformation::deserialize(
                     &fs::read_to_string(self.opened_user_information.path.clone()).unwrap(),
-                    self.opened_user_information.password.clone()
+                    self.opened_user_information.password.clone(),
                 ) {
                     Ok(mut user_info) => {
                         if ui.button("Save ip address").clicked() {
@@ -185,11 +185,13 @@ impl eframe::App for backend::TemplateApp {
                     //Modify the base64 encoded string of send on ip, so it can be used in different places without having to re-encode every frame
                     self.client_ui.send_on_ip_base64_encoded =
                         general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
+
                     if let Ok(incoming_message) = incoming_sync_message {
                         self.client_ui.incoming_msg = incoming_message;
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
+
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;
@@ -239,7 +241,7 @@ impl backend::TemplateApp {
         ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                 ui.add_enabled_ui(
-                    matches!(self.client_connection.state, ConnectionState::Disconnected),
+                    matches!(self.client_connection.state, ConnectionState::Disconnected) ||matches!(self.client_connection.state, ConnectionState::Error),
                     |ui| {
                         ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                     },
@@ -263,8 +265,6 @@ impl backend::TemplateApp {
                             self.reset_client_connection();
                         }
                     }
-                    //this is what will get displayed if there sint a connection or the last connection attempt failed
-                    //Everything else (ConnectionState::Error)
                     _ => {
                         if ui.button("Connect").clicked() {
                             let ip = self.client_ui.send_on_ip.clone();
@@ -378,6 +378,7 @@ impl backend::TemplateApp {
         let password = self.client_connection.password.clone();
 
         let uuid = self.opened_user_information.uuid.clone();
+        
         //Disconnect from server
         tokio::task::spawn(async move {
             match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
