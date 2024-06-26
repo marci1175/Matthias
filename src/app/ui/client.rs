@@ -483,7 +483,6 @@ impl TemplateApp {
                         select! {
                         //Recive input from main thread to shutdown
                             _ = shutdown_token.cancelled() => {
-                                println!("Reciver shut down");
                                 break;
                             },
 
@@ -507,15 +506,16 @@ impl TemplateApp {
                                         eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                         eprintln!("Early end of file error is a normal occurence after disconnecting");
                                         display_error_message(err);
+
+                                        //Error appeared, after this the tread quits, so there arent an inf amount of threads running
+                                        let _ = sender_clone.send(None);
+
                                         break;
                                     },
                                 }
                             }
                         }
                     }
-                    
-                    //Error appeared, after this the tread quits, so there arent an inf amount of threads running
-                    let _ = sender_clone.send(None);
                 });
 
                 //Init sync message
@@ -533,14 +533,15 @@ impl TemplateApp {
                 //Spawn server syncer thread
                 tokio::spawn(async move {
                     loop {
-                        if dbg!(shutdown_token_clone.is_cancelled()) {
-                            break;
-                        }
-
                         //This patter match will always return true, the message were trying to pattern match is constructed above 
                         //We should update the message for syncing, so we will provide the latest info to the server
                         if let ClientMessageType::SyncMessage(inner) = &mut message.message_type {
                             tokio::time::sleep(Duration::from_secs(2)).await;
+
+                            //We should only check for the value after sleep
+                            if shutdown_token_clone.is_cancelled() {
+                                break;
+                            }
 
                             let index = *last_seen_message_index.lock().unwrap();
 
@@ -549,7 +550,7 @@ impl TemplateApp {
 
                                 //We only send a sync packet if we need to
                                 //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                                match dbg!(&connection_pair).send_message(message.clone()).await {
+                                match connection_pair.send_message(message.clone()).await {
                                     Ok(_) => {},
                                     Err(err) => {
                                         dbg!(err);
@@ -768,7 +769,7 @@ impl TemplateApp {
                         //Signal the remaining thread to be shut down
                         // self.autosync_shutdown_token.cancel();
                         // wtf? investigate
-                        
+
                         //Then the thread got an error, we should reset the state
                         dbg!("Client reciver or sync thread panicked");
                     }

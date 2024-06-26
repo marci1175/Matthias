@@ -56,9 +56,6 @@ impl eframe::App for backend::TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if dbg!(self.autosync_shutdown_token.is_cancelled()) {
-
-        }
         /* TODOS:
             TODO: add scripting
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306: {
@@ -227,9 +224,6 @@ impl backend::TemplateApp {
 
     /// This function resets clientconnection and all of its other attributes (self.client_ui.incoming_msg, self.autosync_should_run)
     fn reset_client_connection(&mut self) {
-        //Reset client, as we are already disconnecting above
-        self.client_connection.reset_state();
-
         self.client_ui.incoming_msg = ServerMaster::default();
 
         self.autosync_shutdown_token.cancel();
@@ -386,9 +380,12 @@ impl backend::TemplateApp {
 
         let uuid = self.opened_user_information.uuid.clone();
 
+        //Shut down threadsa nad reset state
+        self.reset_client_connection();
+
         //Disconnect from server
         tokio::task::spawn(async move {
-            match ClientConnection::disconnect(&mut connection, username, password, uuid).await {
+            match connection.disconnect(username, password, uuid).await {
                 Ok(_) => {}
                 Err(err) => {
                     display_error_message(err);
@@ -396,6 +393,7 @@ impl backend::TemplateApp {
             };
         });
 
-        self.reset_client_connection();
+        //Reset client, as we are already disconnecting above
+        self.client_connection.reset_state();
     }
 }

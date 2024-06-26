@@ -126,7 +126,6 @@ pub async fn server_main(
                     break;
                 }
                 connection = tcp_listener.accept() => {
-                    println!("Connection accepted");
                     connection?
                 }
             };
@@ -280,7 +279,7 @@ async fn sync_message_with_clients(
 
     for client in connected_clients_locked.iter_mut() {
         if let Some(client_handle) = &mut client.handle {
-            let mut client_handle = dbg!(client_handle.lock().await);
+            let mut client_handle = client_handle.lock().await;
 
             client_handle
                 .write_all(&message_lenght.to_be_bytes())
@@ -510,8 +509,6 @@ impl MessageService {
         //Check if user has been banned
         self.handle_banned_uuid(&req, &client_handle).await?;
 
-        println!("Handling msg!");
-        
         //if the client is not found in the list means we have not established a connection, thus an invalid packet (if the user enters a false password then this will return false because it didnt get added in the first part of this function)
         if self //Check if we have already established a connection with the client, if yes then it doesnt matter what password the user has entered
             .connected_clients
