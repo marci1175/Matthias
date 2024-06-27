@@ -761,6 +761,10 @@ impl TemplateApp {
                             }
                             Err(_err) => {
                                 display_error_message(message);
+
+                                //Assuming the connection is faulty we reset state
+                                self.reset_client_connection();
+                                self.client_connection.reset_state();
                             }
                         }
                     } else {
