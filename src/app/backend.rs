@@ -1231,10 +1231,16 @@ pub enum ServerMessageType {
     Server(ServerMessage),
 }
 
+/// The types of message the server can "send"
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum ServerMessage {
+    /// This is sent when a user is connected to the server
     UserConnect(ClientProfile),
+    /// This is sent when a user is disconnecting from the server
     UserDisconnect(ClientProfile),
+
+    /// This is sent when a user is banned from the server
+    UserBan(ClientProfile),
 }
 
 ///This struct contains all the reactions of one message
@@ -1669,10 +1675,10 @@ impl UserInformation {
         let hashed_password = sha256::digest(self.password.clone());
         let encryption_key = hex::decode(hashed_password)?;
 
-        Ok(encrypt_aes256(
+        encrypt_aes256(
             serde_json::to_string(&self)?,
             &encryption_key,
-        )?)
+        )
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self

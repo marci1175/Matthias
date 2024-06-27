@@ -28,7 +28,7 @@ use crate::app::backend::{
 };
 use rand::Rng;
 use std::sync::Mutex;
-use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, select};
+use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, select, task::JoinHandle};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -151,7 +151,7 @@ pub async fn server_main(
     let message_service_clone = msg_service.clone();
 
     //This thread keeps in sync with the ui, so the user can interact with the servers settings
-    tokio::spawn(async move {
+    let _: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             select! {
                 //We should only init a sync 3 secs
@@ -167,7 +167,20 @@ pub async fn server_main(
 
                     //Since we cant just rewrite the connected_clients we clear and then insert every
                     for (key, value) in connected_clients_server.into_iter() {
-                        connected_clients_profile_list.insert(key, value);
+                        connected_clients_profile_list.insert(key.clone(), value);
+                    }
+
+                    let mut clients = message_service_lock.connected_clients.lock().await;
+
+                    //Iter through connected clients
+                    for (idx, client) in clients.clone().iter().enumerate() {
+                        //Iter through banned uuids
+                        for banned_uuid in message_service_lock.shared_fields.lock().await.banned_uuids.lock().await.iter() {
+                            //If there is a matching uuid in the connected clients list and the banned uuids, we should disconnect using the handle
+                            if client.uuid == *banned_uuid {
+                                message_service_lock.handle_server_ban(client, &mut clients, idx).await?;
+                            }
+                        }
                     }
                 },
 
@@ -177,6 +190,7 @@ pub async fn server_main(
                 },
             }
         }
+        Ok(())
     });
 
     //Lock message service so we can access the fields
@@ -260,13 +274,11 @@ async fn sync_message_with_clients(
 
     key: [u8; 32],
 ) -> anyhow::Result<()> {
-    let mut connected_clients_locked = connected_clients
-    .lock().await;
+    let mut connected_clients_locked = connected_clients.lock().await;
 
     let server_master = ServerSync {
         message,
-        user_seen_list: user_seen_list
-        .lock().await.to_vec(),
+        user_seen_list: user_seen_list.lock().await.to_vec(),
     };
 
     let server_master_string = server_master.struct_into_string();
@@ -452,36 +464,9 @@ impl MessageService {
                             for (index, client) in clients.clone().iter().enumerate() {
                                 //If found, then disconnect the client
                                 if client.uuid == req.uuid {
-                                    send_message_to_client(
-                                        &mut *client.handle.clone().unwrap().lock().await,
-                                        "Server disconnecting from client.".to_owned(),
-                                    )
-                                    .await?;
-
-                                    let client_handle = clients.remove(index);
-                                    
-                                    drop(client_handle);
-
-                                    let server_msg = ServerOutput {
-                                        replying_to: None,
-                                        message_type: ServerMessageType::Server(
-                                            super::backend::ServerMessage::UserDisconnect(
-                                                self.connected_clients_profile
-                                                    .lock()
-                                                    .await
-                                                    .get(&client.uuid)
-                                                    .unwrap()
-                                                    .clone(),
-                                            ),
-                                        ),
-                                        author: "Server".to_string(),
-                                        message_date: {
-                                            Utc::now().format("%Y.%m.%d. %H:%M").to_string()
-                                        },
-                                        uuid: String::from("00000000-0000-0000-0000-000000000000"),
-                                    };
-
-                                    self.messages.lock().await.push(server_msg.clone());
+                                    let server_msg = self
+                                        .handle_server_disconnect(client, &mut clients, index)
+                                        .await?;
 
                                     sync_message_with_clients(
                                         Arc::new(tokio::sync::Mutex::new(clients.clone())),
@@ -651,6 +636,82 @@ impl MessageService {
         }
     }
 
+    async fn handle_server_disconnect(
+        &self,
+        client: &ConnectedClient,
+        clients: &mut tokio::sync::MutexGuard<'_, Vec<ConnectedClient>>,
+        index: usize,
+    ) -> Result<ServerOutput, Error> {
+        send_message_to_client(
+            &mut *client.handle.clone().unwrap().lock().await,
+            "Server disconnecting from client.".to_owned(),
+        )
+        .await?;
+
+        clients.remove(index);
+
+        let server_msg = ServerOutput {
+            replying_to: None,
+            message_type: ServerMessageType::Server(super::backend::ServerMessage::UserDisconnect(
+                self.connected_clients_profile
+                    .lock()
+                    .await
+                    .get(&client.uuid)
+                    .unwrap()
+                    .clone(),
+            )),
+            author: "Server".to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: String::from("00000000-0000-0000-0000-000000000000"),
+        };
+
+        self.messages.lock().await.push(server_msg.clone());
+
+        Ok(server_msg)
+    }
+
+    async fn handle_server_ban(
+        &self,
+        client: &ConnectedClient,
+        clients: &mut tokio::sync::MutexGuard<'_, Vec<ConnectedClient>>,
+        index: usize,
+    ) -> Result<ServerOutput, Error> {
+        let client_handle_clone = client.handle.clone().unwrap();
+
+        let mut client_handle = &mut *client_handle_clone.lock().await;
+        //Send ban message to client
+        send_message_to_client(&mut client_handle, "You have been banned!".to_owned()).await?;
+
+        //Signal disconnection
+        send_message_to_client(
+            &mut client_handle,
+            "Server disconnecting from client.".to_owned(),
+        )
+        .await?;
+
+        //Remove client
+        clients.remove(index);
+
+        let server_msg = ServerOutput {
+            replying_to: None,
+            message_type: ServerMessageType::Server(super::backend::ServerMessage::UserBan(
+                self.connected_clients_profile
+                    .lock()
+                    .await
+                    .get(&client.uuid)
+                    .unwrap()
+                    .clone(),
+            )),
+            author: "Server".to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+            uuid: String::from("00000000-0000-0000-0000-000000000000"),
+        };
+
+        self.messages.lock().await.push(server_msg.clone());
+
+        Ok(server_msg)
+    }
+
     async fn handle_banned_uuid(
         &self,
         req: &ClientMessage,
@@ -666,15 +727,11 @@ impl MessageService {
             .iter()
             .position(|item| *item == req.uuid)
         {
-            let mut client_handle = &mut *client_handle.try_lock()?;
+            let mut client_handle = &mut *client_handle.lock().await;
 
             send_message_to_client(&mut client_handle, "You have been banned!".to_string()).await?;
 
             self.connected_clients.lock().await.remove(idx);
-            self.connected_clients_profile
-                .lock()
-                .await
-                .remove(&req.uuid);
 
             //Signal disconnection
             send_message_to_client(

@@ -1,9 +1,9 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, RichText};
-use tokio_util::sync::CancellationToken;
 use std::fs::{self};
 use tap::TapFallible;
+use tokio_util::sync::CancellationToken;
 
 pub mod backend;
 
@@ -67,7 +67,6 @@ impl eframe::App for backend::TemplateApp {
             TODO: Discord like emoji :skull:
             TODO: Restructure files
             TODO: implement instant banning in servers
-            TODO: rewrite username sending, more specifically we should pair the uuid and the username so the client doesnt have to send a username every message
         */
 
         if self.main.register_mode {
@@ -192,7 +191,6 @@ impl eframe::App for backend::TemplateApp {
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
-
                 } else {
                     //If we recived a None it means we have an error
                     self.client_connection.state = ConnectionState::Error;
@@ -239,7 +237,8 @@ impl backend::TemplateApp {
         ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                 ui.add_enabled_ui(
-                    matches!(self.client_connection.state, ConnectionState::Disconnected) ||matches!(self.client_connection.state, ConnectionState::Error),
+                    matches!(self.client_connection.state, ConnectionState::Disconnected)
+                        || matches!(self.client_connection.state, ConnectionState::Error),
                     |ui| {
                         ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
                     },
@@ -278,7 +277,7 @@ impl backend::TemplateApp {
 
                             //Reset shutdown token
                             self.autosync_shutdown_token = CancellationToken::new();
-                            
+
                             //Clone ctx so we can call request repaint from another thread
                             let ctx = ctx.clone();
 

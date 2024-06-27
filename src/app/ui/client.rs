@@ -3,19 +3,18 @@ use egui::{
     Stroke,
 };
 use rodio::{Decoder, Sink};
-use tokio_util::sync::CancellationToken;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_audio, write_file, write_image, ClientMessage,
+    decrypt_aes256, display_error_message, write_audio, write_file, ClientMessage,
     ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
     ServerSync,
 };
 
-use crate::app::backend::{SearchType, ServerImageReply, ServerMessageType, TemplateApp};
+use crate::app::backend::{SearchType, ServerMessageType, TemplateApp};
 use crate::app::client::ServerReply;
 
 impl TemplateApp {
@@ -497,7 +496,6 @@ impl TemplateApp {
 
                                         //Request repaint
                                         context_clone.request_repaint();
-                                        
                                         //Send to reciver
                                         sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
                                     },

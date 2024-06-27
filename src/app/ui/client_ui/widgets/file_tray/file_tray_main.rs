@@ -136,6 +136,9 @@ impl TemplateApp {
                                                 crate::app::backend::ServerMessage::UserDisconnect(profile) => {
                                                     format!("{} has disconnected", profile.username)
                                                 },
+                                                crate::app::backend::ServerMessage::UserBan(profile) => {
+                                                    format!("{} has been banned", profile.username)
+                                                },
                                             },
                                             ServerMessageType::Edit(_) => unreachable!(),
                                             ServerMessageType::Reaction(_) => unreachable!(),
