@@ -62,11 +62,8 @@ impl eframe::App for backend::TemplateApp {
                     TODO: fix audio playback
                     TODO: add notfications
                 }
-
-
             TODO: Discord like emoji :skull:
             TODO: Restructure files
-            TODO: implement instant banning in servers
         */
 
         if self.main.register_mode {
