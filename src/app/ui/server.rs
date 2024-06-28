@@ -139,7 +139,9 @@ impl TemplateApp {
                         )));
                     }
 
-                    ui.label("Connected users");
+                    ui.separator();
+
+                    ui.label("Clients' profiles");
                     //Display connected users, with a Table
                     ui.allocate_ui(vec2(ui.available_width(), 200.), |ui| {
                         TableBuilder::new(ui)

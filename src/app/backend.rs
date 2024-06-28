@@ -1675,10 +1675,7 @@ impl UserInformation {
         let hashed_password = sha256::digest(self.password.clone());
         let encryption_key = hex::decode(hashed_password)?;
 
-        encrypt_aes256(
-            serde_json::to_string(&self)?,
-            &encryption_key,
-        )
+        encrypt_aes256(serde_json::to_string(&self)?, &encryption_key)
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self

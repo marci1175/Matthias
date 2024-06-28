@@ -1,4 +1,3 @@
-
 use crate::app::backend::{display_error_message, login};
 
 use crate::app::backend::TemplateApp;

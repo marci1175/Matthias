@@ -493,11 +493,16 @@ impl MessageService {
 
         //If a client manages to stay connected after being banned this check should server as protection
         //This will check if the sender's uuid is in the connected client's list, which it should be since the client needs to connect to the server (Sending information), before being allowed to send a message
-        if !self.connected_clients.lock().await.iter().any(|client| client.uuid == req.uuid) {
+        if !self
+            .connected_clients
+            .lock()
+            .await
+            .iter()
+            .any(|client| client.uuid == req.uuid)
+        {
             let mut client_handle = &mut *client_handle.try_lock()?;
             //Disconnect from the client for real, and send an error message
-            send_message_to_client(&mut client_handle, "Failed to authenticate!".into())
-                    .await?;
+            send_message_to_client(&mut client_handle, "Failed to authenticate!".into()).await?;
 
             client_handle.shutdown().await?;
         }
@@ -699,7 +704,7 @@ impl MessageService {
             "Server disconnecting from client.".to_owned(),
         )
         .await?;
-        
+
         //Shutdown client connection
         client_handle.shutdown().await?;
 
