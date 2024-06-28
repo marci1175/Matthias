@@ -2,6 +2,7 @@ use crate::app::backend::{ClientMessage, ConnectionState, MessagingMode, Templat
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::epaint::text::cursor::Cursor;
+use egui::menu::SubMenuButton;
 use egui::text::{CCursor, CursorRange};
 use egui::{
     vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout,
@@ -225,15 +226,19 @@ impl TemplateApp {
                     }
 
                     //Emoji button
-                    let button = ui.add(Button::new(
-                        RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
-                    ));
+                    let emoji_button = ui.menu_button(RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2), |ui| {
+                        //Main emoji tabs
+                        ui.horizontal_top(|ui| {
+                            // ui.selectable_value(current_value, selected_value, "Turtle");
+                        });
 
-                    if button.clicked() {
+                    });
+
+                    if emoji_button.response.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
                     };
 
-                    if button.hovered() {
+                    if emoji_button.response.hovered() {
                         if !self.client_ui.random_generated {
                             let random_number = self
                                 .client_ui
