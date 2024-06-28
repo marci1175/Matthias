@@ -280,7 +280,6 @@ pub struct Client {
     // #[serde(skip)]
     // ///Shows which tabs is selected in the emoji tab
     // pub emoji_tab_state: EmojiTab,
-
     #[serde(skip)]
     ///Fields shared with the client
     pub shared_fields: Arc<Mutex<SharedFields>>,

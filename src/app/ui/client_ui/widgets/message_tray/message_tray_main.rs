@@ -226,13 +226,15 @@ impl TemplateApp {
                     }
 
                     //Emoji button
-                    let emoji_button = ui.menu_button(RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2), |ui| {
-                        //Main emoji tabs
-                        ui.horizontal_top(|ui| {
-                            // ui.selectable_value(current_value, selected_value, "Turtle");
-                        });
-
-                    });
+                    let emoji_button = ui.menu_button(
+                        RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
+                        |ui| {
+                            //Main emoji tabs
+                            ui.horizontal_top(|ui| {
+                                // ui.selectable_value(current_value, selected_value, "Turtle");
+                            });
+                        },
+                    );
 
                     if emoji_button.response.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
