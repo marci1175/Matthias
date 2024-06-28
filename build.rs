@@ -1,5 +1,15 @@
 use chrono::{Duration, Utc};
 use std::fs;
+
+struct AnimatedBlobs {
+    name: String,
+    bytes: &'static [u8],
+}
+
+struct Emojis {
+    animated_blobs: Vec<AnimatedBlobs>
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
