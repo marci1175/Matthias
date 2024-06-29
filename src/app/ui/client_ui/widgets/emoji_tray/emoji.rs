@@ -1,18 +1,9 @@
-use std::collections::BTreeMap;
+use egui::{vec2, Image, ImageButton, RichText};
+use std::{any::Any, collections::BTreeMap};
+
+include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
 use crate::app::backend;
-fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String> {
-    ui.fonts(|f| {
-        f.lock()
-            .fonts
-            .font(&egui::FontId::new(10.0, family)) // size is arbitrary for getting the characters
-            .characters()
-            .iter()
-            .filter(|chr| !chr.is_whitespace() && !chr.is_ascii_control())
-            .map(|&chr| (chr, char_name(chr)))
-            .collect()
-    })
-}
 
 fn char_name(chr: char) -> String {
     special_char_name(chr)
@@ -175,45 +166,252 @@ impl backend::TemplateApp {
         })
     }
 
-    pub fn window_emoji(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Character set")
-            .open(&mut self.main.emoji_mode)
-            .collapsible(false)
-            .show(ctx, |ui| {
-                ui.label("Click to paste".to_string());
-
-                let filter = &self.filter;
-                let named_chars = self
-                    .named_chars
-                    .entry(egui::FontFamily::Monospace)
-                    .or_insert_with(|| available_characters(ui, egui::FontFamily::Monospace));
+    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<Option<()>> {
+        let emoji_button = ui.menu_button(
+            RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
+            |ui| {
+                //Main emoji tabs
+                ui.horizontal_top(|ui| {
+                    for emoji_type in EMOJIS.emoji_types.iter() {
+                        match emoji_type {
+                            EmojiTypes::AnimatedBlobs(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::AnimatedBlobs,
+                                "Animated Blobs",
+                            ),
+                            EmojiTypes::Blobs(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::Blobs,
+                                "Blobs",
+                            ),
+                            EmojiTypes::Icons(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::Icons,
+                                "Icons",
+                            ),
+                            EmojiTypes::Letters(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::Letters,
+                                "Letters",
+                            ),
+                            EmojiTypes::Numbers(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::Numbers,
+                                "Numbers",
+                            ),
+                            EmojiTypes::Turtles(_) => ui.selectable_value(
+                                &mut self.client_ui.emoji_tab_state,
+                                backend::EmojiTypesDiscriminants::Turtles,
+                                "Turtles",
+                            ),
+                        };
+                    }
+                });
 
                 ui.separator();
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
+                match self.client_ui.emoji_tab_state {
+                    backend::EmojiTypesDiscriminants::AnimatedBlobs => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::AnimatedBlobs(animated_blobs) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for animated_blob in animated_blobs {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", animated_blob.name),
+                                                    animated_blob.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
 
-                        for (&chr, name) in named_chars {
-                            if filter.is_empty()
-                                || name.contains(filter)
-                                || *filter == chr.to_string()
-                            {
-                                let button = egui::Button::new(
-                                    egui::RichText::new(chr.to_string()).font(egui::FontId {
-                                        size: self.font_size,
-                                        family: egui::FontFamily::Proportional,
-                                    }),
-                                )
-                                .frame(false);
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &animated_blob.name),
+                                                );
 
-                                if ui.add(button).clicked() {
-                                    self.client_ui.usr_msg.push(chr);
-                                }
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
                             }
                         }
-                    });
-                });
-            });
+                    }
+                    backend::EmojiTypesDiscriminants::Blobs => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::Blobs(blobs) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for blob in blobs {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", blob.name),
+                                                    blob.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
+
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &blob.name),
+                                                );
+
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    backend::EmojiTypesDiscriminants::Icons => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::Icons(icons) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for icon in icons {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", icon.name),
+                                                    icon.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
+
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &icon.name),
+                                                );
+
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    backend::EmojiTypesDiscriminants::Letters => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::Letters(letters) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for letter in letters {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", letter.name),
+                                                    letter.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
+
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &letter.name),
+                                                );
+
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    backend::EmojiTypesDiscriminants::Numbers => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::Numbers(numbers) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for number in numbers {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", number.name),
+                                                    number.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
+
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &number.name),
+                                                );
+
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    backend::EmojiTypesDiscriminants::Turtles => {
+                        for emoji_type in EMOJIS.emoji_types.iter() {
+                            if let EmojiTypes::Turtles(turtles) = emoji_type {
+                                ui.horizontal_wrapped(|ui| {
+                                    for turtle in turtles {
+                                        ui.allocate_ui(vec2(30., 30.), |ui| {
+                                            if ui
+                                                .add(ImageButton::new(Image::from_bytes(
+                                                    format!("bytes://{}", turtle.name),
+                                                    turtle.bytes,
+                                                )))
+                                                .clicked()
+                                            {
+                                                let is_inserting_front =
+                                                    self.client_ui.text_edit_cursor_index
+                                                        == self.client_ui.message_edit_buffer.len();
+
+                                                self.client_ui.message_edit_buffer.insert_str(
+                                                    self.client_ui.text_edit_cursor_index,
+                                                    &format!(":{}:", &turtle.name),
+                                                );
+
+                                                if is_inserting_front {
+                                                    self.client_ui.text_edit_cursor_index =
+                                                        self.client_ui.message_edit_buffer.len();
+                                                }
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            },
+        );
+        emoji_button
     }
 }

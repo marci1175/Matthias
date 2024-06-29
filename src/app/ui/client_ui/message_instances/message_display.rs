@@ -4,7 +4,7 @@ use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense,
 use regex::Regex;
 
 use crate::app::backend::{
-    write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp,
+    parse_incoming_message, write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp
 };
 use rodio::{Decoder, Source};
 
@@ -39,97 +39,12 @@ impl TemplateApp {
                     });
                 }
             }
-            crate::app::backend::ServerMessageType::Normal(inner_message) => {
-                if (inner_message.message.contains('[') && inner_message.message.contains(']'))
-                    && (inner_message.message.contains('(') && inner_message.message.contains(')'))
-                {
-                    let regex =
-                        Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
-
-                    let mut captures: Vec<String> = Vec::new();
-
-                    for capture in regex.captures_iter(&inner_message.message) {
-                        //We iterate over all the captures
-                        for i in 1..capture.len() {
-                            //We push back the captures into the captures vector
-                            captures.push(capture[i].to_string());
-                        }
+            crate::app::backend::ServerMessageType::Normal(message) => {
+                ui.horizontal(|ui| {
+                    for message in parse_incoming_message(message.message.clone()) {
+                        message.display(ui);
                     }
-
-                    if captures.is_empty() {
-                        ui.label(RichText::from(&inner_message.message).size(self.font_size));
-                    } else {
-                        ui.horizontal(|ui| {
-                            let inner_message_clone = inner_message.message.clone();
-
-                            let temp = inner_message_clone.split_whitespace().collect::<Vec<_>>();
-
-                            for item in temp.iter() {
-                                if let Some(capture) = regex.captures(item) {
-                                    // capture[0] combined
-                                    // capture[1] disp
-                                    // capture[2] URL
-                                    ui.hyperlink_to(
-                                        RichText::from(capture[1].to_string()).size(self.font_size),
-                                        capture[2].to_string(),
-                                    );
-                                } else {
-                                    ui.label(RichText::from(*item).size(self.font_size));
-                                }
-                            }
-                        });
-                    }
-                } else if let Some(index) = inner_message.message.find('@') {
-                    let whole_tag = inner_message.message[index + 1..]
-                        .split_whitespace()
-                        .collect::<Vec<&str>>();
-
-                    let name_sent_to = whole_tag.first();
-                    ui.label(
-                        RichText::from(&inner_message.message)
-                            .size(self.font_size)
-                            .color({
-                                if let Some(tagged_name) = name_sent_to {
-                                    if *tagged_name == self.opened_user_information.username {
-                                        Color32::YELLOW
-                                    } else {
-                                        Color32::GRAY
-                                    }
-                                } else {
-                                    Color32::GRAY
-                                }
-                            }),
-                    );
-                } else if inner_message.message.contains('#')
-                    && inner_message.message.rmatches('#').count() <= 5
-                {
-                    let split_lines = inner_message.message.rsplit_once('#').unwrap();
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::from(split_lines.0.replace('#', "")).size(self.font_size),
-                        );
-                        ui.label(
-                            RichText::from(split_lines.1).strong().size(
-                                self.font_size
-                                    * match inner_message
-                                        .message
-                                        .rmatches('#')
-                                        .collect::<Vec<&str>>()
-                                        .len()
-                                    {
-                                        1 => 2.0,
-                                        2 => 1.8,
-                                        3 => 1.6,
-                                        4 => 1.4,
-                                        5 => 1.2,
-                                        _ => 1.,
-                                    } as f32,
-                            ),
-                        );
-                    });
-                } else {
-                    ui.label(RichText::from(&inner_message.message).size(self.font_size));
-                }
+                });
             }
             crate::app::backend::ServerMessageType::Image(picture) => {
                 ui.allocate_ui(vec2(300., 300.), |ui| {

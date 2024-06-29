@@ -81,11 +81,6 @@ impl eframe::App for backend::TemplateApp {
             self.state_client(_frame, ctx);
         }
 
-        //character picker
-        if self.main.emoji_mode && self.main.client_mode {
-            self.window_emoji(ctx);
-        }
-
         //Create value
         let mut settings_window = self.settings_window;
 

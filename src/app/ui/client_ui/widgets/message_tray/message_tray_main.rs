@@ -2,10 +2,9 @@ use crate::app::backend::{ClientMessage, ConnectionState, MessagingMode, Templat
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::epaint::text::cursor::Cursor;
-use egui::menu::SubMenuButton;
 use egui::text::{CCursor, CursorRange};
 use egui::{
-    vec2, Align, Align2, Area, Button, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout,
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Key, KeyboardShortcut, Layout,
     Modifiers, RichText, Rounding, Stroke,
 };
 use rand::Rng;
@@ -34,7 +33,7 @@ impl TemplateApp {
         let mut frame_ui = ui.child_ui(code_rect, Layout::default());
 
         /*We have to clone here because of the closure*/
-        let user_message_clone = self.client_ui.usr_msg.clone();
+        let user_message_clone = self.client_ui.message_edit_buffer.clone();
 
         //We will reconstruct the buffer
         let mut split = user_message_clone.split('@').collect::<Vec<_>>();
@@ -51,7 +50,7 @@ impl TemplateApp {
                 if self.client_ui.display_user_list {
                     ctx.input_mut(|reader| {
                         //Clone var to avoid error
-                        let user_message_clone = self.client_ui.usr_msg.clone();
+                        let user_message_clone = self.client_ui.message_edit_buffer.clone();
 
                         //We will reconstruct the buffer
                         let mut split = user_message_clone.split('@').collect::<Vec<_>>();
@@ -93,7 +92,7 @@ impl TemplateApp {
                                     let split_concat = split.join("@");
 
                                     //Set the buffer to the concatenated vector, append the @ to the 0th index
-                                    self.client_ui.usr_msg = split_concat;
+                                    self.client_ui.message_edit_buffer = split_concat;
                                 }
                             };
                         }
@@ -103,7 +102,7 @@ impl TemplateApp {
         }
 
         //Create widget
-        let text_widget = egui::TextEdit::multiline(&mut self.client_ui.usr_msg)
+        let text_widget = egui::TextEdit::multiline(&mut self.client_ui.message_edit_buffer)
             .font(FontId {
                 size: self.font_size,
                 family: FontFamily::default(),
@@ -123,7 +122,12 @@ impl TemplateApp {
             .show(&mut frame_ui, |ui| {
                 let mut text_widget = text_widget.show(ui);
 
-                if let Some(cursor) = self.client_ui.text_edit_cursor {
+                if let Some(cursor_rng) = text_widget.cursor_range {
+                    self.client_ui.text_edit_cursor_index =
+                        cursor_rng.as_ccursor_range().sorted()[0].index;
+                }
+
+                if let Some(cursor) = self.client_ui.text_edit_cursor_desired_index {
                     text_widget.cursor_range = Some(CursorRange::one(Cursor {
                         ccursor: CCursor::new(cursor),
                         ..Default::default()
@@ -170,20 +174,24 @@ impl TemplateApp {
                                 reader.consume_key(Modifiers::SHIFT, Key::Enter)
                             }))
                     {
-                        if !(self.client_ui.usr_msg.trim().is_empty()
-                            || self.client_ui.usr_msg.trim_end_matches('\n').is_empty())
+                        if !(self.client_ui.message_edit_buffer.trim().is_empty()
+                            || self
+                                .client_ui
+                                .message_edit_buffer
+                                .trim_end_matches('\n')
+                                .is_empty())
                         {
                             match self.client_ui.messaging_mode {
                                 MessagingMode::Edit(index) => {
                                     self.send_msg(ClientMessage::construct_client_message_edit(
                                         index,
-                                        Some(self.client_ui.usr_msg.clone()),
+                                        Some(self.client_ui.message_edit_buffer.clone()),
                                         &self.opened_user_information.uuid,
                                     ))
                                 }
                                 //If its reply or normal mode we can just send the message and call get_reply_index on it
                                 _ => self.send_msg(ClientMessage::construct_normal_msg(
-                                    &self.client_ui.usr_msg,
+                                    &self.client_ui.message_edit_buffer,
                                     &self.opened_user_information.uuid,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 )),
@@ -204,7 +212,7 @@ impl TemplateApp {
                         //clear vectors
                         self.client_ui.files_to_send.clear();
                         self.client_ui.messaging_mode = MessagingMode::Normal;
-                        self.client_ui.usr_msg.clear();
+                        self.client_ui.message_edit_buffer.clear();
                     }
 
                     //add file button
@@ -226,15 +234,7 @@ impl TemplateApp {
                     }
 
                     //Emoji button
-                    let emoji_button = ui.menu_button(
-                        RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
-                        |ui| {
-                            //Main emoji tabs
-                            ui.horizontal_top(|ui| {
-                                // ui.selectable_value(current_value, selected_value, "Turtle");
-                            });
-                        },
-                    );
+                    let emoji_button = self.draw_emoji_selector(ui);
 
                     if emoji_button.response.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;
@@ -327,7 +327,11 @@ impl TemplateApp {
     }
 
     fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
-        let split_user_msg = self.client_ui.usr_msg.split(['@']).collect::<Vec<_>>();
+        let split_user_msg = self
+            .client_ui
+            .message_edit_buffer
+            .split(['@'])
+            .collect::<Vec<_>>();
 
         //If the user didnt type @ || if the seen list is empty
         if split_user_msg.len() - 1 == 0 {

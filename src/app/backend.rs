@@ -1,8 +1,9 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
-use egui::Rect;
+use egui::{vec2, Image, Rect, Response, RichText, Ui};
 use image::DynamicImage;
 use rand::rngs::ThreadRng;
+use regex::Regex;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -272,21 +273,37 @@ impl TemplateApp {
     }
 }
 
+//Include emoji image header file
+include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
+
+//Define a deafult for the discriminant
+impl Default for EmojiTypesDiscriminants {
+    fn default() -> Self {
+        EmojiTypesDiscriminants::Blobs
+    }
+}
+
 /*Children structs*/
 ///Children struct
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
-    // #[serde(skip)]
-    // ///Shows which tabs is selected in the emoji tab
-    // pub emoji_tab_state: EmojiTab,
+    #[serde(skip)]
+    /// Shows which tabs is selected in the emoji tab
+    /// This is enum is included with the generated emoji image header
+    pub emoji_tab_state: EmojiTypesDiscriminants,
+
     #[serde(skip)]
     ///Fields shared with the client
     pub shared_fields: Arc<Mutex<SharedFields>>,
 
     ///When a text_edit_cursor move has been requested this value is a Some
     #[serde(skip)]
-    pub text_edit_cursor: Option<usize>,
+    pub text_edit_cursor_desired_index: Option<usize>,
+
+    ///This value shows where the text edit cursor is, if the ```TextEdit``` widget is exited the value will remain
+    #[serde(skip)]
+    pub text_edit_cursor_index: usize,
 
     ///The rect of the connected users list (which gets displayed when pressing the @)
     #[serde(skip)]
@@ -378,7 +395,7 @@ pub struct Client {
 
     ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
-    pub usr_msg: String,
+    pub message_edit_buffer: String,
 
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
@@ -406,8 +423,10 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            emoji_tab_state: EmojiTypesDiscriminants::Blobs,
             shared_fields: Default::default(),
-            text_edit_cursor: None,
+            text_edit_cursor_desired_index: None,
+            text_edit_cursor_index: 0,
             messaging_mode: MessagingMode::Normal,
             connected_users_display_rect: None,
 
@@ -446,7 +465,7 @@ impl Default for Client {
             random_generated: false,
 
             //msg
-            usr_msg: String::new(),
+            message_edit_buffer: String::new(),
             incoming_msg: ServerMaster::default(),
 
             voice_recording_start: None,
@@ -1929,13 +1948,112 @@ where
     Ok(u32::from_be_bytes(buf[..4].try_into()?))
 }
 
-// /// This struct contains the important info for the server's listener to modify the SharedFields
-// pub struct ModifySharedFields {
-//     pub action_type: ActionType,
+pub struct Message {
+    pub inner_message: MessageDisplay,
+    pub size: f32,
+}
 
-// }
+impl Message {
+    pub fn display(&self, ui: &mut Ui) -> Response {
+        match &self.inner_message {
+            MessageDisplay::Text(inner) => ui.label(RichText::from(inner).size(self.size)),
+            MessageDisplay::Emoji(inner) => ui.allocate_ui(vec2(self.size, self.size), |ui| {
+                ui.add(Image::from_uri(format!("bytes://{}", inner.name.replace(":", ""))));
+            }).response,
+            MessageDisplay::Link(inner) => ui.hyperlink_to(RichText::from(inner.display_name.clone()).size(self.size), inner.destination.clone()),
+        }
+    }
+}
 
-// pub enum ActionType {
-//     Add(Option<usize>),
-//     Remove(Option<usize>)
-// }
+pub fn parse_incoming_message(mut rhs: String) -> Vec<Message> {
+    let mut message_stack: Vec<Message> = Vec::new();
+    //This regex captures links
+    let link_capturing_regex =
+    Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
+
+    //This regex captures emojis
+    let emoji_capturing_regex = Regex::new(":(.*?):").unwrap();
+
+    //Create regex where it captures the #-s in the beginning or after \n-s
+    let header_capturing_regex = Regex::new(r"(^|\n\s*)(#+)(.*)").unwrap();
+
+    //Create captures in string
+    let header_levels_lines: Vec<(usize, String)> = header_capturing_regex
+        .captures_iter(&rhs)
+        .into_iter()
+        .map(|capture| (capture[2].len(), capture[3].to_string()))
+        .collect();
+
+    //Iter through header levels where each part of the string gets its own (optional) header level
+    'header_iter: for (header_level, message_part) in &header_levels_lines {
+        //Parse for links and emojis
+
+        //Parse for links
+        for (label, destination) in link_capturing_regex.captures_iter(&message_part.clone()).map(|captures| (captures[1].to_string(), captures[2].to_string())) {
+            if *header_level > 5 {
+                message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: format!("{}{label}", "#".repeat(*header_level)), destination }), size: 20. * (1. + 1. / *header_level as f32)});
+
+                continue;
+            }
+            
+            message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: label, destination }), size: 20. * (1. + 1. / *header_level as f32)});
+
+            continue 'header_iter;
+        }
+
+        //Parse for emojis
+        for emoji_name in emoji_capturing_regex.captures_iter(message_part).map(|capture| capture[1].to_string()) {
+            if *header_level > 5 {
+                message_stack.push(Message { inner_message: MessageDisplay::Text("#".repeat(*header_level)), size: 20.});
+                message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name}), size: 20.});
+
+                continue;
+            }
+
+            message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name}), size: 20. * (1. + 1. / *header_level as f32)});
+
+            continue 'header_iter;
+        }
+
+        //Parse for normal text
+        if *header_level > 5 {
+            message_stack.push(Message {inner_message: MessageDisplay::Text(format!("{}{}", "#".repeat(*header_level), message_part)), size: 20.});
+
+            continue;
+        }
+
+        message_stack.push(Message {inner_message: MessageDisplay::Text(message_part.trim().to_string()), size: 20. * (1. + 1. / *header_level as f32)});
+    }
+
+    //Parse for links
+    for (label, destination) in link_capturing_regex.captures_iter(&rhs.clone()).map(|captures| (captures[1].to_string(), captures[2].to_string())) {
+        message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: label.clone(), destination: destination.clone() }), size: 20.});
+        rhs = rhs.replacen(&format!("[{}]({})", label, destination), "", 1);
+    }
+
+    //Parse for emojis
+    for emoji_name in emoji_capturing_regex.captures_iter(&rhs.clone()).map(|capture| capture[1].to_string()) {
+        message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name.clone()}), size: 20.});
+
+        rhs = rhs.replacen(&format!(":{emoji_name}:"), "", 1);
+    }
+
+    message_stack.push(Message {inner_message: MessageDisplay::Text(rhs.trim().to_string()), size: 20.});
+
+    message_stack
+}
+
+pub enum MessageDisplay {
+    Text(String),
+    Emoji(EmojiDisplay),
+    Link(HyperLink),
+}
+
+pub struct EmojiDisplay {
+    pub name: String,
+}
+
+pub struct HyperLink {
+    pub display_name: String,
+    pub destination: String,
+}
