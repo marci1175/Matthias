@@ -1,12 +1,12 @@
-use std::{fs, path::PathBuf};
+use std::{fs, ops::ControlFlow, path::PathBuf};
 
 use egui::{
     style::Spacing, vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui,
 };
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, ClientMessage, ServerFileReply, ServerImageUpload,
-    TemplateApp,
+    parse_incoming_message, write_file, ClientMessage, MessageDisplay, ServerFileReply,
+    ServerImageUpload, TemplateApp,
 };
 use rodio::{Decoder, Source};
 
@@ -42,11 +42,31 @@ impl TemplateApp {
                 }
             }
             crate::app::backend::ServerMessageType::Normal(message) => {
-                ui.horizontal_wrapped(|ui| {
-                    for message in parse_incoming_message(message.message.clone()) {
-                        message.display(ui);
+                let messages = parse_incoming_message(message.message.clone());
+                let mut messages_iter = messages.iter();
+
+                'mainloop: loop {
+                    let mut cont = false;
+
+                    ui.horizontal_wrapped(|ui| {
+                        while let Some(message) = messages_iter.next() {
+                            //If there is a newline in the messages vector we need to break out of the horizontal wrapped "loop", so well keep drawing in the next line
+                            if message.inner_message == MessageDisplay::NewLine {
+                                cont = true;
+                                return;
+                            }
+
+                            message.display(ui);
+                        }
+                    });
+
+                    if cont {
+                        continue 'mainloop;
                     }
-                });
+
+                    //Break when we have finished iterating over the messages
+                    break;
+                }
             }
             crate::app::backend::ServerMessageType::Image(picture) => {
                 ui.allocate_ui(vec2(300., 300.), |ui| {

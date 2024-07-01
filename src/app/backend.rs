@@ -1976,6 +1976,7 @@ impl Message {
                 RichText::from(inner.label.clone()).size(self.size),
                 inner.destination.clone(),
             ),
+            MessageDisplay::NewLine => unreachable!(),
         }
     }
 }
@@ -1988,7 +1989,7 @@ struct RegexMatch {
     end_idx: usize,
 
     //This field is used when we are iterating over a series of regexes, and we want to know why pattern the said string is matched by
-    regex_type: usize,
+    regex_type: MessageDisplayDiscriminants,
 
     //The inner string
     capture: String,
@@ -2007,10 +2008,22 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
     let regexes = vec![
         //This regex captures links
         //We should scan for links first
-        Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap(),
+        (
+            MessageDisplayDiscriminants::Link,
+            Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap(),
+        ),
         //This regex captures emojis
         //We should scan for emojis secondly
-        Regex::new(":(.*?):").unwrap(),
+        (
+            MessageDisplayDiscriminants::Emoji,
+            Regex::new(":(.*?):").unwrap(),
+        ),
+        //This regex captures newlines
+        //It doesnt matter when we scan for newlines as theyre not affected by anything
+        (
+            MessageDisplayDiscriminants::NewLine,
+            Regex::new(r".*\n").unwrap(),
+        ),
     ];
 
     //Create captures in string
@@ -2045,7 +2058,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
 
         match regex_match.regex_type {
             //This was matches by the emoji capturing Regex
-            1 => message_stack.push(Message {
+            MessageDisplayDiscriminants::Emoji => message_stack.push(Message {
                 inner_message: MessageDisplay::Emoji(EmojiDisplay {
                     name: regex_match.capture,
                 }),
@@ -2053,7 +2066,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
             }),
 
             //This was matched by the link capturing regex
-            0 => {
+            MessageDisplayDiscriminants::Link => {
                 let label_regex = Regex::new(r"\[(.*?)\]").unwrap();
                 let destination_regex = Regex::new(r"\((.*?)\)").unwrap();
 
@@ -2081,11 +2094,16 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
             }
 
             //This means it was manually added
-            3 => message_stack.push(Message {
+            MessageDisplayDiscriminants::Text => message_stack.push(Message {
                 inner_message: MessageDisplay::Text(regex_match.capture),
                 size,
             }),
-            _ => unreachable!(),
+
+            //The size of a Newline doesnt matter lmao
+            MessageDisplayDiscriminants::NewLine => message_stack.push(Message {
+                inner_message: MessageDisplay::NewLine,
+                size: 0.,
+            }),
         }
     }
 }
@@ -2094,11 +2112,13 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
 fn filter_string(
     message_part: &String,
     header_level: Option<isize>,
-    regexes: &Vec<Regex>,
+    regexes: &Vec<(MessageDisplayDiscriminants, Regex)>,
 ) -> Vec<RegexMatch> {
     let mut match_message_part = message_part.clone();
     let mut matches: Vec<RegexMatch> = Vec::new();
-    for (regex_idx, regex) in regexes.iter().enumerate() {
+
+    //Iter over regexes and save the captured texts labeled with the given Regex capture type
+    for (regex_type, regex) in regexes.iter() {
         for mat in regex.find_iter(&match_message_part.clone()) {
             //We move the capture into a different variable
             let capture = mat.as_str().to_string();
@@ -2106,7 +2126,7 @@ fn filter_string(
             matches.push(RegexMatch {
                 start_idx: mat.start(),
                 end_idx: mat.end(),
-                regex_type: regex_idx,
+                regex_type: *regex_type,
                 capture: capture.clone(),
                 header_level: header_level.unwrap_or_default() as usize,
             });
@@ -2115,6 +2135,7 @@ fn filter_string(
             match_message_part = match_message_part.replacen(&capture, "", 1);
         }
     }
+
     let mut filters: Vec<String> = Vec::new();
     for (start_idx, end_idx) in matches
         .clone()
@@ -2140,7 +2161,7 @@ fn filter_string(
             matches.push(RegexMatch {
                 start_idx,
                 end_idx: start_idx + split_string.len(),
-                regex_type: 3,
+                regex_type: MessageDisplayDiscriminants::Text,
                 capture: split_string.to_string(),
                 header_level: header_level.unwrap_or_default() as usize,
             });
@@ -2151,7 +2172,7 @@ fn filter_string(
         matches.push(RegexMatch {
             start_idx: 0,
             end_idx: message_part.len(),
-            regex_type: 3,
+            regex_type: MessageDisplayDiscriminants::Text,
             capture: message_part.to_string(),
             header_level: header_level.unwrap_or_default() as usize,
         });
@@ -2161,16 +2182,26 @@ fn filter_string(
     matches
 }
 
+/// The discriminants of this enum are used to diffrenciate the types of regex captures
+#[derive(EnumDiscriminants, PartialEq)]
+/// These are the types of messages which can be displayed within a normal message
 pub enum MessageDisplay {
+    /// This is used to display normal plain text
     Text(String),
+    /// This is used to display emojies, and holds the important info for displaying an emoji
     Emoji(EmojiDisplay),
+    /// This is used to display hyperlinks, and holds the important info for displaying a hyperlink
     Link(HyperLink),
-}
 
+    /// This signals that the following ```MessageDisplay``` enums should be in another line
+    NewLine,
+}
+#[derive(PartialEq)]
 pub struct EmojiDisplay {
     pub name: String,
 }
 
+#[derive(PartialEq)]
 pub struct HyperLink {
     pub label: String,
     pub destination: String,
