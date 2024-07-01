@@ -1,6 +1,8 @@
 use std::{fs, path::PathBuf};
 
-use egui::{style::Spacing, vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
+use egui::{
+    style::Spacing, vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui,
+};
 
 use crate::app::backend::{
     parse_incoming_message, write_file, ClientMessage, ServerFileReply, ServerImageUpload,
