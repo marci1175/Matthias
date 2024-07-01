@@ -166,252 +166,217 @@ impl backend::TemplateApp {
         })
     }
 
-    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<Option<()>> {
-        let emoji_button = ui.menu_button(
-            RichText::from(&self.client_ui.random_emoji).size(self.font_size * 1.2),
-            |ui| {
-                //Main emoji tabs
-                ui.horizontal_top(|ui| {
-                    for emoji_type in EMOJIS.emoji_types.iter() {
-                        match emoji_type {
-                            EmojiTypes::AnimatedBlobs(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::AnimatedBlobs,
-                                "Animated Blobs",
-                            ),
-                            EmojiTypes::Blobs(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::Blobs,
-                                "Blobs",
-                            ),
-                            EmojiTypes::Icons(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::Icons,
-                                "Icons",
-                            ),
-                            EmojiTypes::Letters(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::Letters,
-                                "Letters",
-                            ),
-                            EmojiTypes::Numbers(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::Numbers,
-                                "Numbers",
-                            ),
-                            EmojiTypes::Turtles(_) => ui.selectable_value(
-                                &mut self.client_ui.emoji_tab_state,
-                                backend::EmojiTypesDiscriminants::Turtles,
-                                "Turtles",
-                            ),
-                        };
-                    }
-                });
+    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_top(|ui| {
+            for emoji_type in EMOJIS.emoji_types.iter() {
+                match emoji_type {
+                    EmojiTypes::AnimatedBlobs(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::AnimatedBlobs,
+                        "Animated Blobs",
+                    ),
+                    EmojiTypes::Blobs(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Blobs,
+                        "Blobs",
+                    ),
+                    EmojiTypes::Icons(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Icons,
+                        "Icons",
+                    ),
+                    EmojiTypes::Letters(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Letters,
+                        "Letters",
+                    ),
+                    EmojiTypes::Numbers(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Numbers,
+                        "Numbers",
+                    ),
+                    EmojiTypes::Turtles(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Turtles,
+                        "Turtles",
+                    ),
+                    EmojiTypes::Foods(_) => ui.selectable_value(
+                        &mut self.client_ui.emoji_tab_state,
+                        backend::EmojiTypesDiscriminants::Foods,
+                        "Foods",
+                    ),
+                };
+            }
+        });
 
-                ui.separator();
+        ui.separator();
 
-                match self.client_ui.emoji_tab_state {
-                    backend::EmojiTypesDiscriminants::AnimatedBlobs => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::AnimatedBlobs(animated_blobs) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for animated_blob in animated_blobs {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", animated_blob.name),
-                                                    animated_blob.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
+        //This value will become a Some if the user selects (clicks) an emoji
+        let mut selected_emoji: Option<&str> = None;
 
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &animated_blob.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
+        match self.client_ui.emoji_tab_state {
+            backend::EmojiTypesDiscriminants::AnimatedBlobs => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::AnimatedBlobs(animated_blobs) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for animated_blob in animated_blobs {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", animated_blob.name),
+                                            animated_blob.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(animated_blob.name);
+                                    };
                                 });
                             }
-                        }
-                    }
-                    backend::EmojiTypesDiscriminants::Blobs => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::Blobs(blobs) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for blob in blobs {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", blob.name),
-                                                    blob.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
-
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &blob.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    backend::EmojiTypesDiscriminants::Icons => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::Icons(icons) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for icon in icons {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", icon.name),
-                                                    icon.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
-
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &icon.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    backend::EmojiTypesDiscriminants::Letters => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::Letters(letters) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for letter in letters {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", letter.name),
-                                                    letter.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
-
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &letter.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    backend::EmojiTypesDiscriminants::Numbers => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::Numbers(numbers) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for number in numbers {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", number.name),
-                                                    number.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
-
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &number.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    backend::EmojiTypesDiscriminants::Turtles => {
-                        for emoji_type in EMOJIS.emoji_types.iter() {
-                            if let EmojiTypes::Turtles(turtles) = emoji_type {
-                                ui.horizontal_wrapped(|ui| {
-                                    for turtle in turtles {
-                                        ui.allocate_ui(vec2(30., 30.), |ui| {
-                                            if ui
-                                                .add(ImageButton::new(Image::from_bytes(
-                                                    format!("bytes://{}", turtle.name),
-                                                    turtle.bytes,
-                                                )))
-                                                .clicked()
-                                            {
-                                                let is_inserting_front =
-                                                    self.client_ui.text_edit_cursor_index
-                                                        == self.client_ui.message_edit_buffer.len();
-
-                                                self.client_ui.message_edit_buffer.insert_str(
-                                                    self.client_ui.text_edit_cursor_index,
-                                                    &format!(":{}:", &turtle.name),
-                                                );
-
-                                                if is_inserting_front {
-                                                    self.client_ui.text_edit_cursor_index =
-                                                        self.client_ui.message_edit_buffer.len();
-                                                }
-                                            };
-                                        });
-                                    }
-                                });
-                            }
-                        }
+                        });
                     }
                 }
-            },
-        );
-        emoji_button
+            }
+            backend::EmojiTypesDiscriminants::Blobs => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Blobs(blobs) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for blob in blobs {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", blob.name),
+                                            blob.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(blob.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            backend::EmojiTypesDiscriminants::Icons => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Icons(icons) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for icon in icons {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", icon.name),
+                                            icon.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(icon.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            backend::EmojiTypesDiscriminants::Letters => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Letters(letters) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for letter in letters {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", letter.name),
+                                            letter.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(letter.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            backend::EmojiTypesDiscriminants::Numbers => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Numbers(numbers) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for number in numbers {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", number.name),
+                                            number.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(number.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            backend::EmojiTypesDiscriminants::Turtles => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Turtles(turtles) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for turtle in turtles {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", turtle.name),
+                                            turtle.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(turtle.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+            backend::EmojiTypesDiscriminants::Foods => {
+                for emoji_type in EMOJIS.emoji_types.iter() {
+                    if let EmojiTypes::Foods(foods) = emoji_type {
+                        ui.horizontal_wrapped(|ui| {
+                            for food in foods {
+                                ui.allocate_ui(vec2(30., 30.), |ui| {
+                                    if ui
+                                        .add(ImageButton::new(Image::from_bytes(
+                                            format!("bytes://{}", food.name),
+                                            food.bytes,
+                                        )))
+                                        .clicked()
+                                    {
+                                        selected_emoji = Some(food.name);
+                                    };
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        //If selected_emoji isnt a Some(_) then the user didnt click anything
+        if let Some(emoji_name) = selected_emoji {
+            let is_inserting_front =
+                self.client_ui.text_edit_cursor_index == self.client_ui.message_edit_buffer.len();
+
+            self.client_ui.message_edit_buffer.insert_str(
+                self.client_ui.text_edit_cursor_index,
+                &format!(":{}:", emoji_name),
+            );
+
+            if is_inserting_front {
+                self.client_ui.text_edit_cursor_index = self.client_ui.message_edit_buffer.len();
+            }
+        }
     }
 }

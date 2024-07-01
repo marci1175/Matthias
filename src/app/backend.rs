@@ -1953,29 +1953,63 @@ pub struct Message {
     pub size: f32,
 }
 
+use egui::style::Spacing;
+
 impl Message {
     pub fn display(&self, ui: &mut Ui) -> Response {
+        ui.style_mut().spacing = Spacing {
+            item_spacing: vec2(0., 10.),
+            ..Default::default()
+        };
         match &self.inner_message {
             MessageDisplay::Text(inner) => ui.label(RichText::from(inner).size(self.size)),
-            MessageDisplay::Emoji(inner) => ui.allocate_ui(vec2(self.size, self.size), |ui| {
-                ui.add(Image::from_uri(format!("bytes://{}", inner.name.replace(":", ""))));
-            }).response,
-            MessageDisplay::Link(inner) => ui.hyperlink_to(RichText::from(inner.display_name.clone()).size(self.size), inner.destination.clone()),
+            MessageDisplay::Emoji(inner) => {
+                ui.allocate_ui(vec2(self.size, self.size), |ui| {
+                    ui.add(Image::from_uri(format!(
+                        "bytes://{}",
+                        inner.name.replace(":", "")
+                    )));
+                })
+                .response
+            }
+            MessageDisplay::Link(inner) => {
+                ui.hyperlink_to(
+                    RichText::from(inner.label.clone()).size(self.size),
+                    inner.destination.clone(),
+                )
+            },
         }
     }
 }
 
-pub fn parse_incoming_message(mut rhs: String) -> Vec<Message> {
-    let mut message_stack: Vec<Message> = Vec::new();
-    //This regex captures links
-    let link_capturing_regex =
-    Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap();
+#[derive(Clone, Debug)]
+struct RegexMatch {
+    //Where does this match begin in the main string
+    start_idx: usize,
+    //Where does this match end in the main string
+    end_idx: usize,
 
-    //This regex captures emojis
-    let emoji_capturing_regex = Regex::new(":(.*?):").unwrap();
+    //This field is used when we are iterating over a series of regexes, and we want to know why pattern the said string is matched by
+    regex_type: usize,
+
+    capture: String,
+}
+
+pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
+    let mut message_stack: Vec<Message> = Vec::new();
 
     //Create regex where it captures the #-s in the beginning or after \n-s
     let header_capturing_regex = Regex::new(r"(^|\n\s*)(#+)(.*)").unwrap();
+
+    //The regexes we use to capture important information
+    let regexes = vec![
+        //This regex captures links
+        //We should scan for links first
+        Regex::new(r"\[\s*(?P<text>[^\]]*)\]\((?P<link_target>[^)]+)\)").unwrap(),
+        //This regex captures emojis
+        //We should scan for emojis secondly
+        Regex::new(":(.*?):").unwrap(),
+    ];
 
     //Create captures in string
     let header_levels_lines: Vec<(usize, String)> = header_capturing_regex
@@ -1985,60 +2019,120 @@ pub fn parse_incoming_message(mut rhs: String) -> Vec<Message> {
         .collect();
 
     //Iter through header levels where each part of the string gets its own (optional) header level
-    'header_iter: for (header_level, message_part) in &header_levels_lines {
-        //Parse for links and emojis
+    for (header_level, message_part) in &header_levels_lines {
+        let mut match_message_part = message_part.clone();
 
-        //Parse for links
-        for (label, destination) in link_capturing_regex.captures_iter(&message_part.clone()).map(|captures| (captures[1].to_string(), captures[2].to_string())) {
-            if *header_level > 5 {
-                message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: format!("{}{label}", "#".repeat(*header_level)), destination }), size: 20. * (1. + 1. / *header_level as f32)});
+        let header_size = 20. * (1. + 1. / *header_level as f32);
+        let mut matches: Vec<RegexMatch> = Vec::new();
 
-                continue;
+        for (regex_idx, regex) in regexes.iter().enumerate() {
+            for mat in regex.find_iter(&match_message_part.clone()) {
+                //We move the capture into a different variable
+                let capture = mat.as_str().to_string();
+
+                matches.push(RegexMatch {
+                    start_idx: mat.start(),
+                    end_idx: mat.end(),
+                    regex_type: regex_idx,
+                    capture: capture.clone(),
+                });
+
+                //We remove the captured part of the string of the main string
+                match_message_part = match_message_part.replacen(&capture, "", 1);
             }
-            
-            message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: label, destination }), size: 20. * (1. + 1. / *header_level as f32)});
-
-            continue 'header_iter;
         }
 
-        //Parse for emojis
-        for emoji_name in emoji_capturing_regex.captures_iter(message_part).map(|capture| capture[1].to_string()) {
-            if *header_level > 5 {
-                message_stack.push(Message { inner_message: MessageDisplay::Text("#".repeat(*header_level)), size: 20.});
-                message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name}), size: 20.});
+        let mut filters: Vec<String> = Vec::new();
 
-                continue;
+        for (start_idx, end_idx) in matches.clone().iter().map(|item| (item.start_idx, item.end_idx)) {
+            filters.push(message_part[start_idx..end_idx].to_string());
+        }
+
+        let escaped_strings: Vec<String> = filters
+            .iter()
+            .map(|s| regex::escape(s))
+            .collect();
+
+        // Join the escaped strings into a single regex pattern separated by '|'
+        let pattern = escaped_strings.join("|");
+
+        // Compile the regex
+        let re = Regex::new(&pattern).unwrap();
+
+        // Split the string based on the regex pattern
+        let split_strings: Vec<&str> = re.split(&message_part).collect();
+
+        for split_string in split_strings {
+            let start_idx = message_part.find(&split_string).unwrap();
+
+            matches.push(RegexMatch { start_idx, end_idx: start_idx + split_string.len(), regex_type: 3, capture: split_string.to_string() });
+        }
+
+        //Sort matches
+        matches.sort_by(|a, b| a.start_idx.cmp(&b.start_idx));
+
+        //Parse matches
+        for regex_match in matches {
+            match regex_match.regex_type {
+                //This was matches by the emoji capturing Regex
+                1 => message_stack.push(Message {
+                    inner_message: MessageDisplay::Emoji(EmojiDisplay {
+                        name: regex_match.capture,
+                    }),
+                    size: header_size,
+                }),
+
+                //This was matched by the link capturing regex
+                0 => {
+                    let label_regex = Regex::new(r"\[(.*?)\]").unwrap();
+                    let destination_regex = Regex::new(r"\((.*?)\)").unwrap();
+
+                    let hyper_link_label = label_regex
+                        .captures_iter(&regex_match.capture)
+                        .nth(0)
+                        .unwrap()
+                        .get(1)
+                        .unwrap()
+                        .as_str();
+                    let hyper_link_destination = destination_regex
+                        .captures_iter(&regex_match.capture)
+                        .nth(0)
+                        .unwrap()
+                        .get(1)
+                        .unwrap()
+                        .as_str();
+                    message_stack.push(Message {
+                        inner_message: MessageDisplay::Link(HyperLink {
+                            label: hyper_link_label.to_string(),
+                            destination: hyper_link_destination.to_string(),
+                        }),
+                        size: header_size,
+                    })
+                }
+
+                //This means it was manually added
+                3 => {
+                    message_stack.push(Message { inner_message: MessageDisplay::Text(regex_match.capture), size: header_size })
+                }
+                _ => unreachable!(),
             }
-
-            message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name}), size: 20. * (1. + 1. / *header_level as f32)});
-
-            continue 'header_iter;
         }
-
-        //Parse for normal text
-        if *header_level > 5 {
-            message_stack.push(Message {inner_message: MessageDisplay::Text(format!("{}{}", "#".repeat(*header_level), message_part)), size: 20.});
-
-            continue;
-        }
-
-        message_stack.push(Message {inner_message: MessageDisplay::Text(message_part.trim().to_string()), size: 20. * (1. + 1. / *header_level as f32)});
     }
 
-    //Parse for links
-    for (label, destination) in link_capturing_regex.captures_iter(&rhs.clone()).map(|captures| (captures[1].to_string(), captures[2].to_string())) {
-        message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: label.clone(), destination: destination.clone() }), size: 20.});
-        rhs = rhs.replacen(&format!("[{}]({})", label, destination), "", 1);
-    }
+    // //Parse for links
+    // for (label, destination) in link_capturing_regex.captures_iter(&rhs.clone()).map(|captures| (captures[1].to_string(), captures[2].to_string())) {
+    //     message_stack.push(Message { inner_message: MessageDisplay::Link(HyperLink { display_name: label.clone(), destination: destination.clone() }), size: 20.});
+    //     rhs = rhs.replacen(&format!("[{}]({})", label, destination), "", 1);
+    // }
 
-    //Parse for emojis
-    for emoji_name in emoji_capturing_regex.captures_iter(&rhs.clone()).map(|capture| capture[1].to_string()) {
-        message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name.clone()}), size: 20.});
+    // //Parse for emojis
+    // for emoji_name in emoji_capturing_regex.captures_iter(&rhs.clone()).map(|capture| capture[1].to_string()) {
+    //     message_stack.push(Message {inner_message: MessageDisplay::Emoji(EmojiDisplay {name: emoji_name.clone()}), size: 20.});
 
-        rhs = rhs.replacen(&format!(":{emoji_name}:"), "", 1);
-    }
+    //     rhs = rhs.replacen(&format!(":{emoji_name}:"), "", 1);
+    // }
 
-    message_stack.push(Message {inner_message: MessageDisplay::Text(rhs.trim().to_string()), size: 20.});
+    // message_stack.push(Message {inner_message: MessageDisplay::Text(rhs.trim().to_string()), size: 20.});
 
     message_stack
 }
@@ -2054,6 +2148,6 @@ pub struct EmojiDisplay {
 }
 
 pub struct HyperLink {
-    pub display_name: String,
+    pub label: String,
     pub destination: String,
 }

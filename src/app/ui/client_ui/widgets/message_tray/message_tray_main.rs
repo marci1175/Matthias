@@ -234,7 +234,13 @@ impl TemplateApp {
                     }
 
                     //Emoji button
-                    let emoji_button = self.draw_emoji_selector(ui);
+                    let emoji_button = ui.menu_button(
+                        RichText::from(self.client_ui.random_emoji.clone())
+                            .size(self.font_size * 1.2),
+                        |ui| {
+                            self.draw_emoji_selector(ui);
+                        },
+                    );
 
                     if emoji_button.response.clicked() {
                         self.main.emoji_mode = !self.main.emoji_mode;

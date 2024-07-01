@@ -1,10 +1,10 @@
 use std::{fs, path::PathBuf};
 
-use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
-use regex::Regex;
+use egui::{style::Spacing, vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, ClientMessage, ServerFileReply, ServerImageUpload, TemplateApp
+    parse_incoming_message, write_file, ClientMessage, ServerFileReply, ServerImageUpload,
+    TemplateApp,
 };
 use rodio::{Decoder, Source};
 
@@ -40,7 +40,7 @@ impl TemplateApp {
                 }
             }
             crate::app::backend::ServerMessageType::Normal(message) => {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     for message in parse_incoming_message(message.message.clone()) {
                         message.display(ui);
                     }
