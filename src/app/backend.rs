@@ -2006,6 +2006,12 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
 
     //The regexes we use to capture important information
     let regexes = vec![
+        //This regex captures newlines
+        //It doesnt matter when we scan for newlines as theyre not affected by anything
+        (
+            MessageDisplayDiscriminants::NewLine,
+            Regex::new(r"\n").unwrap(),
+        ),
         //This regex captures links
         //We should scan for links first
         (
@@ -2017,12 +2023,6 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
         (
             MessageDisplayDiscriminants::Emoji,
             Regex::new(":(.*?):").unwrap(),
-        ),
-        //This regex captures newlines
-        //It doesnt matter when we scan for newlines as theyre not affected by anything
-        (
-            MessageDisplayDiscriminants::NewLine,
-            Regex::new(r".*\n").unwrap(),
         ),
     ];
 
@@ -2144,7 +2144,9 @@ fn filter_string(
     {
         filters.push(message_part[start_idx..end_idx].to_string());
     }
+
     let escaped_strings: Vec<String> = filters.iter().map(|s| regex::escape(s)).collect();
+
     if !escaped_strings.is_empty() {
         // Join the escaped strings into a single regex pattern separated by '|'
         let pattern = escaped_strings.join("|");
@@ -2179,7 +2181,7 @@ fn filter_string(
     }
     matches.sort_by(|a, b| a.start_idx.cmp(&b.start_idx));
 
-    matches
+    dbg!(matches)
 }
 
 /// The discriminants of this enum are used to diffrenciate the types of regex captures
