@@ -74,7 +74,7 @@ async fn main() -> eframe::Result<()> {
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
             //Create application
-            Box::new(matthias::app::backend::TemplateApp::new(cc))
+            Ok(Box::new(matthias::app::backend::TemplateApp::new(cc)))
         }),
     )
 }

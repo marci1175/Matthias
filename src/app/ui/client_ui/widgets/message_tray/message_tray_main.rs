@@ -30,7 +30,7 @@ impl TemplateApp {
             Stroke::NONE,
         );
 
-        let mut frame_ui = ui.child_ui(code_rect, Layout::default());
+        let mut frame_ui = ui.child_ui(code_rect, Layout::default(), None);
 
         /*We have to clone here because of the closure*/
         let user_message_clone = self.client_ui.message_edit_buffer.clone();

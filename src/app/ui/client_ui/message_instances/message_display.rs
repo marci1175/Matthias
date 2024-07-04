@@ -1,7 +1,7 @@
-use std::{fs, ops::ControlFlow, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use egui::{
-    style::Spacing, vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui,
+    vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui,
 };
 
 use crate::app::backend::{
