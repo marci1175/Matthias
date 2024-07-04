@@ -1995,14 +1995,14 @@ struct RegexMatch {
     capture: String,
 
     //Which header level was it matched on
-    header_level: usize,
+    header_level: Option<usize>,
 }
 
 pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
     let mut message_stack: Vec<Message> = Vec::new();
 
     //Create regex where it captures the #-s in the beginning or after \n-s
-    let header_capturing_regex = Regex::new(r"(^|\n\s*)(#+)(.*)").unwrap();
+    let header_capturing_regex = Regex::new(r"(?m)^(\s*)(#+)?(.*)").unwrap();
 
     //The regexes we use to capture important information
     let regexes = vec![
@@ -2030,7 +2030,19 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
     let header_levels_lines: Vec<(usize, String)> = header_capturing_regex
         .captures_iter(&rhs)
         .into_iter()
-        .map(|capture| (capture[2].len(), capture[3].to_string()))
+        .map(|capture| {
+            (
+                {
+                    //If capture[2] is None then that means thesre isnt a header level, so we can just insert 0
+                    //If capture[2] is Some that means there is a specified header level
+                    match capture.get(2) {
+                        Some(capture) => capture.len(),
+                        None => 0,
+                    }
+                },
+                capture[3].to_string(),
+            )
+        })
         .collect();
 
     let mut matches: Vec<RegexMatch> = Vec::new();
@@ -2038,23 +2050,33 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
     //Iter through header levels where each part of the string gets its own (optional) header level
     for (header_level, message_part) in &header_levels_lines {
         matches.extend(filter_string(
-            message_part,
-            Some(*header_level as isize),
+            format!("{message_part}\n"),
+            {
+                //If the header level equals 0 that means the current message part doesnt have a specified header level
+                if *header_level != 0 {
+                    Some(*header_level)
+                } else {
+                    None
+                }
+            },
             &regexes,
         ));
     }
-
-    //If there arent any headers
-    // matches.extend(filter_string(&rhs, None, &regexes));
 
     parse_regex_match(matches, &mut message_stack);
 
     message_stack
 }
 
+/// Push back all the captured regexes, info to the ```message_stack```, whatever is in the ```message_stack``` gets displayed at the end
 fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>) {
+    //Iter over all the captures we've made
     for regex_match in matches {
-        let size = 20. * (1. + 1. / regex_match.header_level as f32);
+        //Default font size
+        let size = match regex_match.header_level {
+            Some(header_level) => 20. * (1. + 1. / (header_level as f32)),
+            None => 20.,
+        };
 
         match regex_match.regex_type {
             //This was matches by the emoji capturing Regex
@@ -2077,6 +2099,8 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
                     .get(1)
                     .unwrap()
                     .as_str();
+
+                //Get hyperlink destination
                 let hyper_link_destination = destination_regex
                     .captures_iter(&regex_match.capture)
                     .nth(0)
@@ -2095,40 +2119,49 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
 
             //This means it was manually added
             MessageDisplayDiscriminants::Text => message_stack.push(Message {
-                inner_message: MessageDisplay::Text(regex_match.capture),
+                inner_message: MessageDisplay::Text(regex_match.capture.trim().to_string()),
                 size,
             }),
 
             //The size of a Newline doesnt matter lmao
             MessageDisplayDiscriminants::NewLine => message_stack.push(Message {
                 inner_message: MessageDisplay::NewLine,
-                size: 0.,
+                size: 1.,
             }),
         }
     }
 }
 
-/// The reason we provide a header_level as an Option<isize> is because if the string isnt in a header level we can provide a None, therfor calculating the ```header_size``` to be the default 20.
+/// The reason we provide a header_level as an Option<usize> is because if the string isnt in a header level we can provide a None, therfor calculating the ```header_size``` to be the default 20.
+/// This function parses / captures all the information from the message we need
 fn filter_string(
-    message_part: &String,
-    header_level: Option<isize>,
+    // This gets filtered
+    message_part: String,
+    // The header level the string provided above is on (This is needed for calculating the size)
+    header_level: Option<usize>,
+    // The regexes which need to be used to get the important information from the message
     regexes: &Vec<(MessageDisplayDiscriminants, Regex)>,
 ) -> Vec<RegexMatch> {
+    //We clone the message we need to examine, this value will be modifed by the regexes (Deleting the captured information)
     let mut match_message_part = message_part.clone();
+
+    //We back up all the matches from the string into this buffer
     let mut matches: Vec<RegexMatch> = Vec::new();
 
     //Iter over regexes and save the captured texts labeled with the given Regex capture type
     for (regex_type, regex) in regexes.iter() {
+        //Iter over the captures of the regexes
         for mat in regex.find_iter(&match_message_part.clone()) {
-            //We move the capture into a different variable
+            //We move the captured string into a different variable, this is used to delete the matched parts from the string
             let capture = mat.as_str().to_string();
 
+            //We push back the match the the ```matches``` buffer
             matches.push(RegexMatch {
                 start_idx: mat.start(),
                 end_idx: mat.end(),
                 regex_type: *regex_type,
                 capture: capture.clone(),
-                header_level: header_level.unwrap_or_default() as usize,
+                header_level: header_level,
             });
 
             //We remove the captured part of the string of the main string
@@ -2136,52 +2169,74 @@ fn filter_string(
         }
     }
 
-    let mut filters: Vec<String> = Vec::new();
-    for (start_idx, end_idx) in matches
+    filter_plain_text(&mut matches, message_part, header_level);
+
+    //We sort the matches vector so that the captured matches will be in order compared to the original string
+    //We use the starting index of the RegexMatches to order the matches
+    matches.sort_by(|a, b| a.start_idx.cmp(&b.start_idx));
+
+    matches
+}
+
+/// This function is used to "filter" out all the plain text from the message
+fn filter_plain_text(
+    // This is where the plain text matches will get pushed intop
+    matches: &mut Vec<RegexMatch>,
+    // The string which will be examined
+    message_part: String,
+    // This is used to decide the font size
+    header_level: Option<usize>,
+) {
+    //This buffer will contain the captures as a string in the original form, Emoji("Smile") => :Smile:
+    let captured_message_display_enum_as_string: Vec<String> = matches
         .clone()
         .iter()
         .map(|item| (item.start_idx, item.end_idx))
-    {
-        filters.push(message_part[start_idx..end_idx].to_string());
-    }
+        .map(|(start_idx, end_idx)| message_part[start_idx..end_idx].to_string())
+        .collect();
 
-    let escaped_strings: Vec<String> = filters.iter().map(|s| regex::escape(s)).collect();
+    //We turn the captured Message display Enums into regexes, so they can be used later to remove the captured parts from the original string
+    let escaped_strings: Vec<String> = captured_message_display_enum_as_string
+        .iter()
+        .map(|s| regex::escape(s))
+        .collect();
 
+    //If there were captured MessageDisplay enums, we first remove it and then push back the parts of plain text to the ```matches``` buffer
     if !escaped_strings.is_empty() {
-        // Join the escaped strings into a single regex pattern separated by '|'
+        // Join the escaped strings into a single regex pattern separated by '|', to be used in regex later
         let pattern = escaped_strings.join("|");
 
         // Compile the regex
         let re = Regex::new(&pattern).unwrap();
 
-        // Split the string based on the regex pattern
+        //Split the string based on the regex pattern, constructed above
         let split_strings: Vec<&str> = re.split(&message_part).collect();
 
+        //Iter over the split strings
         for split_string in split_strings {
+            //Fetch the starting index in the original string for ordering the matches later
             let start_idx = message_part.find(&split_string).unwrap();
 
+            //Push back the plaintext match to the ```matches``` buffer
             matches.push(RegexMatch {
                 start_idx,
                 end_idx: start_idx + split_string.len(),
                 regex_type: MessageDisplayDiscriminants::Text,
                 capture: split_string.to_string(),
-                header_level: header_level.unwrap_or_default() as usize,
+                header_level: header_level,
             });
         }
     }
-    //We can just push back the whole message as a whole text message
+    //If there were no MessageDisplay enums aka there werent any emojis links etc, we can just push back the whole string as a whole text message
     else {
         matches.push(RegexMatch {
             start_idx: 0,
             end_idx: message_part.len(),
             regex_type: MessageDisplayDiscriminants::Text,
             capture: message_part.to_string(),
-            header_level: header_level.unwrap_or_default() as usize,
+            header_level: header_level,
         });
     }
-    matches.sort_by(|a, b| a.start_idx.cmp(&b.start_idx));
-
-    dbg!(matches)
 }
 
 /// The discriminants of this enum are used to diffrenciate the types of regex captures
@@ -2198,13 +2253,19 @@ pub enum MessageDisplay {
     /// This signals that the following ```MessageDisplay``` enums should be in another line
     NewLine,
 }
+
+/// This struct serves as the information struct for the MessageDisplay's Emoji enum
 #[derive(PartialEq)]
 pub struct EmojiDisplay {
+    /// The name of the emoji wanting to be displayed, we make sure to load in all the emojies into the egui buffer when theyre displayed
     pub name: String,
 }
 
+/// This struct serves as the information struct for the MessageDisplay's Link enum
 #[derive(PartialEq)]
 pub struct HyperLink {
+    /// This is the part of the hyperlink which gets to be displayed
     pub label: String,
+    /// This is the part of the hyperlink which it redirects to
     pub destination: String,
 }
