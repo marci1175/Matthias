@@ -28,6 +28,9 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
     //This will get written to the output file
     let mut content = String::new();
 
+    //bring into scope
+    content.push_str("use phf::phf_map;");
+
     //Emoji types
     let mut emoji_types: Vec<std::ffi::OsString> = Vec::new();
 
@@ -50,7 +53,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
 
             //Push back structs
             content.push_str(&format!(
-                "#[allow(dead_code)]\n#[derive(Debug, Clone)]\npub struct {} {{ pub name: &'static str, pub bytes: &'static [u8] }}\n",
+                "#[allow(dead_code)]\n#[derive(Debug, Clone)]\npub struct {} {{ pub name: &'static str }}\n",
                 dir_name.into_string().unwrap()
             ));
         };
@@ -87,6 +90,9 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
     //Create constant body
     let mut constant_body = String::new();
 
+    //This vector will contain the emoji's name and path to their bytes
+    let mut emoji_tuple: Vec<(String, String)> = Vec::new();   
+
     for (idx, emoji_type) in emoji_types.iter().enumerate() {
         let emoji_type_string = emoji_type.clone().into_string().unwrap();
 
@@ -103,8 +109,14 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
             //Get file path
             let file_path = folder_entry.path();
 
-            emoji_type_body.push_str(&format!(r#"{emoji_type_string}{{name: "{}", bytes: include_bytes!(r"..\\..\\..\..\\..\\{}")}},
-            "#, file_name.to_string_lossy().split('.').next().unwrap(), file_path.to_string_lossy().replace('\\', r"\\").replace('/', r"\\")));
+            let file_name_string = file_name.to_string_lossy();
+            let file_name = file_name_string.split('.').next().unwrap();
+            let file_path = file_path.to_string_lossy().replace('\\', r"\\").replace('/', r"\\");
+
+            emoji_tuple.push((file_name.to_string(), file_path));
+
+            emoji_type_body.push_str(&format!(r#"{emoji_type_string}{{name: "{}"}},
+            "#, file_name));
         }
 
         constant_body.push_str(&format!(
@@ -120,6 +132,14 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
 }};"
     ));
 
+    let map_body: Vec<String> = emoji_tuple.iter().map(|(name, path)| {
+        format!(r#"    "{name}" => include_bytes!(r"..\\..\\..\..\\..\\{path}"),"#)
+    }).collect();
+
+    //Create Map of emojis' name and their associated bytes
+    content.push_str(&format!("\nstatic EMOJI_TUPLES: phf::Map<&'static str, &'static [u8]> = phf_map! {{
+{}
+}};", map_body.join("\n")));
     //Write the contents to the file
     fs::write(path_to_output, content)?;
 
