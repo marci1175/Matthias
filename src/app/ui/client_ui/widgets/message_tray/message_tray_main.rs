@@ -238,7 +238,7 @@ impl TemplateApp {
                         RichText::from(self.client_ui.random_emoji.clone())
                             .size(self.font_size * 1.2),
                         |ui| {
-                            self.draw_emoji_selector(ui);
+                            self.draw_emoji_selector(ui, ctx);
                         },
                     );
 

@@ -1,12 +1,13 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
-use egui::{vec2, Image, Rect, Response, RichText, Ui};
+use egui::load::BytesPoll;
+use egui::{vec2, Color32, Image, Rect, Response, RichText, Ui};
 use image::DynamicImage;
 use rand::rngs::ThreadRng;
 use regex::Regex;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-
+use egui::load::LoadError;
 use super::client::{connect_to_server, ServerReply};
 use super::server::SharedFields;
 use aes_gcm::aead::generic_array::GenericArray;
@@ -1956,7 +1957,7 @@ pub struct Message {
 use egui::style::Spacing;
 
 impl Message {
-    pub fn display(&self, ui: &mut Ui) -> Response {
+    pub fn display(&self, ui: &mut Ui, ctx: &egui::Context) -> Response {
         ui.style_mut().spacing = Spacing {
             item_spacing: vec2(0., 10.),
             ..Default::default()
@@ -1965,10 +1966,36 @@ impl Message {
             MessageDisplay::Text(inner) => ui.label(RichText::from(inner).size(self.size)),
             MessageDisplay::Emoji(inner) => {
                 ui.allocate_ui(vec2(self.size, self.size), |ui| {
-                    ui.add(Image::from_uri(format!(
-                        "bytes://{}",
-                        inner.name.replace(":", "")
-                    )));
+                    let original_emoji_name = inner.name.replace(":", "").to_string();
+                    match ctx.try_load_bytes(&format!("bytes://{}", original_emoji_name)) {
+                        Ok(bytespoll) => {
+                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                if bytes.to_vec() == vec![0] {
+                                    ui.spinner();
+                                    ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
+
+                                    eprintln!("The called emoji was not found in the emoji header: {}", original_emoji_name);
+                                }
+                                ui.add( Image::from_uri(&format!("bytes://{}", original_emoji_name)));
+                            }
+                        },
+                        Err(err) => {
+                            if let LoadError::Loading(inner) = err {
+                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                    //check if we are visible, so there are no unnecessary requests
+                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                        return;
+                                    }
+            
+                                    ctx.include_bytes(format!("bytes://{}", &original_emoji_name), EMOJI_TUPLES.get(&original_emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                } else {
+                                    dbg!(inner);
+                                }
+                            } else {
+                                dbg!(err);
+                            }
+                        },
+                    }
                 })
                 .response
             }

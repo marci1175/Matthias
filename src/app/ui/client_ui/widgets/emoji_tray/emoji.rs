@@ -1,4 +1,7 @@
-use egui::{vec2, Image, ImageButton, RichText};
+use egui::{
+    load::{BytesPoll, LoadError},
+    vec2, Color32, Image, ImageButton, RichText,
+};
 use std::{any::Any, collections::BTreeMap};
 
 include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
@@ -166,7 +169,7 @@ impl backend::TemplateApp {
         })
     }
 
-    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui) {
+    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal_top(|ui| {
             for emoji_type in EMOJIS.emoji_types.iter() {
                 match emoji_type {
@@ -221,15 +224,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for animated_blob in animated_blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", animated_blob.name),
-                                            animated_blob.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(animated_blob.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", animated_blob.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", animated_blob.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", animated_blob.name)))).clicked() {
+                                                    selected_emoji = Some(animated_blob.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &animated_blob.name), EMOJI_TUPLES.get(&animated_blob.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -242,15 +264,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for blob in blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", blob.name),
-                                            blob.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(blob.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", blob.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", blob.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", blob.name)))).clicked() {
+                                                    selected_emoji = Some(blob.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &blob.name), EMOJI_TUPLES.get(&blob.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -263,15 +304,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for icon in icons {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", icon.name),
-                                            icon.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(icon.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", icon.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", icon.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", icon.name)))).clicked() {
+                                                    selected_emoji = Some(icon.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &icon.name), EMOJI_TUPLES.get(&icon.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -284,15 +344,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for letter in letters {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", letter.name),
-                                            letter.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(letter.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", letter.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", letter.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", letter.name)))).clicked() {
+                                                    selected_emoji = Some(letter.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &letter.name), EMOJI_TUPLES.get(&letter.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -305,15 +384,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for number in numbers {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", number.name),
-                                            number.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(number.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", number.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", number.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", number.name)))).clicked() {
+                                                    selected_emoji = Some(number.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &number.name), EMOJI_TUPLES.get(&number.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -326,15 +424,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for turtle in turtles {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", turtle.name),
-                                            turtle.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(turtle.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", turtle.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", turtle.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", turtle.name)))).clicked() {
+                                                    selected_emoji = Some(turtle.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &turtle.name), EMOJI_TUPLES.get(&turtle.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
@@ -347,15 +464,34 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for food in foods {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if ui
-                                        .add(ImageButton::new(Image::from_bytes(
-                                            format!("bytes://{}", food.name),
-                                            food.bytes,
-                                        )))
-                                        .clicked()
-                                    {
-                                        selected_emoji = Some(food.name);
-                                    };
+                                    match ctx.try_load_bytes(&format!("bytes://{}", food.name)) {
+                                        Ok(bytespoll) => {
+                                            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                if bytes.to_vec() == vec![0] {
+                                                    eprintln!("The called emoji was not found in the emoji header: {}", food.name);
+                                                }
+                                                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", food.name)))).clicked() {
+                                                    selected_emoji = Some(food.name);
+                                                };
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    //check if we are visible, so there are no unnecessary requests
+                                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                                        return;
+                                                    }
+                            
+                                                    ctx.include_bytes(format!("bytes://{}", &food.name), EMOJI_TUPLES.get(&food.name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                } else {
+                                                    dbg!(inner);
+                                                }
+                                            } else {
+                                                dbg!(err);
+                                            }
+                                        },
+                                    }
                                 });
                             }
                         });
