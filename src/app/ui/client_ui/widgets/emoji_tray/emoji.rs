@@ -413,6 +413,6 @@ fn display_emoji(
             }
         }
     }
-    
+
     ControlFlow::Continue(())
 }

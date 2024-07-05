@@ -317,6 +317,9 @@ pub struct Client {
     #[serde(skip)]
     pub display_user_list: bool,
 
+    #[serde(skip)]
+    pub display_emoji_list: bool,
+
     ///Search parameters set by user, to chose what to search for obviously
     pub search_parameter: SearchType,
 
@@ -424,6 +427,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            display_emoji_list: false,
             emoji_tab_state: EmojiTypesDiscriminants::Blobs,
             shared_fields: Default::default(),
             text_edit_cursor_desired_index: None,
@@ -1962,6 +1966,7 @@ impl Message {
             item_spacing: vec2(0., 10.),
             ..Default::default()
         };
+
         match &self.inner_message {
             MessageDisplay::Text(inner) => ui.label(RichText::from(inner).size(self.size)),
             MessageDisplay::Emoji(inner) => {
@@ -1976,7 +1981,7 @@ impl Message {
 
                                     eprintln!("The called emoji was not found in the emoji header: {}", original_emoji_name);
                                 }
-                                ui.add( Image::from_uri(&format!("bytes://{}", original_emoji_name)));
+                                ui.add(Image::from_uri(&format!("bytes://{}", original_emoji_name)));
                             }
                         },
                         Err(err) => {

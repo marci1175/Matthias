@@ -29,7 +29,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
     let mut content = String::new();
 
     //bring into scope
-    content.push_str("use phf::phf_map;");
+    content.push_str("use phf::phf_map;\n");
 
     //Emoji types
     let mut emoji_types: Vec<std::ffi::OsString> = Vec::new();
@@ -147,7 +147,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
 
     //Create Map of emojis' name and their associated bytes
     content.push_str(&format!(
-        "\nstatic EMOJI_TUPLES: phf::Map<&'static str, &'static [u8]> = phf_map! {{
+        "\n#[allow(dead_code)]\npub static EMOJI_TUPLES: phf::Map<&'static str, &'static [u8]> = phf_map! {{
 {}
 }};",
         map_body.join("\n")
