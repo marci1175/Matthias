@@ -224,7 +224,12 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for animated_blob in animated_blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, animated_blob.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) = display_emoji(
+                                        ctx,
+                                        animated_blob.name,
+                                        ui,
+                                        &mut selected_emoji,
+                                    ) {
                                         return;
                                     }
                                 });
@@ -239,7 +244,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for blob in blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, blob.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, blob.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -254,7 +261,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for icon in icons {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, icon.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, icon.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -269,7 +278,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for letter in letters {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, letter.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, letter.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -284,7 +295,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for number in numbers {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, number.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, number.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -299,7 +312,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for turtle in turtles {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, turtle.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, turtle.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -314,7 +329,9 @@ impl backend::TemplateApp {
                         ui.horizontal_wrapped(|ui| {
                             for food in foods {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(ctx, food.name, ui, &mut selected_emoji) {
+                                    if let ControlFlow::Break(_) =
+                                        display_emoji(ctx, food.name, ui, &mut selected_emoji)
+                                    {
                                         return;
                                     }
                                 });
@@ -343,18 +360,37 @@ impl backend::TemplateApp {
 }
 
 /// This will display the emoji under the given name, if it is not found in the egui image buffer it will automaticly load it
-fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui, selected_emoji: &mut Option<String>) -> ControlFlow<()> {
+fn display_emoji(
+    ctx: &egui::Context,
+    emoji_name: &str,
+    ui: &mut egui::Ui,
+    selected_emoji: &mut Option<String>,
+) -> ControlFlow<()> {
     match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {
         Ok(bytespoll) => {
-            if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+            if let BytesPoll::Ready {
+                size: _,
+                bytes,
+                mime: _,
+            } = bytespoll
+            {
                 if bytes.to_vec() == vec![0] {
-                    eprintln!("The called emoji was not found in the emoji header: {}", emoji_name);
+                    eprintln!(
+                        "The called emoji was not found in the emoji header: {}",
+                        emoji_name
+                    );
                 }
-                if ui.add(ImageButton::new(Image::from_uri(&format!("bytes://{}", emoji_name)))).clicked() {
+                if ui
+                    .add(ImageButton::new(Image::from_uri(&format!(
+                        "bytes://{}",
+                        emoji_name
+                    ))))
+                    .clicked()
+                {
                     *selected_emoji = Some(emoji_name.to_string());
                 };
             }
-        },
+        }
         Err(err) => {
             if let LoadError::Loading(inner) = err {
                 if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
@@ -362,15 +398,20 @@ fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui, selec
                     if !ui.is_rect_visible(ui.min_rect()) {
                         return ControlFlow::Break(());
                     }
-                            
-                    ctx.include_bytes(format!("bytes://{}", &emoji_name), EMOJI_TUPLES.get(&emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
+
+                    ctx.include_bytes(
+                        format!("bytes://{}", &emoji_name),
+                        EMOJI_TUPLES
+                            .get(&emoji_name)
+                            .map_or_else(|| vec![0], |v| v.to_vec()),
+                    );
                 } else {
                     dbg!(inner);
                 }
             } else {
                 dbg!(err);
             }
-        },
+        }
     }
     ControlFlow::Continue(())
 }
