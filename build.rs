@@ -111,10 +111,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
 
             let file_name_string = file_name.to_string_lossy();
             let file_name = file_name_string.split('.').next().unwrap();
-            let file_path = file_path
-                .to_string_lossy()
-                .replace('\\', r"\\")
-                .replace('/', r"\\");
+            let file_path = file_path.to_string_lossy().replace(['\\', '/'], r"\\");
 
             emoji_tuple.push((file_name.to_string(), file_path));
 

@@ -1,14 +1,14 @@
 use crate::app::backend::{
-    ClientMessage, ConnectionState, MessagingMode, TemplateApp, EMOJIS, EMOJI_TUPLES,
+    ClientMessage, ConnectionState, MessagingMode, TemplateApp, EMOJI_TUPLES,
 };
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
 use egui::epaint::text::cursor::Cursor;
 use egui::load::{BytesPoll, LoadError};
-use egui::text::{CCursor, CursorRange};
+use egui::text::{CCursor, CCursorRange, CursorRange};
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Image, Key, KeyboardShortcut, Layout,
-    Modifiers, RichText, Rounding, Stroke,
+    Modifiers, RichText, Rounding, ScrollArea, Stroke,
 };
 use rand::Rng;
 use rfd::FileDialog;
@@ -40,7 +40,7 @@ impl TemplateApp {
         self.display_emoji_recommendation(ctx);
 
         //Create widget
-        let text_widget = egui::TextEdit::multiline(&mut self.client_ui.message_edit_buffer)
+        let text_widget = egui::TextEdit::multiline(&mut self.client_ui.message_buffer)
             .font(FontId {
                 size: self.font_size,
                 family: FontFamily::default(),
@@ -50,7 +50,6 @@ impl TemplateApp {
             .desired_rows(0)
             .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter))
             .frame(false);
-
         //Create scroll area
         let msg_scroll = egui::ScrollArea::vertical()
             .id_source("usr_input")
@@ -60,16 +59,21 @@ impl TemplateApp {
             .show(&mut frame_ui, |ui| {
                 let mut text_widget = text_widget.show(ui);
 
+                //IF the user has modified this value then we should apply it to the text editor
+                if let Some(cursor_idx) = self.client_ui.text_edit_cursor_desired_index {
+                    text_widget.state.cursor.set_char_range(Some(CCursorRange::one(CCursor::new(cursor_idx))));
+
+                    //Store state
+                    text_widget.state.store(ctx, text_widget.response.id);
+
+                    //Reset desired index
+                    self.client_ui.text_edit_cursor_desired_index = None;
+                }
+
+                //We should reset the value to its updated value
                 if let Some(cursor_rng) = text_widget.cursor_range {
                     self.client_ui.text_edit_cursor_index =
                         cursor_rng.as_ccursor_range().sorted()[0].index;
-                }
-
-                if let Some(cursor) = self.client_ui.text_edit_cursor_desired_index {
-                    text_widget.cursor_range = Some(CursorRange::one(Cursor {
-                        ccursor: CCursor::new(cursor),
-                        ..Default::default()
-                    }));
                 }
 
                 text_widget.response
@@ -99,7 +103,7 @@ impl TemplateApp {
 
     fn display_user_recommendation(&mut self, ctx: &egui::Context) {
         /*We have to clone here because of the closure*/
-        let user_message_clone = self.client_ui.message_edit_buffer.clone();
+        let user_message_clone = self.client_ui.message_buffer.clone();
 
         //We will reconstruct the buffer
         let mut split = user_message_clone.split('@').collect::<Vec<_>>();
@@ -116,7 +120,7 @@ impl TemplateApp {
                 if self.client_ui.display_user_list {
                     ctx.input_mut(|reader| {
                         //Clone var to avoid error
-                        let user_message_clone = self.client_ui.message_edit_buffer.clone();
+                        let user_message_clone = self.client_ui.message_buffer.clone();
 
                         //We will reconstruct the buffer
                         let mut split = user_message_clone.split('@').collect::<Vec<_>>();
@@ -158,7 +162,7 @@ impl TemplateApp {
                                     let split_concat = split.join("@");
 
                                     //Set the buffer to the concatenated vector, append the @ to the 0th index
-                                    self.client_ui.message_edit_buffer = split_concat;
+                                    self.client_ui.message_buffer = split_concat;
                                 }
                             };
                         }
@@ -170,70 +174,56 @@ impl TemplateApp {
 
     fn display_emoji_recommendation(&mut self, ctx: &egui::Context) {
         /*We have to clone here because of the closure*/
-        let user_message_clone = self.client_ui.message_edit_buffer.clone();
+        let user_message_clone = self.client_ui.message_buffer.clone();
 
         //We will reconstruct the buffer
-        let mut split = user_message_clone.split(':').collect::<Vec<_>>();
+        let mut split = user_message_clone
+            .split(':')
+            .map(|item| item.to_string())
+            .collect::<Vec<String>>();
+
+        let split_clone = split.clone();
 
         //We just pattern match for the sake of never panicing, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
         if let Some(last) = split.last_mut() {
             //If the last slice of the string (split by :) doesnt contain any spaces we can paint everything else
-            if !last.contains(' ') && !last.is_empty() {
-                //Set this var true if the : menu is being displayed;
-                self.client_ui.display_emoji_list = true;
+            if !last.contains(' ') && !last.is_empty() && split_clone.len() > 1 {
+                let matched_emojis = self.get_emojis(ctx, last.to_string());
 
-                self.get_emojis(ctx, last.to_string());
+                //If there are no emoji matches we wont allow the user to send the mssage
+                //I might remove this later
+                if matched_emojis.is_empty() {
+                    return;
+                }
 
                 //Consume input when we are diplaying the user list
-                if self.client_ui.display_user_list {
-                    ctx.input_mut(|reader| {
-                        //Clone var to avoid error
-                        let user_message_clone = self.client_ui.message_edit_buffer.clone();
+                ctx.input_mut(|reader| {
+                    //Clone var to avoid error
+                    let user_message_clone = self.client_ui.message_buffer.clone();
 
-                        //We will reconstruct the buffer
+                    //If we have already typed in the emoji OR there are no emoji matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
+                    //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
+                    if reader.consume_key(Modifiers::NONE, Key::Enter) {
+                        //We will reconstruct the original list
                         let mut split = user_message_clone.split(':').collect::<Vec<_>>();
+                        if let Some(last) = split.last_mut() {
+                            let mut formatted_string = matched_emojis[self.client_ui.emoji_selector_index as usize].clone();
+                            
+                            //Make sure we close the emoji
+                            formatted_string.push(':');
+                            
+                            *last = &formatted_string;
 
-                        if let Some(emoji_name) = split.last_mut() {
-                            //If we have already typed in the emoji OR there are no emoji matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
-                            let emoji = EMOJI_TUPLES.get(&emoji_name);
-                            if let Some(_) = emoji {
-                                let name = emoji_name.clone();
-                                
-                                //Wtf logic
-                                if !(name.contains(*last) && *last != name) {
-                                    return;
-                                }
-                            }
+                            //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
+                            let split_concat = split.join(":");
 
-                            //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
-                            if reader.consume_key(Modifiers::NONE, Key::Enter)
-                                && !self.client_ui.incoming_msg.user_seen_list.is_empty()
-                            {
-                                //format the string so the @ stays
-                                if let Some(profile) =
-                                    self.client_ui.incoming_msg.connected_clients_profile.get(
-                                        &self.client_ui.incoming_msg.user_seen_list
-                                            [self.client_ui.user_selector_index as usize]
-                                            .uuid,
-                                    )
-                                {
-                                    let formatted_string = profile.username.clone();
+                            //Set the buffer to the concatenated vector, append the @ to the 0th index
+                            self.client_ui.message_buffer = split_concat;
 
-                                    // *last = &formatted_string;
-
-                                    //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
-                                    let split_concat = split.join("@");
-
-                                    //Set the buffer to the concatenated vector, append the @ to the 0th index
-                                    self.client_ui.message_edit_buffer = split_concat;
-                                }
-                            };
+                            self.client_ui.text_edit_cursor_desired_index = Some(self.client_ui.message_buffer.len());
                         }
-                    });
-                }
-            }
-            else {
-                self.client_ui.display_emoji_list = false;
+                    };
+                });
             }
         }
     }
@@ -253,10 +243,10 @@ impl TemplateApp {
                                 reader.consume_key(Modifiers::SHIFT, Key::Enter)
                             }))
                     {
-                        if !(self.client_ui.message_edit_buffer.trim().is_empty()
+                        if !(self.client_ui.message_buffer.trim().is_empty()
                             || self
                                 .client_ui
-                                .message_edit_buffer
+                                .message_buffer
                                 .trim_end_matches('\n')
                                 .is_empty())
                         {
@@ -264,13 +254,13 @@ impl TemplateApp {
                                 MessagingMode::Edit(index) => {
                                     self.send_msg(ClientMessage::construct_client_message_edit(
                                         index,
-                                        Some(self.client_ui.message_edit_buffer.clone()),
+                                        Some(self.client_ui.message_buffer.clone()),
                                         &self.opened_user_information.uuid,
                                     ))
                                 }
                                 //If its reply or normal mode we can just send the message and call get_reply_index on it
                                 _ => self.send_msg(ClientMessage::construct_normal_msg(
-                                    &self.client_ui.message_edit_buffer,
+                                    &self.client_ui.message_buffer,
                                     &self.opened_user_information.uuid,
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 )),
@@ -291,7 +281,7 @@ impl TemplateApp {
                         //clear vectors
                         self.client_ui.files_to_send.clear();
                         self.client_ui.messaging_mode = MessagingMode::Normal;
-                        self.client_ui.message_edit_buffer.clear();
+                        self.client_ui.message_buffer.clear();
                     }
 
                     //add file button
@@ -414,7 +404,7 @@ impl TemplateApp {
     fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
         let split_user_msg = self
             .client_ui
-            .message_edit_buffer
+            .message_buffer
             .split(['@'])
             .collect::<Vec<_>>();
 
@@ -448,7 +438,6 @@ impl TemplateApp {
                             .iter()
                             .enumerate()
                         {
-                            // self.client_ui.incoming_msg.connected_clients_profile.get(client.uuid).unwrap().username;
                             //If the search buffer is contained in the clients' username
                             if let Some(profile) = self
                                 .client_ui
@@ -514,59 +503,125 @@ impl TemplateApp {
         true
     }
 
-    fn get_emojis(&mut self, ctx: &egui::Context, emoji_name: String) {
+    /// This function draws all the recommended emojis, and returns the list of the emojis' name which contain the ```emoji_name``` arg.
+    fn get_emojis(&mut self, ctx: &egui::Context, emoji_name: String) -> Vec<String> {
+        let matched_emojis: Vec<String> = EMOJI_TUPLES
+            .keys()
+            .filter(|key| key.contains(&emoji_name))
+            .map(|s| s.to_string())
+            .collect();
+
         Area::new("Emojis".into())
             .enabled(true)
             .anchor(Align2::LEFT_BOTTOM, vec2(50., -100.))
             .show(ctx, |ui| {
-                let emoji_group = ui.group(|ui| {
-                    //Display main title
-                    ui.label("Matching emojis:");
-                    //Iter over all of the images
-                    for key in EMOJI_TUPLES.keys() {
-                        //If the user has typed a piece of the emoji's name then this is true
-                        if key.contains(&emoji_name) {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    //Display name of the emoji
-                                    ui.label(RichText::from(*key));
-                                    //Display the emoji itself
-                                    ui.allocate_ui(vec2(30., 30.), |ui| {
-                                        match ctx.try_load_bytes(&format!("bytes://{}", key)) {
-                                            Ok(bytespoll) => {
-                                                if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
-                                                    if bytes.to_vec() == vec![0] {
-                                                        ui.spinner();
-                                                        ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
-                    
-                                                        eprintln!("The called emoji was not found in the emoji header: {}", key);
-                                                    }
-                                                    ui.add(Image::from_uri(&format!("bytes://{}", key)));
-                                                }
-                                            },
-                                            Err(err) => {
-                                                if let LoadError::Loading(inner) = err {
-                                                    if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
-                                                        //check if we are visible, so there are no unnecessary requests
-                                                        if !ui.is_rect_visible(ui.min_rect()) {
-                                                            return;
+                //Draw background, before drawing the area, so it wont overlap
+                if let Some(rect) = self.client_ui.emojis_display_rect {
+                    ui.painter().rect_filled(rect, 5., Color32::BLACK);
+                }
+
+                ui.allocate_ui(vec2(100., 350.), |ui| {
+                    let emoji_group = ui.group(|ui| {
+                        //Display main title
+                        ui.label("Matching emojis:");
+
+                        ui.separator();
+
+                        //Create scroll area
+                        ScrollArea::vertical().show(ui, |ui| {
+                            //Iter over matching emoji names
+                            for (index, emoji_name) in matched_emojis.iter().enumerate() {
+                                //Allocate ui for one entry in the emoji
+                                ui.allocate_ui(vec2(25., 25.), |ui| {
+                                    //Emoji entry group
+                                    let emoji_group = ui.group(|ui| {
+                                        //Create entry
+                                        ui.horizontal_centered(|ui| {
+                                            //Display name of the emoji, if the selector index and the iter index matches we draw the name with yellow
+                                            if self.client_ui.emoji_selector_index as usize == index {
+                                                ui.label(RichText::from(emoji_name).color(Color32::YELLOW));
+                                            }
+                                            else {
+                                                ui.label(RichText::from(emoji_name));
+                                            }
+
+                                            //Display the emoji itself
+                                            ui.allocate_ui(vec2(30., 30.), |ui| {
+                                                //Try to load the emoji bytes
+                                                match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {
+                                                    Ok(bytespoll) => {
+                                                        if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
+                                                            if bytes.to_vec() == vec![0] {
+                                                                ui.spinner();
+                                                                ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
+                                                                eprintln!("The called emoji was not found in the emoji header: {}", emoji_name);
+                                                            }
+                                                            ui.add(Image::from_uri(&format!("bytes://{}", emoji_name)));
                                                         }
-                                
-                                                        ctx.include_bytes(format!("bytes://{}", &key), EMOJI_TUPLES.get(&key).map_or_else(|| vec![0], |v| v.to_vec()));
-                                                    } else {
-                                                        dbg!(inner);
-                                                    }
-                                                } else {
-                                                    dbg!(err);
+                                                    },
+                                                    Err(err) => {
+                                                        if let LoadError::Loading(inner) = err {
+                                                            if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                                //check if we are visible, so there are no unnecessary requests
+                                                                if !ui.is_rect_visible(ui.min_rect()) {
+                                                                    return;
+                                                                }
+                                                                ctx.include_bytes(format!("bytes://{}", &emoji_name), EMOJI_TUPLES.get(emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
+                                                            } else {
+                                                                dbg!(inner);
+                                                            }
+                                                        } else {
+                                                            dbg!(err);
+                                                        }
+                                                    },
                                                 }
-                                            },
-                                        }
+                                            });
+                                        });
                                     });
+
+                                    //If the user uses the arrows to navigate in the emoji entries we should make the current highlighted emoji always visible
+                                    if index == self.client_ui.emoji_selector_index as usize {
+                                        emoji_group.response.scroll_to_me(None);
+                                    }
                                 });
-                            });
-                        }
-                    }
+                            }
+                        });
+                    });
+
+                self.client_ui.emojis_display_rect = Some(emoji_group.response.rect);
+
+                //if there are no matched emojis we return to, avoid panicing cuz of the clamping, and to avoid consuming inputs
+                if matched_emojis.is_empty() {
+                    return;
+                }
+
+                //Log keyboard actions
+                ctx.input_mut(|reader| {
+                    if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                        self.client_ui.emoji_selector_index -= 1;
+                    };
+
+                    if reader.consume_key(Modifiers::NONE, Key::ArrowDown) {
+                        self.client_ui.emoji_selector_index += 1;
+                    };
                 });
+
+                //Clamp to ensure usage safety, we take away 1 for obvious vector indexing reasons
+                self.client_ui.emoji_selector_index = self
+                    .client_ui
+                    .emoji_selector_index
+                    //*Make sure we return if ```self.client_ui.incoming_msg.user_seen_list``` is empty because then it'd overflow
+                    .clamp(
+                        0,
+                        matched_emojis.len() as i32 - 1,
+                    );
+                });
+
+
+                //We repaint to make the background repaint instantly
+                ctx.request_repaint();
             });
+
+        matched_emojis
     }
 }

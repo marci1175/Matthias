@@ -257,7 +257,7 @@ impl TemplateApp {
                                         if let ServerMessageType::Normal(inner) = &item.message_type {
                                             if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/edit.png"), "Edit")).clicked() {
                                                 self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
-                                                self.client_ui.message_edit_buffer = inner.message.to_string();
+                                                self.client_ui.message_buffer = inner.message.to_string();
                                                 ui.close_menu();
                                             }
                                         }

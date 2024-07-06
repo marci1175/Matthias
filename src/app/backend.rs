@@ -310,9 +310,21 @@ pub struct Client {
     #[serde(skip)]
     pub connected_users_display_rect: Option<egui::Rect>,
 
+    ///The rect of the recommended emojis list (which gets displayed when pressing the :)
+    #[serde(skip)]
+    pub emojis_display_rect: Option<egui::Rect>,
+
     ///After pressing @ and the user list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing @ again
     #[serde(skip)]
     pub user_selector_index: i32,
+
+    ///After pressing : and the emoji list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing : again
+    #[serde(skip)]
+    pub emoji_selector_index: i32,
+
+    ///This tracks the selected emoji's key (Its name in the Map)
+    #[serde(skip)]
+    pub emoji_selector_string: String,
 
     #[serde(skip)]
     pub display_user_list: bool,
@@ -399,7 +411,7 @@ pub struct Client {
 
     ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
-    pub message_edit_buffer: String,
+    pub message_buffer: String,
 
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
@@ -427,6 +439,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            emojis_display_rect: None,
             display_emoji_list: false,
             emoji_tab_state: EmojiTypesDiscriminants::Blobs,
             shared_fields: Default::default(),
@@ -470,11 +483,13 @@ impl Default for Client {
             random_generated: false,
 
             //msg
-            message_edit_buffer: String::new(),
+            message_buffer: String::new(),
             incoming_msg: ServerMaster::default(),
 
             voice_recording_start: None,
             last_seen_msg_index: Arc::new(Mutex::new(0)),
+            emoji_selector_index: 0,
+            emoji_selector_string: String::new(),
         }
     }
 }
@@ -1971,14 +1986,13 @@ impl Message {
             MessageDisplay::Text(inner) => ui.label(RichText::from(inner).size(self.size)),
             MessageDisplay::Emoji(inner) => {
                 ui.allocate_ui(vec2(self.size, self.size), |ui| {
-                    let original_emoji_name = inner.name.replace(":", "").to_string();
+                    let original_emoji_name = inner.name.replace(':', "").to_string();
                     match ctx.try_load_bytes(&format!("bytes://{}", original_emoji_name)) {
                         Ok(bytespoll) => {
                             if let BytesPoll::Ready { size:_, bytes, mime:_ } = bytespoll {
                                 if bytes.to_vec() == vec![0] {
                                     ui.spinner();
                                     ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
-
                                     eprintln!("The called emoji was not found in the emoji header: {}", original_emoji_name);
                                 }
                                 ui.add(Image::from_uri(&format!("bytes://{}", original_emoji_name)));
@@ -1991,7 +2005,7 @@ impl Message {
                                     if !ui.is_rect_visible(ui.min_rect()) {
                                         return;
                                     }
-            
+
                                     ctx.include_bytes(format!("bytes://{}", &original_emoji_name), EMOJI_TUPLES.get(&original_emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
                                 } else {
                                     dbg!(inner);
@@ -2061,7 +2075,6 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
     //Create captures in string
     let header_levels_lines: Vec<(usize, String)> = header_capturing_regex
         .captures_iter(&rhs)
-        .into_iter()
         .map(|capture| {
             (
                 {
@@ -2112,12 +2125,24 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
 
         match regex_match.regex_type {
             //This was matches by the emoji capturing Regex
-            MessageDisplayDiscriminants::Emoji => message_stack.push(Message {
-                inner_message: MessageDisplay::Emoji(EmojiDisplay {
-                    name: regex_match.capture,
-                }),
-                size,
-            }),
+            MessageDisplayDiscriminants::Emoji => {
+                //If a valid emoji was provided
+                if EMOJI_TUPLES.contains_key(&regex_match.capture.replace(":", "")) {
+                    message_stack.push(Message {
+                        inner_message: MessageDisplay::Emoji(EmojiDisplay {
+                            name: regex_match.capture,
+                        }),
+                        size,
+                    })
+                }
+                //If an invalid emoji was provided, we should just display it as text
+                else {
+                    message_stack.push(Message {
+                        inner_message: MessageDisplay::Text(regex_match.capture.trim().to_string()),
+                        size,
+                    })
+                }
+            },
 
             //This was matched by the link capturing regex
             MessageDisplayDiscriminants::Link => {
@@ -2126,7 +2151,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
 
                 let hyper_link_label = label_regex
                     .captures_iter(&regex_match.capture)
-                    .nth(0)
+                    .next()
                     .unwrap()
                     .get(1)
                     .unwrap()
@@ -2135,7 +2160,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
                 //Get hyperlink destination
                 let hyper_link_destination = destination_regex
                     .captures_iter(&regex_match.capture)
-                    .nth(0)
+                    .next()
                     .unwrap()
                     .get(1)
                     .unwrap()
@@ -2193,7 +2218,7 @@ fn filter_string(
                 end_idx: mat.end(),
                 regex_type: *regex_type,
                 capture: capture.clone(),
-                header_level: header_level,
+                header_level,
             });
 
             //We remove the captured part of the string of the main string
@@ -2247,7 +2272,7 @@ fn filter_plain_text(
         //Iter over the split strings
         for split_string in split_strings {
             //Fetch the starting index in the original string for ordering the matches later
-            let start_idx = message_part.find(&split_string).unwrap();
+            let start_idx = message_part.find(split_string).unwrap();
 
             //Push back the plaintext match to the ```matches``` buffer
             matches.push(RegexMatch {
@@ -2255,7 +2280,7 @@ fn filter_plain_text(
                 end_idx: start_idx + split_string.len(),
                 regex_type: MessageDisplayDiscriminants::Text,
                 capture: split_string.to_string(),
-                header_level: header_level,
+                header_level,
             });
         }
     }
@@ -2266,7 +2291,7 @@ fn filter_plain_text(
             end_idx: message_part.len(),
             regex_type: MessageDisplayDiscriminants::Text,
             capture: message_part.to_string(),
-            header_level: header_level,
+            header_level,
         });
     }
 }

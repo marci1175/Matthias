@@ -1,8 +1,8 @@
 use egui::{
     load::{BytesPoll, LoadError},
-    vec2, Color32, Image, ImageButton, RichText,
+    vec2, Image, ImageButton,
 };
-use std::{any::Any, collections::BTreeMap, ops::ControlFlow};
+use std::{collections::BTreeMap, ops::ControlFlow};
 
 include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
@@ -229,9 +229,7 @@ impl backend::TemplateApp {
                                         animated_blob.name,
                                         ui,
                                         &mut selected_emoji,
-                                    ) {
-                                        return;
-                                    }
+                                    ) {}
                                 });
                             }
                         });
@@ -247,7 +245,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, blob.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -264,7 +261,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, icon.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -281,7 +277,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, letter.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -298,7 +293,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, number.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -315,7 +309,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, turtle.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -332,7 +325,6 @@ impl backend::TemplateApp {
                                     if let ControlFlow::Break(_) =
                                         display_emoji(ctx, food.name, ui, &mut selected_emoji)
                                     {
-                                        return;
                                     }
                                 });
                             }
@@ -345,15 +337,15 @@ impl backend::TemplateApp {
         //If selected_emoji isnt a Some(_) then the user didnt click anything
         if let Some(emoji_name) = selected_emoji {
             let is_inserting_front =
-                self.client_ui.text_edit_cursor_index == self.client_ui.message_edit_buffer.len();
+                self.client_ui.text_edit_cursor_index == self.client_ui.message_buffer.len();
 
-            self.client_ui.message_edit_buffer.insert_str(
+            self.client_ui.message_buffer.insert_str(
                 self.client_ui.text_edit_cursor_index,
                 &format!(":{}:", emoji_name),
             );
 
             if is_inserting_front {
-                self.client_ui.text_edit_cursor_index = self.client_ui.message_edit_buffer.len();
+                self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
             }
         }
     }
@@ -402,7 +394,7 @@ fn display_emoji(
                     ctx.include_bytes(
                         format!("bytes://{}", &emoji_name),
                         EMOJI_TUPLES
-                            .get(&emoji_name)
+                            .get(emoji_name)
                             .map_or_else(|| vec![0], |v| v.to_vec()),
                     );
                 } else {

@@ -47,7 +47,7 @@ impl TemplateApp {
                     let mut cont = false;
 
                     ui.horizontal_wrapped(|ui| {
-                        while let Some(message) = messages_iter.next() {
+                        for message in messages_iter.by_ref() {
                             //If there is a newline in the messages vector we need to break out of the horizontal wrapped "loop", so well keep drawing in the next line
                             if message.inner_message == MessageDisplay::NewLine {
                                 cont = true;
