@@ -61,7 +61,10 @@ impl TemplateApp {
 
                 //IF the user has modified this value then we should apply it to the text editor
                 if let Some(cursor_idx) = self.client_ui.text_edit_cursor_desired_index {
-                    text_widget.state.cursor.set_char_range(Some(CCursorRange::one(CCursor::new(cursor_idx))));
+                    text_widget
+                        .state
+                        .cursor
+                        .set_char_range(Some(CCursorRange::one(CCursor::new(cursor_idx))));
 
                     //Store state
                     text_widget.state.store(ctx, text_widget.response.id);
@@ -207,11 +210,13 @@ impl TemplateApp {
                         //We will reconstruct the original list
                         let mut split = user_message_clone.split(':').collect::<Vec<_>>();
                         if let Some(last) = split.last_mut() {
-                            let mut formatted_string = matched_emojis[self.client_ui.emoji_selector_index as usize].clone();
-                            
+                            let mut formatted_string = matched_emojis
+                                [self.client_ui.emoji_selector_index as usize]
+                                .clone();
+
                             //Make sure we close the emoji
                             formatted_string.push(':');
-                            
+
                             *last = &formatted_string;
 
                             //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
@@ -220,7 +225,8 @@ impl TemplateApp {
                             //Set the buffer to the concatenated vector, append the @ to the 0th index
                             self.client_ui.message_buffer = split_concat;
 
-                            self.client_ui.text_edit_cursor_desired_index = Some(self.client_ui.message_buffer.len());
+                            self.client_ui.text_edit_cursor_desired_index =
+                                Some(self.client_ui.message_buffer.len());
                         }
                     };
                 });

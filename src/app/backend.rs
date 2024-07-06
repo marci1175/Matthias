@@ -2142,7 +2142,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
                         size,
                     })
                 }
-            },
+            }
 
             //This was matched by the link capturing regex
             MessageDisplayDiscriminants::Link => {
