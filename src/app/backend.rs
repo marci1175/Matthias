@@ -1151,15 +1151,15 @@ pub struct ServerFileUpload {
 /// This enum holds all the Server reply types so it can be decoded more easily on the client side
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerReplyType {
-    FileReply(ServerFileReply),
+    File(ServerFileReply),
 
-    ImageReply(ServerImageReply),
+    Image(ServerImageReply),
 
-    AudioReply(ServerAudioReply),
+    Audio(ServerAudioReply),
 
     /// The requested client's profile
     /// The first value is the encrypted uuid
-    ClientReply(ServerClientReply),
+    Client(ServerClientReply),
 }
 
 /// This struct holds everything important so the client can save and handle client profiles
@@ -1277,12 +1277,12 @@ pub enum ServerMessageType {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum ServerMessage {
     /// This is sent when a user is connected to the server
-    UserConnect(ClientProfile),
+    Connect(ClientProfile),
     /// This is sent when a user is disconnecting from the server
-    UserDisconnect(ClientProfile),
+    Disconnect(ClientProfile),
 
     /// This is sent when a user is banned from the server
-    UserBan(ClientProfile),
+    Ban(ClientProfile),
 }
 
 ///This struct contains all the reactions of one message
@@ -2127,7 +2127,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
             //This was matches by the emoji capturing Regex
             MessageDisplayDiscriminants::Emoji => {
                 //If a valid emoji was provided
-                if EMOJI_TUPLES.contains_key(&regex_match.capture.replace(":", "")) {
+                if EMOJI_TUPLES.contains_key(&regex_match.capture.replace(':', "")) {
                     message_stack.push(Message {
                         inner_message: MessageDisplay::Emoji(EmojiDisplay {
                             name: regex_match.capture,

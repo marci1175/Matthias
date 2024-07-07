@@ -82,13 +82,13 @@ impl TemplateApp {
                                                                     message_clone.to_string()
                                                                 },
                                                                 ServerMessageType::Server(server) => match server {
-                                                                    crate::app::backend::ServerMessage::UserConnect(profile) => {
+                                                                    crate::app::backend::ServerMessage::Connect(profile) => {
                                                                         format!("{} has connected", profile.username)
                                                                     },
-                                                                    crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                                                                    crate::app::backend::ServerMessage::Disconnect(profile) => {
                                                                         format!("{} has disconnected", profile.username)
                                                                     },
-                                                                    crate::app::backend::ServerMessage::UserBan(profile) => {
+                                                                    crate::app::backend::ServerMessage::Ban(profile) => {
                                                                         format!("{} has benned banned", profile.username)
                                                                     }
                                                                 },

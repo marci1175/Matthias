@@ -408,7 +408,7 @@ impl MessageService {
                                 let server_msg = ServerOutput {
                                     replying_to: None,
                                     message_type: ServerMessageType::Server(
-                                        super::backend::ServerMessage::UserConnect(profile.clone()),
+                                        super::backend::ServerMessage::Connect(profile.clone()),
                                     ),
                                     author: "Server".to_string(),
                                     message_date: {
@@ -668,7 +668,7 @@ impl MessageService {
 
         let server_msg = ServerOutput {
             replying_to: None,
-            message_type: ServerMessageType::Server(super::backend::ServerMessage::UserDisconnect(
+            message_type: ServerMessageType::Server(super::backend::ServerMessage::Disconnect(
                 self.connected_clients_profile
                     .lock()
                     .await
@@ -713,7 +713,7 @@ impl MessageService {
 
         let server_msg = ServerOutput {
             replying_to: None,
-            message_type: ServerMessageType::Server(super::backend::ServerMessage::UserBan(
+            message_type: ServerMessageType::Server(super::backend::ServerMessage::Ban(
                 self.connected_clients_profile
                     .lock()
                     .await
@@ -1037,7 +1037,7 @@ impl MessageService {
             ClientRequestTypeStruct::ImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.index).await;
 
-                serde_json::to_string(&ServerReplyType::ImageReply(ServerImageReply {
+                serde_json::to_string(&ServerReplyType::Image(ServerImageReply {
                     bytes: read_file,
                     index: img_request.index,
                 }))
@@ -1046,7 +1046,7 @@ impl MessageService {
             ClientRequestTypeStruct::FileRequest(file_request) => {
                 let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
 
-                serde_json::to_string(&ServerReplyType::FileReply(ServerFileReply {
+                serde_json::to_string(&ServerReplyType::File(ServerFileReply {
                     file_name: file_name.clone(),
                     bytes: file_bytes.clone(),
                 }))
@@ -1055,7 +1055,7 @@ impl MessageService {
             ClientRequestTypeStruct::AudioRequest(audio_request) => {
                 let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
 
-                serde_json::to_string(&ServerReplyType::AudioReply(ServerAudioReply {
+                serde_json::to_string(&ServerReplyType::Audio(ServerAudioReply {
                     bytes: file_bytes,
                     index: audio_request.index,
                     file_name: file_name.unwrap_or_default(),
@@ -1067,7 +1067,7 @@ impl MessageService {
 
                 let client = connected_clients.get(client_request_uuid).unwrap();
 
-                serde_json::to_string(&ServerReplyType::ClientReply(ServerClientReply {
+                serde_json::to_string(&ServerReplyType::Client(ServerClientReply {
                     uuid: client_request_uuid.to_string(),
                     profile: client.clone(),
                 }))

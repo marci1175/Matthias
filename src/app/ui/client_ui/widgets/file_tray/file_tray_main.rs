@@ -107,7 +107,6 @@ impl TemplateApp {
                             if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
                                 //Reset messaging mode
                                 self.client_ui.messaging_mode = MessagingMode::Normal;
-                                
                                 //Clear messaging buffer
                                 self.client_ui.message_buffer.clear();
                             }
@@ -134,13 +133,13 @@ impl TemplateApp {
                                             ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
                                             ServerMessageType::Normal(msg) => msg.message.clone(),
                                             ServerMessageType::Server(server) => match server {
-                                                crate::app::backend::ServerMessage::UserConnect(profile) => {
+                                                crate::app::backend::ServerMessage::Connect(profile) => {
                                                     format!("{} has connected", profile.username)
                                                 },
-                                                crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                                                crate::app::backend::ServerMessage::Disconnect(profile) => {
                                                     format!("{} has disconnected", profile.username)
                                                 },
-                                                crate::app::backend::ServerMessage::UserBan(profile) => {
+                                                crate::app::backend::ServerMessage::Ban(profile) => {
                                                     format!("{} has been banned", profile.username)
                                                 },
                                             },

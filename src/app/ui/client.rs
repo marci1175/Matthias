@@ -598,7 +598,10 @@ impl TemplateApp {
                                                     message.new_message.clone()
                                                 {
                                                     if let ServerMessageType::Normal(inner) =
-                                                        &mut self.client_ui.incoming_msg.message_list
+                                                        &mut self
+                                                            .client_ui
+                                                            .incoming_msg
+                                                            .message_list
                                                             [message.index as usize]
                                                             .message_type
                                                     {
@@ -661,10 +664,10 @@ impl TemplateApp {
                                         match incoming_reply {
                                             Ok(inner) => {
                                                 match inner {
-                                                    ServerReplyType::FileReply(file) => {
+                                                    ServerReplyType::File(file) => {
                                                         let _ = write_file(file);
                                                     }
-                                                    ServerReplyType::ImageReply(image) => {
+                                                    ServerReplyType::Image(image) => {
                                                         //Forget image so itll be able to get displayed
                                                         ctx.forget_image(&format!(
                                                             "bytes://{}",
@@ -677,7 +680,7 @@ impl TemplateApp {
                                                             image.bytes,
                                                         );
                                                     }
-                                                    ServerReplyType::AudioReply(audio) => {
+                                                    ServerReplyType::Audio(audio) => {
                                                         let stream_handle = self
                                                             .client_ui
                                                             .audio_playback
@@ -724,7 +727,7 @@ impl TemplateApp {
                                                             ))
                                                             .unwrap();
                                                     }
-                                                    ServerReplyType::ClientReply(client_reply) => {
+                                                    ServerReplyType::Client(client_reply) => {
                                                         self.client_ui
                                                             .incoming_msg
                                                             .connected_clients_profile

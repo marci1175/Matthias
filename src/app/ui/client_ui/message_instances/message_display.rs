@@ -99,36 +99,27 @@ impl TemplateApp {
                             }
                         }
                         Err(load_error) => {
-                            match load_error {
-                                egui::load::LoadError::Loading(inner) => {
-                                    if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
-                                        //check if we are visible
-                                        if !ui.is_rect_visible(ui.min_rect()) {
-                                            return;
-                                        }
-
-                                        //Load an empty byte to the said URI
-                                        ctx.include_bytes(format!("bytes://{}", picture.index), vec![0]);
-
-                                        //We dont have file on our local system so we have to ask the server to provide it
-                                        let uuid = &self.opened_user_information.uuid;
-
-                                        let message =
-                                            ClientMessage::construct_image_request_msg(picture.index, uuid);
-
-                                        let connection = self.client_connection.clone();
-
-                                        tokio::spawn(async move {
-                                            //We only have to send the message it will get recived in a diff place
-                                            connection.clone().send_message(message).await.unwrap();
-                                        });
+                            if let egui::load::LoadError::Loading(inner) = load_error {
+                                if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                    //check if we are visible
+                                    if !ui.is_rect_visible(ui.min_rect()) {
+                                        return;
                                     }
-                                    else {
-                                        dbg!(inner);
-                                    }
-                                },
-
-                                _ => {}
+                                    //Load an empty byte to the said URI
+                                    ctx.include_bytes(format!("bytes://{}", picture.index), vec![0]);
+                                    //We dont have file on our local system so we have to ask the server to provide it
+                                    let uuid = &self.opened_user_information.uuid;
+                                    let message =
+                                        ClientMessage::construct_image_request_msg(picture.index, uuid);
+                                    let connection = self.client_connection.clone();
+                                    tokio::spawn(async move {
+                                        //We only have to send the message it will get recived in a diff place
+                                        connection.clone().send_message(message).await.unwrap();
+                                    });
+                                }
+                                else {
+                                    dbg!(inner);
+                                }
                             }
                         }
                     };
@@ -330,13 +321,13 @@ impl TemplateApp {
             }
             crate::app::backend::ServerMessageType::Server(server_msg) => {
                 let message = match server_msg {
-                    crate::app::backend::ServerMessage::UserConnect(profile) => {
+                    crate::app::backend::ServerMessage::Connect(profile) => {
                         format!("@{} has connected to the server.", profile.username)
                     }
-                    crate::app::backend::ServerMessage::UserDisconnect(profile) => {
+                    crate::app::backend::ServerMessage::Disconnect(profile) => {
                         format!("@{} has disconnected from the server.", profile.username)
                     }
-                    crate::app::backend::ServerMessage::UserBan(profile) => {
+                    crate::app::backend::ServerMessage::Ban(profile) => {
                         format!("@{} has been banned from the server.", profile.username)
                     }
                 };
