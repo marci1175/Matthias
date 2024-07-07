@@ -40,22 +40,25 @@ impl TemplateApp {
         self.display_emoji_recommendation(ctx);
 
         //If the key was not consumed by any of the two previous functions, we will edit the latest message sent by us
-        ctx.input_mut(|reader| {
-            //Consume key
-            if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
-                //Iter over all the messages so we will get the latest message sent by us
-                for (idx, message) in self.client_ui.incoming_msg.message_list.iter().enumerate() {
-                    //Validate editable message
-                    if let ServerMessageType::Normal(inner) = &message.message_type {
-                        if message.uuid == self.opened_user_information.uuid && message.message_type != ServerMessageType::Deleted {
-                            self.client_ui.messaging_mode = MessagingMode::Edit(idx);
-                            self.client_ui.message_buffer = inner.message.to_string();
+        //We wont allow this when we are either editing a message or we are replying to one
+        if !(matches!(self.client_ui.messaging_mode, MessagingMode::Edit(_)) || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_))) {
+            ctx.input_mut(|reader| {
+                //Consume key
+                if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                    //Iter over all the messages so we will get the latest message sent by us
+                    for (idx, message) in self.client_ui.incoming_msg.message_list.iter().enumerate() {
+                        //Validate editable message
+                        if let ServerMessageType::Normal(inner) = &message.message_type {
+                            if message.uuid == self.opened_user_information.uuid && message.message_type != ServerMessageType::Deleted {
+                                self.client_ui.messaging_mode = MessagingMode::Edit(idx);
+                                self.client_ui.message_buffer = inner.message.to_string();
+                            }
                         }
+                        
                     }
-                    
                 }
-            }
-        });
+            });
+        }
 
         //Create widget
         let text_widget = egui::TextEdit::multiline(&mut self.client_ui.message_buffer)
