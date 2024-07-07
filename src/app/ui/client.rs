@@ -223,7 +223,7 @@ impl TemplateApp {
                 egui::ScrollArea::new([true, true]).auto_shrink([false, true]).show(ui, |ui|{
                     ui.allocate_ui(ui.available_size(), |ui|{
                         let mut has_search = false;
-                        for (index, message) in self.client_ui.incoming_msg.struct_list.iter().enumerate() {
+                        for (index, message) in self.client_ui.incoming_msg.message_list.iter().enumerate() {
                             match self.client_ui.search_parameter {
                                 SearchType::Name => {
                                     if let ServerMessageType::Normal(inner_message) = &message.message_type {
@@ -522,7 +522,7 @@ impl TemplateApp {
                     &self.login_username,
                     &self.opened_user_information.uuid,
                     //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
-                    self.client_ui.incoming_msg.struct_list.len(),
+                    self.client_ui.incoming_msg.message_list.len(),
                     Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
                 );
 
@@ -598,7 +598,7 @@ impl TemplateApp {
                                                     message.new_message.clone()
                                                 {
                                                     if let ServerMessageType::Normal(inner) =
-                                                        &mut self.client_ui.incoming_msg.struct_list
+                                                        &mut self.client_ui.incoming_msg.message_list
                                                             [message.index as usize]
                                                             .message_type
                                                     {
@@ -606,7 +606,7 @@ impl TemplateApp {
                                                         inner.has_been_edited = true;
                                                     }
                                                 } else {
-                                                    self.client_ui.incoming_msg.struct_list
+                                                    self.client_ui.incoming_msg.message_list
                                                         [message.index as usize]
                                                         .message_type = ServerMessageType::Deleted;
                                                 }
@@ -646,7 +646,7 @@ impl TemplateApp {
                                                 //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
                                                 self.client_ui
                                                     .incoming_msg
-                                                    .struct_list
+                                                    .message_list
                                                     .push(msg.message);
                                             }
                                         }

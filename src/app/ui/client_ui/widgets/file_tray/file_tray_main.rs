@@ -79,13 +79,13 @@ impl TemplateApp {
                         }
                         ui.horizontal(|ui| {
                             ui.group(|ui|{
-                                //Replying to ui part
+                                //Editing message ui part
                                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                     //place them in one line
                                     //Selected message
-                                    let selected_message = &self.client_ui.incoming_msg.struct_list[edit_index];
+                                    let selected_message = &self.client_ui.incoming_msg.message_list[edit_index];
                                     ui.horizontal(|ui| {
-                                        //Replying to "{author}:"
+                                        //Editing: {msg}
                                         ui.label(RichText::from(match &selected_message.message_type {
                                             //We only have to display this enum variant cuz thats the only one which can be edited
                                             ServerMessageType::Normal(msg) => format!("Editing: {}", {
@@ -105,7 +105,11 @@ impl TemplateApp {
                                 });
                             });
                             if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
+                                //Reset messaging mode
                                 self.client_ui.messaging_mode = MessagingMode::Normal;
+                                
+                                //Clear messaging buffer
+                                self.client_ui.message_buffer.clear();
                             }
                         });
                     }
@@ -119,7 +123,7 @@ impl TemplateApp {
                                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                     //place them in one line
                                     //Selected message
-                                    let selected_message = &self.client_ui.incoming_msg.struct_list[replying_to];
+                                    let selected_message = &self.client_ui.incoming_msg.message_list[replying_to];
                                     ui.horizontal(|ui| {
                                         //Replying to "{author}:"
                                         ui.label(RichText::from(format!("{}:", selected_message.author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));

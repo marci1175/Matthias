@@ -1412,7 +1412,7 @@ impl ServerOutput {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster {
     ///All of the messages recived from the server
-    pub struct_list: Vec<ServerOutput>,
+    pub message_list: Vec<ServerOutput>,
 
     ///All of the messages' reactions are
     pub reaction_list: Vec<MessageReaction>,

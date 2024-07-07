@@ -1,5 +1,5 @@
 use crate::app::backend::{
-    ClientMessage, ConnectionState, MessagingMode, TemplateApp, EMOJI_TUPLES,
+    ClientMessage, ConnectionState, MessagingMode, ServerMessageType, TemplateApp, EMOJI_TUPLES
 };
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
@@ -39,6 +39,24 @@ impl TemplateApp {
 
         self.display_emoji_recommendation(ctx);
 
+        //If the key was not consumed by any of the two previous functions, we will edit the latest message sent by us
+        ctx.input_mut(|reader| {
+            //Consume key
+            if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                //Iter over all the messages so we will get the latest message sent by us
+                for (idx, message) in self.client_ui.incoming_msg.message_list.iter().enumerate() {
+                    //Validate editable message
+                    if let ServerMessageType::Normal(inner) = &message.message_type {
+                        if message.uuid == self.opened_user_information.uuid && message.message_type != ServerMessageType::Deleted {
+                            self.client_ui.messaging_mode = MessagingMode::Edit(idx);
+                            self.client_ui.message_buffer = inner.message.to_string();
+                        }
+                    }
+                    
+                }
+            }
+        });
+
         //Create widget
         let text_widget = egui::TextEdit::multiline(&mut self.client_ui.message_buffer)
             .font(FontId {
@@ -50,6 +68,7 @@ impl TemplateApp {
             .desired_rows(0)
             .return_key(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter))
             .frame(false);
+
         //Create scroll area
         let msg_scroll = egui::ScrollArea::vertical()
             .id_source("usr_input")
@@ -180,7 +199,7 @@ impl TemplateApp {
         let user_message_clone = self.client_ui.message_buffer.clone();
 
         //We will reconstruct the buffer
-        let mut split = user_message_clone
+        let split = user_message_clone
             .split(':')
             .map(|item| item.to_string())
             .collect::<Vec<String>>();
@@ -188,7 +207,7 @@ impl TemplateApp {
         let split_clone = split.clone();
 
         //We just pattern match for the sake of never panicing, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
-        if let Some(last) = split.last_mut() {
+        if let Some(last) = split.last() {
             //If the last slice of the string (split by :) doesnt contain any spaces we can paint everything else
             if !last.contains(' ') && !last.is_empty() && split_clone.len() > 1 {
                 let matched_emojis = self.get_emojis(ctx, last.to_string());

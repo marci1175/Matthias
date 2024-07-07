@@ -38,14 +38,14 @@ impl TemplateApp {
                             }
 
                             //Check if sink_list is bigger than messages, to avoid crashing
-                            if self.client_ui.audio_playback.sink_list.len() > self.client_ui.incoming_msg.struct_list.len() {
-                                for _ in 0..(self.client_ui.audio_playback.sink_list.len() as i32 - self.client_ui.incoming_msg.struct_list.len() as i32).abs() {
+                            if self.client_ui.audio_playback.sink_list.len() > self.client_ui.incoming_msg.message_list.len() {
+                                for _ in 0..(self.client_ui.audio_playback.sink_list.len() as i32 - self.client_ui.incoming_msg.message_list.len() as i32).abs() {
                                     self.client_ui.audio_playback.sink_list.remove(self.client_ui.audio_playback.sink_list.len() - 1);
                                 }
                             }
 
                             //Allocate places manually for the audio playback (sink_list), but only allocate what we need
-                            for _ in 0..(self.client_ui.incoming_msg.struct_list.len() - self.client_ui.audio_playback.sink_list.len()) {
+                            for _ in 0..(self.client_ui.incoming_msg.message_list.len() - self.client_ui.audio_playback.sink_list.len()) {
                                 self.client_ui.audio_playback.sink_list.push(None);
 
                                 //Define defaults, for speed and volume based on the same logic as above ^
@@ -54,21 +54,21 @@ impl TemplateApp {
 
                             let mut message_instances: Vec<Response> = Vec::new();
 
-                            for (iter_index, item) in self.client_ui.incoming_msg.clone().struct_list.iter().enumerate() {
+                            for (iter_index, item) in self.client_ui.incoming_msg.clone().message_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui| {
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
 
                                                 ui.horizontal(|ui| {
-                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_msg.struct_list[replied_to].uuid.clone(), ui);
+                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_msg.message_list[replied_to].uuid.clone(), ui);
 
 
                                                 if ui.add(egui::widgets::Button::new(
                                                     RichText::from(
                                                         format!("{}: {}",
-                                                            self.client_ui.incoming_msg.struct_list[replied_to].author,
-                                                            match &self.client_ui.incoming_msg.struct_list[replied_to].message_type {
+                                                            self.client_ui.incoming_msg.message_list[replied_to].author,
+                                                            match &self.client_ui.incoming_msg.message_list[replied_to].message_type {
                                                                 ServerMessageType::Deleted => "Deleted message".to_string(),
                                                                 ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                                 ServerMessageType::Image(_img) => "Image".to_string(),

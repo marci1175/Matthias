@@ -789,7 +789,7 @@ impl MessageService {
         //Construct reply
         let server_master = ServerMaster {
             //Return an empty message list
-            struct_list: self.messages.try_lock().unwrap().clone(),
+            message_list: self.messages.try_lock().unwrap().clone(),
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
             reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
             connected_clients_profile: self.connected_clients_profile.try_lock().unwrap().clone(),
