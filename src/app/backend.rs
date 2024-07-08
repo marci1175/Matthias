@@ -1,4 +1,5 @@
 use super::client::{connect_to_server, ServerReply};
+use super::read_extensions_dir;
 use super::server::SharedFields;
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
@@ -267,7 +268,21 @@ impl Default for TemplateApp {
 impl TemplateApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            let mut data: TemplateApp = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+
+            //Read extension dir every startup
+            match read_extensions_dir() {
+                Ok(extension_list) => {
+                    data.client_ui.extension_list = extension_list;
+                },
+                //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
+                Err(err) => {
+                    dbg!(err);
+                    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
+                },
+            }
+
+            return data;
         }
 
         Default::default()
@@ -289,8 +304,6 @@ impl Default for EmojiTypesDiscriminants {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
-
-    #[serde(skip)]
     /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
     pub extension_list: Vec<ExtensionProperties>,
 
@@ -2328,7 +2341,7 @@ pub struct HyperLink {
     pub destination: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
 pub struct ExtensionProperties {
     pub contents: String,
 

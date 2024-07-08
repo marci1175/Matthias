@@ -13,7 +13,7 @@ impl TemplateApp {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
     ) -> egui::InnerResponse<()> {
-        ui.allocate_ui(vec2(ui.available_width(), ui.available_height() - self.client_ui.scroll_widget_rect.height() + 10.), |ui|{
+        ui.allocate_ui(vec2(ui.available_width(), ui.available_height()), |ui|{
             egui::ScrollArea::vertical()
                     .id_source("msg_area")
                     .stick_to_bottom(self.client_ui.scroll_to_message.is_none())

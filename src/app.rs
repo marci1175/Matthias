@@ -518,7 +518,7 @@ impl backend::TemplateApp {
     }
 }
 
-fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
+pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
     let mut extensions: Vec<ExtensionProperties> = Vec::new();
 
     for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))?
