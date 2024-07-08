@@ -6,13 +6,13 @@ edition = "2021"
 rust-version = "1.71"
 
 [dependencies]
-egui = "0.28.0"
-egui_extras = { version = "0.28.0", features = ["all_loaders", "datepicker", "serde", "syntect"] }
+egui = "0.28.1"
+egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
 
 prost = "0.10"
 tokio = { version = "1.37.0", features = ["full"] }
-eframe = { version = "0.28.0", default-features = true, features = [
+eframe = { version = "0.28.1", default-features = true, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
@@ -48,6 +48,7 @@ tokio-util = "0.7.11"
 dashmap = {version = "6.0.0", features = ["serde"]}
 sha256 = "1.5.0"
 phf = {version = "0.11.2", features = ["macros"]}
+mlua = {version = "0.9.9", features = ["luajit"]}
 
 [dependencies.uuid]
 version = "1.6.1"
