@@ -1,6 +1,6 @@
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Layout, RichText};
+use egui::{vec2, Align, Color32, Layout, RichText, TextEdit};
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -90,7 +90,7 @@ impl eframe::App for backend::TemplateApp {
             .show(ctx, |ui| {
                 //show client mode settings
                 if self.main.client_mode {
-                    self.client_setup_ui(ui, ctx);
+                    self.client_settings_ui(ui, ctx);
 
                     self.server_setup_ui(ui, ctx);
                 }
@@ -221,145 +221,145 @@ impl backend::TemplateApp {
         self.client_connection.state = ConnectionState::Disconnected;
     }
 
-    fn client_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.label("Connect to an ip address");
+    fn client_settings_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.collapsing("Client", |ui| {
+            ui.label("Connect to an ip address");
 
-        let compare_ip = self.client_ui.send_on_ip.clone();
+            let compare_ip = self.client_ui.send_on_ip.clone();
 
-        ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
-            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                ui.add_enabled_ui(
-                    matches!(self.client_connection.state, ConnectionState::Disconnected)
-                        || matches!(self.client_connection.state, ConnectionState::Error),
-                    |ui| {
-                        ui.text_edit_singleline(&mut self.client_ui.send_on_ip);
-                    },
-                );
+            ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    ui.add_enabled_ui(
+                        matches!(self.client_connection.state, ConnectionState::Disconnected)
+                            || matches!(self.client_connection.state, ConnectionState::Error),
+                        |ui| {
+                            ui.add(TextEdit::singleline(&mut self.client_ui.send_on_ip).hint_text("Address")).on_hover_text("Formatting: [FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF]:PORT");
+                        },
+                    );
 
-                match &self.client_connection.state {
-                    ConnectionState::Connected(_) => {
-                        if ui
-                            .button(RichText::from("Disconnect").color(Color32::RED))
-                            .clicked()
-                        {
-                            self.disconnect_from_server();
+                    match &self.client_connection.state {
+                        ConnectionState::Connected(_) => {
+                            if ui
+                                .button(RichText::from("Disconnect").color(Color32::RED))
+                                .clicked()
+                            {
+                                self.disconnect_from_server();
+                            }
                         }
-                    }
-                    ConnectionState::Connecting => {
-                        if ui
-                            .button(RichText::from("Cancel connection").color(Color32::LIGHT_GRAY))
-                            .clicked()
-                        {
-                            //Reset client
-                            self.reset_client_connection();
-                        }
-                    }
-                    _ => {
-                        if ui.button("Connect").clicked() {
-                            let ip = self.client_ui.send_on_ip.clone();
-
-                            let username = self.login_username.clone();
-                            let password = self
-                                .client_ui
-                                .req_passw
-                                .then_some(&self.client_ui.client_password)
-                                .cloned();
-
-                            let sender = self.connection_sender.clone();
-
-                            //Reset shutdown token
-                            self.autosync_shutdown_token = CancellationToken::new();
-
-                            //Clone ctx so we can call request repaint from another thread
-                            let ctx = ctx.clone();
-
-                            let user_information = self.opened_user_information.clone();
-
-                            //Reset all messages and everything else
-                            self.client_ui.incoming_msg = ServerMaster::default();
-
-                            //Forget all imaes so the cahced imges will be deleted
-                            ctx.forget_all_images();
-
-                            tokio::task::spawn(async move {
-                                match ClientConnection::connect(
-                                    ip,
-                                    username,
-                                    password,
-                                    &user_information.uuid,
-                                    user_information.profile,
+                        ConnectionState::Connecting => {
+                            if ui
+                                .button(
+                                    RichText::from("Cancel connection").color(Color32::LIGHT_GRAY),
                                 )
-                                .await
-                                {
-                                    Ok(ok) => {
-                                        ctx.request_repaint();
-                                        if let Err(err) = sender.send(Some(ok)) {
-                                            dbg!(err);
-                                        };
-                                    }
-                                    Err(err) => {
-                                        display_error_message(err);
-                                        if let Err(err) = sender.send(None) {
-                                            dbg!(err);
-                                        };
-                                    }
-                                };
-                            });
+                                .clicked()
+                            {
+                                //Reset client
+                                self.reset_client_connection();
+                            }
+                        }
+                        _ => {
+                            if ui.button("Connect").clicked() {
+                                let ip = self.client_ui.send_on_ip.clone();
 
-                            //reset autosync
-                            self.server_sender_thread = None;
+                                let username = self.login_username.clone();
+                                let password = self
+                                    .client_ui
+                                    .req_passw
+                                    .then_some(&self.client_ui.client_password)
+                                    .cloned();
 
-                            self.client_connection.state = ConnectionState::Connecting;
+                                let sender = self.connection_sender.clone();
+
+                                //Reset shutdown token
+                                self.autosync_shutdown_token = CancellationToken::new();
+
+                                //Clone ctx so we can call request repaint from another thread
+                                let ctx = ctx.clone();
+
+                                let user_information = self.opened_user_information.clone();
+
+                                //Reset all messages and everything else
+                                self.client_ui.incoming_msg = ServerMaster::default();
+
+                                //Forget all imaes so the cahced imges will be deleted
+                                ctx.forget_all_images();
+
+                                tokio::task::spawn(async move {
+                                    match ClientConnection::connect(
+                                        ip,
+                                        username,
+                                        password,
+                                        &user_information.uuid,
+                                        user_information.profile,
+                                    )
+                                    .await
+                                    {
+                                        Ok(ok) => {
+                                            ctx.request_repaint();
+                                            if let Err(err) = sender.send(Some(ok)) {
+                                                dbg!(err);
+                                            };
+                                        }
+                                        Err(err) => {
+                                            display_error_message(err);
+                                            if let Err(err) = sender.send(None) {
+                                                dbg!(err);
+                                            };
+                                        }
+                                    };
+                                });
+
+                                //reset autosync
+                                self.server_sender_thread = None;
+
+                                self.client_connection.state = ConnectionState::Connecting;
+                            }
                         }
                     }
-                }
 
-                ui.label(match self.client_connection.state {
-                    ConnectionState::Connected(_) => {
-                        RichText::from("Connected").color(Color32::GREEN)
-                    }
-                    ConnectionState::Disconnected => {
-                        RichText::from("Disconnected").color(Color32::LIGHT_RED)
-                    }
-                    ConnectionState::Connecting => {
-                        RichText::from("Connecting").color(Color32::LIGHT_GREEN)
-                    }
-                    ConnectionState::Error => {
-                        RichText::from("Error when trying to connect").color(Color32::RED)
-                    }
-                });
+                    ui.label(match self.client_connection.state {
+                        ConnectionState::Connected(_) => {
+                            RichText::from("Connected").color(Color32::GREEN)
+                        }
+                        ConnectionState::Disconnected => {
+                            RichText::from("Disconnected").color(Color32::LIGHT_RED)
+                        }
+                        ConnectionState::Connecting => {
+                            RichText::from("Connecting").color(Color32::LIGHT_GREEN)
+                        }
+                        ConnectionState::Error => {
+                            RichText::from("Error when trying to connect").color(Color32::RED)
+                        }
+                    });
 
-                ui.allocate_ui(vec2(25., 25.), |ui| {
-                    if ui
-                        .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../icons/bookmark.png"
-                        )))
-                        .clicked()
-                    {
-                        self.main.bookmark_mode = !self.main.bookmark_mode;
-                    };
+                    ui.allocate_ui(vec2(25., 25.), |ui| {
+                        if ui
+                            .add(egui::widgets::ImageButton::new(egui::include_image!(
+                                "../icons/bookmark.png"
+                            )))
+                            .clicked()
+                        {
+                            self.main.bookmark_mode = !self.main.bookmark_mode;
+                        };
+                    });
                 });
             });
+
+            let compare_passwords = self.client_ui.client_password.clone();
+            if self.client_ui.req_passw {
+                ui.add(TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password"));
+            };
+
+            if compare_passwords != self.client_ui.client_password
+                || self.client_ui.send_on_ip != compare_ip
+            {
+                self.server_sender_thread = None;
+                self.client_ui.incoming_msg = ServerMaster::default();
+            }
+
+            //Draw the extensions part of the ui
+            self.client_extension(ui, ctx);
         });
-
-        ui.checkbox(&mut self.client_ui.req_passw, "Set password");
-        let compare_passwords = self.client_ui.client_password.clone();
-        if self.client_ui.req_passw {
-            ui.text_edit_singleline(&mut self.client_ui.client_password);
-        };
-
-        if compare_passwords != self.client_ui.client_password
-            || self.client_ui.send_on_ip != compare_ip
-        {
-            self.server_sender_thread = None;
-            self.client_ui.incoming_msg = ServerMaster::default();
-        }
-
-        if self.client_ui.invalid_password {
-            ui.label(RichText::from("Invalid Password!").color(Color32::RED));
-        }
-
-        ui.separator();
     }
 
     fn disconnect_from_server(&mut self) {
@@ -386,5 +386,9 @@ impl backend::TemplateApp {
 
         //Reset client, as we are already disconnecting above
         self.client_connection.reset_state();
+    }
+
+    fn client_extension(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.label("Extensions");
     }
 }

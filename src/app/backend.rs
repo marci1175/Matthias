@@ -361,10 +361,6 @@ pub struct Client {
     ///Selected ip address (without port as seen above)
     pub send_on_address: String,
 
-    ///This is used when the client entered a false password to connect with to the server
-    #[serde(skip)]
-    pub invalid_password: bool,
-
     ///This is set to on when an image is enlarged
     #[serde(skip)]
     pub image_overlay: bool,
@@ -462,7 +458,6 @@ impl Default for Client {
             scroll_to_message: None,
             send_on_port: String::new(),
             send_on_address: String::new(),
-            invalid_password: false,
             image_overlay: false,
             files_to_send: Vec::new(),
             animation_state: 0.0,
