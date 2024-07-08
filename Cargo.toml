@@ -7,7 +7,7 @@ rust-version = "1.71"
 
 [dependencies]
 egui = "0.28.0"
-egui_extras = { version = "0.28.0", features = ["all_loaders", "datepicker", "serde"] }
+egui_extras = { version = "0.28.0", features = ["all_loaders", "datepicker", "serde", "syntect"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
 
 prost = "0.10"

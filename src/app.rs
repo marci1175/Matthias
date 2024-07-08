@@ -1,6 +1,9 @@
+use anyhow::Error;
+use backend::ExtensionProperties;
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Layout, RichText, TextEdit};
+use egui::{vec2, Align, Color32, Id, Layout, Modifiers, RichText, TextEdit};
+use egui_extras::{Column, TableBuilder};
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -233,7 +236,13 @@ impl backend::TemplateApp {
                         matches!(self.client_connection.state, ConnectionState::Disconnected)
                             || matches!(self.client_connection.state, ConnectionState::Error),
                         |ui| {
-                            ui.add(TextEdit::singleline(&mut self.client_ui.send_on_ip).hint_text("Address")).on_hover_text("Formatting: [FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF]:PORT");
+                            ui.add(
+                                TextEdit::singleline(&mut self.client_ui.send_on_ip)
+                                    .hint_text("Address"),
+                            )
+                            .on_hover_text(
+                                "Formatting: [FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF]:PORT",
+                            );
                         },
                     );
 
@@ -347,7 +356,9 @@ impl backend::TemplateApp {
 
             let compare_passwords = self.client_ui.client_password.clone();
             if self.client_ui.req_passw {
-                ui.add(TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password"));
+                ui.add(
+                    TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password"),
+                );
             };
 
             if compare_passwords != self.client_ui.client_password
@@ -358,7 +369,9 @@ impl backend::TemplateApp {
             }
 
             //Draw the extensions part of the ui
-            self.client_extension(ui, ctx);
+            ui.collapsing("Extensions", |ui| {
+                self.client_extension(ui, ctx);
+            });
         });
     }
 
@@ -389,6 +402,143 @@ impl backend::TemplateApp {
     }
 
     fn client_extension(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.label("Extensions");
+        ui.horizontal(|ui| {
+            ui.label("Extensions");
+
+            //Refresh button for refreshing the extensions
+            if ui.button("Refresh").clicked() {
+                //Read the extensions
+                match read_extensions_dir() {
+                    Ok(extension_list) => {
+                        self.client_ui.extension_list = extension_list;
+                    },
+                    //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
+                    Err(err) => {
+                        dbg!(err);
+                        let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
+                    },
+                }
+            };
+        });
+
+        ui.allocate_ui(vec2(ui.available_width(), 200.), |ui| {
+            TableBuilder::new(ui)
+            .resizable(true)
+            .auto_shrink([true, false])
+            .striped(true)
+            .columns(
+                Column::remainder().at_most(ctx.available_rect().width()),
+                /*Columns should be: 1. Name 2. Start / Stop 3. Edit*/ 3,
+            )
+            .header(25., |mut rows| {
+                //Name
+                rows.col(|ui| {
+                    ui.label("Name");
+                });
+                //Start / Stop
+                rows.col(|ui| {
+                    ui.label("State");
+                });
+                //Edit
+                rows.col(|ui| {
+                    ui.label("Edit");
+                });
+            })
+            .body(|body| {
+                //Iter over all the extensions
+                body.rows(30., self.client_ui.extension_list.len(), |mut row| {
+                    let row_idx = row.index();
+                    
+                    //Each ```extension_list``` entry is a row
+                    let extension = &mut self.client_ui.extension_list[row_idx];
+
+                    //Name
+                    row.col(|ui| {
+                        ui.horizontal_centered(|ui| {
+                            ui.label(&extension.name);
+                        });
+                    });
+                    //Start / Stop
+                    row.col(|ui: &mut egui::Ui| {
+                        ui.horizontal_centered(|ui| {
+                            //If extension is stopped
+                            let has_been_clicked = if !extension.is_running {
+                                ui.button("Start")
+                            }
+                            else {
+                                ui.button("Stop")
+                            }.clicked();
+
+                            //Change value if it has been interacted with there are only two states so this is pretty straightforward
+                            if has_been_clicked {
+                                extension.is_running = !extension.is_running;
+                            }
+
+                        });
+                    });
+                    //Edit
+                    row.col(|ui| {
+                        ui.horizontal_centered(|ui| {
+                            ui.menu_button("Edit", |ui| {
+                                ui.horizontal(|ui| {
+                                    if ui.button("Save").clicked() {
+                                        //Write source file changes
+                                        if let Err(err) = extension.write_change_to_file() {
+                                            display_error_message(err);
+                                        };
+                                    }
+                                    ui.label("CTRL + S");
+                                });
+
+                                let theme = egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx());
+
+                                let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
+                                    let mut layout_job =
+                                        egui_extras::syntax_highlighting::highlight(ui.ctx(), &theme, string, "lua");
+                                    layout_job.wrap.max_width = wrap_width;
+                                    ui.fonts(|f| f.layout_job(layout_job))
+                                };
+
+                                ui.add(TextEdit::multiline(&mut extension.text_edit_buffer).code_editor().layouter(&mut layouter));
+                            });
+                        });
+
+                        //Catch ctrl + c shortcut for cooler text edit
+                        ctx.input_mut(|writer| {
+                            if writer.consume_key(Modifiers::CTRL, egui::Key::S) {
+                                if let Err(err) = extension.write_change_to_file() {
+                                    display_error_message(err);
+                                };
+                            }
+                        });
+                    });
+                })
+            });
+        });
     }
+}
+
+fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
+    let mut extensions: Vec<ExtensionProperties> = Vec::new();
+
+    for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))?
+    {
+        let dir_entry = entry.map_err(|err| Error::msg(err.to_string()))?;
+        
+        //If the file doesnt have an extension, then we can ingore it
+        if let Some(extension) = dir_entry.path().extension() {
+            //If the file is a lua file
+            if extension.to_string_lossy() == "lua" {
+                //Get the path to the entry
+                let path_to_entry = dir_entry.path();
+                //Read the file so it can be run later
+                let file_content = fs::read_to_string(&path_to_entry)?;
+
+                //Push back the important info, so it can be returned later
+                extensions.push(ExtensionProperties::new(file_content, path_to_entry.clone(), path_to_entry.file_name().unwrap().to_string_lossy().to_string()));
+            }
+        }
+    }
+
+    Ok(extensions)
 }

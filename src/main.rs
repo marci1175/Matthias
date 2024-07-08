@@ -7,6 +7,7 @@ mod app;
 
 use egui::ViewportBuilder;
 use egui::{Style, Visuals};
+use tokio::fs;
 use windows_sys::{
     w,
     Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
@@ -59,6 +60,8 @@ async fn main() -> eframe::Result<()> {
         },
         ..Default::default()
     };
+
+    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
 
     eframe::run_native(
         "Matthias",

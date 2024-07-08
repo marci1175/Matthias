@@ -289,6 +289,11 @@ impl Default for EmojiTypesDiscriminants {
 /// Client Ui
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct Client {
+
+    #[serde(skip)]
+    /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
+    pub extension_list: Vec<ExtensionProperties>,
+
     #[serde(skip)]
     /// Shows which tabs is selected in the emoji tab
     /// This is enum is included with the generated emoji image header
@@ -435,6 +440,7 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
+            extension_list: Vec::new(),
             emojis_display_rect: None,
             display_emoji_list: false,
             emoji_tab_state: EmojiTypesDiscriminants::Blobs,
@@ -2320,4 +2326,31 @@ pub struct HyperLink {
     pub label: String,
     /// This is the part of the hyperlink which it redirects to
     pub destination: String,
+}
+
+#[derive(Default, Debug)]
+pub struct ExtensionProperties {
+    pub contents: String,
+
+    pub name: String,
+
+    pub is_running: bool,
+
+    pub path_to_extension: PathBuf,
+
+    pub text_edit_buffer: String,
+}
+
+impl ExtensionProperties {
+    pub fn new(contents: String, path: PathBuf, name: String) -> Self {
+        Self { text_edit_buffer: contents.clone(), contents, name, path_to_extension: path, ..Default::default() }
+    }
+
+    pub fn write_change_to_file(&mut self) -> anyhow::Result<()> {
+        fs::write(self.path_to_extension.clone(), self.text_edit_buffer.clone())?;
+
+        self.contents = self.text_edit_buffer.clone();
+
+        Ok(())
+    }
 }
