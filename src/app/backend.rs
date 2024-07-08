@@ -16,6 +16,7 @@ use egui::load::BytesPoll;
 use egui::load::LoadError;
 use egui::{vec2, Color32, Image, Rect, Response, RichText, Ui};
 use image::DynamicImage;
+use mlua::Lua;
 use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
@@ -42,6 +43,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
+    #[serde(skip)]
+    pub lua: Lua,
+
     /*
         Font
     */
@@ -186,6 +190,7 @@ impl Default for TemplateApp {
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
         Self {
+            lua: Lua::new(),
             register: Register::default(),
 
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(

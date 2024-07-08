@@ -48,7 +48,7 @@ tokio-util = "0.7.11"
 dashmap = {version = "6.0.0", features = ["serde"]}
 sha256 = "1.5.0"
 phf = {version = "0.11.2", features = ["macros"]}
-mlua = {version = "0.9.9", features = ["luajit"]}
+mlua = {version = "0.9.9", features = ["luajit", "async", "vendored"]}
 
 [dependencies.uuid]
 version = "1.6.1"
@@ -86,4 +86,4 @@ opt-level = 2
 
 # Dont optimize in debug builds for faster compile and better sense of code speed:
 [profile.dev]
-opt-level = 0 
+opt-level = 0
