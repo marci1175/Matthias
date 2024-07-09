@@ -4,7 +4,9 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Id, Layout, Modifiers, RichText, TextEdit};
 use egui_extras::{Column, TableBuilder};
+use lua::lua_main;
 use std::fs::{self};
+use std::ops::Deref;
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
 
@@ -13,6 +15,7 @@ pub mod backend;
 mod client;
 mod server;
 mod ui;
+mod lua;
 
 use self::backend::{display_error_message, ClientMessage, UserInformation};
 
@@ -182,7 +185,7 @@ impl eframe::App for backend::TemplateApp {
                         general_purpose::URL_SAFE_NO_PAD.encode(self.client_ui.send_on_ip.clone());
 
                     if let Ok(incoming_message) = incoming_sync_message {
-                        self.client_ui.incoming_msg = incoming_message;
+                        self.client_ui.incoming_messages = incoming_message;
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
@@ -217,7 +220,7 @@ impl backend::TemplateApp {
 
     /// This function resets clientconnection and all of its other attributes (self.client_ui.incoming_msg, self.autosync_should_run)
     fn reset_client_connection(&mut self) {
-        self.client_ui.incoming_msg = ServerMaster::default();
+        self.client_ui.incoming_messages = ServerMaster::default();
 
         self.autosync_shutdown_token.cancel();
 
@@ -288,7 +291,7 @@ impl backend::TemplateApp {
                                 let user_information = self.opened_user_information.clone();
 
                                 //Reset all messages and everything else
-                                self.client_ui.incoming_msg = ServerMaster::default();
+                                self.client_ui.incoming_messages = ServerMaster::default();
 
                                 //Forget all imaes so the cahced imges will be deleted
                                 ctx.forget_all_images();
@@ -365,7 +368,7 @@ impl backend::TemplateApp {
                 || self.client_ui.send_on_ip != compare_ip
             {
                 self.server_sender_thread = None;
-                self.client_ui.incoming_msg = ServerMaster::default();
+                self.client_ui.incoming_messages = ServerMaster::default();
             }
 
             //Draw the extensions part of the ui

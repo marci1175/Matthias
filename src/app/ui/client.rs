@@ -223,7 +223,7 @@ impl TemplateApp {
                 egui::ScrollArea::new([true, true]).auto_shrink([false, true]).show(ui, |ui|{
                     ui.allocate_ui(ui.available_size(), |ui|{
                         let mut has_search = false;
-                        for (index, message) in self.client_ui.incoming_msg.message_list.iter().enumerate() {
+                        for (index, message) in self.client_ui.incoming_messages.message_list.iter().enumerate() {
                             match self.client_ui.search_parameter {
                                 SearchType::Name => {
                                     if let ServerMessageType::Normal(inner_message) = &message.message_type {
@@ -522,7 +522,7 @@ impl TemplateApp {
                     &self.login_username,
                     &self.opened_user_information.uuid,
                     //Send how many messages we have, the server will compare it to its list, and then send the missing messages, reducing traffic
-                    self.client_ui.incoming_msg.message_list.len(),
+                    self.client_ui.incoming_messages.message_list.len(),
                     Some(*self.client_ui.last_seen_msg_index.lock().unwrap()),
                 );
 
@@ -581,7 +581,7 @@ impl TemplateApp {
                                 match incoming_struct {
                                     Ok(msg) => {
                                         //Always make sure to store the latest user_seen list
-                                        self.client_ui.incoming_msg.user_seen_list =
+                                        self.client_ui.incoming_messages.user_seen_list =
                                             msg.user_seen_list;
 
                                         //If its a sync message then we dont need to back it up
@@ -600,7 +600,7 @@ impl TemplateApp {
                                                     if let ServerMessageType::Normal(inner) =
                                                         &mut self
                                                             .client_ui
-                                                            .incoming_msg
+                                                            .incoming_messages
                                                             .message_list
                                                             [message.index as usize]
                                                             .message_type
@@ -609,7 +609,7 @@ impl TemplateApp {
                                                         inner.has_been_edited = true;
                                                     }
                                                 } else {
-                                                    self.client_ui.incoming_msg.message_list
+                                                    self.client_ui.incoming_messages.message_list
                                                         [message.index as usize]
                                                         .message_type = ServerMessageType::Deleted;
                                                 }
@@ -617,20 +617,20 @@ impl TemplateApp {
                                             ServerMessageType::Reaction(message) => {
                                                 //Search if there has already been a reaction added
                                                 if let Some(index) =
-                                                    self.client_ui.incoming_msg.reaction_list
+                                                    self.client_ui.incoming_messages.reaction_list
                                                         [message.index as usize]
                                                         .message_reactions
                                                         .iter()
                                                         .position(|item| item.char == message.char)
                                                 {
                                                     //If yes, increment the reaction counter
-                                                    self.client_ui.incoming_msg.reaction_list
+                                                    self.client_ui.incoming_messages.reaction_list
                                                         [message.index as usize]
                                                         .message_reactions[index]
                                                         .times += 1;
                                                 } else {
                                                     //If no, add a new reaction counter
-                                                    self.client_ui.incoming_msg.reaction_list
+                                                    self.client_ui.incoming_messages.reaction_list
                                                         [message.index as usize]
                                                         .message_reactions
                                                         .push(Reaction {
@@ -642,13 +642,13 @@ impl TemplateApp {
                                             _ => {
                                                 //Allocate Message vec for the new message
                                                 self.client_ui
-                                                    .incoming_msg
+                                                    .incoming_messages
                                                     .reaction_list
                                                     .push(MessageReaction::default());
 
                                                 //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
                                                 self.client_ui
-                                                    .incoming_msg
+                                                    .incoming_messages
                                                     .message_list
                                                     .push(msg.message);
                                             }
@@ -729,7 +729,7 @@ impl TemplateApp {
                                                     }
                                                     ServerReplyType::Client(client_reply) => {
                                                         self.client_ui
-                                                            .incoming_msg
+                                                            .incoming_messages
                                                             .connected_clients_profile
                                                             .insert(
                                                                 client_reply.uuid.clone(),

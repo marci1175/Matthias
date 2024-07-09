@@ -434,7 +434,7 @@ pub struct Client {
 
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
-    pub incoming_msg: ServerMaster,
+    pub incoming_messages: ServerMaster,
 
     /// Last seen message's index, this will get sent
     #[serde(skip)]
@@ -503,7 +503,7 @@ impl Default for Client {
 
             //msg
             message_buffer: String::new(),
-            incoming_msg: ServerMaster::default(),
+            incoming_messages: ServerMaster::default(),
 
             voice_recording_start: None,
             last_seen_msg_index: Arc::new(Mutex::new(0)),

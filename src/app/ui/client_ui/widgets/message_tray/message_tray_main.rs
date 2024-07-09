@@ -48,7 +48,7 @@ impl TemplateApp {
                 if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
                     //Iter over all the messages so we will get the latest message sent by us
                     for (idx, message) in
-                        self.client_ui.incoming_msg.message_list.iter().enumerate()
+                        self.client_ui.incoming_messages.message_list.iter().enumerate()
                     {
                         //Validate editable message
                         if let ServerMessageType::Normal(inner) = &message.message_type {
@@ -156,10 +156,10 @@ impl TemplateApp {
 
                         if let Some(buffer) = split.last_mut() {
                             //If we have already typed in the full username OR there are no username matches in what we typed in we can return, so we wont consume the enter key therefor were going to send the message
-                            for seen in &self.client_ui.incoming_msg.user_seen_list {
+                            for seen in &self.client_ui.incoming_messages.user_seen_list {
                                 let profile = self
                                     .client_ui
-                                    .incoming_msg
+                                    .incoming_messages
                                     .connected_clients_profile
                                     .get(&seen.uuid);
                                 if let Some(profile) = profile {
@@ -173,12 +173,12 @@ impl TemplateApp {
 
                             //If the ENTER key is pressed append the name to the self.client_ui.text_edit_buffer
                             if reader.consume_key(Modifiers::NONE, Key::Enter)
-                                && !self.client_ui.incoming_msg.user_seen_list.is_empty()
+                                && !self.client_ui.incoming_messages.user_seen_list.is_empty()
                             {
                                 //format the string so the @ stays
                                 if let Some(profile) =
-                                    self.client_ui.incoming_msg.connected_clients_profile.get(
-                                        &self.client_ui.incoming_msg.user_seen_list
+                                    self.client_ui.incoming_messages.connected_clients_profile.get(
+                                        &self.client_ui.incoming_messages.user_seen_list
                                             [self.client_ui.user_selector_index as usize]
                                             .uuid,
                                     )
@@ -458,14 +458,14 @@ impl TemplateApp {
                 let message_group = ui.group(|ui| {
                     ui.label(RichText::from("Users:").strong());
                     if let Some(last_str) = split_user_msg.last() {
-                        if self.client_ui.incoming_msg.user_seen_list.is_empty() {
+                        if self.client_ui.incoming_messages.user_seen_list.is_empty() {
                             //Display greeting message
                             ui.label(RichText::from("Syncing. . .").color(Color32::RED));
                         }
 
                         for (index, client) in self
                             .client_ui
-                            .incoming_msg
+                            .incoming_messages
                             .user_seen_list
                             .iter()
                             .enumerate()
@@ -473,7 +473,7 @@ impl TemplateApp {
                             //If the search buffer is contained in the clients' username
                             if let Some(profile) = self
                                 .client_ui
-                                .incoming_msg
+                                .incoming_messages
                                 .connected_clients_profile
                                 .get(&client.uuid)
                             {
@@ -503,7 +503,7 @@ impl TemplateApp {
                 self.client_ui.connected_users_display_rect = Some(message_group.response.rect);
 
                 //If the seen list is empty we should display a message indicating its loading but we should return before clamping because it would go -1 therefor we would be panicking
-                if self.client_ui.incoming_msg.user_seen_list.is_empty() {
+                if self.client_ui.incoming_messages.user_seen_list.is_empty() {
                     return;
                 }
 
@@ -525,7 +525,7 @@ impl TemplateApp {
                     //*Make sure we return if ```self.client_ui.incoming_msg.user_seen_list``` is empty because then it'd overflow
                     .clamp(
                         0,
-                        self.client_ui.incoming_msg.user_seen_list.len() as i32 - 1,
+                        self.client_ui.incoming_messages.user_seen_list.len() as i32 - 1,
                     );
             });
 

@@ -38,14 +38,14 @@ impl TemplateApp {
                             }
 
                             //Check if sink_list is bigger than messages, to avoid crashing
-                            if self.client_ui.audio_playback.sink_list.len() > self.client_ui.incoming_msg.message_list.len() {
-                                for _ in 0..(self.client_ui.audio_playback.sink_list.len() as i32 - self.client_ui.incoming_msg.message_list.len() as i32).abs() {
+                            if self.client_ui.audio_playback.sink_list.len() > self.client_ui.incoming_messages.message_list.len() {
+                                for _ in 0..(self.client_ui.audio_playback.sink_list.len() as i32 - self.client_ui.incoming_messages.message_list.len() as i32).abs() {
                                     self.client_ui.audio_playback.sink_list.remove(self.client_ui.audio_playback.sink_list.len() - 1);
                                 }
                             }
 
                             //Allocate places manually for the audio playback (sink_list), but only allocate what we need
-                            for _ in 0..(self.client_ui.incoming_msg.message_list.len() - self.client_ui.audio_playback.sink_list.len()) {
+                            for _ in 0..(self.client_ui.incoming_messages.message_list.len() - self.client_ui.audio_playback.sink_list.len()) {
                                 self.client_ui.audio_playback.sink_list.push(None);
 
                                 //Define defaults, for speed and volume based on the same logic as above ^
@@ -54,21 +54,21 @@ impl TemplateApp {
 
                             let mut message_instances: Vec<Response> = Vec::new();
 
-                            for (iter_index, item) in self.client_ui.incoming_msg.clone().message_list.iter().enumerate() {
+                            for (iter_index, item) in self.client_ui.incoming_messages.clone().message_list.iter().enumerate() {
                                 //Emoji tray pops up when right clicking on a message
                                 let message_group = ui.group(|ui| {
                                         if let Some(replied_to) = item.replying_to {
                                             ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
 
                                                 ui.horizontal(|ui| {
-                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_msg.message_list[replied_to].uuid.clone(), ui);
+                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_messages.message_list[replied_to].uuid.clone(), ui);
 
 
                                                 if ui.add(egui::widgets::Button::new(
                                                     RichText::from(
                                                         format!("{}: {}",
-                                                            self.client_ui.incoming_msg.message_list[replied_to].author,
-                                                            match &self.client_ui.incoming_msg.message_list[replied_to].message_type {
+                                                            self.client_ui.incoming_messages.message_list[replied_to].author,
+                                                            match &self.client_ui.incoming_messages.message_list[replied_to].message_type {
                                                                 ServerMessageType::Deleted => "Deleted message".to_string(),
                                                                 ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
                                                                 ServerMessageType::Image(_img) => "Image".to_string(),
@@ -131,7 +131,7 @@ impl TemplateApp {
                                         egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
                                             ui.horizontal(|ui| {
                                                 //Check if there is a reaction list vector already allocated non the index of the specific message
-                                                match &self.client_ui.incoming_msg.reaction_list.get(iter_index) {
+                                                match &self.client_ui.incoming_messages.reaction_list.get(iter_index) {
                                                     Some(reactions) => {
                                                         for item in &reactions.message_reactions {
                                                             ui.group(|ui| {
@@ -156,7 +156,7 @@ impl TemplateApp {
 
                                 //Display where the users seen their last message
                                 ui.horizontal(|ui| {
-                                    for client in self.client_ui.incoming_msg.user_seen_list.clone() {
+                                    for client in self.client_ui.incoming_messages.user_seen_list.clone() {
                                         if iter_index == client.index {
                                             //Make it more visible
                                             ui.group(|ui| {
@@ -166,7 +166,7 @@ impl TemplateApp {
                                                 });
 
                                                 //Client name
-                                                if let Some(profile) = self.client_ui.incoming_msg.connected_clients_profile.get(&client.uuid) {
+                                                if let Some(profile) = self.client_ui.incoming_messages.connected_clients_profile.get(&client.uuid) {
                                                     let username = profile.username.clone();
 
                                                     ui.label(RichText::from(&username).size(self.font_size / 1.3));
@@ -201,7 +201,7 @@ impl TemplateApp {
                                         //If the message was sent by a normal user
                                         else {
                                             //We can safely unwrap here
-                                            let user_profile = self.client_ui.incoming_msg.connected_clients_profile.get(&item.uuid).unwrap();
+                                            let user_profile = self.client_ui.incoming_messages.connected_clients_profile.get(&item.uuid).unwrap();
                                             //Include full profile picture so it can be displayed
                                             ctx.include_bytes(
                                                 "bytes://profile_picture",

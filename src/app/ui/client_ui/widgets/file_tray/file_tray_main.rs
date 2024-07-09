@@ -83,7 +83,7 @@ impl TemplateApp {
                                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                     //place them in one line
                                     //Selected message
-                                    let selected_message = &self.client_ui.incoming_msg.message_list[edit_index];
+                                    let selected_message = &self.client_ui.incoming_messages.message_list[edit_index];
                                     ui.horizontal(|ui| {
                                         //Editing: {msg}
                                         ui.label(RichText::from(match &selected_message.message_type {
@@ -122,7 +122,7 @@ impl TemplateApp {
                                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
                                     //place them in one line
                                     //Selected message
-                                    let selected_message = &self.client_ui.incoming_msg.message_list[replying_to];
+                                    let selected_message = &self.client_ui.incoming_messages.message_list[replying_to];
                                     ui.horizontal(|ui| {
                                         //Replying to "{author}:"
                                         ui.label(RichText::from(format!("{}:", selected_message.author)).size(self.font_size).weak().color(Color32::LIGHT_GRAY));
