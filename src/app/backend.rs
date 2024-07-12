@@ -17,11 +17,12 @@ use egui::load::LoadError;
 use egui::{vec2, Color32, Image, Rect, Response, RichText, Ui};
 use image::DynamicImage;
 use mlua::Lua;
+use mlua_proc_macro::ToTable;
 use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
@@ -40,9 +41,9 @@ use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, ToTable)]
 #[serde(default)]
-pub struct TemplateApp {
+pub struct Application {
     #[serde(skip)]
     pub lua: Lua,
 
@@ -51,7 +52,7 @@ pub struct TemplateApp {
     */
     ///fontbook
     pub filter: String,
-    pub named_chars: BTreeMap<egui::FontFamily, BTreeMap<char, String>>,
+
     ///font
     pub font_size: f32,
 
@@ -72,6 +73,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub server_has_started: bool,
 
+    #[table(save)]
     #[serde(skip)]
     /// This is used to store the connected client profile
     /// The field get modified by the server_main function (When a server is started this is passed in and is later modified by the server)
@@ -130,6 +132,8 @@ pub struct TemplateApp {
     /*
         Client main
     */
+    //We can skip this entry of the table since, we implement Totable separetly
+    #[table(skip)]
     pub client_ui: Client,
 
     #[serde(skip)]
@@ -161,6 +165,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
     pub server_output_reciver: Receiver<Option<String>>,
+
     #[serde(skip)]
     /// This is what the sync thread uses to send messages to the main thread
     pub server_output_sender: Sender<Option<String>>,
@@ -176,7 +181,7 @@ pub struct TemplateApp {
     pub opened_user_information: UserInformation,
 }
 
-impl Default for TemplateApp {
+impl Default for Application {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel::<String>();
         let (stx, srx) = mpsc::channel::<String>();
@@ -200,7 +205,6 @@ impl Default for TemplateApp {
 
             //fontbook
             filter: Default::default(),
-            named_chars: Default::default(),
 
             //login page
             login_username: String::new(),
@@ -269,23 +273,46 @@ impl Default for TemplateApp {
     }
 }
 
-#[allow(dead_code)]
-impl TemplateApp {
+impl Application {
+    /// Set global lua table so that the luas can use it
+    pub fn set_global_lua_table(&self) {
+        //Slows down code
+        self.set_table_from_struct(&self.lua);
+        self.client_ui.set_table_from_struct(&self.lua);
+    }
+
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
-            let mut data: TemplateApp = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            let mut data: Application =
+                eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
             //Read extension dir every startup
             match read_extensions_dir() {
                 Ok(extension_list) => {
-                    data.client_ui.extension_list = extension_list;
-                },
+                    data.client_ui.extension.extension_list = extension_list;
+                }
                 //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
                 Err(err) => {
                     dbg!(err);
                     let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
-                },
+                }
             }
+
+            let output_list = data.client_ui.extension.output.clone();
+
+            //Insert lua function
+            let print = data.lua.create_function(move |_, msg: String| {
+                match output_list.lock() {
+                    Ok(mut list) => list.push(LuaOutput::Standard(msg)),
+                    Err(err) => {
+                        dbg!(err);
+                    },
+                }
+
+                Ok(())
+            }).unwrap();
+
+            data.lua.globals().set("print", print).unwrap();
 
             return data;
         }
@@ -304,13 +331,12 @@ impl Default for EmojiTypesDiscriminants {
     }
 }
 
-/*Children structs*/
-///Children struct
-/// Client Ui
-#[derive(serde::Deserialize, serde::Serialize)]
+/// Client side variables
+#[derive(ToTable, serde::Deserialize, serde::Serialize)]
 pub struct Client {
-    /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
-    pub extension_list: Vec<ExtensionProperties>,
+    #[table(skip)]
+    /// This entry contains all the extensions and their output
+    pub extension: Extension,
 
     #[serde(skip)]
     /// Shows which tabs is selected in the emoji tab
@@ -323,47 +349,48 @@ pub struct Client {
 
     ///When a text_edit_cursor move has been requested this value is a Some
     #[serde(skip)]
+    #[table(save)]
     pub text_edit_cursor_desired_index: Option<usize>,
 
     ///This value shows where the text edit cursor is, if the ```TextEdit``` widget is exited the value will remain
     #[serde(skip)]
+    #[table(save)]
     pub text_edit_cursor_index: usize,
 
     ///The rect of the connected users list (which gets displayed when pressing the @)
     #[serde(skip)]
+    #[table(save)]
     pub connected_users_display_rect: Option<egui::Rect>,
 
     ///The rect of the recommended emojis list (which gets displayed when pressing the :)
     #[serde(skip)]
+    #[table(save)]
     pub emojis_display_rect: Option<egui::Rect>,
 
     ///After pressing @ and the user list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing @ again
     #[serde(skip)]
+    #[table(save)]
     pub user_selector_index: i32,
 
     ///After pressing : and the emoji list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing : again
     #[serde(skip)]
     pub emoji_selector_index: i32,
 
-    ///This tracks the selected emoji's key (Its name in the Map)
     #[serde(skip)]
-    pub emoji_selector_string: String,
-
-    #[serde(skip)]
+    #[table(save)]
     pub display_user_list: bool,
-
-    #[serde(skip)]
-    pub display_emoji_list: bool,
 
     ///Search parameters set by user, to chose what to search for obviously
     pub search_parameter: SearchType,
 
     ///Search buffer
     #[serde(skip)]
+    #[table(save)]
     pub search_buffer: String,
 
     ///Check if search panel is open
     #[serde(skip)]
+    #[table(save)]
     pub search_mode: bool,
 
     ///audio playback
@@ -372,10 +399,12 @@ pub struct Client {
 
     ///this doesnt really matter if we save or no so whatever, implements scrolling to message element
     #[serde(skip)]
+    #[table(save)]
     pub scroll_to_message: Option<ScrollToMessage>,
 
     ///index of the reply the user clicked on
     #[serde(skip)]
+    #[table(save)]
     pub scroll_to_message_index: Option<usize>,
 
     ///Selected port on sending
@@ -386,6 +415,7 @@ pub struct Client {
 
     ///This is set to on when an image is enlarged
     #[serde(skip)]
+    #[table(save)]
     pub image_overlay: bool,
 
     ///Scroll widget rect, text editor's rect
@@ -396,6 +426,7 @@ pub struct Client {
 
     ///A vector of all the added files to the buffer, these are the PathBufs which get read, then their bytes get sent
     #[serde(skip)]
+    #[table(save)]
     pub files_to_send: Vec<PathBuf>,
 
     ///This checks if the text editor is open or not
@@ -418,6 +449,7 @@ pub struct Client {
 
     ///This checks if a file is dragged above Matthias, so it knows when to display the cool animation 8)
     #[serde(skip)]
+    #[table(save)]
     pub drop_file_animation: bool,
 
     /// This field sets the message edit mode
@@ -426,14 +458,17 @@ pub struct Client {
     /// Reply(. . .)
     /// Edit(. . .)
     #[serde(skip)]
+    #[table(save)]
     pub messaging_mode: MessagingMode,
 
     ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
+    #[table(save)]
     pub message_buffer: String,
 
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
+    #[table(save)]
     pub incoming_messages: ServerMaster,
 
     /// Last seen message's index, this will get sent
@@ -453,14 +488,14 @@ pub struct Client {
 
     ///Log when the voice recording has been started so we know how long the recording is
     #[serde(skip)]
+    #[table(save)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 }
 impl Default for Client {
     fn default() -> Self {
         Self {
-            extension_list: Vec::new(),
+            extension: Extension::default(),
             emojis_display_rect: None,
-            display_emoji_list: false,
             emoji_tab_state: EmojiTypesDiscriminants::Blobs,
             shared_fields: Default::default(),
             text_edit_cursor_desired_index: None,
@@ -508,13 +543,12 @@ impl Default for Client {
             voice_recording_start: None,
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
-            emoji_selector_string: String::new(),
         }
     }
 }
 
 ///Main, Global stuff for the Ui
-#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Default, ToTable)]
 pub struct Main {
     ///Checks if the emoji tray is on
     #[serde(skip)]
@@ -703,7 +737,7 @@ pub struct ClientAudioRequest {
 ///Reaction packet, defines which message its reacting to and with which char
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientReaction {
-    pub char: char,
+    pub emoji_name: String,
     pub message_index: usize,
 }
 
@@ -808,11 +842,11 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_reaction_msg(char: char, index: usize, uuid: &str) -> ClientMessage {
+    pub fn construct_reaction_msg(emoji_name: String, index: usize, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::Reaction(ClientReaction {
-                char,
+                emoji_name,
                 message_index: index,
             }),
             uuid: uuid.to_string(),
@@ -1246,8 +1280,8 @@ pub struct ServerMessageReaction {
     /// The message's index it belongs to
     pub index: i32,
 
-    /// The char added to the message specified by the index field
-    pub char: char,
+    /// The emoji's name added to the message specified by the index field
+    pub emoji_name: String,
 }
 
 /// This struct is empty as its just a placeholder, because the info is provided in the struct which this message is wrapped in, and is provided directly when sending a message from the server to the client
@@ -1312,7 +1346,7 @@ pub struct MessageReaction {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Reaction {
-    pub char: char,
+    pub emoji_name: String,
     pub times: i64,
 }
 
@@ -1413,7 +1447,7 @@ impl ServerOutput {
                     //These messages also have a side effect on the server's list of the messages
                     //The client will interpret these messages and modify its own message list
                     ClientMessageType::Reaction(message) => {
-                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, char: message.char })
+                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, emoji_name: message.emoji_name })
                     },
                     ClientMessageType::MessageEdit(message) => {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
@@ -1598,7 +1632,9 @@ impl Seek for PlaybackCursor {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ScrollToMessage {
+    #[serde(skip)]
     pub messages: Vec<egui::Response>,
     pub index: usize,
 }
@@ -2346,7 +2382,7 @@ pub struct HyperLink {
     pub destination: String,
 }
 
-#[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Default, Debug, serde::Deserialize, serde::Serialize)]
 pub struct ExtensionProperties {
     pub contents: String,
 
@@ -2361,14 +2397,57 @@ pub struct ExtensionProperties {
 
 impl ExtensionProperties {
     pub fn new(contents: String, path: PathBuf, name: String) -> Self {
-        Self { text_edit_buffer: contents.clone(), contents, name, path_to_extension: path, ..Default::default() }
+        Self {
+            text_edit_buffer: contents.clone(),
+            contents,
+            name,
+            path_to_extension: path,
+            ..Default::default()
+        }
     }
 
     pub fn write_change_to_file(&mut self) -> anyhow::Result<()> {
-        fs::write(self.path_to_extension.clone(), self.text_edit_buffer.clone())?;
+        fs::write(
+            self.path_to_extension.clone(),
+            self.text_edit_buffer.clone(),
+        )?;
 
         self.contents = self.text_edit_buffer.clone();
 
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub enum LuaOutput {
+    /// This enum type is used to report code panics (In the lua runtime)
+    Error(String),
+
+    /// Standard output from the lua runtime
+    Standard(String),
+
+    /// Displays useful information like a file got modifed (This message will only be added from the rust runtime, for example when saving a file)
+    Info(String),
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct Extension {
+    /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
+    pub extension_list: Vec<ExtensionProperties>,
+
+    #[serde(skip)]
+    /// This list contins all the output from the extensions, panics are logged and stdouts are also logged here as Standard()
+    pub output: Arc<Mutex<Vec<LuaOutput>>>,
+
+    pub output_rect: Rect,
+}
+
+impl Default for Extension {
+    fn default() -> Self {
+        Self {
+            extension_list: Vec::new(),
+            output: Arc::new(Mutex::new(Vec::new())),
+            output_rect: Rect::NOTHING,
+        }
     }
 }

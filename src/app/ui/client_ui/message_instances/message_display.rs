@@ -3,14 +3,14 @@ use std::{fs, path::PathBuf};
 use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, ClientMessage, MessageDisplay, ServerFileReply,
-    ServerImageUpload, TemplateApp,
+    parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
+    ServerFileReply, ServerImageUpload,
 };
 use rodio::{Decoder, Source};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::PlaybackCursor;
-impl TemplateApp {
+impl Application {
     /// This function is used to displayed the messages wrapped information (The message itself)
     pub fn message_display(
         &mut self,

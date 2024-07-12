@@ -1,27 +1,29 @@
+//Define the maximum amount of entries in the lua output vector
+const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
+
 use anyhow::Error;
 use backend::ExtensionProperties;
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Id, Layout, Modifiers, RichText, TextEdit};
+use egui::{vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Stroke, TextEdit};
 use egui_extras::{Column, TableBuilder};
-use lua::lua_main;
-use std::fs::{self};
-use std::ops::Deref;
+use lua::execute_code;
 use tap::TapFallible;
+use std::fs::{self};
 use tokio_util::sync::CancellationToken;
 
 pub mod backend;
 
 mod client;
+mod lua;
 mod server;
 mod ui;
-mod lua;
 
 use self::backend::{display_error_message, ClientMessage, UserInformation};
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
 
-impl eframe::App for backend::TemplateApp {
+impl eframe::App for backend::Application {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
@@ -63,14 +65,70 @@ impl eframe::App for backend::TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
-            TODO: add scripting
+            TODO: improve scripting
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306: {
                     TODO: fix audio playback
                     TODO: add notfications
                 }
-            TODO: Discord like emoji :skull:
             TODO: Restructure files
+
+            TODO: Fix emoji drawing
+            TODO: Api docs
         */
+
+        //Set global lua table before everything
+        //Slows down app
+        //Only allow it if tis relerase build
+        #[cfg(not(debug_assertions))]
+        {
+            self.set_global_lua_table();
+        }
+
+        //Run lua scripts when rendering a frame (I should impl callbacks)
+        for extension in self.client_ui.extension.extension_list.iter_mut() {
+            //Check if the extension is supposed to run
+            if extension.is_running {
+                //Run script
+                match execute_code(&self.lua, extension.contents.clone()) {
+                    Ok(_) => {
+                        //Code executed successfully
+                    }
+                    Err(err) => {
+                        //Save error message
+                        match self.client_ui.extension.output.lock() {
+                            Ok(mut output) => {
+                                output.push(backend::LuaOutput::Error(err.to_string()));
+
+                                //Stop the exectuion of this script
+                                extension.is_running = false;
+
+                                output
+                                        .push(backend::LuaOutput::Info(format!(
+                                            r#"Extension "{}" was forcibly stopped due to a runtime error."#,
+                                            extension.name
+                                        )));
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                            }
+                        }
+                    }
+                };
+            }
+        }
+
+        //Truncate the vector from the other way around so the newest messages will stay
+        //This will only start working if ```self.client_ui.extension.output.len() > LUA_OUTPUT_BUFFER_SIZE```
+        match self.client_ui.extension.output.try_lock() {
+            Ok(mut output) => {
+                if let Some(desired_idx) = output.len().checked_sub(LUA_OUTPUT_BUFFER_SIZE) {
+                    output.drain(0..desired_idx);
+                }
+            }
+            Err(err) => {
+                dbg!(err);
+            }
+        }
 
         if self.main.register_mode {
             self.state_register(_frame, ctx);
@@ -201,7 +259,7 @@ impl eframe::App for backend::TemplateApp {
     }
 }
 
-impl backend::TemplateApp {
+impl backend::Application {
     /// This function spawn an async tokio thread, to send the message passed in as the argument, this function does not await a response from the server
     pub fn send_msg(&self, message: ClientMessage) {
         let connection = self.client_connection.clone();
@@ -413,24 +471,41 @@ impl backend::TemplateApp {
                 //Read the extensions
                 match read_extensions_dir() {
                     Ok(extension_list) => {
-                        self.client_ui.extension_list = extension_list;
-                    },
+                        self.client_ui.extension.extension_list = extension_list;
+                    }
                     //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
                     Err(err) => {
                         dbg!(err);
-                        let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
-                    },
+                        let _ =
+                            fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
+                    }
                 }
             };
         });
 
-        ui.allocate_ui(vec2(ui.available_width(), 200.), |ui| {
-            TableBuilder::new(ui)
+        #[cfg(not(debug_assertions))]
+        ui.horizontal(|ui| {
+            ui.columns(2, |columns| {
+                self.draw_extension_table(columns, ctx);
+
+                self.draw_extension_output(columns);
+            });
+        });
+
+        #[cfg(debug_assertions)]
+        ui.label(RichText::from("The lua api is temporarily disabled in debug due to performance issues."));
+    }
+
+    #[allow(dead_code)]
+    fn draw_extension_table(&mut self, columns: &mut [egui::Ui], ctx: &egui::Context) {
+        let available_width = columns[0].available_width();
+
+        TableBuilder::new(&mut columns[0])
             .resizable(true)
             .auto_shrink([true, false])
             .striped(true)
             .columns(
-                Column::remainder().at_most(ctx.available_rect().width()),
+                Column::remainder().at_most(available_width),
                 /*Columns should be: 1. Name 2. Start / Stop 3. Edit*/ 3,
             )
             .header(25., |mut rows| {
@@ -449,85 +524,176 @@ impl backend::TemplateApp {
             })
             .body(|body| {
                 //Iter over all the extensions
-                body.rows(30., self.client_ui.extension_list.len(), |mut row| {
-                    let row_idx = row.index();
-                    
-                    //Each ```extension_list``` entry is a row
-                    let extension = &mut self.client_ui.extension_list[row_idx];
+                body.rows(
+                    30.,
+                    self.client_ui.extension.extension_list.len(),
+                    |mut row| {
+                        let row_idx = row.index();
 
-                    //Name
-                    row.col(|ui| {
-                        ui.horizontal_centered(|ui| {
-                            ui.label(&extension.name);
-                        });
-                    });
-                    //Start / Stop
-                    row.col(|ui: &mut egui::Ui| {
-                        ui.horizontal_centered(|ui| {
-                            //If extension is stopped
-                            let has_been_clicked = if !extension.is_running {
-                                ui.button("Start")
-                            }
-                            else {
-                                ui.button("Stop")
-                            }.clicked();
+                        //Each ```extension_list``` entry is a row
+                        let extension = &mut self.client_ui.extension.extension_list[row_idx];
 
-                            //Change value if it has been interacted with there are only two states so this is pretty straightforward
-                            if has_been_clicked {
-                                extension.is_running = !extension.is_running;
-                            }
-
-                        });
-                    });
-                    //Edit
-                    row.col(|ui| {
-                        ui.horizontal_centered(|ui| {
-                            ui.menu_button("Edit", |ui| {
-                                ui.horizontal(|ui| {
-                                    if ui.button("Save").clicked() {
-                                        //Write source file changes
-                                        if let Err(err) = extension.write_change_to_file() {
-                                            display_error_message(err);
-                                        };
-                                    }
-                                    ui.label("CTRL + S");
-                                });
-
-                                let theme = egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx());
-
-                                let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
-                                    let mut layout_job =
-                                        egui_extras::syntax_highlighting::highlight(ui.ctx(), &theme, string, "lua");
-                                    layout_job.wrap.max_width = wrap_width;
-                                    ui.fonts(|f| f.layout_job(layout_job))
-                                };
-
-                                ui.add(TextEdit::multiline(&mut extension.text_edit_buffer).code_editor().layouter(&mut layouter));
+                        //Name
+                        row.col(|ui| {
+                            ui.horizontal_centered(|ui| {
+                                ui.label(&extension.name);
                             });
                         });
 
-                        //Catch ctrl + c shortcut for cooler text edit
-                        ctx.input_mut(|writer| {
-                            if writer.consume_key(Modifiers::CTRL, egui::Key::S) {
-                                if let Err(err) = extension.write_change_to_file() {
-                                    display_error_message(err);
-                                };
-                            }
+                        //Start / Stop
+                        row.col(|ui: &mut egui::Ui| {
+                            ui.horizontal_centered(|ui| {
+                                //If extension is stopped
+                                let has_been_clicked = if !extension.is_running {
+                                    ui.button("Start")
+                                } else {
+                                    ui.button("Stop")
+                                }
+                                .clicked();
+
+                                //Change value if it has been interacted with there are only two states so this is pretty straightforward
+                                if has_been_clicked {
+                                    extension.is_running = !extension.is_running;
+
+                                    match self.client_ui.extension.output.try_lock() {
+                                        Ok(mut output) => {
+                                            match extension.is_running {
+                                                true => {
+                                                    output.push(
+                                                        backend::LuaOutput::Info(format!(
+                                                            r#"Extension "{}" has been started."#,
+                                                            extension.name
+                                                        )),
+                                                    );
+                                                }
+                                                false => {
+                                                    output.push(
+                                                        backend::LuaOutput::Info(format!(
+                                                            r#"Extension "{}" has been stopped."#,
+                                                            extension.name
+                                                        )),
+                                                    );
+                                                }
+                                            }
+                                        },
+                                        Err(err) => {
+                                            dbg!(err);
+                                        },
+                                    }
+                                }
+                            });
                         });
-                    });
-                })
+                        //Edit
+                        row.col(|ui| {
+                            ui.horizontal_centered(|ui| {
+                                ui.menu_button("Edit", |ui| {
+                                    ui.horizontal(|ui| {
+                                        if ui.button("Save").clicked() {
+                                            if let Err(err) = extension.write_change_to_file() {
+                                                display_error_message(err);
+                                            };
+                                        }
+
+                                        ui.label("CTRL + S");
+
+                                        if extension.contents != extension.text_edit_buffer {
+                                            ui.label(RichText::new("Unsaved").color(Color32::RED));
+                                        }
+                                    });
+
+                                    let theme =
+                                        egui_extras::syntax_highlighting::CodeTheme::from_memory(
+                                            ui.ctx(),
+                                        );
+
+                                    let mut layouter =
+                                        |ui: &egui::Ui, string: &str, wrap_width: f32| {
+                                            let mut layout_job =
+                                                egui_extras::syntax_highlighting::highlight(
+                                                    ui.ctx(),
+                                                    &theme,
+                                                    string,
+                                                    "lua",
+                                                );
+                                            layout_job.wrap.max_width = wrap_width;
+                                            ui.fonts(|f| f.layout_job(layout_job))
+                                        };
+
+                                    ui.add(
+                                        TextEdit::multiline(&mut extension.text_edit_buffer)
+                                            .code_editor()
+                                            .layouter(&mut layouter),
+                                    );
+                                });
+
+                                //Display unsaved state
+                                if extension.contents != extension.text_edit_buffer {
+                                    ui.label(RichText::new("Unsaved").color(Color32::RED));
+                                }
+                            });
+
+                            //Catch ctrl + c shortcut for cooler text edit
+                            ctx.input_mut(|writer| {
+                                if writer.consume_key(Modifiers::CTRL, egui::Key::S) {
+                                    if let Err(err) = extension.write_change_to_file() {
+                                        display_error_message(err);
+                                    };
+                                }
+                            });
+                        });
+                    },
+                )
             });
-        });
+    }
+
+    fn draw_extension_output(&mut self, columns: &mut [egui::Ui]) {
+        columns[1]
+            .painter_at(self.client_ui.extension.output_rect.expand(15.))
+            .rect_stroke(
+                self.client_ui.extension.output_rect.expand(5.),
+                5.,
+                Stroke::new(2., Color32::GRAY),
+            );
+
+        columns[1]
+            .painter_at(self.client_ui.extension.output_rect)
+            .rect_filled(
+                self.client_ui.extension.output_rect.expand(10.),
+                5.,
+                Color32::BLACK,
+            );
+
+        let scroll_area = ScrollArea::vertical()
+            .stick_to_bottom(true)
+            .id_source(columns[1].next_auto_id())
+            .show(&mut columns[1], |ui| {
+                for output in self.client_ui.extension.output.lock().as_deref().unwrap_or(&vec![]).iter() {
+                    match output {
+                        backend::LuaOutput::Error(error) => {
+                            ui.label(RichText::from(error).color(Color32::RED));
+                        }
+                        backend::LuaOutput::Standard(output) => {
+                            ui.label(RichText::from(output).color(Color32::LIGHT_YELLOW));
+                        }
+                        backend::LuaOutput::Info(info) => {
+                            ui.label(
+                                RichText::from(format!("INFO: {info}")).color(Color32::LIGHT_BLUE),
+                            );
+                        }
+                    }
+                }
+            });
+
+        self.client_ui.extension.output_rect = scroll_area.inner_rect;
     }
 }
 
 pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
     let mut extensions: Vec<ExtensionProperties> = Vec::new();
 
-    for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))?
-    {
+    for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))? {
         let dir_entry = entry.map_err(|err| Error::msg(err.to_string()))?;
-        
+
         //If the file doesnt have an extension, then we can ingore it
         if let Some(extension) = dir_entry.path().extension() {
             //If the file is a lua file
@@ -538,7 +704,15 @@ pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
                 let file_content = fs::read_to_string(&path_to_entry)?;
 
                 //Push back the important info, so it can be returned later
-                extensions.push(ExtensionProperties::new(file_content, path_to_entry.clone(), path_to_entry.file_name().unwrap().to_string_lossy().to_string()));
+                extensions.push(ExtensionProperties::new(
+                    file_content,
+                    path_to_entry.clone(),
+                    path_to_entry
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string(),
+                ));
             }
         }
     }

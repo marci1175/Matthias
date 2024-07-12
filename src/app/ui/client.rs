@@ -14,10 +14,10 @@ use crate::app::backend::{
     ServerSync,
 };
 
-use crate::app::backend::{SearchType, ServerMessageType, TemplateApp};
+use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
 
-impl TemplateApp {
+impl Application {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "settings_area").show(
             ctx,
@@ -621,10 +621,12 @@ impl TemplateApp {
                                                         [message.index as usize]
                                                         .message_reactions
                                                         .iter()
-                                                        .position(|item| item.char == message.char)
+                                                        .position(|item| item.emoji_name == message.emoji_name)
                                                 {
                                                     //If yes, increment the reaction counter
-                                                    self.client_ui.incoming_messages.reaction_list
+                                                    self.client_ui
+                                                        .incoming_messages
+                                                        .reaction_list
                                                         [message.index as usize]
                                                         .message_reactions[index]
                                                         .times += 1;
@@ -634,7 +636,7 @@ impl TemplateApp {
                                                         [message.index as usize]
                                                         .message_reactions
                                                         .push(Reaction {
-                                                            char: message.char,
+                                                            emoji_name: message.emoji_name.clone(),
                                                             times: 1,
                                                         })
                                                 }

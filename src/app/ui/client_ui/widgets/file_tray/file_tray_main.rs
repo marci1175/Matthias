@@ -1,9 +1,9 @@
 use egui::{vec2, Align, Color32, ImageButton, Layout, RichText};
 
 //use crate::app::account_manager::write_file;
-use crate::app::backend::{MessagingMode, ServerMessageType, TemplateApp};
+use crate::app::backend::{Application, MessagingMode, ServerMessageType};
 
-impl TemplateApp {
+impl Application {
     pub fn file_tray(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("file_tray").show_animated(ctx, (!self.client_ui.files_to_send.is_empty() || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_)) || matches!(self.client_ui.messaging_mode, MessagingMode::Edit(_))) && self.client_ui.usr_msg_expanded, |ui|{
             ui.allocate_space(vec2(ui.available_width(), 10.));

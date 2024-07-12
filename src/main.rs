@@ -76,8 +76,10 @@ async fn main() -> eframe::Result<()> {
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
+            let application = matthias::app::backend::Application::new(cc);
+
             //Create application
-            Ok(Box::new(matthias::app::backend::TemplateApp::new(cc)))
+            Ok(Box::new(application))
         }),
     )
 }

@@ -1,5 +1,5 @@
 use crate::app::backend::{
-    ClientMessage, ConnectionState, MessagingMode, ServerMessageType, TemplateApp, EMOJI_TUPLES,
+    Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
 use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
 use chrono::Utc;
@@ -14,7 +14,7 @@ use rfd::FileDialog;
 use std::fs::{self};
 use std::sync::mpsc;
 
-impl TemplateApp {
+impl Application {
     pub fn message_tray(
         &mut self,
         ui: &mut egui::Ui,
@@ -44,17 +44,25 @@ impl TemplateApp {
             || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_)))
         {
             ctx.input_mut(|reader| {
-                //Consume key
-                if reader.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                //Check if this key was pressed
+                //We will not consume this key since its not sure we can acually edit the message
+                if reader.key_pressed(Key::ArrowUp) {
                     //Iter over all the messages so we will get the latest message sent by us
-                    for (idx, message) in
-                        self.client_ui.incoming_messages.message_list.iter().enumerate()
+                    for (idx, message) in self
+                        .client_ui
+                        .incoming_messages
+                        .message_list
+                        .iter()
+                        .enumerate()
                     {
                         //Validate editable message
                         if let ServerMessageType::Normal(inner) = &message.message_type {
                             if message.uuid == self.opened_user_information.uuid
                                 && message.message_type != ServerMessageType::Deleted
                             {
+                                //If we can edit said message we can safely consume the key
+                                reader.consume_key(Modifiers::NONE, Key::ArrowUp);
+
                                 self.client_ui.messaging_mode = MessagingMode::Edit(idx);
                                 self.client_ui.message_buffer = inner.message.to_string();
                             }
@@ -176,8 +184,11 @@ impl TemplateApp {
                                 && !self.client_ui.incoming_messages.user_seen_list.is_empty()
                             {
                                 //format the string so the @ stays
-                                if let Some(profile) =
-                                    self.client_ui.incoming_messages.connected_clients_profile.get(
+                                if let Some(profile) = self
+                                    .client_ui
+                                    .incoming_messages
+                                    .connected_clients_profile
+                                    .get(
                                         &self.client_ui.incoming_messages.user_seen_list
                                             [self.client_ui.user_selector_index as usize]
                                             .uuid,
@@ -339,7 +350,20 @@ impl TemplateApp {
                         RichText::from(self.client_ui.random_emoji.clone())
                             .size(self.font_size * 1.2),
                         |ui| {
-                            self.draw_emoji_selector(ui, ctx);
+                            //If selected_emoji isnt a Some(_) then the user didnt click anything
+                            if let Some(emoji_name) = self.draw_emoji_selector(ui, ctx) {
+                                let is_inserting_front =
+                                    self.client_ui.text_edit_cursor_index == self.client_ui.message_buffer.len();
+                    
+                                self.client_ui.message_buffer.insert_str(
+                                    self.client_ui.text_edit_cursor_index,
+                                    &format!(":{}:", emoji_name),
+                                );
+                    
+                                if is_inserting_front {
+                                    self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
+                                }
+                            }
                         },
                     );
 

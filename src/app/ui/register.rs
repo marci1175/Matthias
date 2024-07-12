@@ -1,6 +1,6 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{display_error_message, register, ProfileImage, Register, TemplateApp};
+use crate::app::backend::{display_error_message, register, Application, ProfileImage, Register};
 use anyhow::bail;
 use egui::{
     vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke,
@@ -9,7 +9,7 @@ use egui::{
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};
 
-impl TemplateApp {
+impl Application {
     pub fn state_register(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         egui::TopBottomPanel::top("register_menu").show(ctx, |ui| {
             ui.vertical_centered(|ui| {

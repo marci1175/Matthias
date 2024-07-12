@@ -1,9 +1,9 @@
 use crate::app::backend::{display_error_message, login};
 
-use crate::app::backend::TemplateApp;
+use crate::app::backend::Application;
 use egui::{Align, Layout, RichText};
 
-impl TemplateApp {
+impl Application {
     pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         let is_focused = ctx.input(|input| input.focused);
 

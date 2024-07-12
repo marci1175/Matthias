@@ -1,13 +1,13 @@
-use crate::app::backend::{
-    decrypt_aes256, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
-    ServerMessageType, TemplateApp,
-};
+
+use crate::app::{backend::{
+    decrypt_aes256, Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType
+}, ui::client_ui::widgets::emoji_tray::emoji::display_emoji};
 use egui::{
     load::{BytesPoll, LoadError},
     vec2, Align, Button, Color32, Image, Layout, Response, RichText,
 };
 
-impl TemplateApp {
+impl Application {
     pub fn client_ui_message_main(
         &mut self,
         ui: &mut egui::Ui,
@@ -135,7 +135,9 @@ impl TemplateApp {
                                                     Some(reactions) => {
                                                         for item in &reactions.message_reactions {
                                                             ui.group(|ui| {
-                                                                ui.label(RichText::from(item.char.to_string()).size(self.font_size / 1.1))
+                                                                ui.allocate_ui(vec2(20., 20.), |ui| {
+                                                                    display_emoji(ctx, &item.emoji_name, ui);
+                                                                });
                                                             });
                                                             ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
                                                         }
@@ -273,50 +275,11 @@ impl TemplateApp {
                                     }
 
                                     ui.menu_button("React", |ui| {
-                                        let filter = &self.filter;
-                                        let named_chars = self.named_chars
-                                            .entry(egui::FontFamily::Monospace)
-                                            .or_insert_with(|| TemplateApp::available_characters(ui, egui::FontFamily::Monospace));
-
-                                        ui.allocate_ui(vec2(300., 300.), |ui|{
-                                            egui::ScrollArea::vertical().show(ui, |ui| {
-                                                ui.horizontal_wrapped(|ui| {
-                                                    ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
-
-                                                    for (&chr, name) in named_chars {
-                                                        if filter.is_empty()
-                                                            || name.contains(filter)
-                                                            || *filter == chr.to_string()
-                                                        {
-                                                            let button = egui::Button::new(
-                                                                egui::RichText::new(chr.to_string()).font(egui::FontId {
-                                                                    size: self.font_size,
-                                                                    family: egui::FontFamily::Proportional,
-                                                                }),
-                                                            )
-                                                            .frame(false);
-                                                            if ui.add(button).clicked() {
-
-                                                                let uuid = self.opened_user_information.uuid.clone();
-
-                                                                let message = ClientMessage::construct_reaction_msg(
-                                                                    chr, iter_index,  &uuid,
-                                                                );
-                                                                let connection = self.client_connection.clone();
-
-                                                                tokio::spawn(async move {
-                                                                    match connection.send_message(message).await {
-                                                                        Ok(_) => {},
-                                                                        Err(err) => println!("{err}"),
-                                                                    };
-                                                                });
-                                                            }
-                                                        }
-                                                    }
-                                                });
-                                            });
-                                        });
+                                        if let Some(emoji_name) = self.draw_emoji_selector(ui, ctx) {
+                                            self.send_msg(ClientMessage::construct_reaction_msg(emoji_name, iter_index, &self.opened_user_information.uuid));
+                                        }
                                     });
+
                                     if let ServerMessageType::Normal(inner) = &item.message_type {
                                         if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/copy.png"), "Copy message")).clicked() {
                                             ctx.copy_text(inner.message.clone());

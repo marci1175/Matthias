@@ -1,4 +1,4 @@
-use crate::app::backend::{decrypt_aes256, display_error_message, ClientProfile, TemplateApp};
+use crate::app::backend::{decrypt_aes256, display_error_message, Application, ClientProfile};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
 use dashmap::DashMap;
@@ -6,7 +6,7 @@ use egui::{vec2, Align, Color32, Context, Image, Layout, RichText};
 use egui_extras::{Column, TableBuilder};
 use tokio_util::sync::CancellationToken;
 
-impl TemplateApp {
+impl Application {
     pub fn server_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &Context) {
         ui.collapsing("Server", |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {

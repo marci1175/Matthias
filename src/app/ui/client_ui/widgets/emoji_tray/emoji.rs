@@ -2,7 +2,7 @@ use egui::{
     load::{BytesPoll, LoadError},
     vec2, Image, ImageButton,
 };
-use std::{collections::BTreeMap, ops::ControlFlow};
+use std::collections::BTreeMap;
 
 include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
@@ -155,7 +155,8 @@ fn special_char_name(chr: char) -> Option<&'static str> {
     }
 }
 
-impl backend::TemplateApp {
+impl backend::Application {
+    /// Iterates over all the characters
     pub fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String> {
         ui.fonts(|f| {
             f.lock()
@@ -169,7 +170,8 @@ impl backend::TemplateApp {
         })
     }
 
-    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    /// We return the name of the emoji selected, if none was selected in that frame we reutrn None
+    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) -> Option<String> {
         ui.horizontal_top(|ui| {
             for emoji_type in EMOJIS.emoji_types.iter() {
                 match emoji_type {
@@ -219,145 +221,213 @@ impl backend::TemplateApp {
 
         match self.client_ui.emoji_tab_state {
             backend::EmojiTypesDiscriminants::AnimatedBlobs => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::AnimatedBlobs(animated_blobs) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for animated_blob in animated_blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) = display_emoji(
-                                        ctx,
-                                        animated_blob.name,
-                                        ui,
-                                        &mut selected_emoji,
-                                    ) {}
+                                    selected_emoji = display_emoji(ctx, animated_blob.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Blobs => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Blobs(blobs) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for blob in blobs {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, blob.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, blob.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Icons => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Icons(icons) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for icon in icons {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, icon.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, icon.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Letters => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Letters(letters) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for letter in letters {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, letter.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, letter.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Numbers => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Numbers(numbers) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for number in numbers {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, number.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, number.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Turtles => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Turtles(turtles) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for turtle in turtles {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, turtle.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, turtle.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
             backend::EmojiTypesDiscriminants::Foods => {
+                //If we have selected an emoji we just return it, god forgive me for this piece of code
+                if selected_emoji.is_some() {
+                    return selected_emoji;
+                }
+                
                 for emoji_type in EMOJIS.emoji_types.iter() {
+                    //If its some we break the loop
+                    if selected_emoji.is_some() {
+                        break;
+                    }
+
                     if let EmojiTypes::Foods(foods) = emoji_type {
                         ui.horizontal_wrapped(|ui| {
                             for food in foods {
                                 ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    if let ControlFlow::Break(_) =
-                                        display_emoji(ctx, food.name, ui, &mut selected_emoji)
-                                    {
-                                    }
+                                    selected_emoji = display_emoji(ctx, food.name, ui);
                                 });
+
+                                //If its some we break the loop
+                                if selected_emoji.is_some() {
+                                    break;
+                                }
                             }
                         });
                     }
                 }
             }
-        }
+        };
 
-        //If selected_emoji isnt a Some(_) then the user didnt click anything
-        if let Some(emoji_name) = selected_emoji {
-            let is_inserting_front =
-                self.client_ui.text_edit_cursor_index == self.client_ui.message_buffer.len();
-
-            self.client_ui.message_buffer.insert_str(
-                self.client_ui.text_edit_cursor_index,
-                &format!(":{}:", emoji_name),
-            );
-
-            if is_inserting_front {
-                self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
-            }
-        }
+        selected_emoji
     }
 }
 
 /// This will display the emoji under the given name, if it is not found in the egui image buffer it will automaticly load it
-fn display_emoji(
+pub fn display_emoji(
     ctx: &egui::Context,
     emoji_name: &str,
     ui: &mut egui::Ui,
-    selected_emoji: &mut Option<String>,
-) -> ControlFlow<()> {
+) -> Option<String> {
     match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {
         Ok(bytespoll) => {
             if let BytesPoll::Ready {
@@ -376,10 +446,10 @@ fn display_emoji(
                     .add(ImageButton::new(Image::from_uri(&format!(
                         "bytes://{}",
                         emoji_name
-                    ))))
+                    ))).frame(false))
                     .clicked()
                 {
-                    *selected_emoji = Some(emoji_name.to_string());
+                    return Some(emoji_name.to_string());
                 };
             }
         }
@@ -388,7 +458,7 @@ fn display_emoji(
                 if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
                     //check if we are visible, so there are no unnecessary requests
                     if !ui.is_rect_visible(ui.min_rect()) {
-                        return ControlFlow::Break(());
+                        return None;
                     }
 
                     ctx.include_bytes(
@@ -406,5 +476,5 @@ fn display_emoji(
         }
     }
 
-    ControlFlow::Continue(())
+    None
 }

@@ -1102,7 +1102,7 @@ impl MessageService {
                     .iter_mut()
                 {
                     //Check if it has already been reacted before, if yes add one to the counter
-                    if item.char == reaction.char {
+                    if item.emoji_name == reaction.emoji_name {
                         item.times += 1;
 
                         //Quit the function immediately, so we can add the new reaction
@@ -1114,7 +1114,7 @@ impl MessageService {
                 reaction_vec[reaction.message_index]
                     .message_reactions
                     .push(Reaction {
-                        char: reaction.char,
+                        emoji_name: reaction.emoji_name.clone(),
                         //Set default amount, start from 1
                         times: 1,
                     });

@@ -51,7 +51,9 @@ phf = {version = "0.11.2", features = ["macros"]}
 mlua = {version = "0.9.9", features = ["luajit", "async", "vendored"]}
 quote = "1.0.36"
 syn = {version = "2.0.70", features = ["full"]}
-mlua_proc_macro = "0.1.1"
+mlua_proc_macro = "0.1.10"
+mlua-sys = {version = "0.6.1", features = ["luajit", "vendored"]}
+speed_test = "0.1.8"
 
 [dependencies.uuid]
 version = "1.6.1"
