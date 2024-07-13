@@ -314,23 +314,47 @@ impl Application {
             }).unwrap();
 
             //Clone contex
-            let ctx_clone = cc.egui_ctx.clone();
+            let ctx_clone_line = cc.egui_ctx.clone();
+            let ctx_clone_rect = cc.egui_ctx.clone();
 
             //Create draw line function
-            let draw_line = data.lua.create_function(move |_, pos_to_pos: ([i32; 2], [i32; 2])| {
+            let draw_line = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], (i32, i32, i32, i32))| {
+                let color = args.2.clone();
+
                 //Create the hasher
                 let mut hasher = DefaultHasher::new();
                 
                 //Hash the input
-                pos_to_pos.hash(&mut hasher);
+                args.hash(&mut hasher);
                 
                 //We get the hashed string
                 let area_name = hasher.finish().to_string().into();
 
                 //Create area
-                egui::Area::new(area_name).show(&ctx_clone, |ui| {
+                egui::Area::new(area_name).show(&ctx_clone_line, |ui| {
                     //Draw line based on args
-                    ui.painter().line_segment([Pos2::new(pos_to_pos.0[0] as f32, pos_to_pos.0[1] as f32), Pos2::new(pos_to_pos.1[0] as f32, pos_to_pos.1[1] as f32)], Stroke::new(5., Color32::WHITE));
+                    ui.painter().line_segment([Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)], Stroke::new(5., Color32::from_rgba_premultiplied(color.0 as u8, color.1 as u8, color.2 as u8, color.3 as u8)));
+                });
+
+                Ok(())
+            }).unwrap();
+
+            let draw_rect_filled = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
+                let color = args.2.clone();
+
+                //Create the hasher
+                let mut hasher = DefaultHasher::new();
+                
+                //Hash the input
+                args.hash(&mut hasher);
+                
+                //We get the hashed string
+                let area_name = hasher.finish().to_string().into();
+
+                //Create area
+                egui::Area::new(area_name).show(&ctx_clone_rect, |ui| {
+                    //Draw line based on args
+                    ui.painter().rect_filled(Rect::from_points(&[Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)]), 0., Color32::from_rgba_premultiplied(color[0] as u8, color[1] as u8, color[2] as u8, color[3] as u8));
                 });
 
                 Ok(())
@@ -338,8 +362,8 @@ impl Application {
 
             //Set functions
             data.lua.globals().set("print", print).unwrap();
-            
             data.lua.globals().set("draw_line", draw_line).unwrap();
+            data.lua.globals().set("draw_rect_filled", draw_rect_filled).unwrap();
 
             return data;
         }
