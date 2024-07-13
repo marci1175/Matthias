@@ -83,7 +83,7 @@ impl eframe::App for backend::Application {
         {
             self.set_global_lua_table();
         }
-
+        
         //Run lua scripts when rendering a frame (I should impl callbacks)
         for extension in self.client_ui.extension.extension_list.iter_mut() {
             //Check if the extension is supposed to run
@@ -646,6 +646,7 @@ impl backend::Application {
             });
     }
 
+    ///Draw the extension's output into the little "console"
     fn draw_extension_output(&mut self, columns: &mut [egui::Ui]) {
         columns[1]
             .painter_at(self.client_ui.extension.output_rect.expand(15.))
@@ -688,6 +689,7 @@ impl backend::Application {
     }
 }
 
+///Read all the extensions from the folder
 pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
     let mut extensions: Vec<ExtensionProperties> = Vec::new();
 

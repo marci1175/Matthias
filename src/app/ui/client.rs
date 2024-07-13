@@ -387,8 +387,8 @@ impl Application {
             .anchor(
                 Align2::RIGHT_BOTTOM,
                 match self.client_ui.usr_msg_expanded {
-                    true => vec2(-41.0, (-panel_height - 10.) / 14.),
-                    false => vec2(-41.0, -10.),
+                    true => vec2(-45.0, -(panel_height.clamp(58., f32::MAX) + 5.)),
+                    false => vec2(-45.0, -45.),
                 },
             )
             .show(ctx, |ui| {

@@ -14,7 +14,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
 use egui::load::BytesPoll;
 use egui::load::LoadError;
-use egui::{vec2, Color32, Image, Rect, Response, RichText, Ui};
+use egui::{vec2, Color32, Id, Image, Pos2, Rect, Response, RichText, Stroke, Ui};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
@@ -312,7 +313,33 @@ impl Application {
                 Ok(())
             }).unwrap();
 
+            //Clone contex
+            let ctx_clone = cc.egui_ctx.clone();
+
+            //Create draw line function
+            let draw_line = data.lua.create_function(move |_, pos_to_pos: ([i32; 2], [i32; 2])| {
+                //Create the hasher
+                let mut hasher = DefaultHasher::new();
+                
+                //Hash the input
+                pos_to_pos.hash(&mut hasher);
+                
+                //We get the hashed string
+                let area_name = hasher.finish().to_string().into();
+
+                //Create area
+                egui::Area::new(area_name).show(&ctx_clone, |ui| {
+                    //Draw line based on args
+                    ui.painter().line_segment([Pos2::new(pos_to_pos.0[0] as f32, pos_to_pos.0[1] as f32), Pos2::new(pos_to_pos.1[0] as f32, pos_to_pos.1[1] as f32)], Stroke::new(5., Color32::WHITE));
+                });
+
+                Ok(())
+            }).unwrap();
+
+            //Set functions
             data.lua.globals().set("print", print).unwrap();
+            
+            data.lua.globals().set("draw_line", draw_line).unwrap();
 
             return data;
         }
