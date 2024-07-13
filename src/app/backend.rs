@@ -196,7 +196,11 @@ impl Default for Application {
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
         Self {
-            lua: Lua::new(),
+            //Make it so we can import any kind of library
+            lua: unsafe {
+                Lua::unsafe_new()
+            },
+            
             register: Register::default(),
 
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -318,7 +322,7 @@ impl Application {
             let ctx_clone_rect = cc.egui_ctx.clone();
 
             //Create draw line function
-            let draw_line = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], (i32, i32, i32, i32))| {
+            let draw_line = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
                 let color = args.2.clone();
 
                 //Create the hasher
@@ -333,7 +337,7 @@ impl Application {
                 //Create area
                 egui::Area::new(area_name).show(&ctx_clone_line, |ui| {
                     //Draw line based on args
-                    ui.painter().line_segment([Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)], Stroke::new(5., Color32::from_rgba_premultiplied(color.0 as u8, color.1 as u8, color.2 as u8, color.3 as u8)));
+                    ui.painter().line_segment([Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)], Stroke::new(5., Color32::from_rgba_premultiplied(color[0] as u8, color[1] as u8, color[2] as u8, color[3] as u8)));
                 });
 
                 Ok(())
@@ -355,6 +359,7 @@ impl Application {
                 egui::Area::new(area_name).show(&ctx_clone_rect, |ui| {
                     //Draw line based on args
                     ui.painter().rect_filled(Rect::from_points(&[Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)]), 0., Color32::from_rgba_premultiplied(color[0] as u8, color[1] as u8, color[2] as u8, color[3] as u8));
+                    ctx_clone_rect.request_repaint();
                 });
 
                 Ok(())
