@@ -66,14 +66,17 @@ impl eframe::App for backend::Application {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
             TODO: improve scripting
-            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306: {
-                    TODO: fix audio playback
-                    TODO: add notfications
-                }
+            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
+            TODO: fix audio playback (egui's fault)
+            TODO: add notfications
             TODO: Restructure files
 
             TODO: Fix emoji drawing
             TODO: Api docs
+            TODO: Implement callbacks
+            TODO: Optimize api
+            TODO: Fix packet rejection bug when connecting to early to an inavlid ip
+            TODO: try to make ipv4 support
         */
 
         //Set global lua table before everything
