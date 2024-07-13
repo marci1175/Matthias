@@ -78,7 +78,7 @@ impl eframe::App for backend::Application {
 
         //Set global lua table before everything
         //Slows down app
-        //Only allow it if tis relerase build
+        //Only allow it if its release build
         #[cfg(not(debug_assertions))]
         {
             self.set_global_lua_table();
