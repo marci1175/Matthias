@@ -29,6 +29,7 @@ use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::ops::Add;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
@@ -2041,43 +2042,21 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
     Ok(())
 }
 
-///Write an image file to the appdata folder
-#[inline]
-pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
-    //secondly create the folder labeled with the specified server ip
-
-    let path = format!(
-        "{}\\matthias\\Client\\{}\\Images\\{}",
-        env!("APPDATA"),
-        general_purpose::URL_SAFE_NO_PAD.encode(ip),
-        file_response.signature
-    );
-
-    let _ = fs::create_dir(&path).inspect_err(|err| {
-        dbg!(err);
-    });
-
-    fs::write(path, &file_response.bytes)?;
-
-    Ok(())
-}
-
 ///Write an audio file to the appdata folder
 #[inline]
 pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     //secondly create the folder labeled with the specified server ip
-    let path = format!(
-        "{}\\matthias\\Client\\{}\\Audios\\{}",
+    let folder_path = format!(
+        "{}\\matthias\\Client\\{}\\Audios",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
-        file_response.signature
     );
 
-    let _ = fs::create_dir(&path).inspect_err(|err| {
+    let _ = fs::create_dir_all(&folder_path).inspect_err(|err| {
         dbg!(err);
     });
 
-    fs::write(path, file_response.bytes)?;
+    fs::write(format!("{folder_path}\\{}", file_response.signature), file_response.bytes)?;
 
     Ok(())
 }

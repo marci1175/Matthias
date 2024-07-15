@@ -40,10 +40,10 @@ pub struct MessageService {
     /// Contains all the messages
     pub messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
 
-    ///Contains all of the reactions added to the messages
+    /// Contains all of the reactions added to the messages
     pub reactions: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
 
-    ///This is the required password by the server this password is hashed with argon2, and is compared with the hashed client password
+    /// This is the required password by the server this password is hashed with argon2, and is compared with the hashed client password
     pub passw: String,
 
     /// This is the list, which we will send the files from, these are generated file names, so names will rarely ever match (1 / 1.8446744e+19) chance
@@ -54,7 +54,7 @@ pub struct MessageService {
     /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
     pub image_list: Arc<DashMap<String, PathBuf>>,
 
-    ///This list contains a list of the path to the stored audio files
+    /// This list contains a list of the path to the stored audio files
     /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
     pub audio_list: Arc<DashMap<String, PathBuf>>,
 
@@ -802,8 +802,8 @@ impl MessageService {
         if let SyncMessage(inner) = &req.message_type {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
             if let Some(last_seen_message_index) = inner.last_seen_message_index {
-                match &mut self.clients_last_seen_index.try_lock() {
-                    Ok(client_vec) => {
+                match self.clients_last_seen_index.try_lock() {
+                    Ok(mut client_vec) => {
                         //Iter over the whole list so we can update the user's index if there is one
                         if let Some(client_index_pos) =
                             client_vec.iter().position(|client| client.uuid == req.uuid)

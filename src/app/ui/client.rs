@@ -714,6 +714,7 @@ impl Application {
                                                         let file_stream_to_be_read =
                                                             fs::read(&path_to_audio)
                                                                 .unwrap_or_default();
+                                                            
                                                         let cursor = PlaybackCursor::new(
                                                             file_stream_to_be_read,
                                                         );
@@ -726,10 +727,7 @@ impl Application {
                                                                 sink,
                                                                 cursor,
                                                                 //Is this needed
-                                                                // audio.signature as usize,
-                                                                unimplemented!(
-                                                                    "I dont know what to put here"
-                                                                ),
+                                                                0,
                                                                 path_to_audio,
                                                             ))
                                                             .unwrap();
