@@ -1,6 +1,5 @@
 use egui::{
-    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Layout, Pos2, RichText, Sense,
-    Stroke,
+    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2, RichText, Sense, Stroke
 };
 use rodio::{Decoder, Sink};
 use std::fs;
@@ -74,6 +73,22 @@ impl Application {
                                 .size(20.),
                         );
                     });
+                    
+                    ui.allocate_ui(vec2(10., 40.), |ui| {
+                        ui.separator();
+                    });
+
+                    if matches!(self.client_connection.state, ConnectionState::Connected(_)) {
+                        ui.allocate_ui(vec2(40., 40.), |ui| {
+                            let call_button = ui.add(ImageButton::new(Image::new(egui::include_image!("..\\..\\..\\icons\\call.png"))));
+            
+                        if call_button.clicked() {
+                            //Init call
+                        }
+            
+                        call_button.on_hover_text("Start a group call");
+                        });
+                    }
                 });
 
                 ui.allocate_space(vec2(ui.available_width(), 5.));
@@ -714,7 +729,7 @@ impl Application {
                                                         let file_stream_to_be_read =
                                                             fs::read(&path_to_audio)
                                                                 .unwrap_or_default();
-                                                            
+
                                                         let cursor = PlaybackCursor::new(
                                                             file_stream_to_be_read,
                                                         );
