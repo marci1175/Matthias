@@ -621,7 +621,9 @@ impl Application {
                                                         [message.index as usize]
                                                         .message_reactions
                                                         .iter()
-                                                        .position(|item| item.emoji_name == message.emoji_name)
+                                                        .position(|item| {
+                                                            item.emoji_name == message.emoji_name
+                                                        })
                                                 {
                                                     //If yes, increment the reaction counter
                                                     self.client_ui
@@ -673,12 +675,12 @@ impl Application {
                                                         //Forget image so itll be able to get displayed
                                                         ctx.forget_image(&format!(
                                                             "bytes://{}",
-                                                            image.index
+                                                            image.signature
                                                         ));
 
                                                         //load image to the said URI
                                                         ctx.include_bytes(
-                                                            format!("bytes://{}", image.index),
+                                                            format!("bytes://{}", image.signature),
                                                             image.bytes,
                                                         );
                                                     }
@@ -697,7 +699,7 @@ impl Application {
                                                             env!("APPDATA"),
                                                             self.client_ui
                                                                 .send_on_ip_base64_encoded,
-                                                            audio.index
+                                                            audio.signature
                                                         ));
 
                                                         let _ = write_audio(
@@ -724,7 +726,10 @@ impl Application {
                                                                 sink,
                                                                 cursor,
                                                                 //Is this needed
-                                                                audio.index as usize,
+                                                                // audio.signature as usize,
+                                                                unimplemented!(
+                                                                    "I dont know what to put here"
+                                                                ),
                                                                 path_to_audio,
                                                             ))
                                                             .unwrap();

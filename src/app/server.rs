@@ -26,8 +26,6 @@ use crate::app::backend::{
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
-use rand::Rng;
-use std::sync::Mutex;
 use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, select, task::JoinHandle};
 
 use tokio::{
@@ -50,19 +48,19 @@ pub struct MessageService {
 
     /// This is the list, which we will send the files from, these are generated file names, so names will rarely ever match (1 / 1.8446744e+19) chance
     /// The names are not relevant since when downloading them the client will always ask for a new name
-    pub file_list: Mutex<Vec<PathBuf>>,
+    pub file_list: Arc<DashMap<String, PathBuf>>,
 
     /// This list contains a list of the path to the stored images
     /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
-    pub image_list: Mutex<Vec<PathBuf>>,
+    pub image_list: Arc<DashMap<String, PathBuf>>,
 
     ///This list contains a list of the path to the stored audio files
     /// When the client is asking for a file, they provide an index (which we provided originally when syncing, aka sending the latest message to all the clients)
-    pub audio_list: Mutex<Vec<PathBuf>>,
+    pub audio_list: Arc<DashMap<String, PathBuf>>,
 
     /// This list contains the names of the saved audios, since we generate a random name for the files we want to store
     /// We also dont ask the user the provide a name whenever playing an audio (requesting it from the server)
-    pub audio_names: Mutex<Vec<Option<String>>>,
+    pub audio_names: Arc<DashMap<String, Option<String>>>,
 
     ///connected clients
     pub connected_clients: Arc<tokio::sync::Mutex<Vec<ConnectedClient>>>,
@@ -591,26 +589,19 @@ impl MessageService {
                         //This is unreachable, as requests are handled elsewhere
                         FileRequestType(_) => unreachable!(),
 
-                        FileUpload(inner) => {
-                            match inner.extension.clone().unwrap_or_default().as_str() {
-                                //We have to subtract 1 from every len because of indexing on the client side (we check its lenght after processing the client's message therfor the lenght will be 1 altough the image is on the 0th index)
-                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => {
-                                    self.image_list.lock().unwrap().len() as i32 - 1
-                                }
-                                "wav" | "mp3" | "m4a" => {
-                                    self.audio_list.lock().unwrap().len() as i32 - 1
-                                }
-                                _ => self.file_list.lock().unwrap().len() as i32 - 1,
-                            }
-                        }
+                        FileUpload(inner) => sha256::digest(&inner.bytes),
 
-                        NormalMessage(_) => -1,
+                        //Some message types may not have a signature, they arent requested the same way as files
+                        NormalMessage(_) => String::new(),
 
-                        SyncMessage(_) => -1,
+                        //Some message types may not have a signature, they arent requested the same way as files
+                        SyncMessage(_) => String::new(),
 
-                        ClientReaction(_) => -1,
+                        //Some message types may not have a signature, they arent requested the same way as files
+                        ClientReaction(_) => String::new(),
 
-                        MessageEdit(_) => -1,
+                        //Some message types may not have a signature, they arent requested the same way as files
+                        MessageEdit(_) => String::new(),
                     },
                     //Get message type
                     match &req.message_type {
@@ -769,8 +760,8 @@ impl MessageService {
         let mut messages = self.messages.lock().await;
         messages.push(ServerOutput::convert_clientmsg_to_servermsg(
             req.clone(),
-            //Im not sure why I did that, Tf is this?
-            -1,
+            //Signatures for messages may be used later for something more useful
+            String::new(),
             Normal,
             req.uuid.clone(),
             self.connected_clients_profile
@@ -843,17 +834,18 @@ impl MessageService {
             .unwrap()
             .clone()
             .username;
+
         //500mb limit
         if !req.bytes.len() > 500000000 {
             match env::var("APPDATA") {
                 Ok(app_data) => {
-                    //generate a random number to avoid file overwrites, cuz of same name files
-                    let random_generated_number = rand::thread_rng().gen_range(-i64::MAX..i64::MAX);
+                    //Get the signature of the file, and this is going to be the handle for this file
+                    let file_hash = sha256::digest(&req.bytes);
 
                     //create file, add file to its named so it can never be mixed with images
                     match fs::File::create(format!(
-                        "{app_data}\\Matthias\\Server\\{}file.{}",
-                        random_generated_number,
+                        "{app_data}\\Matthias\\Server\\{}.{}",
+                        file_hash,
                         req.extension.clone().unwrap_or_default()
                     )) {
                         Ok(mut created_file) => {
@@ -864,23 +856,19 @@ impl MessageService {
                             created_file.flush().unwrap();
                             //success
 
-                            match self.file_list.lock() {
-                                Ok(mut ok) => {
-                                    ok.push(PathBuf::from(format!(
-                                        "{app_data}\\Matthias\\Server\\{}file.{}",
-                                        random_generated_number,
-                                        req.extension.clone().unwrap_or_default()
-                                    )));
-                                }
-                                Err(err) => {
-                                    println!("{err}")
-                                }
-                            };
+                            self.file_list.insert(
+                                file_hash.clone(),
+                                PathBuf::from(format!(
+                                    "{app_data}\\Matthias\\Server\\{}.{}",
+                                    file_hash,
+                                    req.extension.clone().unwrap_or_default()
+                                )),
+                            );
 
                             let mut messages = self.messages.lock().await;
                             messages.push(ServerOutput::convert_clientmsg_to_servermsg(
                                 request.clone(),
-                                self.file_list.lock().unwrap().len() as i32,
+                                file_hash,
                                 Upload,
                                 request.uuid.clone(),
                                 file_author,
@@ -897,12 +885,12 @@ impl MessageService {
             }
         }
     }
-    async fn serve_file(&self, index: i32) -> (Vec<u8>, PathBuf) {
-        let path = &self.file_list.lock().unwrap()[index as usize];
-        (fs::read(path).unwrap_or_default(), path.clone())
+    async fn serve_file(&self, signature: String) -> (Vec<u8>, PathBuf) {
+        let path = self.file_list.get(&signature).unwrap().clone();
+        (fs::read(&path).unwrap_or_default(), path)
     }
-    async fn serve_image(&self, index: i32) -> Vec<u8> {
-        fs::read(&self.image_list.lock().unwrap()[index as usize]).unwrap_or_default()
+    async fn serve_image(&self, signature: String) -> Vec<u8> {
+        fs::read(&*self.image_list.get(&signature).unwrap()).unwrap_or_default()
     }
     async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
         //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
@@ -915,16 +903,12 @@ impl MessageService {
             .clone()
             .username;
 
+        let file_signature = sha256::digest(img.bytes.clone());
+
         match env::var("APPDATA") {
             Ok(app_data) => {
-                let mut image_path = self.image_list.lock().unwrap();
-
-                let image_path_lenght = image_path.len();
-
-                match fs::File::create(format!(
-                    "{app_data}\\Matthias\\Server\\{}",
-                    image_path_lenght
-                )) {
+                match fs::File::create(format!("{app_data}\\Matthias\\Server\\{}", file_signature))
+                {
                     Ok(mut created_file) => {
                         if let Err(err) = created_file.write_all(&img.bytes) {
                             println!("[{err}\n{}]", err.kind());
@@ -937,7 +921,7 @@ impl MessageService {
                             Ok(mut ok) => {
                                 ok.push(ServerOutput::convert_clientmsg_to_servermsg(
                                     req.clone(),
-                                    image_path_lenght as i32,
+                                    file_signature.clone(),
                                     Image,
                                     req.uuid.clone(),
                                     file_author,
@@ -947,10 +931,13 @@ impl MessageService {
                         }
 
                         //Only save as last step to avoid a mismatch + correct indexing :)
-                        image_path.push(PathBuf::from(format!(
-                            "{app_data}\\Matthias\\Server\\{}",
-                            image_path_lenght
-                        )));
+                        self.image_list.insert(
+                            file_signature.clone(),
+                            PathBuf::from(format!(
+                                "{app_data}\\Matthias\\Server\\{}",
+                                file_signature
+                            )),
+                        );
                     }
                     Err(err) => {
                         println!(" [{err} {}]", err.kind());
@@ -972,14 +959,15 @@ impl MessageService {
             .unwrap()
             .clone()
             .username;
-        let mut audio_paths = self.audio_list.lock().unwrap();
 
-        let audio_paths_lenght = audio_paths.len();
+        let mut audio_paths = self.audio_list.clone();
+
+        let file_signature = sha256::digest(audio.bytes.clone());
 
         match fs::File::create(format!(
             "{}\\Matthias\\Server\\{}",
             env!("APPDATA"),
-            audio_paths_lenght
+            file_signature
         )) {
             Ok(mut created_file) => {
                 if let Err(err) = created_file.write_all(&audio.bytes) {
@@ -993,7 +981,7 @@ impl MessageService {
                     Ok(mut ok) => {
                         ok.push(ServerOutput::convert_clientmsg_to_servermsg(
                             req.clone(),
-                            audio_paths_lenght as i32,
+                            file_signature.clone(),
                             Audio,
                             req.uuid.clone(),
                             file_author,
@@ -1003,27 +991,27 @@ impl MessageService {
                 }
 
                 //Only save as last step to avoid a mismatch + correct indexing :)
-                audio_paths.push(PathBuf::from(format!(
-                    "{}\\Matthias\\Server\\{}",
-                    env!("APPDATA"),
-                    audio_paths_lenght
-                )));
+                audio_paths.insert(
+                    file_signature.clone(),
+                    PathBuf::from(format!(
+                        "{}\\Matthias\\Server\\{}",
+                        env!("APPDATA"),
+                        file_signature
+                    )),
+                );
 
                 //consequently save the audio_recording's name
-                match self.audio_names.try_lock() {
-                    Ok(mut vec) => vec.push(audio.name.clone()),
-                    Err(err) => println!("{err}"),
-                }
+                self.audio_names.insert(file_signature, audio.name.clone());
             }
             Err(err) => {
                 println!(" [{err} {}]", err.kind());
             }
         }
     }
-    async fn serve_audio(&self, index: i32) -> (Vec<u8>, Option<String>) {
+    async fn serve_audio(&self, signature: String) -> (Vec<u8>, Option<String>) {
         (
-            fs::read(&self.audio_list.lock().unwrap()[index as usize]).unwrap_or_default(),
-            self.audio_names.lock().unwrap()[index as usize].clone(),
+            fs::read(&*self.audio_list.get(&signature).unwrap()).unwrap_or_default(),
+            self.audio_names.get(&signature).unwrap().clone(),
         )
     }
 
@@ -1035,16 +1023,17 @@ impl MessageService {
     ) -> anyhow::Result<String> {
         let reply = match request_type {
             ClientRequestTypeStruct::ImageRequest(img_request) => {
-                let read_file = self.serve_image(img_request.index).await;
+                let read_file = self.serve_image(img_request.signature.clone()).await;
 
                 serde_json::to_string(&ServerReplyType::Image(ServerImageReply {
                     bytes: read_file,
-                    index: img_request.index,
+                    signature: img_request.signature.clone(),
                 }))
                 .unwrap_or_default()
             }
             ClientRequestTypeStruct::FileRequest(file_request) => {
-                let (file_bytes, file_name) = &self.serve_file(file_request.index).await;
+                let (file_bytes, file_name) =
+                    &self.serve_file(file_request.signature.clone()).await;
 
                 serde_json::to_string(&ServerReplyType::File(ServerFileReply {
                     file_name: file_name.clone(),
@@ -1053,11 +1042,12 @@ impl MessageService {
                 .unwrap_or_default()
             }
             ClientRequestTypeStruct::AudioRequest(audio_request) => {
-                let (file_bytes, file_name) = self.serve_audio(audio_request.index).await;
+                let (file_bytes, file_name) =
+                    self.serve_audio(audio_request.signature.clone()).await;
 
                 serde_json::to_string(&ServerReplyType::Audio(ServerAudioReply {
                     bytes: file_bytes,
-                    index: audio_request.index,
+                    signature: audio_request.signature.clone(),
                     file_name: file_name.unwrap_or_default(),
                 }))
                 .unwrap_or_default()

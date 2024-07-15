@@ -171,7 +171,11 @@ impl backend::Application {
     }
 
     /// We return the name of the emoji selected, if none was selected in that frame we reutrn None
-    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) -> Option<String> {
+    pub fn draw_emoji_selector(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+    ) -> Option<String> {
         ui.horizontal_top(|ui| {
             for emoji_type in EMOJIS.emoji_types.iter() {
                 match emoji_type {
@@ -225,7 +229,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -253,7 +257,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -281,7 +285,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -309,7 +313,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -337,7 +341,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -365,7 +369,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -393,7 +397,7 @@ impl backend::Application {
                 if selected_emoji.is_some() {
                     return selected_emoji;
                 }
-                
+
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     //If its some we break the loop
                     if selected_emoji.is_some() {
@@ -423,11 +427,7 @@ impl backend::Application {
 }
 
 /// This will display the emoji under the given name, if it is not found in the egui image buffer it will automaticly load it
-pub fn display_emoji(
-    ctx: &egui::Context,
-    emoji_name: &str,
-    ui: &mut egui::Ui,
-) -> Option<String> {
+pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -> Option<String> {
     match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {
         Ok(bytespoll) => {
             if let BytesPoll::Ready {
@@ -443,10 +443,10 @@ pub fn display_emoji(
                     );
                 }
                 if ui
-                    .add(ImageButton::new(Image::from_uri(&format!(
-                        "bytes://{}",
-                        emoji_name
-                    ))).frame(false))
+                    .add(
+                        ImageButton::new(Image::from_uri(&format!("bytes://{}", emoji_name)))
+                            .frame(false),
+                    )
                     .clicked()
                 {
                     return Some(emoji_name.to_string());

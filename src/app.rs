@@ -8,8 +8,8 @@ use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Stroke, TextEdit};
 use egui_extras::{Column, TableBuilder};
 use lua::execute_code;
-use tap::TapFallible;
 use std::fs::{self};
+use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
 
 pub mod backend;
@@ -86,7 +86,7 @@ impl eframe::App for backend::Application {
         {
             self.set_global_lua_table();
         }
-        
+
         //Run lua scripts when rendering a frame (I should impl callbacks)
         for extension in self.client_ui.extension.extension_list.iter_mut() {
             //Check if the extension is supposed to run
@@ -496,7 +496,9 @@ impl backend::Application {
         });
 
         #[cfg(debug_assertions)]
-        ui.label(RichText::from("The lua api is temporarily disabled in debug due to performance issues."));
+        ui.label(RichText::from(
+            "The lua api is temporarily disabled in debug due to performance issues.",
+        ));
     }
 
     #[allow(dead_code)]
@@ -559,29 +561,23 @@ impl backend::Application {
                                     extension.is_running = !extension.is_running;
 
                                     match self.client_ui.extension.output.try_lock() {
-                                        Ok(mut output) => {
-                                            match extension.is_running {
-                                                true => {
-                                                    output.push(
-                                                        backend::LuaOutput::Info(format!(
-                                                            r#"Extension "{}" has been started."#,
-                                                            extension.name
-                                                        )),
-                                                    );
-                                                }
-                                                false => {
-                                                    output.push(
-                                                        backend::LuaOutput::Info(format!(
-                                                            r#"Extension "{}" has been stopped."#,
-                                                            extension.name
-                                                        )),
-                                                    );
-                                                }
+                                        Ok(mut output) => match extension.is_running {
+                                            true => {
+                                                output.push(backend::LuaOutput::Info(format!(
+                                                    r#"Extension "{}" has been started."#,
+                                                    extension.name
+                                                )));
+                                            }
+                                            false => {
+                                                output.push(backend::LuaOutput::Info(format!(
+                                                    r#"Extension "{}" has been stopped."#,
+                                                    extension.name
+                                                )));
                                             }
                                         },
                                         Err(err) => {
                                             dbg!(err);
-                                        },
+                                        }
                                     }
                                 }
                             });
@@ -671,7 +667,15 @@ impl backend::Application {
             .stick_to_bottom(true)
             .id_source(columns[1].next_auto_id())
             .show(&mut columns[1], |ui| {
-                for output in self.client_ui.extension.output.lock().as_deref().unwrap_or(&vec![]).iter() {
+                for output in self
+                    .client_ui
+                    .extension
+                    .output
+                    .lock()
+                    .as_deref()
+                    .unwrap_or(&vec![])
+                    .iter()
+                {
                     match output {
                         backend::LuaOutput::Error(error) => {
                             ui.label(RichText::from(error).color(Color32::RED));

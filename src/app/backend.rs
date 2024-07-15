@@ -197,10 +197,8 @@ impl Default for Application {
 
         Self {
             //Make it so we can import any kind of library
-            lua: unsafe {
-                Lua::unsafe_new()
-            },
-            
+            lua: unsafe { Lua::unsafe_new() },
+
             register: Register::default(),
 
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -306,69 +304,107 @@ impl Application {
             let output_list = data.client_ui.extension.output.clone();
 
             //Insert lua function
-            let print = data.lua.create_function(move |_, msg: String| {
-                match output_list.lock() {
-                    Ok(mut list) => list.push(LuaOutput::Standard(msg)),
-                    Err(err) => {
-                        dbg!(err);
-                    },
-                }
+            let print = data
+                .lua
+                .create_function(move |_, msg: String| {
+                    match output_list.lock() {
+                        Ok(mut list) => list.push(LuaOutput::Standard(msg)),
+                        Err(err) => {
+                            dbg!(err);
+                        }
+                    }
 
-                Ok(())
-            }).unwrap();
+                    Ok(())
+                })
+                .unwrap();
 
             //Clone contex
             let ctx_clone_line = cc.egui_ctx.clone();
             let ctx_clone_rect = cc.egui_ctx.clone();
 
             //Create draw line function
-            let draw_line = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                let color = args.2.clone();
+            let draw_line = data
+                .lua
+                .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
+                    let color = args.2.clone();
 
-                //Create the hasher
-                let mut hasher = DefaultHasher::new();
-                
-                //Hash the input
-                args.hash(&mut hasher);
-                
-                //We get the hashed string
-                let area_name = hasher.finish().to_string().into();
+                    //Create the hasher
+                    let mut hasher = DefaultHasher::new();
 
-                //Create area
-                egui::Area::new(area_name).show(&ctx_clone_line, |ui| {
-                    //Draw line based on args
-                    ui.painter().line_segment([Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)], Stroke::new(5., Color32::from_rgba_premultiplied(color[0] as u8, color[1] as u8, color[2] as u8, color[3] as u8)));
-                });
+                    //Hash the input
+                    args.hash(&mut hasher);
 
-                Ok(())
-            }).unwrap();
+                    //We get the hashed string
+                    let area_name = hasher.finish().to_string().into();
 
-            let draw_rect_filled = data.lua.create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                let color = args.2.clone();
+                    //Create area
+                    egui::Area::new(area_name).show(&ctx_clone_line, |ui| {
+                        //Draw line based on args
+                        ui.painter().line_segment(
+                            [
+                                Pos2::new(args.0[0] as f32, args.0[1] as f32),
+                                Pos2::new(args.1[0] as f32, args.1[1] as f32),
+                            ],
+                            Stroke::new(
+                                5.,
+                                Color32::from_rgba_premultiplied(
+                                    color[0] as u8,
+                                    color[1] as u8,
+                                    color[2] as u8,
+                                    color[3] as u8,
+                                ),
+                            ),
+                        );
+                    });
 
-                //Create the hasher
-                let mut hasher = DefaultHasher::new();
-                
-                //Hash the input
-                args.hash(&mut hasher);
-                
-                //We get the hashed string
-                let area_name = hasher.finish().to_string().into();
+                    Ok(())
+                })
+                .unwrap();
 
-                //Create area
-                egui::Area::new(area_name).show(&ctx_clone_rect, |ui| {
-                    //Draw line based on args
-                    ui.painter().rect_filled(Rect::from_points(&[Pos2::new(args.0[0] as f32, args.0[1] as f32), Pos2::new(args.1[0] as f32, args.1[1] as f32)]), 0., Color32::from_rgba_premultiplied(color[0] as u8, color[1] as u8, color[2] as u8, color[3] as u8));
-                    ctx_clone_rect.request_repaint();
-                });
+            let draw_rect_filled = data
+                .lua
+                .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
+                    let color = args.2.clone();
 
-                Ok(())
-            }).unwrap();
+                    //Create the hasher
+                    let mut hasher = DefaultHasher::new();
+
+                    //Hash the input
+                    args.hash(&mut hasher);
+
+                    //We get the hashed string
+                    let area_name = hasher.finish().to_string().into();
+
+                    //Create area
+                    egui::Area::new(area_name).show(&ctx_clone_rect, |ui| {
+                        //Draw line based on args
+                        ui.painter().rect_filled(
+                            Rect::from_points(&[
+                                Pos2::new(args.0[0] as f32, args.0[1] as f32),
+                                Pos2::new(args.1[0] as f32, args.1[1] as f32),
+                            ]),
+                            0.,
+                            Color32::from_rgba_premultiplied(
+                                color[0] as u8,
+                                color[1] as u8,
+                                color[2] as u8,
+                                color[3] as u8,
+                            ),
+                        );
+                        ctx_clone_rect.request_repaint();
+                    });
+
+                    Ok(())
+                })
+                .unwrap();
 
             //Set functions
             data.lua.globals().set("print", print).unwrap();
             data.lua.globals().set("draw_line", draw_line).unwrap();
-            data.lua.globals().set("draw_rect_filled", draw_rect_filled).unwrap();
+            data.lua
+                .globals()
+                .set("draw_rect_filled", draw_rect_filled)
+                .unwrap();
 
             return data;
         }
@@ -775,19 +811,22 @@ pub enum ConnectionType {
 ///This is used by the client for requesting file
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientFileRequest {
-    pub index: i32,
+    /// This is the signature of the file which has been uploaded, this acts like a handle to the file
+    pub signature: String,
 }
 
 ///This is used by the client for requesting images
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientImageRequest {
-    pub index: i32,
+    /// This is the signature of the file which has been uploaded, this acts like a handle to the file
+    pub signature: String,
 }
 
 ///Client requests audio file in server
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientAudioRequest {
-    pub index: i32,
+    /// This is the signature of the file which has been uploaded, this acts like a handle to the file
+    pub signature: String,
 }
 
 ///Reaction packet, defines which message its reacting to and with which char
@@ -980,11 +1019,11 @@ impl ClientMessage {
     }
 
     ///this is used for asking for a file
-    pub fn construct_file_request_msg(index: i32, uuid: &str) -> ClientMessage {
+    pub fn construct_file_request_msg(signature: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::FileRequest(
-                ClientFileRequest { index },
+                ClientFileRequest { signature },
             )),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -992,11 +1031,11 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_image_request_msg(index: i32, uuid: &str) -> ClientMessage {
+    pub fn construct_image_request_msg(signature: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ImageRequest(
-                ClientImageRequest { index },
+                ClientImageRequest { signature },
             )),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1004,11 +1043,11 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_audio_request_msg(index: i32, uuid: &str) -> ClientMessage {
+    pub fn construct_audio_request_msg(signature: String, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::AudioRequest(
-                ClientAudioRequest { index },
+                ClientAudioRequest { signature },
             )),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1254,7 +1293,7 @@ impl Debug for ConnectionState {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerFileUpload {
     pub file_name: String,
-    pub index: i32,
+    pub signature: String,
 }
 
 /// This enum holds all the Server reply types so it can be decoded more easily on the client side
@@ -1282,7 +1321,7 @@ pub struct ServerClientReply {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerImageReply {
     pub bytes: Vec<u8>,
-    pub index: i32,
+    pub signature: String,
 }
 
 ///This is what the server sends back, when asked for a file (FIleRequest)
@@ -1296,7 +1335,7 @@ pub struct ServerFileReply {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerAudioReply {
     pub bytes: Vec<u8>,
-    pub index: i32,
+    pub signature: String,
     pub file_name: String,
 }
 
@@ -1310,14 +1349,14 @@ pub struct ServerNormalMessage {
 ///REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerAudioUpload {
-    pub index: i32,
+    pub signature: String,
     pub file_name: String,
 }
 
 ///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerImageUpload {
-    pub index: i32,
+    pub signature: String,
 }
 
 /// This struct contains all the important information for the client to edit / update its own message list
@@ -1430,8 +1469,8 @@ impl ServerOutput {
     /// This function converts a client message to a ServerOutput, which gets sent to all the clients (Its basicly a simplified client message)
     pub fn convert_clientmsg_to_servermsg(
         normal_msg: ClientMessage,
-        // The index is used to ask bytes from the server, for example in a image message this index will be used to get the image's byte
-        index: i32,
+        // The signature is used to ask bytes from the server, for example in a image message this signature will be used to get the image's byte
+        signature: String,
         //Automaticly generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
         uuid: String,
@@ -1457,21 +1496,21 @@ impl ServerOutput {
                                             upload.name.unwrap_or_default(),
                                             upload.extension.unwrap_or_default()
                                         ),
-                                        index,
+                                        signature,
                                     }
                                 )
                             },
                             ServerMessageTypeDiscriminants::Image => {
                                 ServerMessageType::Image(
                                     ServerImageUpload {
-                                        index,
+                                        signature,
                                     }
                                 )
                             },
                             ServerMessageTypeDiscriminants::Audio => {
                                 ServerMessageType::Audio(
                                     ServerAudioUpload {
-                                        index,
+                                        signature,
                                         file_name: format!(
                                             "{}.{}",
                                             upload.name.unwrap_or_default(),
@@ -2011,7 +2050,7 @@ pub fn write_image(file_response: &ServerImageReply, ip: String) -> Result<()> {
         "{}\\matthias\\Client\\{}\\Images\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
-        file_response.index
+        file_response.signature
     );
 
     let _ = fs::create_dir(&path).inspect_err(|err| {
@@ -2031,7 +2070,7 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
         "{}\\matthias\\Client\\{}\\Audios\\{}",
         env!("APPDATA"),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
-        file_response.index
+        file_response.signature
     );
 
     let _ = fs::create_dir(&path).inspect_err(|err| {

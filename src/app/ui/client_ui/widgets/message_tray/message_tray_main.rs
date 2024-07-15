@@ -41,7 +41,8 @@ impl Application {
         //If the key was not consumed by any of the two previous functions, we will edit the latest message sent by us
         //We wont allow this when we are either editing a message or we are replying to one
         if !(matches!(self.client_ui.messaging_mode, MessagingMode::Edit(_))
-            || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_))) && self.client_ui.message_buffer.is_empty()
+            || matches!(self.client_ui.messaging_mode, MessagingMode::Reply(_)))
+            && self.client_ui.message_buffer.is_empty()
         {
             ctx.input_mut(|reader| {
                 //Check if this key was pressed
@@ -352,16 +353,17 @@ impl Application {
                         |ui| {
                             //If selected_emoji isnt a Some(_) then the user didnt click anything
                             if let Some(emoji_name) = self.draw_emoji_selector(ui, ctx) {
-                                let is_inserting_front =
-                                    self.client_ui.text_edit_cursor_index == self.client_ui.message_buffer.len();
-                    
+                                let is_inserting_front = self.client_ui.text_edit_cursor_index
+                                    == self.client_ui.message_buffer.len();
+
                                 self.client_ui.message_buffer.insert_str(
                                     self.client_ui.text_edit_cursor_index,
                                     &format!(":{}:", emoji_name),
                                 );
-                    
+
                                 if is_inserting_front {
-                                    self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
+                                    self.client_ui.text_edit_cursor_index =
+                                        self.client_ui.message_buffer.len();
                                 }
 
                                 ui.close_menu();

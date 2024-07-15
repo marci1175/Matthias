@@ -28,7 +28,7 @@ impl Application {
                 //If we want to download the file included in the message
                 if button.clicked() {
                     let message = ClientMessage::construct_file_request_msg(
-                        inner.index,
+                        inner.signature.clone(),
                         &self.opened_user_information.uuid,
                     );
 
@@ -68,7 +68,7 @@ impl Application {
             }
             crate::app::backend::ServerMessageType::Image(picture) => {
                 ui.allocate_ui(vec2(300., 300.), |ui| {
-                    match ctx.try_load_bytes(&format!("bytes://{}", picture.index)) {
+                    match ctx.try_load_bytes(&format!("bytes://{}", picture.signature)) {
                         Ok(bytes_poll) => {
                             //display picture from bytes
                             if let egui::load::BytesPoll::Ready {bytes, ..} = bytes_poll {
@@ -78,7 +78,7 @@ impl Application {
                                     return;
                                 }
                                 let image_widget = ui.add(egui::widgets::Image::from_uri(
-                                    format!("bytes://{}", picture.index),
+                                    format!("bytes://{}", picture.signature),
                                 ));
                                 if image_widget.interact(Sense::click()).clicked() {
                                     self.client_ui.image_overlay = true;
@@ -106,11 +106,11 @@ impl Application {
                                         return;
                                     }
                                     //Load an empty byte to the said URI
-                                    ctx.include_bytes(format!("bytes://{}", picture.index), vec![0]);
+                                    ctx.include_bytes(format!("bytes://{}", picture.signature), vec![0]);
                                     //We dont have file on our local system so we have to ask the server to provide it
                                     let uuid = &self.opened_user_information.uuid;
                                     let message =
-                                        ClientMessage::construct_image_request_msg(picture.index, uuid);
+                                        ClientMessage::construct_image_request_msg(picture.signature.clone(), uuid);
                                     let connection = self.client_connection.clone();
                                     tokio::spawn(async move {
                                         //We only have to send the message it will get recived in a diff place
@@ -140,7 +140,7 @@ impl Application {
                     "{}\\Matthias\\Client\\{}\\Audios\\{}",
                     env!("APPDATA"),
                     self.client_ui.send_on_ip_base64_encoded,
-                    audio.index
+                    audio.signature
                 ));
 
                 ui.allocate_ui(vec2(300., 150.), |ui| {
@@ -222,7 +222,7 @@ impl Application {
                                         if !path_to_audio.exists() {
                                             let message =
                                                 ClientMessage::construct_audio_request_msg(
-                                                    audio.index,
+                                                    audio.signature.clone(),
                                                     &self.opened_user_information.uuid,
                                                 );
 
@@ -382,7 +382,7 @@ impl Application {
                     vec2(ui.available_width() / 1.3, ui.available_height() / 1.3),
                     |ui| {
                         ui.add(egui::widgets::Image::from_bytes(
-                            format!("bytes://{}", picture.index),
+                            format!("bytes://{}", picture.signature),
                             image_bytes.clone(),
                         )) /*Add the same context menu as before*/
                         .context_menu(|ui| {
