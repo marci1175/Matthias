@@ -1,7 +1,10 @@
-
-use crate::app::{backend::{
-    decrypt_aes256, Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage, ServerMessageType
-}, ui::client_ui::widgets::emoji_tray::emoji::display_emoji};
+use crate::app::{
+    backend::{
+        decrypt_aes256, Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
+        ServerMessageType,
+    },
+    ui::client_ui::widgets::emoji_tray::emoji::display_emoji,
+};
 use egui::{
     load::{BytesPoll, LoadError},
     vec2, Align, Button, Color32, Image, Layout, Response, RichText,

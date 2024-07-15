@@ -1,8 +1,8 @@
 //Define the maximum amount of entries in the lua output vector
 const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
 
-use anyhow::Error;
 use crate::app::lua::ExtensionProperties;
+use anyhow::Error;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Stroke, TextEdit};
@@ -252,7 +252,6 @@ impl eframe::App for backend::Application {
                         //If we recived a None it means we have an error
                         self.client_connection.state = ConnectionState::Error;
                     }
-
                 }
             }
             Err(_err) => {
@@ -420,11 +419,15 @@ impl backend::Application {
 
             let compare_passwords = self.client_ui.client_password.clone();
 
-            ui.add_enabled(!matches!(self.client_connection.state, ConnectionState::Connected(_)), |ui: &mut egui::Ui| {
-                ui.add(
-                    TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password (Optional)"),
-                )
-            });
+            ui.add_enabled(
+                !matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                |ui: &mut egui::Ui| {
+                    ui.add(
+                        TextEdit::singleline(&mut self.client_ui.client_password)
+                            .hint_text("Password (Optional)"),
+                    )
+                },
+            );
 
             if compare_passwords != self.client_ui.client_password
                 || self.client_ui.send_on_ip != compare_ip

@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use egui::Rect;
 use mlua::Lua;
@@ -74,10 +78,10 @@ pub struct Extension {
 pub enum EventCall {
     /// Triggered when sending a message
     OnChatSend,
-    
+
     /// Triggered when reciving a message
     OnChatRecive,
-    
+
     /// Triggered when reciving a message from the server
     OnServerChatRecive,
 
@@ -97,27 +101,13 @@ pub enum EventCall {
 impl Extension {
     pub fn event_call_extension(event: EventCall, lua: &Lua) {
         match event {
-            EventCall::OnChatSend => {
-
-            },
-            EventCall::OnChatRecive => {
-
-            },
-            EventCall::OnServerChatRecive => {
-
-            },
-            EventCall::OnCallSend => {
-
-            },
-            EventCall::OnCallRecive => {
-
-            },
-            EventCall::OnDraw => {
-
-            },
-            EventCall::OnConnect => {
-
-            },
+            EventCall::OnChatSend => {}
+            EventCall::OnChatRecive => {}
+            EventCall::OnServerChatRecive => {}
+            EventCall::OnCallSend => {}
+            EventCall::OnCallRecive => {}
+            EventCall::OnDraw => {}
+            EventCall::OnConnect => {}
         }
     }
 }

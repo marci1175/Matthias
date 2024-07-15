@@ -2036,7 +2036,10 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
         dbg!(err);
     });
 
-    fs::write(format!("{folder_path}\\{}", file_response.signature), file_response.bytes)?;
+    fs::write(
+        format!("{folder_path}\\{}", file_response.signature),
+        file_response.bytes,
+    )?;
 
     Ok(())
 }
