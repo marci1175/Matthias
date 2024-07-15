@@ -2,7 +2,7 @@
 const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
 
 use anyhow::Error;
-use backend::ExtensionProperties;
+use crate::app::lua::ExtensionProperties;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Stroke, TextEdit};
@@ -65,24 +65,19 @@ impl eframe::App for backend::Application {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
-            TODO: improve scripting
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: fix audio playback (egui's fault)
             TODO: add notfications
             TODO: Restructure files
 
-            TODO: Fix emoji drawing
             TODO: Api docs
             TODO: Implement callbacks
-            TODO: Optimize api
-            TODO: Fix packet rejection bug when connecting to early to an inavlid ip
             TODO: try to make ipv4 support
         */
 
         //Set global lua table before everything
         //Slows down app
         //Only allow it if its release build
-        #[cfg(not(debug_assertions))]
         {
             self.set_global_lua_table();
         }
@@ -100,13 +95,13 @@ impl eframe::App for backend::Application {
                         //Save error message
                         match self.client_ui.extension.output.lock() {
                             Ok(mut output) => {
-                                output.push(backend::LuaOutput::Error(err.to_string()));
+                                output.push(crate::app::lua::LuaOutput::Error(err.to_string()));
 
                                 //Stop the exectuion of this script
                                 extension.is_running = false;
 
                                 output
-                                        .push(backend::LuaOutput::Info(format!(
+                                        .push(crate::app::lua::LuaOutput::Info(format!(
                                             r#"Extension "{}" was forcibly stopped due to a runtime error."#,
                                             extension.name
                                         )));
@@ -424,11 +419,12 @@ impl backend::Application {
             });
 
             let compare_passwords = self.client_ui.client_password.clone();
-            if self.client_ui.req_passw {
+
+            ui.add_enabled(!matches!(self.client_connection.state, ConnectionState::Connected(_)), |ui: &mut egui::Ui| {
                 ui.add(
-                    TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password"),
-                );
-            };
+                    TextEdit::singleline(&mut self.client_ui.client_password).hint_text("Password (Optional)"),
+                )
+            });
 
             if compare_passwords != self.client_ui.client_password
                 || self.client_ui.send_on_ip != compare_ip
@@ -491,7 +487,6 @@ impl backend::Application {
             };
         });
 
-        #[cfg(not(debug_assertions))]
         ui.horizontal(|ui| {
             ui.columns(2, |columns| {
                 self.draw_extension_table(columns, ctx);
@@ -499,14 +494,8 @@ impl backend::Application {
                 self.draw_extension_output(columns);
             });
         });
-
-        #[cfg(debug_assertions)]
-        ui.label(RichText::from(
-            "The lua api is temporarily disabled in debug due to performance issues.",
-        ));
     }
 
-    #[allow(dead_code)]
     fn draw_extension_table(&mut self, columns: &mut [egui::Ui], ctx: &egui::Context) {
         let available_width = columns[0].available_width();
 
@@ -568,13 +557,13 @@ impl backend::Application {
                                     match self.client_ui.extension.output.try_lock() {
                                         Ok(mut output) => match extension.is_running {
                                             true => {
-                                                output.push(backend::LuaOutput::Info(format!(
+                                                output.push(lua::LuaOutput::Info(format!(
                                                     r#"Extension "{}" has been started."#,
                                                     extension.name
                                                 )));
                                             }
                                             false => {
-                                                output.push(backend::LuaOutput::Info(format!(
+                                                output.push(lua::LuaOutput::Info(format!(
                                                     r#"Extension "{}" has been stopped."#,
                                                     extension.name
                                                 )));
@@ -682,13 +671,13 @@ impl backend::Application {
                     .iter()
                 {
                     match output {
-                        backend::LuaOutput::Error(error) => {
+                        lua::LuaOutput::Error(error) => {
                             ui.label(RichText::from(error).color(Color32::RED));
                         }
-                        backend::LuaOutput::Standard(output) => {
+                        lua::LuaOutput::Standard(output) => {
                             ui.label(RichText::from(output).color(Color32::LIGHT_YELLOW));
                         }
-                        backend::LuaOutput::Info(info) => {
+                        lua::LuaOutput::Info(info) => {
                             ui.label(
                                 RichText::from(format!("INFO: {info}")).color(Color32::LIGHT_BLUE),
                             );

@@ -1,4 +1,5 @@
 use super::client::{connect_to_server, ServerReply};
+use super::lua::{Extension, LuaOutput};
 use super::read_extensions_dir;
 use super::server::SharedFields;
 use aes_gcm::aead::generic_array::GenericArray;
@@ -29,7 +30,6 @@ use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::ops::Add;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
@@ -43,11 +43,11 @@ use windows_sys::w;
 use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
 use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
-#[derive(serde::Deserialize, serde::Serialize, ToTable)]
+#[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
 pub struct Application {
     #[serde(skip)]
-    pub lua: Lua,
+    pub lua: Arc<Lua>,
 
     /*
         Font
@@ -100,12 +100,6 @@ pub struct Application {
     ///Which port is the server open on
     pub open_on_port: String,
 
-    ///thread communication for server
-    #[serde(skip)]
-    pub srx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub stx: mpsc::Sender<String>,
-
     ///child windows
     #[serde(skip)]
     pub settings_window: bool,
@@ -116,9 +110,9 @@ pub struct Application {
 
     ///thread communication for audio ! SAVING !
     #[serde(skip)]
-    pub audio_save_rx: mpsc::Receiver<(Option<Sink>, PlaybackCursor, usize, PathBuf)>,
+    pub audio_save_rx: Arc<mpsc::Receiver<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>>,
     #[serde(skip)]
-    pub audio_save_tx: mpsc::Sender<(Option<Sink>, PlaybackCursor, usize, PathBuf)>,
+    pub audio_save_tx: Arc<mpsc::Sender<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>>,
 
     /*
         Register
@@ -141,22 +135,16 @@ pub struct Application {
     #[serde(skip)]
     pub client_connection: ClientConnection,
 
-    ///thread communication for client
-    #[serde(skip)]
-    pub rx: mpsc::Receiver<String>,
-    #[serde(skip)]
-    pub tx: mpsc::Sender<String>,
-
     ///data sync
     #[serde(skip)]
-    pub drx: mpsc::Receiver<String>,
+    pub drx: Arc<mpsc::Receiver<String>>,
     #[serde(skip)]
-    pub dtx: mpsc::Sender<String>,
+    pub dtx: Arc<mpsc::Sender<String>>,
 
     ///Server connection
     /// This channel hosts a Client connection and the sync message sent by the server in a String format
     #[serde(skip)]
-    pub connection_reciver: mpsc::Receiver<Option<(ClientConnection, String)>>,
+    pub connection_reciver: Arc<mpsc::Receiver<Option<(ClientConnection, String)>>>,
     #[serde(skip)]
     pub connection_sender: mpsc::Sender<Option<(ClientConnection, String)>>,
 
@@ -166,7 +154,7 @@ pub struct Application {
 
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
-    pub server_output_reciver: Receiver<Option<String>>,
+    pub server_output_reciver: Arc<Receiver<Option<String>>>,
 
     #[serde(skip)]
     /// This is what the sync thread uses to send messages to the main thread
@@ -185,11 +173,9 @@ pub struct Application {
 
 impl Default for Application {
     fn default() -> Self {
-        let (tx, rx) = mpsc::channel::<String>();
-        let (stx, srx) = mpsc::channel::<String>();
         let (dtx, drx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
-            mpsc::channel::<(Option<Sink>, PlaybackCursor, usize, PathBuf)>();
+            mpsc::channel::<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>();
 
         let (connection_sender, connection_reciver) =
             mpsc::channel::<Option<(ClientConnection, String)>>();
@@ -198,7 +184,7 @@ impl Default for Application {
 
         Self {
             //Make it so we can import any kind of library
-            lua: unsafe { Lua::unsafe_new() },
+            lua: unsafe { Arc::new(Lua::unsafe_new()) },
 
             register: Register::default(),
 
@@ -223,10 +209,6 @@ impl Default for Application {
             server_password: String::default(),
             open_on_port: String::default(),
 
-            //thread communication for server
-            srx,
-            stx,
-
             //child windows
             settings_window: false,
 
@@ -238,8 +220,8 @@ impl Default for Application {
             atx: None,
 
             //thread communication for audio saving
-            audio_save_rx,
-            audio_save_tx,
+            audio_save_rx: Arc::new(audio_save_rx),
+            audio_save_tx: Arc::new(audio_save_tx),
 
             //main
             main: Main::default(),
@@ -254,20 +236,16 @@ impl Default for Application {
 
             //emoji button
 
-            //thread communication for client
-            rx,
-            tx,
-
             //Server connection
             connection_sender,
-            connection_reciver,
+            connection_reciver: Arc::new(connection_reciver),
 
             //data sync
-            drx,
-            dtx,
+            drx: Arc::new(drx),
+            dtx: Arc::new(dtx),
             server_sender_thread: None,
 
-            server_output_reciver,
+            server_output_reciver: Arc::new(server_output_reciver),
             server_output_sender,
 
             autosync_shutdown_token: CancellationToken::new(),
@@ -280,9 +258,8 @@ impl Default for Application {
 impl Application {
     /// Set global lua table so that the luas can use it
     pub fn set_global_lua_table(&self) {
-        //Slows down code
-        self.set_table_from_struct(&self.lua);
-        self.client_ui.set_table_from_struct(&self.lua);
+        self.client_ui.clone().set_lua_table_function(&self.lua);
+        self.clone().set_lua_table_function(&self.lua);
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -425,7 +402,7 @@ impl Default for EmojiTypesDiscriminants {
 }
 
 /// Client side variables
-#[derive(ToTable, serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, ToTable)]
 pub struct Client {
     #[table(skip)]
     /// This entry contains all the extensions and their output
@@ -584,6 +561,7 @@ pub struct Client {
     #[table(save)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 }
+
 impl Default for Client {
     fn default() -> Self {
         Self {
@@ -641,7 +619,7 @@ impl Default for Client {
 }
 
 ///Main, Global stuff for the Ui
-#[derive(serde::Deserialize, serde::Serialize, Default, ToTable)]
+#[derive(serde::Deserialize, serde::Serialize, Default, ToTable, Clone)]
 pub struct Main {
     ///Checks if the emoji tray is on
     #[serde(skip)]
@@ -1639,14 +1617,15 @@ impl ClientLastSeenMessage {
  Client backend
 */
 
+#[derive(Clone)]
 ///Struct for global audio playback
 pub struct AudioPlayback {
     ///Output stream
-    pub stream: OutputStream,
+    pub stream: Arc<OutputStream>,
     ///Output stream handle
     pub stream_handle: OutputStreamHandle,
     ///Audio sinks, these are the audios played
-    pub sink_list: Vec<Option<Sink>>,
+    pub sink_list: Vec<Option<Arc<Sink>>>,
     ///Settings list for the sink_list (The audios being played)
     pub settings_list: Vec<AudioSettings>,
 }
@@ -1655,7 +1634,7 @@ impl Default for AudioPlayback {
     fn default() -> Self {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         Self {
-            stream,
+            stream: Arc::new(stream),
             stream_handle,
             sink_list: Vec::new(),
             settings_list: Vec::new(),
@@ -1663,6 +1642,7 @@ impl Default for AudioPlayback {
     }
 }
 
+#[derive(Clone)]
 ///This is used by the audio player, this is where you can set the speed and volume etc
 pub struct AudioSettings {
     ///Volume for audio stream
@@ -1728,7 +1708,7 @@ impl Seek for PlaybackCursor {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct ScrollToMessage {
     #[serde(skip)]
     pub messages: Vec<egui::Response>,
@@ -2454,74 +2434,4 @@ pub struct HyperLink {
     pub label: String,
     /// This is the part of the hyperlink which it redirects to
     pub destination: String,
-}
-
-#[derive(Clone, Default, Debug, serde::Deserialize, serde::Serialize)]
-pub struct ExtensionProperties {
-    pub contents: String,
-
-    pub name: String,
-
-    pub is_running: bool,
-
-    pub path_to_extension: PathBuf,
-
-    pub text_edit_buffer: String,
-}
-
-impl ExtensionProperties {
-    pub fn new(contents: String, path: PathBuf, name: String) -> Self {
-        Self {
-            text_edit_buffer: contents.clone(),
-            contents,
-            name,
-            path_to_extension: path,
-            ..Default::default()
-        }
-    }
-
-    pub fn write_change_to_file(&mut self) -> anyhow::Result<()> {
-        fs::write(
-            self.path_to_extension.clone(),
-            self.text_edit_buffer.clone(),
-        )?;
-
-        self.contents = self.text_edit_buffer.clone();
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub enum LuaOutput {
-    /// This enum type is used to report code panics (In the lua runtime)
-    Error(String),
-
-    /// Standard output from the lua runtime
-    Standard(String),
-
-    /// Displays useful information like a file got modifed (This message will only be added from the rust runtime, for example when saving a file)
-    Info(String),
-}
-
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct Extension {
-    /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
-    pub extension_list: Vec<ExtensionProperties>,
-
-    #[serde(skip)]
-    /// This list contins all the output from the extensions, panics are logged and stdouts are also logged here as Standard()
-    pub output: Arc<Mutex<Vec<LuaOutput>>>,
-
-    pub output_rect: Rect,
-}
-
-impl Default for Extension {
-    fn default() -> Self {
-        Self {
-            extension_list: Vec::new(),
-            output: Arc::new(Mutex::new(Vec::new())),
-            output_rect: Rect::NOTHING,
-        }
-    }
 }

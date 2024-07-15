@@ -2831,9 +2831,9 @@ dependencies = [
 
 [[package]]
 name = "mlua_proc_macro"
-version = "0.1.10"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "179d8714716f9080441a0437031398b04e3865e97d445c874ae9512a40ce9b94"
+checksum = "9f8e5c6f95e6b518d306821e52fa394247c4db221308db8789b816cb5feeacab"
 dependencies = [
  "anyhow",
  "mlua",

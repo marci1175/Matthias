@@ -4,6 +4,7 @@ use egui::{
 use rodio::{Decoder, Sink};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::select;
 
@@ -734,7 +735,7 @@ impl Application {
                                                             file_stream_to_be_read,
                                                         );
                                                         let sink = Some(
-                                                            Sink::try_new(&stream_handle).unwrap(),
+                                                            Arc::new(Sink::try_new(&stream_handle).unwrap()),
                                                         );
 
                                                         sender
