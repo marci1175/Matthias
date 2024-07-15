@@ -251,8 +251,13 @@ impl eframe::App for backend::Application {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
                 } else {
-                    //If we recived a None it means we have an error
-                    self.client_connection.state = ConnectionState::Error;
+                    // A race condition will occur if we connected succesfully after getting a connection error (request timed out)
+                    // So we check if we have already made the connection before actually modifying the value based on the timed out request
+                    if !matches!(self.client_connection.state, ConnectionState::Connected(_)) {
+                        //If we recived a None it means we have an error
+                        self.client_connection.state = ConnectionState::Error;
+                    }
+
                 }
             }
             Err(_err) => {
