@@ -22,7 +22,7 @@ use crate::app::backend::{
     ClientMessage,
     ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
-        SyncMessage,
+        SyncMessage, VoipConnection,
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
@@ -518,6 +518,9 @@ impl MessageService {
         //Search through the list
         {
             match &req.message_type {
+                VoipConnection(request) => {
+
+                },
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
                 SyncMessage(_msg) => {
@@ -586,6 +589,7 @@ impl MessageService {
                     req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
+                        VoipConnection(_) => unreachable!(),
                         //This is unreachable, as requests are handled elsewhere
                         FileRequestType(_) => unreachable!(),
 
@@ -618,6 +622,7 @@ impl MessageService {
                         SyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         MessageEdit(_) => Edit,
+                        VoipConnection(_) => unreachable!(),
                     },
                     req.uuid.clone(),
                     self.connected_clients_profile

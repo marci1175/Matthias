@@ -357,7 +357,7 @@ impl backend::Application {
                                 ctx.forget_all_images();
 
                                 tokio::task::spawn(async move {
-                                    match ClientConnection::connect(
+                                    match ClientConnection::connect_to_server(
                                         ip,
                                         username,
                                         password,

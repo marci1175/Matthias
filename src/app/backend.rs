@@ -853,6 +853,8 @@ pub enum ClientMessageType {
     Reaction(ClientReaction),
 
     MessageEdit(ClientMessageEdit),
+
+    VoipConnection(ClientVoipRequest),
 }
 
 ///This is what gets to be sent out by the client
@@ -1092,10 +1094,20 @@ impl ClientConnection {
         }
     }
 
+    /// This function
+    // pub async fn connect_to_voip(addr: String) -> anyhow::Result<UdpSocket> {
+    //     let udp_socket = UdpSocket::bind("[::1]").await?;
+
+    //     udp_socket.connect(addr).await?;
+
+    //     udp_socket.send(buf).await?;
+
+    //     Ok(udp_socket)
+    // }
+
     /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
-    /// This function blocks (time depends on the connection speed)
     /// This function also hashes the password argument which it sends, and then if the connection was successful the returned struct's password field will contain the already hashed password
-    pub async fn connect(
+    pub async fn connect_to_server(
         ip: String,
         author: String,
         password: Option<String>,
@@ -1308,7 +1320,7 @@ pub struct ServerClientReply {
 pub struct ServerImageReply {
     /// The requested image's bytes
     pub bytes: Vec<u8>,
-    
+
     /// The requested image's sha256 signature
     pub signature: String,
 }
@@ -1418,6 +1430,8 @@ pub enum ServerMessageType {
     /// This message type can only be produced by the server, and hold useful information to the user(s)
     #[strum_discriminants(strum(message = "Server"))]
     Server(ServerMessage),
+
+    VoipConnection(ServerVoipReply),
 }
 
 /// The types of message the server can "send"
@@ -1430,21 +1444,6 @@ pub enum ServerMessage {
 
     /// This is sent when a user is banned from the server
     Ban(ClientProfile),
-}
-
-///This struct contains all the reactions of one message
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-pub struct MessageReaction {
-    /// The list of reactions added to a message
-    pub message_reactions: Vec<Reaction>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct Reaction {
-    /// The reaction's corresponding emoji name
-    pub emoji_name: String,
-    /// The coutner of how many times this emoji has been sent
-    pub times: i64,
 }
 
 ///This is one msg (packet), which gets bundled when sending ServerMain
@@ -1516,6 +1515,7 @@ impl ServerOutput {
                                     }
                                 )
                             },
+                            ServerMessageTypeDiscriminants::VoipConnection => unreachable!("Voip connection requests should be handled before this function"),
                             ServerMessageTypeDiscriminants::Deleted => unreachable!(),
                             ServerMessageTypeDiscriminants::Sync => unreachable!(),
                             ServerMessageTypeDiscriminants::Normal => unreachable!(),
@@ -1544,6 +1544,7 @@ impl ServerOutput {
                     ClientMessageType::MessageEdit(message) => {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
                     },
+                    ClientMessageType::VoipConnection(_) => unreachable!("Voip connection requests should be handled before this function"),
                 },
             author: username,
             message_date: normal_msg.message_date,
@@ -1629,6 +1630,69 @@ impl ClientLastSeenMessage {
     pub fn new(index: usize, uuid: String) -> Self {
         Self { index, uuid }
     }
+}
+
+/// This enum contains the actions the client can take, these are sent to the server
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ClientVoipRequest {
+    /// A voip a call will be automaticly issued if there is no ongoing call
+    Connect(ClientVoipConnectionRequest),
+
+    /// The voip call will automaticly stop once there are no connected clients
+    Disconnect,
+}
+
+/// This struct is sent to the server for evaluation, and
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ClientVoipConnectionRequest {
+    /// This field is not needed, becuase only connected users can start a call, and we can identify their profiles based on their uuid
+    // pub profile: ClientProfile,
+
+    /// The uuid of the connecting client
+    pub uuid: String,
+}
+
+/// This num contains the actions the server can take, these are sent to the client
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ServerVoipRequest {
+    /// This enum acts as a ```packet``` and is handed out to all the clients if a connection is started / established
+    ConnectionStart(ServerVoipStart),
+    /// This enum acts as a ```packet``` and i handed out to all the clients connected to the call
+    ConnectionClosed(ServerVoipClose),
+}
+
+/// This struct contains all the infomation important for the non connected clients
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerVoipStart {
+    /// The clients connected to the Voip call
+    pub connected_clients: Vec<ClientProfile>,
+}
+
+/// This enum holds the two outcomes of a connection request
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum ServerVoipReply {
+    /// This enum is when the connection request is successful
+    Success(ServerVoipAuthenticate),
+    /// This enum is when the connection request is unsuccessful, it also contains the reason
+    Fail(ServerVoipClose),
+}
+
+/// This struct contains the reason for closing the voip connection
+/// This maybe at any point of the Voip call, or the connection
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerVoipClose {
+    /// The reason for closing the Voip connection
+    pub reason: String,
+}
+
+/// This struct is a result of sucessful authentication, this gets handed out once the connection is successfull
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerVoipAuthenticate {
+    /// The decryption key used to decrypt the packets sent by the server
+    pub decryption_key: [u8; 32],
+
+    /// The session id of the user used to identify the user
+    pub session_id: String,
 }
 
 /*
@@ -2455,4 +2519,19 @@ pub struct HyperLink {
     pub label: String,
     /// This is the part of the hyperlink which it redirects to
     pub destination: String,
+}
+
+///This struct contains all the reactions of one message
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+pub struct MessageReaction {
+    /// The list of reactions added to a message
+    pub message_reactions: Vec<Reaction>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct Reaction {
+    /// The reaction's corresponding emoji name
+    pub emoji_name: String,
+    /// The coutner of how many times this emoji has been sent
+    pub times: i64,
 }

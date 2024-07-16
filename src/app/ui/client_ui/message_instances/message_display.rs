@@ -354,8 +354,9 @@ impl Application {
 
             crate::app::backend::ServerMessageType::Edit(_)
             | crate::app::backend::ServerMessageType::Reaction(_)
-            | crate::app::backend::ServerMessageType::Sync(_) => {
-                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) should not be displayed")
+            | crate::app::backend::ServerMessageType::Sync(_)
+            | crate::app::backend::ServerMessageType::VoipConnection(_) => {
+                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) & crate::app::backend::ServerMessageType::VoipConnection(_) should not be displayed")
             }
         }
     }
