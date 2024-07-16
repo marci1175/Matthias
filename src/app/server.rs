@@ -13,7 +13,7 @@ use super::backend::{
     ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
     },
-    ServerReplyType, ServerSync,
+    ServerReplyType, ServerSync, ServerVoip,
 };
 
 use crate::app::backend::ServerMaster;
@@ -75,7 +75,10 @@ pub struct MessageService {
     /// In this hashmap the key is the connecting client's uuid, and the value is the ClientProfile struct (which will later get converted to string with serde_json)
     pub connected_clients_profile: Arc<tokio::sync::Mutex<HashMap<String, ClientProfile>>>,
 
+    /// This field contains all the shared fields, these fields are shared with the frontend
     pub shared_fields: Arc<tokio::sync::Mutex<SharedFields>>,
+
+    pub voip: Option<ServerVoip>,
 }
 
 /// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system

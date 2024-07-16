@@ -23,6 +23,7 @@ use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use tokio::net::UdpSocket;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -30,6 +31,7 @@ use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
@@ -1693,6 +1695,20 @@ pub struct ServerVoipAuthenticate {
 
     /// The session id of the user used to identify the user
     pub session_id: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ServerVoip {
+    /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
+    connected_clients: Vec<(String, SocketAddr)>,
+
+    /// This field contains the amount of time the call has been established for
+    #[serde(skip)]
+    established_since: chrono::Duration,
+
+    /// The socket the server is listening on for incoming messages
+    #[serde(skip)]
+    socket: Option<Arc<UdpSocket>>,
 }
 
 /*
