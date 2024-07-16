@@ -1,4 +1,7 @@
-use std::{collections::HashMap, env, fs, io::Write, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Error, Result};
 use chrono::Utc;
@@ -11,9 +14,10 @@ use super::backend::{
     ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
     ServerClientReply, ServerMessageType,
     ServerMessageTypeDiscriminants::{
-        Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync, Upload,
+        Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
+        Upload, VoipConnection as Voip,
     },
-    ServerReplyType, ServerSync, ServerVoip,
+    ServerReplyType, ServerSync, ServerVoip, ServerVoipAuthenticate, ServerVoipReply,
 };
 
 use crate::app::backend::ServerMaster;
@@ -26,7 +30,12 @@ use crate::app::backend::{
     },
     ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
 };
-use tokio::{io::AsyncWrite, net::tcp::OwnedReadHalf, select, task::JoinHandle};
+use tokio::{
+    io::AsyncWrite,
+    net::{tcp::OwnedReadHalf, UdpSocket},
+    select,
+    task::JoinHandle,
+};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -79,6 +88,8 @@ pub struct MessageService {
     pub shared_fields: Arc<tokio::sync::Mutex<SharedFields>>,
 
     pub voip: Option<ServerVoip>,
+
+    opened_on_port: String,
 }
 
 /// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system
@@ -105,6 +116,7 @@ pub async fn server_main(
     let msg_service = Arc::new(tokio::sync::Mutex::new(MessageService {
         passw: encrypt(password),
         decryption_key: rand::random::<[u8; 32]>(),
+        opened_on_port: port,
         ..Default::default()
     }));
 
@@ -121,7 +133,7 @@ pub async fn server_main(
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //Wait for incoming connections or wait till the server gets shut down
-            let (stream, _address) = select! {
+            let (stream, socket_addr) = select! {
                 _ = cancellation_child.cancelled() => {
                     //shutdown server
                     break;
@@ -143,6 +155,7 @@ pub async fn server_main(
                 Arc::new(tokio::sync::Mutex::new(writer)),
                 message_service_clone,
                 cancellation_token.child_token(),
+                socket_addr,
             );
         }
         Ok(())
@@ -209,6 +222,7 @@ fn spawn_client_reader(
     writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     msg_service: Arc<tokio::sync::Mutex<MessageService>>,
     cancellation_token: CancellationToken,
+    socket_addr: SocketAddr,
 ) {
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
@@ -226,10 +240,10 @@ fn spawn_client_reader(
                 }
             };
 
-            let message_service = msg_service.lock().await;
+            let mut message_service = msg_service.lock().await;
 
             match message_service
-                .message_main(incoming_message, writer.clone())
+                .message_main(incoming_message, writer.clone(), socket_addr)
                 .await
             {
                 Ok(_) => {}
@@ -330,9 +344,10 @@ impl MessageService {
     /// When experiening errors, make sure to check the error message as it may be on purpose
     #[inline]
     async fn message_main(
-        &self,
+        &mut self,
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+        socket_addr: SocketAddr,
     ) -> Result<()> {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
@@ -522,8 +537,47 @@ impl MessageService {
         {
             match &req.message_type {
                 VoipConnection(request) => {
+                    match request {
+                        super::backend::ClientVoipRequest::Connect => {
+                            //
+                            //Authenticate if needed
+                            //
 
-                },
+                            if let Some(ongoing_call) = &self.voip {
+                                ongoing_call.connect(req.uuid.clone(), socket_addr)?;
+                            }
+                            // If there is no ongoing call, we should create it
+                            else {
+                                let voip_server =
+                                    self.create_voip_server(self.opened_on_port.clone()).await?;
+
+                                //Immediately connect the user who has requested the voip call
+                                voip_server.connect(req.uuid.clone(), socket_addr)?;
+
+                                //Set voip server
+                                self.voip = Some(voip_server);
+                            }
+
+                            //Send important ifno to client (Session ID, etc)
+                            send_message_to_client(
+                                &mut *client_handle.try_lock()?,
+                                encrypt_aes256(
+                                    serde_json::to_string(&ServerVoipReply::Success(
+                                        //Create session ID
+                                        ServerVoipAuthenticate::new()?,
+                                    ))?,
+                                    &self.decryption_key,
+                                )?,
+                            )
+                            .await?;
+                        }
+                        super::backend::ClientVoipRequest::Disconnect => {
+                            if let Some(ongoing_voip) = &self.voip {
+                                ongoing_voip.disconnect(req.uuid.clone())?;
+                            }
+                        }
+                    }
+                }
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
                 SyncMessage(_msg) => {
@@ -592,7 +646,7 @@ impl MessageService {
                     req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
-                        VoipConnection(_) => unreachable!(),
+                        VoipConnection(_) => String::new(),
                         //This is unreachable, as requests are handled elsewhere
                         FileRequestType(_) => unreachable!(),
 
@@ -625,7 +679,7 @@ impl MessageService {
                         SyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
                         MessageEdit(_) => Edit,
-                        VoipConnection(_) => unreachable!(),
+                        VoipConnection(_) => Voip,
                     },
                     req.uuid.clone(),
                     self.connected_clients_profile
@@ -649,6 +703,18 @@ impl MessageService {
 
             Err(Error::msg("Invalid password entered by client!"))
         }
+    }
+
+    async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip> {
+        // Create socket
+        let socket = UdpSocket::bind(format!("[::1]:{port}")).await?;
+
+        //Return ServerVoip
+        Ok(ServerVoip {
+            connected_clients: Arc::new(DashMap::new()),
+            established_since: Utc::now(),
+            socket: Arc::new(socket),
+        })
     }
 
     async fn handle_server_disconnect(
@@ -968,7 +1034,7 @@ impl MessageService {
             .clone()
             .username;
 
-        let mut audio_paths = self.audio_list.clone();
+        let audio_paths = self.audio_list.clone();
 
         let file_signature = sha256::digest(audio.bytes.clone());
 

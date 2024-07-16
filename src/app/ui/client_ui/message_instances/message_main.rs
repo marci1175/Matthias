@@ -315,7 +315,12 @@ impl Application {
 
     /// This function displays the 64x64 icon of a client based on their uuid
     /// This function also requests the server for the image if the image isnt available on the given URI
-    fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui) {
+    pub fn display_icon_from_server(
+        &mut self,
+        ctx: &egui::Context,
+        uuid: String,
+        ui: &mut egui::Ui,
+    ) {
         //If uuid is the server's we just include the image of the server
         if uuid == "00000000-0000-0000-0000-000000000000" {
             ui.add(Image::new(egui::include_image!(

@@ -1,7 +1,7 @@
 use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
-use crate::app::ui::client_ui::client_actions::audio_recording::audio_recroding;
+use crate::app::ui::client_ui::client_actions::audio_recording::audio_recording;
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
 use egui::text::{CCursor, CCursorRange};
@@ -394,32 +394,21 @@ impl Application {
                     //Record button
                     if let Some(atx) = self.atx.clone() {
                         ui.horizontal_centered(|ui| {
-                            ui.label(
-                                RichText::from("Recording")
-                                    .size(self.font_size)
-                                    .color(Color32::RED),
-                            );
-                            //Display lenght
-                            ui.label(
-                                RichText::from(format!(
-                                    "{}s",
-                                    Utc::now()
-                                        .signed_duration_since(
-                                            self.client_ui.voice_recording_start.unwrap()
+                            let stop_recording_button = ui
+                                .allocate_ui(
+                                    vec2(ui.available_width(), self.font_size * 1.5),
+                                    |ui| {
+                                        ui.add(
+                                            egui::ImageButton::new(egui::include_image!(
+                                                "../../../../../../icons/record.png"
+                                            ))
+                                            .tint(Color32::RED),
                                         )
-                                        .num_seconds()
-                                ))
-                                .size(self.font_size),
-                            );
-                            if ui
-                                .add(
-                                    egui::ImageButton::new(egui::include_image!(
-                                        "../../../../../../icons/record.png"
-                                    ))
-                                    .tint(Color32::RED),
+                                    },
                                 )
-                                .clicked()
-                            {
+                                .inner;
+
+                            if stop_recording_button.clicked() {
                                 //Just send something, it doesnt really matter
                                 atx.send(false).unwrap();
 
@@ -440,6 +429,25 @@ impl Application {
                                 //Destroy state
                                 self.atx = None;
                             }
+
+                            //Display stats
+                            ui.label(
+                                RichText::from("Recording")
+                                    .size(self.font_size)
+                                    .color(Color32::RED),
+                            );
+                            //Display lenght
+                            ui.label(
+                                RichText::from(format!(
+                                    "{}s",
+                                    Utc::now()
+                                        .signed_duration_since(
+                                            self.client_ui.voice_recording_start.unwrap()
+                                        )
+                                        .num_seconds()
+                                ))
+                                .size(self.font_size),
+                            );
                         });
                     } else if ui
                         .add(egui::ImageButton::new(egui::include_image!(
@@ -454,7 +462,7 @@ impl Application {
                         //Set audio recording start
                         self.client_ui.voice_recording_start = Some(Utc::now());
 
-                        audio_recroding(rx, self.audio_file.clone());
+                        audio_recording(rx, self.audio_file.clone());
                     }
                 });
             });

@@ -23,7 +23,6 @@ use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use tokio::net::UdpSocket;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
@@ -39,6 +38,7 @@ use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 use windows_sys::w;
@@ -143,12 +143,19 @@ pub struct Application {
     #[serde(skip)]
     pub dtx: Arc<mpsc::Sender<String>>,
 
-    ///Server connection
+    /// Server connection
     /// This channel hosts a Client connection and the sync message sent by the server in a String format
     #[serde(skip)]
     pub connection_reciver: Arc<mpsc::Receiver<Option<(ClientConnection, String)>>>,
     #[serde(skip)]
     pub connection_sender: mpsc::Sender<Option<(ClientConnection, String)>>,
+
+    /// Voip (UdpSocket) maker
+    /// When a successful ```Voip``` instance is created it is sent over from the async thread
+    #[serde(skip)]
+    pub voip_connection_reciver: Arc<mpsc::Receiver<Voip>>,
+    #[serde(skip)]
+    pub voip_connection_sender: mpsc::Sender<Voip>,
 
     ///Server - client syncing thread
     #[serde(skip)]
@@ -183,6 +190,8 @@ impl Default for Application {
             mpsc::channel::<Option<(ClientConnection, String)>>();
 
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
+
+        let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
             //Make it so we can import any kind of library
@@ -249,6 +258,9 @@ impl Default for Application {
 
             server_output_reciver: Arc::new(server_output_reciver),
             server_output_sender,
+
+            voip_connection_reciver: Arc::new(voip_connection_reciver),
+            voip_connection_sender,
 
             autosync_shutdown_token: CancellationToken::new(),
             server_connected_clients_profile: Arc::new(DashMap::new()),
@@ -562,6 +574,9 @@ pub struct Client {
     #[serde(skip)]
     #[table(save)]
     pub voice_recording_start: Option<DateTime<Utc>>,
+
+    #[serde(skip)]
+    pub voip: Option<Voip>,
 }
 
 impl Default for Client {
@@ -616,6 +631,7 @@ impl Default for Client {
             voice_recording_start: None,
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
+            voip: None,
         }
     }
 }
@@ -1064,8 +1080,23 @@ impl ClientMessage {
         }
     }
 
-    //this is used for SENDING IMAGES SO THE SERVER CAN DECIDE IF ITS A PICTURE
-    //NOTICE: ALL THE AUDIO UPLOAD TYPES HAVE BEEN CONVERTED INTO ONE => "ClientFileUpload" this ensures that the client doesnt handle any backend stuff
+    pub fn construct_voip_connect(uuid: &str) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Connect),
+            uuid: uuid.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
+
+    pub fn construct_voip_disconnect(uuid: &str) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Disconnect),
+            uuid: uuid.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
 }
 
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
@@ -1433,7 +1464,9 @@ pub enum ServerMessageType {
     #[strum_discriminants(strum(message = "Server"))]
     Server(ServerMessage),
 
-    VoipConnection(ServerVoipReply),
+    /// This message shows if a user has connected to the voip call
+    #[strum_discriminants(strum(message = "Voip status"))]
+    VoipConnection(ServerVoipState),
 }
 
 /// The types of message the server can "send"
@@ -1517,7 +1550,7 @@ impl ServerOutput {
                                     }
                                 )
                             },
-                            ServerMessageTypeDiscriminants::VoipConnection => unreachable!("Voip connection requests should be handled before this function"),
+                            ServerMessageTypeDiscriminants::VoipConnection => unreachable!(),
                             ServerMessageTypeDiscriminants::Deleted => unreachable!(),
                             ServerMessageTypeDiscriminants::Sync => unreachable!(),
                             ServerMessageTypeDiscriminants::Normal => unreachable!(),
@@ -1535,6 +1568,18 @@ impl ServerOutput {
                             }
                         )
                     },
+                    ClientMessageType::VoipConnection(voip_message_type) => {
+                        let server_message = match voip_message_type {
+                            ClientVoipRequest::Connect => {
+                                ServerVoipState::Connected(uuid.clone())
+                            },
+                            ClientVoipRequest::Disconnect => {
+                                ServerVoipState::Disconnected(uuid.clone())
+                            },
+                        };
+
+                        ServerMessageType::VoipConnection(server_message)
+                    },
                     ClientMessageType::SyncMessage(_) => {
                         ServerMessageType::Sync(ServerMessageSync {  })
                     },
@@ -1546,7 +1591,6 @@ impl ServerOutput {
                     ClientMessageType::MessageEdit(message) => {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })
                     },
-                    ClientMessageType::VoipConnection(_) => unreachable!("Voip connection requests should be handled before this function"),
                 },
             author: username,
             message_date: normal_msg.message_date,
@@ -1638,24 +1682,23 @@ impl ClientLastSeenMessage {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientVoipRequest {
     /// A voip a call will be automaticly issued if there is no ongoing call
-    Connect(ClientVoipConnectionRequest),
+    Connect,
 
     /// The voip call will automaticly stop once there are no connected clients
     Disconnect,
 }
 
-/// This struct is sent to the server for evaluation, and
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientVoipConnectionRequest {
-    /// This field is not needed, becuase only connected users can start a call, and we can identify their profiles based on their uuid
-    // pub profile: ClientProfile,
-
-    /// The uuid of the connecting client
-    pub uuid: String,
+/// This enum is used to display if a client has joined or left the Voip call, this is a ServerMessageType
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum ServerVoipState {
+    /// Client connected, the inner value is their uuid
+    Connected(String),
+    /// Client disconnected, the inner value is their uuid
+    Disconnected(String),
 }
 
 /// This num contains the actions the server can take, these are sent to the client
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum ServerVoipRequest {
     /// This enum acts as a ```packet``` and is handed out to all the clients if a connection is started / established
     ConnectionStart(ServerVoipStart),
@@ -1664,7 +1707,7 @@ pub enum ServerVoipRequest {
 }
 
 /// This struct contains all the infomation important for the non connected clients
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerVoipStart {
     /// The clients connected to the Voip call
     pub connected_clients: Vec<ClientProfile>,
@@ -1691,24 +1734,75 @@ pub struct ServerVoipClose {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerVoipAuthenticate {
     /// The decryption key used to decrypt the packets sent by the server
-    pub decryption_key: [u8; 32],
+    pub decryption_key: Vec<u8>,
 
     /// The session id of the user used to identify the user
     pub session_id: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+impl ServerVoipAuthenticate {
+    /// This function creates a new instance of ```Self```, it automaticly generates a session_id
+    pub fn new() -> anyhow::Result<Self> {
+        let session_id = Uuid::new_v4().to_string();
+
+        let decryption_key = hex::decode(sha256::digest(&session_id)).map_err(|err| {
+            anyhow::Error::msg(format!("Sha256 hash could not be turned into hex: {err}"))
+        })?;
+
+        Ok(Self {
+            decryption_key,
+            session_id,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ServerVoip {
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
-    connected_clients: Vec<(String, SocketAddr)>,
+    pub connected_clients: Arc<DashMap<String, SocketAddr>>,
 
     /// This field contains the amount of time the call has been established for
-    #[serde(skip)]
-    established_since: chrono::Duration,
+    pub established_since: chrono::DateTime<Utc>,
 
     /// The socket the server is listening on for incoming messages
-    #[serde(skip)]
-    socket: Option<Arc<UdpSocket>>,
+    /// The only reason this is an option so we can implement ```serde::Deserialize```
+    pub socket: Arc<UdpSocket>,
+}
+
+impl ServerVoip {
+    /// Add the ```SocketAddr``` to the ```UDP``` server's destiantions
+    pub fn connect(&self, uuid: String, socket_addr: SocketAddr) -> anyhow::Result<()> {
+        self.connected_clients.insert(uuid, socket_addr);
+
+        Ok(())
+    }
+
+    /// Remove the ```SocketAddr``` to the ```UDP``` server's destiantions
+    pub fn disconnect(&self, uuid: String) -> anyhow::Result<()> {
+        self.connected_clients
+            .remove(&uuid)
+            .ok_or_else(|| anyhow::Error::msg("Client was not connected"))?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Voip {
+    /// The clients socket, which theyre listening on
+    pub socket: Arc<UdpSocket>,
+
+    /// The authentication info given by the server
+    pub auth: ServerVoipAuthenticate,
+}
+
+impl Voip {
+    pub async fn new(auth: ServerVoipAuthenticate, address: String) -> anyhow::Result<Self> {
+        Ok(Self {
+            socket: Arc::new(UdpSocket::bind(address).await?),
+            auth,
+        })
+    }
 }
 
 /*

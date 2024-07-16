@@ -12,7 +12,7 @@ use tokio::select;
 use crate::app::backend::{
     decrypt_aes256, display_error_message, write_audio, write_file, ClientMessage,
     ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
-    ServerSync,
+    ServerSync, ServerVoipReply, Voip,
 };
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
@@ -87,7 +87,9 @@ impl Application {
                             )));
 
                             if call_button.clicked() {
-                                //Init call
+                                self.send_msg(ClientMessage::construct_voip_connect(
+                                    &self.opened_user_information.uuid,
+                                ));
                             }
 
                             call_button.on_hover_text("Start a group call");
@@ -780,7 +782,59 @@ impl Application {
                                                 }
                                             }
                                             Err(_err) => {
-                                                dbg!(_err);
+                                                let incoming_reply: Result<
+                                                    ServerVoipReply,
+                                                    serde_json::Error,
+                                                > = serde_json::from_str(&decrypted_message);
+
+                                                match incoming_reply {
+                                                    Ok(voip_connection) => {
+                                                        match voip_connection {
+                                                            ServerVoipReply::Success(voip) => {
+                                                                //Move sender into thread
+                                                                let sender = self
+                                                                    .voip_connection_sender
+                                                                    .clone();
+
+                                                                let port = self
+                                                                    .client_ui
+                                                                    .send_on_ip
+                                                                    .split(":")
+                                                                    .last()
+                                                                    .unwrap_or_default()
+                                                                    .to_string();
+
+                                                                //Spawn thread which will create the ```Voip``` instance
+                                                                tokio::spawn(async move {
+                                                                    match Voip::new(
+                                                                        voip,
+                                                                        dbg!(port),
+                                                                    )
+                                                                    .await
+                                                                    {
+                                                                        Ok(voip) => {
+                                                                            // It is okay to unwrap since it doesnt matter if we panic
+                                                                            sender
+                                                                                .send(voip)
+                                                                                .unwrap();
+                                                                        }
+                                                                        Err(err) => {
+                                                                            display_error_message(
+                                                                                err,
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                });
+                                                            }
+                                                            ServerVoipReply::Fail(err) => {
+                                                                display_error_message(err.reason);
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(_err) => {
+                                                        dbg!(_err);
+                                                    }
+                                                }
                                             }
                                         }
                                     }

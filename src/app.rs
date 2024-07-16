@@ -258,6 +258,14 @@ impl eframe::App for backend::Application {
                 // dbg!(_err);
             }
         }
+
+        //Voip instance listener
+        match self.voip_connection_reciver.try_recv() {
+            Ok(voip) => {
+                self.client_ui.voip = Some(voip);
+            }
+            Err(_err) => {}
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
+use egui::{vec2, Align, Align2, Area, Color32, Context, Image, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
     parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
@@ -351,12 +351,52 @@ impl Application {
                     }
                 }));
             }
+            crate::app::backend::ServerMessageType::VoipConnection(connection_type) => {
+                match connection_type {
+                    crate::app::backend::ServerVoipState::Connected(client_uuid) => {
+                        let profile = self
+                            .client_ui
+                            .incoming_messages
+                            .connected_clients_profile
+                            .get(client_uuid.as_str())
+                            .unwrap()
+                            .clone();
 
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::from(format!(
+                                    "@{} has connected to the group call.",
+                                    profile.username
+                                ))
+                                .size(self.font_size),
+                            );
+                        });
+                    }
+                    crate::app::backend::ServerVoipState::Disconnected(client_uuid) => {
+                        let profile = self
+                            .client_ui
+                            .incoming_messages
+                            .connected_clients_profile
+                            .get(client_uuid)
+                            .unwrap()
+                            .clone();
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::from(format!(
+                                    "@{} has disconnected from the group call.",
+                                    profile.username
+                                ))
+                                .size(self.font_size),
+                            );
+                        });
+                    }
+                };
+            }
             crate::app::backend::ServerMessageType::Edit(_)
             | crate::app::backend::ServerMessageType::Reaction(_)
-            | crate::app::backend::ServerMessageType::Sync(_)
-            | crate::app::backend::ServerMessageType::VoipConnection(_) => {
-                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) & crate::app::backend::ServerMessageType::VoipConnection(_) should not be displayed")
+            | crate::app::backend::ServerMessageType::Sync(_) => {
+                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) should not be displayed")
             }
         }
     }

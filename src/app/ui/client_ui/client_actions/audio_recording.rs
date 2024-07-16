@@ -33,7 +33,7 @@ impl Default for Opt {
     }
 }
 
-pub fn audio_recroding(receiver: mpsc::Receiver<bool>, path: Arc<Mutex<PathBuf>>) {
+pub fn audio_recording(receiver: mpsc::Receiver<bool>, path: Arc<Mutex<PathBuf>>) {
     std::thread::spawn(move || {
         let opt = Opt::default();
 
@@ -53,7 +53,6 @@ pub fn audio_recroding(receiver: mpsc::Receiver<bool>, path: Arc<Mutex<PathBuf>>
             .expect("Failed to get default input config");
 
         // The WAV file we're recording to.
-
         let spec = wav_spec_from_config(&config);
 
         let path = path.lock().unwrap().to_string_lossy().to_string().clone();
