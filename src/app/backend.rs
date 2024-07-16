@@ -1271,17 +1271,22 @@ impl Debug for ConnectionState {
 ///This is what the server sends back (pushes to message vector), when reciving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerFileUpload {
+    /// The uploaded file's name
     pub file_name: String,
+    /// The uploaded file's sha256 singnature
     pub signature: String,
 }
 
 /// This enum holds all the Server reply types so it can be decoded more easily on the client side
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ServerReplyType {
+    /// Returns the requested file
     File(ServerFileReply),
 
+    /// Returns the requested image
     Image(ServerImageReply),
 
+    /// Returns the requested audio file
     Audio(ServerAudioReply),
 
     /// The requested client's profile
@@ -1292,29 +1297,41 @@ pub enum ServerReplyType {
 /// This struct holds everything important so the client can save and handle client profiles
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerClientReply {
+    /// The uuid of the user's profile we requested
     pub uuid: String,
+    /// The profile of the user
     pub profile: ClientProfile,
 }
 
 ///When client asks for the image based on the provided index, reply with the image bytes
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerImageReply {
+    /// The requested image's bytes
     pub bytes: Vec<u8>,
+    
+    /// The requested image's sha256 signature
     pub signature: String,
 }
 
 ///This is what the server sends back, when asked for a file (FIleRequest)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerFileReply {
+    /// The requested file's bytes
     pub bytes: Vec<u8>,
+
+    /// The requested file's name
+    /// The reason a ```PathBuf``` is used here instead of a String, is because we need to grab the extension of the file easily
     pub file_name: PathBuf,
 }
 
 ///When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerAudioReply {
+    /// The requested audio file's bytes
     pub bytes: Vec<u8>,
+    /// The requested audio file's signature
     pub signature: String,
+    /// The requested audio file's name
     pub file_name: String,
 }
 
@@ -1328,13 +1345,16 @@ pub struct ServerNormalMessage {
 ///REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerAudioUpload {
+    /// The signature of the uploaded image file
     pub signature: String,
+    /// The file name of the uploaded audio
     pub file_name: String,
 }
 
 ///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerImageUpload {
+    /// The signature of the uploaded image, this is the "handle" the clients asks the file on
     pub signature: String,
 }
 
@@ -1415,19 +1435,22 @@ pub enum ServerMessage {
 ///This struct contains all the reactions of one message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct MessageReaction {
+    /// The list of reactions added to a message
     pub message_reactions: Vec<Reaction>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Reaction {
+    /// The reaction's corresponding emoji name
     pub emoji_name: String,
+    /// The coutner of how many times this emoji has been sent
     pub times: i64,
 }
 
 ///This is one msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerOutput {
-    /// Which message is this a reply to?
+    /// The ```usize``` shows which message its a reply to in the message stack
     /// The server stores all messages in a vector so this index shows which message its a reply to (if it is)
     pub replying_to: Option<usize>,
     /// Inner message which is *wrapped* in the ServerOutput
@@ -1461,11 +1484,6 @@ impl ServerOutput {
                 match normal_msg.message_type {
                     ClientMessageType::FileRequestType(_) => unimplemented!("Converting request packets isnt implemented, because they shouldnt be displayed by the client"),
                     ClientMessageType::FileUpload(upload) => {
-                        //The reason it doesnt panic if for example it a normal message because, an Upload can never be a:
-                        //  Normal message
-                        //  Message edit
-                        //  Reaction to a message
-
                         match upload_type {
                             ServerMessageTypeDiscriminants::Upload => {
                                 ServerMessageType::Upload(
@@ -1565,7 +1583,7 @@ impl ServerMaster {
 pub struct ServerSync {
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
-
+    /// The inner message
     pub message: ServerOutput,
 }
 
