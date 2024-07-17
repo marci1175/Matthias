@@ -540,7 +540,7 @@ impl MessageService {
                     match request {
                         super::backend::ClientVoipRequest::Connect(port) => {
                             let socket_addr = SocketAddr::new(socket_addr.ip(), *port);
-                            
+
                             //
                             //Authenticate if needed
                             //
@@ -550,8 +550,9 @@ impl MessageService {
                             }
                             // If there is no ongoing call, we should create it
                             else {
-                                let voip_server =
-                                    self.create_voip_server(self.opened_on_port.clone()).await?;
+                                let voip_server = dbg!(
+                                    self.create_voip_server(self.opened_on_port.clone()).await?
+                                );
 
                                 //Immediately connect the user who has requested the voip call
                                 voip_server.connect(req.uuid.clone(), socket_addr)?;

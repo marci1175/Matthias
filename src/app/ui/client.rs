@@ -88,43 +88,37 @@ impl Application {
 
                             if call_button.clicked() {
                                 //Move sender into thread
-                                let sender = self
-                                .voip_connection_sender
-                                .clone();
+                                let sender = self.voip_connection_sender.clone();
 
-                            let port = self
-                                .client_ui
-                                .send_on_ip
-                                .split(":")
-                                .last()
-                                .unwrap_or_default()
-                                .to_string();
+                                let port = self
+                                    .client_ui
+                                    .send_on_ip
+                                    .split(":")
+                                    .last()
+                                    .unwrap_or_default()
+                                    .to_string();
 
-                            //Check for invalid port
-                            if port.is_empty() {
-                                display_error_message("Invalid address to send the message on.");
+                                //Check for invalid port
+                                if port.is_empty() {
+                                    display_error_message(
+                                        "Invalid address to send the message on.",
+                                    );
 
-                                return;
-                            }
-
-                            //Spawn thread which will create the ```Voip``` instance
-                            tokio::spawn(async move {
-                                match Voip::new()
-                                .await
-                                {
-                                    Ok(voip) => {
-                                        // It is okay to unwrap since it doesnt matter if we panic
-                                        sender
-                                            .send(voip)
-                                            .unwrap();
-                                    }
-                                    Err(err) => {
-                                        display_error_message(
-                                            err,
-                                        );
-                                    }
+                                    return;
                                 }
-                            });    
+
+                                //Spawn thread which will create the ```Voip``` instance
+                                tokio::spawn(async move {
+                                    match Voip::new().await {
+                                        Ok(voip) => {
+                                            // It is okay to unwrap since it doesnt matter if we panic
+                                            sender.send(voip).unwrap();
+                                        }
+                                        Err(err) => {
+                                            display_error_message(err);
+                                        }
+                                    }
+                                });
                             }
 
                             call_button.on_hover_text("Start a group call");
@@ -826,13 +820,14 @@ impl Application {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
                                                             ServerVoipReply::Success(voip_auth) => {
-                                                                if let Some(voip) = self.client_ui.voip.as_mut() {
+                                                                if let Some(voip) =
+                                                                    self.client_ui.voip.as_mut()
+                                                                {
                                                                     voip.auth = Some(voip_auth);
-                                                                }
-                                                                else {
+                                                                } else {
                                                                     //This shouldnt happen
                                                                     dbg!("UpdSocket timing error");
-                                                                }                        
+                                                                }
                                                             }
                                                             ServerVoipReply::Fail(err) => {
                                                                 display_error_message(err.reason);
@@ -869,6 +864,33 @@ impl Application {
                     // dbg!(_err);
                 }
             }
+        }
+    }
+
+    ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 30ms of your voice then sends it to the linked voip destination
+    fn client_voip_thread(&mut self) {
+        if let Some(voip) = self.client_ui.voip.clone() {
+            let destination = self.client_ui.send_on_ip.clone();
+
+            //Reciver thread
+            tokio::spawn(async move {
+                //Listen on socket, play audio
+                loop {
+                    // select! {
+                    //     _
+                    // }
+                }
+            });
+
+            //Sender thread
+            tokio::spawn(async move {
+                //Conect socket to destination
+                voip.socket.connect(destination).await.unwrap();
+
+                //Record 50ms audio, send it to the server
+                //We can just send it becasue we have already  set the default destination address
+                loop {}
+            });
         }
     }
 }

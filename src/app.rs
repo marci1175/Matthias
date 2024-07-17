@@ -264,9 +264,10 @@ impl eframe::App for backend::Application {
             Ok(voip) => {
                 self.client_ui.voip = Some(voip.clone());
 
-                self.send_msg(
-                    ClientMessage::construct_voip_connect(&self.opened_user_information.uuid, voip.socket.local_addr().unwrap().port())
-                )
+                self.send_msg(ClientMessage::construct_voip_connect(
+                    &self.opened_user_information.uuid,
+                    voip.socket.local_addr().unwrap().port(),
+                ))
             }
             Err(_err) => {}
         }

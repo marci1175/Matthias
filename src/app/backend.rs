@@ -161,6 +161,10 @@ pub struct Application {
     #[serde(skip)]
     pub server_sender_thread: Option<()>,
 
+    /// Voip audio sender thread
+    #[serde(skip)]
+    pub voip_sender_thread: Option<()>,
+
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
     pub server_output_reciver: Arc<Receiver<Option<String>>>,
@@ -194,6 +198,8 @@ impl Default for Application {
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
+            voip_sender_thread: None,
+
             //Make it so we can import any kind of library
             lua: unsafe { Arc::new(Lua::unsafe_new()) },
 
