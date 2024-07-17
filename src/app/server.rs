@@ -538,7 +538,9 @@ impl MessageService {
             match &req.message_type {
                 VoipConnection(request) => {
                     match request {
-                        super::backend::ClientVoipRequest::Connect => {
+                        super::backend::ClientVoipRequest::Connect(port) => {
+                            let socket_addr = SocketAddr::new(socket_addr.ip(), *port);
+                            
                             //
                             //Authenticate if needed
                             //

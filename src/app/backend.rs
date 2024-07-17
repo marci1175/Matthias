@@ -1080,10 +1080,10 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_voip_connect(uuid: &str) -> ClientMessage {
+    pub fn construct_voip_connect(uuid: &str, port: u16) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Connect),
+            message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Connect(port)),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -1570,7 +1570,7 @@ impl ServerOutput {
                     },
                     ClientMessageType::VoipConnection(voip_message_type) => {
                         let server_message = match voip_message_type {
-                            ClientVoipRequest::Connect => {
+                            ClientVoipRequest::Connect(_) => {
                                 ServerVoipState::Connected(uuid.clone())
                             },
                             ClientVoipRequest::Disconnect => {
@@ -1682,7 +1682,8 @@ impl ClientLastSeenMessage {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientVoipRequest {
     /// A voip a call will be automaticly issued if there is no ongoing call
-    Connect,
+    /// The inner value of conncect is the port the Client ```UdpScoket``` is opened on
+    Connect(u16),
 
     /// The voip call will automaticly stop once there are no connected clients
     Disconnect,
@@ -1793,14 +1794,16 @@ pub struct Voip {
     pub socket: Arc<UdpSocket>,
 
     /// The authentication info given by the server
-    pub auth: ServerVoipAuthenticate,
+    /// If this is None but the voip instance is Some that means that the server hasnt replied with the authentication, but the socket is open
+    pub auth: Option<ServerVoipAuthenticate>,
 }
 
 impl Voip {
-    pub async fn new(auth: ServerVoipAuthenticate, address: String) -> anyhow::Result<Self> {
+    /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
+    pub async fn new() -> anyhow::Result<Self> {
         Ok(Self {
-            socket: Arc::new(UdpSocket::bind(address).await?),
-            auth,
+            socket: Arc::new(UdpSocket::bind(format!("[::1]:0")).await?),
+            auth: None,
         })
     }
 }

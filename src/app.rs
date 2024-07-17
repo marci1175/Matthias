@@ -262,7 +262,11 @@ impl eframe::App for backend::Application {
         //Voip instance listener
         match self.voip_connection_reciver.try_recv() {
             Ok(voip) => {
-                self.client_ui.voip = Some(voip);
+                self.client_ui.voip = Some(voip.clone());
+
+                self.send_msg(
+                    ClientMessage::construct_voip_connect(&self.opened_user_information.uuid, voip.socket.local_addr().unwrap().port())
+                )
             }
             Err(_err) => {}
         }

@@ -409,7 +409,7 @@ impl Application {
                                 .inner;
 
                             if stop_recording_button.clicked() {
-                                //Just send something, it doesnt really matter
+                                  //Just send something, it doesnt really matter
                                 atx.send(false).unwrap();
 
                                 //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
