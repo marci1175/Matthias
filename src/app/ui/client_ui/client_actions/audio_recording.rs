@@ -67,25 +67,25 @@ pub fn record_audio_for_set_duration(dur: Duration) -> anyhow::Result<Vec<f32>> 
     let stream = match config.sample_format() {
         cpal::SampleFormat::I8 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i8, i8>(data, &mut wav_buffer),
+            move |data, _: &_| write_input_data::<i8, i8>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I16 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i16, i16>(data, &mut wav_buffer),
+            move |data, _: &_| write_input_data::<i16, i16>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i32, i32>(data, &mut wav_buffer),
+            move |data, _: &_| write_input_data::<i32, i32>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<f32, f32>(data, &mut wav_buffer),
+            move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
@@ -131,7 +131,7 @@ pub fn audio_recording_with_recv(
 ) -> anyhow::Result<Vec<f32>> {
     let (config, device) = get_config_and_device()?;
 
-    let mut wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
+    let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
 
     let wav_buffer_clone = wav_buffer.clone();
 
@@ -142,25 +142,38 @@ pub fn audio_recording_with_recv(
     let stream = match config.sample_format() {
         cpal::SampleFormat::I8 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i8, i8>(data, &mut wav_buffer),
+            move |data, _: &_| {
+                dbg!(data.len());
+                write_input_data::<i8, i8>(data, wav_buffer.clone())
+            },
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I16 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i16, i16>(data, &mut wav_buffer),
+            move |data, _: &_| {
+                dbg!(data.len());
+                write_input_data::<i16, i16>(data, wav_buffer.clone())
+            },
+
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<i32, i32>(data, &mut wav_buffer),
+            move |data, _: &_| {
+                dbg!(data.len());
+                write_input_data::<i32, i32>(data, wav_buffer.clone())
+            },
             err_fn,
             None,
         )?,
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<f32, f32>(data, &mut wav_buffer),
+            move |data, _: &_| {
+                dbg!(data.len());
+                write_input_data::<f32, f32>(data, wav_buffer.clone())
+            },
             err_fn,
             None,
         )?,
@@ -176,7 +189,13 @@ pub fn audio_recording_with_recv(
     //Block until further notice by user
     receiver.recv()?;
 
-    Ok(wav_buffer_clone.clone().lock().unwrap().clone())
+    println!("Recording stopped");
+
+    let recoreded_bytes = wav_buffer_clone.clone().lock().unwrap().clone();
+    
+    dbg!(recoreded_bytes.len());
+
+    Ok(recoreded_bytes)
 }
 
 fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
@@ -198,33 +217,36 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
 
 pub fn create_playbackable_audio(recording: Vec<f32>) -> Vec<u8> {
     let writer = Arc::new(Mutex::new(Vec::new()));
-    let (config, device) = get_config_and_device().unwrap();
+
+    let (config, _) = get_config_and_device().unwrap();
 
     let spec = wav_spec_from_config(&config);
 
-    let mut buf = Cursor::new(writer.lock().unwrap().clone());
+    let writer_lock = &mut *writer.lock().unwrap();
+
+    let mut buf = Cursor::new(writer_lock);
 
     let mut wav_buffer = WavWriter::new(BufWriter::new(&mut buf), spec).unwrap();
 
     for sample in recording {
-        wav_buffer.write_sample(sample);
+        wav_buffer.write_sample(sample).unwrap();
     }
 
     drop(wav_buffer);
 
-    buf.into_inner()
+    buf.into_inner().to_vec()
 }
 
 type WavWriterHandle = Arc<Mutex<Vec<f32>>>;
 
-fn write_input_data<T, U>(input: &[T], writer: &mut WavWriterHandle)
+fn write_input_data<T, U>(input: &[T], writer: WavWriterHandle)
 where
     T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
 {
-    let inp_vec = input
+    let mut inp_vec = input
         .iter()
         .map(|num| num.to_f32().unwrap())
         .collect::<Vec<f32>>();
 
-    writer.lock().unwrap().clone_from(&inp_vec);
+    writer.lock().unwrap().append(&mut inp_vec);
 }

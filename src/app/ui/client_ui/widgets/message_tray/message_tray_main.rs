@@ -1,7 +1,7 @@
 use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
-use crate::app::ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_playbackable_audio};
+use crate::app::ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_playbackable_audio, record_audio_for_set_duration};
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
 use egui::text::{CCursor, CCursorRange};
@@ -471,12 +471,17 @@ impl Application {
 
                             let playback_bytes = create_playbackable_audio(bytes);
 
-                            let decoder = rodio::Decoder::new(BufReader::new(Cursor::new(playback_bytes))).unwrap();
+                            let decoder = rodio::Decoder::new(BufReader::new(Cursor::new(playback_bytes.clone()))).unwrap();
 
                             let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
+                            
                             let sink = rodio::Sink::try_new(&handle).unwrap();
+                            
+                            dbg!(playback_bytes.len());
 
                             sink.append(decoder);
+
+                            sink.sleep_until_end();
                         });
                     }
                 });
