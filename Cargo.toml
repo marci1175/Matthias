@@ -54,6 +54,8 @@ syn = {version = "2.0.70", features = ["full"]}
 mlua_proc_macro = "0.1.12"
 mlua-sys = {version = "0.6.1", features = ["luajit", "vendored"]}
 speed_test = "0.1.8"
+pipe = "0.4.0"
+num-traits = "0.2.19"
 
 [dependencies.uuid]
 version = "1.6.1"

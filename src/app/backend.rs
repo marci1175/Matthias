@@ -896,6 +896,10 @@ impl ClientMessage {
         serde_json::to_string(self).unwrap_or_default()
     }
 
+    // pub fn construct_audio_upload(bytes: Vec<f32>) -> ClientMessage {
+
+    // }
+
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
         msg: &str,

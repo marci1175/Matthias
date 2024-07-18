@@ -1,7 +1,7 @@
 use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
-use crate::app::ui::client_ui::client_actions::audio_recording::audio_recording;
+use crate::app::ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_playbackable_audio};
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
 use egui::text::{CCursor, CCursorRange};
@@ -9,9 +9,11 @@ use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Image, Key, KeyboardShortcut, Layout,
     Modifiers, RichText, Rounding, ScrollArea, Stroke,
 };
+use hound::WavWriter;
 use rand::Rng;
 use rfd::FileDialog;
 use std::fs::{self};
+use std::io::{BufRead, BufReader, Cursor, Write};
 use std::sync::mpsc;
 
 impl Application {
@@ -462,7 +464,20 @@ impl Application {
                         //Set audio recording start
                         self.client_ui.voice_recording_start = Some(Utc::now());
 
-                        audio_recording(rx, self.audio_file.clone());
+                        let app_clone = self.clone();
+
+                        tokio::spawn(async move {
+                            let bytes = audio_recording_with_recv(rx).unwrap();
+
+                            let playback_bytes = create_playbackable_audio(bytes);
+
+                            let decoder = rodio::Decoder::new(BufReader::new(Cursor::new(playback_bytes))).unwrap();
+
+                            let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
+                            let sink = rodio::Sink::try_new(&handle).unwrap();
+
+                            sink.append(decoder);
+                        });
                     }
                 });
             });
