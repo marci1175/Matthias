@@ -104,7 +104,6 @@ pub fn record_audio_for_set_duration(dur: Duration) -> anyhow::Result<Vec<f32>> 
 }
 
 fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
-    
     let opt = Opt::default();
 
     let host = cpal::default_host();
@@ -126,9 +125,7 @@ fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
 }
 
 /// This function records audio on a different thread, until the reciver recives something, then the recorded buffer is returned
-pub fn audio_recording_with_recv(
-    receiver: mpsc::Receiver<bool>,
-) -> anyhow::Result<Vec<f32>> {
+pub fn audio_recording_with_recv(receiver: mpsc::Receiver<bool>) -> anyhow::Result<Vec<f32>> {
     let (config, device) = get_config_and_device()?;
 
     let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -142,38 +139,25 @@ pub fn audio_recording_with_recv(
     let stream = match config.sample_format() {
         cpal::SampleFormat::I8 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| {
-                dbg!(data.len());
-                write_input_data::<i8, i8>(data, wav_buffer.clone())
-            },
+            move |data, _: &_| write_input_data::<i8, i8>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I16 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| {
-                dbg!(data.len());
-                write_input_data::<i16, i16>(data, wav_buffer.clone())
-            },
-
+            move |data, _: &_| write_input_data::<i16, i16>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::I32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| {
-                dbg!(data.len());
-                write_input_data::<i32, i32>(data, wav_buffer.clone())
-            },
+            move |data, _: &_| write_input_data::<i32, i32>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| {
-                dbg!(data.len());
-                write_input_data::<f32, f32>(data, wav_buffer.clone())
-            },
+            move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone()),
             err_fn,
             None,
         )?,
@@ -189,11 +173,7 @@ pub fn audio_recording_with_recv(
     //Block until further notice by user
     receiver.recv()?;
 
-    println!("Recording stopped");
-
     let recoreded_bytes = wav_buffer_clone.clone().lock().unwrap().clone();
-    
-    dbg!(recoreded_bytes.len());
 
     Ok(recoreded_bytes)
 }

@@ -81,47 +81,63 @@ impl Application {
                     });
 
                     if matches!(self.client_connection.state, ConnectionState::Connected(_)) {
+                        let port = self
+                            .client_ui
+                            .send_on_ip
+                            .split(":")
+                            .last()
+                            .unwrap_or_default()
+                            .to_string();
+
+                        //Check for invalid port
+                        if port.is_empty() {
+                            display_error_message("Invalid address to send the message on.");
+
+                            return;
+                        }
+
                         ui.allocate_ui(vec2(40., 40.), |ui| {
-                            let call_button = ui.add(ImageButton::new(Image::new(
-                                egui::include_image!("..\\..\\..\\icons\\call.png"),
-                            )));
+                            if let Some(_) = self.client_ui.voip.as_mut() {
+                                let disconnect_button = ui.add(ImageButton::new(
+                                    Image::new(egui::include_image!("..\\..\\..\\icons\\call.png"))
+                                        .tint(Color32::RED),
+                                ));
 
-                            if call_button.clicked() {
-                                //Move sender into thread
-                                let sender = self.voip_connection_sender.clone();
+                                if disconnect_button.clicked() {
+                                    //Shut down listener server, and disconnect from server
 
-                                let port = self
-                                    .client_ui
-                                    .send_on_ip
-                                    .split(":")
-                                    .last()
-                                    .unwrap_or_default()
-                                    .to_string();
+                                    self.send_msg(ClientMessage::construct_voip_disconnect(
+                                        &self.opened_user_information.uuid,
+                                    ));
 
-                                //Check for invalid port
-                                if port.is_empty() {
-                                    display_error_message(
-                                        "Invalid address to send the message on.",
-                                    );
+                                    //Reset state
+                                    self.client_ui.voip = None;
+                                }
+                            } else {
+                                let call_button = ui.add(ImageButton::new(Image::new(
+                                    egui::include_image!("..\\..\\..\\icons\\call.png"),
+                                )));
 
-                                    return;
+                                if call_button.clicked() {
+                                    //Move sender into thread
+                                    let sender = self.voip_connection_sender.clone();
+
+                                    //Spawn thread which will create the ```Voip``` instance
+                                    tokio::spawn(async move {
+                                        match Voip::new().await {
+                                            Ok(voip) => {
+                                                // It is okay to unwrap since it doesnt matter if we panic
+                                                sender.send(voip).unwrap();
+                                            }
+                                            Err(err) => {
+                                                display_error_message(err);
+                                            }
+                                        }
+                                    });
                                 }
 
-                                //Spawn thread which will create the ```Voip``` instance
-                                tokio::spawn(async move {
-                                    match Voip::new().await {
-                                        Ok(voip) => {
-                                            // It is okay to unwrap since it doesnt matter if we panic
-                                            sender.send(voip).unwrap();
-                                        }
-                                        Err(err) => {
-                                            display_error_message(err);
-                                        }
-                                    }
-                                });
+                                call_button.on_hover_text("Start a group call");
                             }
-
-                            call_button.on_hover_text("Start a group call");
                         });
                     }
                 });
@@ -457,6 +473,21 @@ impl Application {
         //Server reciver
         self.client_recv(ctx);
 
+        match self.audio_bytes_rx.try_recv() {
+            Ok(bytes) => {
+                //Send audio file
+                self.send_msg(ClientMessage::construct_file_msg_from_bytes(
+                    bytes,
+                    "wav".to_string(),
+                    self.client_ui.messaging_mode.get_reply_index(),
+                    self.opened_user_information.uuid.clone(),
+                ));
+            }
+            Err(_err) => {
+                // dbg!(_err);
+            }
+        }
+
         match self.audio_save_rx.try_recv() {
             Ok((sink, cursor, index, path_to_audio)) => {
                 //Check if the request was unsuccesful, so we can reset the states
@@ -691,6 +722,11 @@ impl Application {
                                                             emoji_name: message.emoji_name.clone(),
                                                             times: 1,
                                                         })
+                                                }
+                                            }
+                                            ServerMessageType::VoipState(state) => {
+                                                if let Some(voip_connected_client) = self.client_ui.incoming_messages.ongoing_voip_call.as_mut() {
+                                                    voip_connected_client.connected_clients = state.connected_clients.clone();
                                                 }
                                             }
                                             _ => {

@@ -116,6 +116,12 @@ pub struct Application {
     #[serde(skip)]
     pub audio_save_tx: Arc<mpsc::Sender<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>>,
 
+    ///Channels for sending recorded, and formatted Wav audio bytes
+    #[serde(skip)]
+    pub audio_bytes_tx: Arc<mpsc::Sender<Vec<u8>>>,
+    #[serde(skip)]
+    pub audio_bytes_rx: Arc<mpsc::Receiver<Vec<u8>>>,
+
     /*
         Register
     */
@@ -190,6 +196,8 @@ impl Default for Application {
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>();
 
+        let (audio_bytes_tx, audio_bytes_rx) = mpsc::channel::<Vec<u8>>();
+
         let (connection_sender, connection_reciver) =
             mpsc::channel::<Option<(ClientConnection, String)>>();
 
@@ -239,6 +247,10 @@ impl Default for Application {
             //thread communication for audio saving
             audio_save_rx: Arc::new(audio_save_rx),
             audio_save_tx: Arc::new(audio_save_tx),
+
+            //Channels for sending recorded, and formatted Wav audio bytes
+            audio_bytes_rx: Arc::new(audio_bytes_rx),
+            audio_bytes_tx: Arc::new(audio_bytes_tx),
 
             //main
             main: Main::default(),
@@ -896,9 +908,23 @@ impl ClientMessage {
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    // pub fn construct_audio_upload(bytes: Vec<f32>) -> ClientMessage {
-
-    // }
+    pub fn construct_file_msg_from_bytes(
+        bytes: Vec<u8>,
+        file_extension: String,
+        replying_to: Option<usize>,
+        uuid: String,
+    ) -> ClientMessage {
+        ClientMessage {
+            replying_to,
+            message_type: ClientMessageType::FileUpload(ClientFileUpload {
+                extension: Some(file_extension),
+                name: None,
+                bytes: bytes,
+            }),
+            uuid,
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
 
     ///this is used when sending a normal message
     pub fn construct_normal_msg(
@@ -1475,8 +1501,11 @@ pub enum ServerMessageType {
     Server(ServerMessage),
 
     /// This message shows if a user has connected to the voip call
-    #[strum_discriminants(strum(message = "Voip status"))]
-    VoipConnection(ServerVoipState),
+    #[strum_discriminants(strum(message = "Voip connection"))]
+    VoipConnection(ServerVoipEvent),
+
+    #[strum_discriminants(strum(message = "Voip state"))]
+    VoipState(ServerVoipState),
 }
 
 /// The types of message the server can "send"
@@ -1560,6 +1589,7 @@ impl ServerOutput {
                                     }
                                 )
                             },
+                            ServerMessageTypeDiscriminants::VoipState => unreachable!(),
                             ServerMessageTypeDiscriminants::VoipConnection => unreachable!(),
                             ServerMessageTypeDiscriminants::Deleted => unreachable!(),
                             ServerMessageTypeDiscriminants::Sync => unreachable!(),
@@ -1581,10 +1611,10 @@ impl ServerOutput {
                     ClientMessageType::VoipConnection(voip_message_type) => {
                         let server_message = match voip_message_type {
                             ClientVoipRequest::Connect(_) => {
-                                ServerVoipState::Connected(uuid.clone())
+                                ServerVoipEvent::Connected(uuid.clone())
                             },
                             ClientVoipRequest::Disconnect => {
-                                ServerVoipState::Disconnected(uuid.clone())
+                                ServerVoipEvent::Disconnected(uuid.clone())
                             },
                         };
 
@@ -1624,6 +1654,9 @@ pub struct ServerMaster {
 
     ///This entry holds all the connected user's profile
     pub connected_clients_profile: HashMap<String, ClientProfile>,
+
+    ///This entry shows all the client connected to the Voip call, if there is a a call
+    pub ongoing_voip_call: Option<ServerVoipState>,
 }
 
 impl ServerMaster {
@@ -1701,11 +1734,17 @@ pub enum ClientVoipRequest {
 
 /// This enum is used to display if a client has joined or left the Voip call, this is a ServerMessageType
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerVoipState {
+pub enum ServerVoipEvent {
     /// Client connected, the inner value is their uuid
     Connected(String),
     /// Client disconnected, the inner value is their uuid
     Disconnected(String),
+}
+
+///The struct contains all the useful information for displaying an ongoing voip connection.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct ServerVoipState {
+    pub connected_clients: Vec<String>,
 }
 
 /// This num contains the actions the server can take, these are sent to the client

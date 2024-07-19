@@ -1,7 +1,9 @@
 use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
-use crate::app::ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_playbackable_audio, record_audio_for_set_duration};
+use crate::app::ui::client_ui::client_actions::audio_recording::{
+    audio_recording_with_recv, create_playbackable_audio, record_audio_for_set_duration,
+};
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
 use egui::text::{CCursor, CCursorRange};
@@ -14,7 +16,7 @@ use rand::Rng;
 use rfd::FileDialog;
 use std::fs::{self};
 use std::io::{BufRead, BufReader, Cursor, Write};
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 
 impl Application {
     pub fn message_tray(
@@ -410,23 +412,10 @@ impl Application {
                                 )
                                 .inner;
 
+                            //Signal the recording thread to stop
                             if stop_recording_button.clicked() {
                                 //Just send something, it doesnt really matter
                                 atx.send(false).unwrap();
-
-                                //Path to voice recording created by audio_recording.rs, Arc mutex to avoid data races
-                                match self.audio_file.clone().try_lock() {
-                                    Ok(ok) => {
-                                        self.send_msg(ClientMessage::construct_file_msg(
-                                            ok.to_path_buf().clone(),
-                                            &self.opened_user_information.uuid,
-                                            self.client_ui.messaging_mode.get_reply_index(),
-                                        ));
-
-                                        let _ = fs::remove_file(ok.to_path_buf());
-                                    }
-                                    Err(error) => println!("{error}"),
-                                };
 
                                 //Destroy state
                                 self.atx = None;
@@ -464,24 +453,16 @@ impl Application {
                         //Set audio recording start
                         self.client_ui.voice_recording_start = Some(Utc::now());
 
-                        let app_clone = self.clone();
+                        //Move into thread
+                        let audio_bytes_sender = self.audio_bytes_tx.clone();
 
                         tokio::spawn(async move {
                             let bytes = audio_recording_with_recv(rx).unwrap();
 
+                            //These bytes can be played back with rodio (Wav format)
                             let playback_bytes = create_playbackable_audio(bytes);
 
-                            let decoder = rodio::Decoder::new(BufReader::new(Cursor::new(playback_bytes.clone()))).unwrap();
-
-                            let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
-                            
-                            let sink = rodio::Sink::try_new(&handle).unwrap();
-                            
-                            dbg!(playback_bytes.len());
-
-                            sink.append(decoder);
-
-                            sink.sleep_until_end();
+                            audio_bytes_sender.send(playback_bytes).unwrap();
                         });
                     }
                 });

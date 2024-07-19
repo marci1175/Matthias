@@ -99,6 +99,7 @@ impl Application {
                                                                 ServerMessageType::Reaction(_) => unreachable!(),
                                                                 ServerMessageType::Sync(_) => unreachable!(),
                                                                 ServerMessageType::VoipConnection(_) => unreachable!(),
+                                                                ServerMessageType::VoipState(_) => unreachable!(),
                                                             }
                                                         )
                                                     )

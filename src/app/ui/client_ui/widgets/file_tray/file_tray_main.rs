@@ -147,7 +147,8 @@ impl Application {
                                             ServerMessageType::Edit(_) => unreachable!(),
                                             ServerMessageType::Reaction(_) => unreachable!(),
                                             ServerMessageType::Sync(_) => unreachable!(),
-                                        }).size(self.font_size).strong());
+                                                                ServerMessageType::VoipState(_) => unreachable!(),
+                                                            }).size(self.font_size).strong());
                                     });
                                 });
                             });

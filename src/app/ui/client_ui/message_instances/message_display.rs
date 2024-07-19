@@ -4,7 +4,7 @@ use egui::{vec2, Align, Align2, Area, Color32, Context, Image, Layout, RichText,
 
 use crate::app::backend::{
     parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
-    ServerFileReply, ServerImageUpload,
+    ServerFileReply, ServerImageUpload, ServerMessageType,
 };
 use rodio::{Decoder, Source};
 
@@ -353,7 +353,7 @@ impl Application {
             }
             crate::app::backend::ServerMessageType::VoipConnection(connection_type) => {
                 match connection_type {
-                    crate::app::backend::ServerVoipState::Connected(client_uuid) => {
+                    crate::app::backend::ServerVoipEvent::Connected(client_uuid) => {
                         let profile = self
                             .client_ui
                             .incoming_messages
@@ -372,7 +372,7 @@ impl Application {
                             );
                         });
                     }
-                    crate::app::backend::ServerVoipState::Disconnected(client_uuid) => {
+                    crate::app::backend::ServerVoipEvent::Disconnected(client_uuid) => {
                         let profile = self
                             .client_ui
                             .incoming_messages
@@ -393,10 +393,10 @@ impl Application {
                     }
                 };
             }
-            crate::app::backend::ServerMessageType::Edit(_)
+            crate::app::backend::ServerMessageType::Edit(_) | ServerMessageType::VoipState(_)
             | crate::app::backend::ServerMessageType::Reaction(_)
             | crate::app::backend::ServerMessageType::Sync(_) => {
-                unimplemented!("ServerMessageType::Edit(_) & ServerMessageType::Reaction(_) & crate::app::backend::ServerMessageType::Sync(_) should not be displayed")
+                unimplemented!("Message type should not be displayed")
             }
         }
     }

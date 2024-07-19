@@ -18,6 +18,7 @@ use super::backend::{
         Upload, VoipConnection as Voip,
     },
     ServerReplyType, ServerSync, ServerVoip, ServerVoipAuthenticate, ServerVoipReply,
+    ServerVoipState,
 };
 
 use crate::app::backend::ServerMaster;
@@ -645,6 +646,7 @@ impl MessageService {
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
                         VoipConnection(_) => String::new(),
+                        
                         //This is unreachable, as requests are handled elsewhere
                         FileRequestType(_) => unreachable!(),
 
@@ -856,6 +858,19 @@ impl MessageService {
             user_seen_list: self.clients_last_seen_index.try_lock().unwrap().clone(),
             reaction_list: (*self.reactions.try_lock().unwrap().clone()).to_vec(),
             connected_clients_profile: self.connected_clients_profile.try_lock().unwrap().clone(),
+            ongoing_voip_call: {
+                if let Some(voip) = &self.voip {
+                    Some(ServerVoipState {
+                        connected_clients: voip
+                            .connected_clients
+                            .iter()
+                            .map(|entry| entry.key().clone())
+                            .collect(),
+                    })
+                } else {
+                    None
+                }
+            },
         };
 
         //convert reply into string
