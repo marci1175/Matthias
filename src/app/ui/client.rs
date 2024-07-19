@@ -4,15 +4,14 @@ use egui::{
 };
 use rodio::{Decoder, Sink};
 use std::fs;
+use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_audio, write_file, ClientMessage,
-    ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
-    ServerSync, ServerVoipReply, Voip,
+    decrypt_aes256, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipPacket, ServerVoipReply, Voip
 };
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
@@ -116,6 +115,9 @@ impl Application {
                                     //Reset state
                                     self.client_ui.voip = None;
                                     self.voip_thread = None;
+
+                                    //Shutdown listener and recorder thread
+                                    self.voip_shutdown_token.cancel();
                                 }
                             } else {
                                 let call_button = ui.add(ImageButton::new(Image::new(
@@ -916,33 +918,35 @@ impl Application {
         }
     }
 
-    ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 30ms of your voice then sends it to the linked voip destination
+    ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 35ms of your voice then sends it to the linked voip destination
     fn client_voip_thread(&mut self) {
         if let Some(voip) = self.client_ui.voip.clone() {
             self.voip_thread.get_or_insert_with(|| {
-                println!("Sender started");
-
                 let uuid = self.opened_user_information.uuid.clone();
                 let destination = self.client_ui.send_on_ip.clone();
-                
+                let decryption_key = self.client_connection.client_secret.clone();
                 let cancel_token = self.voip_shutdown_token.clone();
                 let cancel_token_child = cancel_token.child_token();
 
+                //Clone session id field
+                let auth_session_id = voip.auth.clone().unwrap().session_id;
+
+                let reciver_socket_part = voip.socket.clone();
+
                 //Sender thread
-                let spawn = tokio::spawn(async move {
+                tokio::spawn(async move {
                     //Conect socket to destination
                     voip.socket.connect(destination).await.unwrap();
 
                     //Record 35ms of audio, send it to the server
-                    //We can just send it becasue we have already  set the default destination address
+                    //We can just send it becasue we have already set the default destination address
                     loop {
                         select! {
                             playbackable_audio = async {
                                 create_playbackable_audio(record_audio_for_set_duration(Duration::from_millis(35)).unwrap_or_default())
                             } => {
                                 dbg!(playbackable_audio.len());
-                                
-                                match voip.send_audio(uuid.clone(), playbackable_audio).await {
+                                match voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await {
                                     //This function doesnt return anything wrapped
                                     Ok(_) => (),
                                     Err(err) => {
@@ -960,12 +964,45 @@ impl Application {
                         }
                     }
                 });
+                let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
+                
+                
 
                 //Reciver thread
                 tokio::spawn(async move {
+                    //Create sink
+                    let sink = Arc::new(rodio::Sink::try_new(&handle).unwrap());
+
                     //Listen on socket, play audio
                     loop {
-                        
+                        select! {
+                            _ = cancel_token_child.cancelled() => {
+                                //Break out of the listener loop
+                                break;
+                            },
+
+                            //Recive bytes
+                            _recived_bytes_count = async {
+                                let mut header_buf = vec![0; 4];
+
+                                reciver_socket_part.recv(&mut header_buf).await.unwrap();
+
+                                let body_lenght = u32::from_be_bytes(header_buf.try_into().unwrap());
+
+                                let mut body_buffer = vec![0; body_lenght as usize];
+
+                                reciver_socket_part.recv(&mut body_buffer).await.unwrap();
+
+                                //Decrypt message
+                                let decrypted_message = decrypt_aes256(&String::from_utf8(body_buffer).unwrap(), &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
+
+                                //Cnvert into server packet
+                                let server_voip_packet: ServerVoipPacket = serde_json::from_str(&decrypted_message).unwrap();
+
+                                //Play recived bytes
+                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(server_voip_packet.bytes))).unwrap());
+                            } => {}
+                        }
                     }
                 });
 

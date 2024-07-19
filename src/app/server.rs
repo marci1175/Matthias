@@ -21,7 +21,7 @@ use super::backend::{
     ServerVoipState,
 };
 
-use crate::app::backend::ServerMaster;
+use crate::app::backend::{decrypt_aes256, ClientVoipPacket, ServerMaster, ServerVoipPacket};
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
@@ -340,6 +340,79 @@ where
     Ok(())
 }
 
+pub fn create_voip_management(voip: ServerVoip, shutdown_token: CancellationToken, decryption_key: [u8; 32]) {
+    //Clone so we can move it into the thread
+    let listener = voip.socket.clone();
+    
+    //Spawn listener thread
+    tokio::spawn(async move {
+        loop {
+            //Clone so we can move the value
+            let voip_connected_clients = voip.connected_clients.clone();
+            
+            select! {
+                _ = shutdown_token.cancelled() => {
+
+                    //Shutdown thread by exiting the loop
+                    break;
+                },
+                //recive_message lenght by reading its first 4 bytes
+                _ = async {
+                    //Clone so we can move it into the thread
+                    let relay = voip.socket.clone();
+
+                    //Create buffer for header
+                    let mut header_buf = vec![0; 4];
+
+                    //Get header
+                    listener.recv(&mut header_buf).await.unwrap();
+                    
+                    //Get message lenght
+                    let header_lenght = dbg!(u32::from_be_bytes(header_buf[..4].try_into().unwrap()));
+
+                    //Create body according to message size indicated by eader
+                    let mut body_buf = vec![0; header_lenght as usize];
+
+                    //Get body
+                    listener.recv(&mut body_buf).await.unwrap();
+
+                    //Decrypt message
+                    let decrypted_message = decrypt_aes256(&String::from_utf8(body_buf).unwrap(), &decryption_key).unwrap();
+
+                    //Cnvert into client packet
+                    let client_voip_packet: ClientVoipPacket = serde_json::from_str(&decrypted_message).unwrap();
+
+                    //Spawn relay thread
+                    //Relay message
+                    tokio::spawn(async move {
+                        for (connected_socket_addr, authentication) in voip_connected_clients.iter().map(|entry| entry.value().clone()) {
+                            let server_voip_packet = ServerVoipPacket::new(client_voip_packet.bytes.clone());
+                            
+                            let server_packet_string = serde_json::to_string(&server_voip_packet).unwrap();
+
+                            //Encrypt it with the client's session ID
+                            let encrypted_packet = encrypt_aes256(server_packet_string, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
+
+                            let encrypted_packet_bytes = encrypted_packet.as_bytes();
+
+                            let message_lenght_header = (encrypted_packet_bytes.len() as u32).to_be_bytes().to_vec();
+
+                            //Send the header indicating message lenght
+                            relay.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                            
+                            //Send the encrypted relay bytes to the client
+                            relay.send_to(&encrypted_packet_bytes, connected_socket_addr).await.unwrap();
+                        }
+                    });
+                } => {},
+            }
+        }
+    });
+
+    //Spawn relay thread
+    
+}
+
 impl MessageService {
     /// The result returned by this function may be a real error, or an error constructed on purpose so that the thread call this function gets shut down.
     /// When experiening errors, make sure to check the error message as it may be on purpose
@@ -572,7 +645,13 @@ impl MessageService {
                                 self.voip = Some(voip_server);
                             }
 
-                            
+                            //We can safely unwrap here since the value cannot be None
+                            if let Some(voip) = &self.voip {
+                                create_voip_management(voip.clone(), voip.thread_cancellation_token.clone(), self.decryption_key);
+                            }
+                            else {
+                                bail!("This logically cannot happen, please investigate!")
+                            }
 
                             //Sync connected users with all users
                             sync_message_with_clients(
@@ -608,14 +687,21 @@ impl MessageService {
                             .await?;
                         }
                         super::backend::ClientVoipRequest::Disconnect => {
-                            if let Some(ongoing_voip) = &self.voip {
+                            if let Some(ongoing_voip) = self.voip.clone() {
                                 ongoing_voip.disconnect(req.uuid.clone())?;
+
+                                if ongoing_voip.connected_clients.is_empty() {
+                                    //If the voip has no connected clients we can shut down the whole service
+                                    self.voip = None;
+                                }
                             }
                             else {
                                 println!("Voip disconnected from an offline server")
                             }
                         }
                     }
+                
+                    
                 }
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
@@ -754,6 +840,8 @@ impl MessageService {
             connected_clients: Arc::new(DashMap::new()),
             established_since: Utc::now(),
             socket: Arc::new(socket),
+            thread_cancellation_token: CancellationToken::new(),
+            threads: None,
         })
     }
 

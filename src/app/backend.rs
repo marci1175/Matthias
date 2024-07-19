@@ -1814,7 +1814,7 @@ impl ServerVoipAuthenticate {
 
 #[derive(Debug, Clone)]
 pub struct ServerVoip {
-    /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
+    /// This field contains all the connected client's ```uuid``` with their ```SocketAddr``` and ```ServerVoipAuthenticate```
     pub connected_clients: Arc<DashMap<String, (SocketAddr, ServerVoipAuthenticate)>>,
 
     /// This field contains the amount of time the call has been established for
@@ -1823,10 +1823,17 @@ pub struct ServerVoip {
     /// The socket the server is listening on for incoming messages
     /// The only reason this is an option so we can implement ```serde::Deserialize```
     pub socket: Arc<UdpSocket>,
+
+    /// The cancellation token cancels threads, which are for listening and relaying (Distributing info)
+    pub thread_cancellation_token: CancellationToken,
+
+    /// This entry makes sure the 2 threads are only spawned once
+    pub threads: Option<()>,
 }
 
 impl ServerVoip {
-    /// Add the ```SocketAddr``` to the ```UDP``` server's destiantions
+    /// Add the ```SocketAddr``` to the ```UDP``` server's destinations
+    /// This function can take Self as a clone since we are only accessing entries which implement ```Sync```
     pub fn connect(&self, uuid: String, socket_addr: SocketAddr, session_authenticator: ServerVoipAuthenticate) -> anyhow::Result<()> {
         self.connected_clients.insert(uuid, (socket_addr, session_authenticator));
 
@@ -1857,15 +1864,30 @@ impl Voip {
     /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
     pub async fn new() -> anyhow::Result<Self> {
         Ok(Self {
-            socket: Arc::new(UdpSocket::bind(format!("[::1]:0")).await?),
+            socket: Arc::new(UdpSocket::bind(format!("[::]:0")).await?),
             auth: None,
         })
     }
 
-    pub async fn send_audio(&self, _uuid: String, bytes: Vec<u8>) -> anyhow::Result<()> {
+    /// This function sends the audio and the uuid wrapped in a ```ClientVoipPacket```, this struct is encrypted.
+    /// The first 4 bytes of this message is the byte lenght of the encrypted packet
+    pub async fn send_audio(&self, _uuid: String, bytes: Vec<u8>, encryption_key: &[u8]) -> anyhow::Result<()> {
         let packet = ClientVoipPacket::new(bytes, _uuid);
 
-        let packet_string = serde_json::to_string(&packet)?;
+        let packet_as_string = serde_json::to_string(&packet)?;
+
+        //Encrypt message
+        let encrypted_message = encrypt_aes256(packet_as_string, encryption_key)?;
+
+        let message_bytes = encrypted_message.as_bytes();
+
+        let message_lenght_in_bytes = (message_bytes.len() as u32).to_be_bytes().to_vec();
+
+        //first sedn the message size
+        self.socket.send(&message_lenght_in_bytes).await?;
+
+        //Send the actual message
+        self.socket.send(&message_bytes).await?;
 
         Ok(())
     }
@@ -1880,6 +1902,17 @@ pub struct ClientVoipPacket {
 impl ClientVoipPacket {
     pub fn new(bytes: Vec<u8>, uuid: String) -> Self {
         Self { bytes, uuid }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct ServerVoipPacket {
+    pub bytes: Vec<u8>,
+}
+
+impl ServerVoipPacket {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self { bytes }
     }
 }
 
