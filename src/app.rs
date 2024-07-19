@@ -61,6 +61,7 @@ impl eframe::App for backend::Application {
         //Shut down the server
         self.server_shutdown_token.cancel();
         self.autosync_shutdown_token.cancel();
+        self.voip_shutdown_token.cancel();
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

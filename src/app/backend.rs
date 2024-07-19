@@ -96,6 +96,10 @@ pub struct Application {
     #[serde(skip)]
     pub server_shutdown_token: CancellationToken,
 
+    ///Voip thread shutdown token
+    #[serde(skip)]
+    pub voip_shutdown_token: CancellationToken,
+
     ///What is the server's password set to
     pub server_password: String,
 
@@ -169,7 +173,7 @@ pub struct Application {
 
     /// Voip audio sender thread
     #[serde(skip)]
-    pub voip_sender_thread: Option<()>,
+    pub voip_thread: Option<()>,
 
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
@@ -206,7 +210,8 @@ impl Default for Application {
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
-            voip_sender_thread: None,
+            voip_shutdown_token: CancellationToken::new(),
+            voip_thread: None,
 
             //Make it so we can import any kind of library
             lua: unsafe { Arc::new(Lua::unsafe_new()) },
@@ -1784,6 +1789,7 @@ pub struct ServerVoipClose {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerVoipAuthenticate {
     /// The decryption key used to decrypt the packets sent by the server
+    /// The decryption key is derived from the session id
     pub decryption_key: Vec<u8>,
 
     /// The session id of the user used to identify the user
@@ -1809,7 +1815,7 @@ impl ServerVoipAuthenticate {
 #[derive(Debug, Clone)]
 pub struct ServerVoip {
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
-    pub connected_clients: Arc<DashMap<String, SocketAddr>>,
+    pub connected_clients: Arc<DashMap<String, (SocketAddr, ServerVoipAuthenticate)>>,
 
     /// This field contains the amount of time the call has been established for
     pub established_since: chrono::DateTime<Utc>,
@@ -1821,8 +1827,8 @@ pub struct ServerVoip {
 
 impl ServerVoip {
     /// Add the ```SocketAddr``` to the ```UDP``` server's destiantions
-    pub fn connect(&self, uuid: String, socket_addr: SocketAddr) -> anyhow::Result<()> {
-        self.connected_clients.insert(uuid, socket_addr);
+    pub fn connect(&self, uuid: String, socket_addr: SocketAddr, session_authenticator: ServerVoipAuthenticate) -> anyhow::Result<()> {
+        self.connected_clients.insert(uuid, (socket_addr, session_authenticator));
 
         Ok(())
     }
@@ -1854,6 +1860,26 @@ impl Voip {
             socket: Arc::new(UdpSocket::bind(format!("[::1]:0")).await?),
             auth: None,
         })
+    }
+
+    pub async fn send_audio(&self, _uuid: String, bytes: Vec<u8>) -> anyhow::Result<()> {
+        let packet = ClientVoipPacket::new(bytes, _uuid);
+
+        let packet_string = serde_json::to_string(&packet)?;
+
+        Ok(())
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct ClientVoipPacket {
+    pub bytes: Vec<u8>,
+    pub uuid: String,
+}
+
+impl ClientVoipPacket {
+    pub fn new(bytes: Vec<u8>, uuid: String) -> Self {
+        Self { bytes, uuid }
     }
 }
 
@@ -2153,6 +2179,8 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
 
 /// aes256 is encrypted by this function by a fixed key
 pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Result<String> {
+    ensure!(key.len() == 32);
+
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);

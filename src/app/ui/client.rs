@@ -17,6 +17,9 @@ use crate::app::backend::{
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
+use crate::app::ui::client_ui::client_actions::audio_recording::{
+    create_playbackable_audio, record_audio_for_set_duration,
+};
 
 impl Application {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
@@ -112,6 +115,7 @@ impl Application {
 
                                     //Reset state
                                     self.client_ui.voip = None;
+                                    self.voip_thread = None;
                                 }
                             } else {
                                 let call_button = ui.add(ImageButton::new(Image::new(
@@ -473,6 +477,9 @@ impl Application {
         //Server reciver
         self.client_recv(ctx);
 
+        //Client voip thread managemant
+        self.client_voip_thread();
+
         match self.audio_bytes_rx.try_recv() {
             Ok(bytes) => {
                 //Send audio file
@@ -725,8 +732,14 @@ impl Application {
                                                 }
                                             }
                                             ServerMessageType::VoipState(state) => {
-                                                if let Some(voip_connected_client) = self.client_ui.incoming_messages.ongoing_voip_call.as_mut() {
-                                                    voip_connected_client.connected_clients = state.connected_clients.clone();
+                                                if let Some(voip_connected_client) = self
+                                                    .client_ui
+                                                    .incoming_messages
+                                                    .ongoing_voip_call
+                                                    .as_mut()
+                                                {
+                                                    voip_connected_client.connected_clients =
+                                                        state.connected_clients.clone();
                                                 }
                                             }
                                             _ => {
@@ -906,26 +919,56 @@ impl Application {
     ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 30ms of your voice then sends it to the linked voip destination
     fn client_voip_thread(&mut self) {
         if let Some(voip) = self.client_ui.voip.clone() {
-            let destination = self.client_ui.send_on_ip.clone();
+            self.voip_thread.get_or_insert_with(|| {
+                println!("Sender started");
 
-            //Reciver thread
-            tokio::spawn(async move {
-                //Listen on socket, play audio
-                loop {
-                    // select! {
-                    //     _
-                    // }
-                }
-            });
+                let uuid = self.opened_user_information.uuid.clone();
+                let destination = self.client_ui.send_on_ip.clone();
+                
+                let cancel_token = self.voip_shutdown_token.clone();
+                let cancel_token_child = cancel_token.child_token();
 
-            //Sender thread
-            tokio::spawn(async move {
-                //Conect socket to destination
-                voip.socket.connect(destination).await.unwrap();
+                //Sender thread
+                let spawn = tokio::spawn(async move {
+                    //Conect socket to destination
+                    voip.socket.connect(destination).await.unwrap();
 
-                //Record 50ms audio, send it to the server
-                //We can just send it becasue we have already  set the default destination address
-                loop {}
+                    //Record 35ms of audio, send it to the server
+                    //We can just send it becasue we have already  set the default destination address
+                    loop {
+                        select! {
+                            playbackable_audio = async {
+                                create_playbackable_audio(record_audio_for_set_duration(Duration::from_millis(35)).unwrap_or_default())
+                            } => {
+                                dbg!(playbackable_audio.len());
+                                
+                                match voip.send_audio(uuid.clone(), playbackable_audio).await {
+                                    //This function doesnt return anything wrapped
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        dbg!(err);
+
+                                        //Handle error
+                                    },
+                                }
+                            },
+
+                            _ = cancel_token.cancelled() => {
+                                //Exit thread
+                                break;
+                            },
+                        }
+                    }
+                });
+
+                //Reciver thread
+                tokio::spawn(async move {
+                    //Listen on socket, play audio
+                    loop {
+                        
+                    }
+                });
+
             });
         }
     }

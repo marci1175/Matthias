@@ -393,7 +393,8 @@ impl Application {
                     }
                 };
             }
-            crate::app::backend::ServerMessageType::Edit(_) | ServerMessageType::VoipState(_)
+            crate::app::backend::ServerMessageType::Edit(_)
+            | ServerMessageType::VoipState(_)
             | crate::app::backend::ServerMessageType::Reaction(_)
             | crate::app::backend::ServerMessageType::Sync(_) => {
                 unimplemented!("Message type should not be displayed")

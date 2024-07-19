@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Error, Result};
+use anyhow::{bail, Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
@@ -542,8 +542,23 @@ impl MessageService {
                         super::backend::ClientVoipRequest::Connect(port) => {
                             let socket_addr = SocketAddr::new(socket_addr.ip(), *port);
 
+                            let session_authenticator = ServerVoipAuthenticate::new()?;
+
+                            //Send important ifno to client (Session ID, etc)
+                            send_message_to_client(
+                                &mut *client_handle.try_lock()?,
+                                encrypt_aes256(
+                                    serde_json::to_string(&ServerVoipReply::Success(
+                                        //Create session auth
+                                        session_authenticator.clone(),
+                                    ))?,
+                                    &self.decryption_key,
+                                )?,
+                            )
+                            .await?;
+
                             if let Some(ongoing_call) = &self.voip {
-                                ongoing_call.connect(req.uuid.clone(), socket_addr)?;
+                                ongoing_call.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
                             }
                             // If there is no ongoing call, we should create it
                             else {
@@ -551,28 +566,53 @@ impl MessageService {
                                     self.create_voip_server(self.opened_on_port.clone()).await?;
 
                                 //Immediately connect the user who has requested the voip call
-                                voip_server.connect(req.uuid.clone(), socket_addr)?;
+                                voip_server.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
 
                                 //Set voip server
                                 self.voip = Some(voip_server);
                             }
 
-                            //Send important ifno to client (Session ID, etc)
-                            send_message_to_client(
-                                &mut *client_handle.try_lock()?,
-                                encrypt_aes256(
-                                    serde_json::to_string(&ServerVoipReply::Success(
-                                        //Create session ID
-                                        ServerVoipAuthenticate::new()?,
-                                    ))?,
-                                    &self.decryption_key,
-                                )?,
+                            
+
+                            //Sync connected users with all users
+                            sync_message_with_clients(
+                                self.connected_clients.clone(),
+                                self.clients_last_seen_index.clone(),
+                                ServerOutput {
+                                    replying_to: None,
+                                    message_type: ServerMessageType::VoipState(ServerVoipState {
+                                        connected_clients: self
+                                            .voip
+                                            .as_ref()
+                                            .unwrap()
+                                            .connected_clients
+                                            .iter()
+                                            .map(|f| f.key().clone())
+                                            .collect(),
+                                    }),
+                                    message_date: {
+                                        Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                    },
+                                    uuid: req.uuid.clone(),
+                                    author: self
+                                        .connected_clients_profile
+                                        .lock()
+                                        .await
+                                        .get(&req.uuid)
+                                        .unwrap()
+                                        .username
+                                        .clone(),
+                                },
+                                self.decryption_key,
                             )
                             .await?;
                         }
                         super::backend::ClientVoipRequest::Disconnect => {
                             if let Some(ongoing_voip) = &self.voip {
                                 ongoing_voip.disconnect(req.uuid.clone())?;
+                            }
+                            else {
+                                println!("Voip disconnected from an offline server")
                             }
                         }
                     }
@@ -646,7 +686,7 @@ impl MessageService {
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
                         VoipConnection(_) => String::new(),
-                        
+
                         //This is unreachable, as requests are handled elsewhere
                         FileRequestType(_) => unreachable!(),
 
@@ -707,8 +747,8 @@ impl MessageService {
 
     async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip> {
         // Create socket
-        let socket = UdpSocket::bind(format!("[::1]:{port}")).await?;
-
+        let socket = UdpSocket::bind(format!("[::]:{port}")).await?;
+        
         //Return ServerVoip
         Ok(ServerVoip {
             connected_clients: Arc::new(DashMap::new()),
