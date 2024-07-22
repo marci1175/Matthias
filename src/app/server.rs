@@ -21,7 +21,7 @@ use super::backend::{
     ServerVoipState,
 };
 
-use crate::app::backend::{decrypt_aes256, ClientVoipPacket, ServerMaster, ServerVoipPacket};
+use crate::app::backend::{decrypt_aes256, decrypt_aes256_bytes, encrypt_aes256_bytes, ClientVoipPacket, ServerMaster, ServerVoipPacket};
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
@@ -368,7 +368,7 @@ pub fn create_voip_management(voip: ServerVoip, shutdown_token: CancellationToke
                     listener.recv(&mut header_buf).await.unwrap();
                     
                     //Get message lenght
-                    let header_lenght = dbg!(u32::from_be_bytes(header_buf[..4].try_into().unwrap()));
+                    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
                     //Create body according to message size indicated by eader
                     let mut body_buf = vec![0; header_lenght as usize];
@@ -377,31 +377,26 @@ pub fn create_voip_management(voip: ServerVoip, shutdown_token: CancellationToke
                     listener.recv(&mut body_buf).await.unwrap();
 
                     //Decrypt message
-                    let decrypted_message = decrypt_aes256(&String::from_utf8(body_buf).unwrap(), &decryption_key).unwrap();
+                    //This is what we relay to all the other clients
+                    let decrypted_bytes = decrypt_aes256_bytes(&body_buf, &decryption_key).unwrap();
 
-                    //Cnvert into client packet
-                    let client_voip_packet: ClientVoipPacket = serde_json::from_str(&decrypted_message).unwrap();
+                    // let audio = &decrypted_bytes[..10800];
+                    // let uuid = String::from_utf8(decrypted_bytes[10800..].to_vec()).unwrap();
 
                     //Spawn relay thread
                     //Relay message
                     tokio::spawn(async move {
                         for (connected_socket_addr, authentication) in voip_connected_clients.iter().map(|entry| entry.value().clone()) {
-                            let server_voip_packet = ServerVoipPacket::new(client_voip_packet.bytes.clone());
-                            
-                            let server_packet_string = serde_json::to_string(&server_voip_packet).unwrap();
-
                             //Encrypt it with the client's session ID
-                            let encrypted_packet = encrypt_aes256(server_packet_string, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
+                            let encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
 
-                            let encrypted_packet_bytes = encrypted_packet.as_bytes();
-
-                            let message_lenght_header = (encrypted_packet_bytes.len() as u32).to_be_bytes().to_vec();
+                            let message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
 
                             //Send the header indicating message lenght
                             relay.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
                             
                             //Send the encrypted relay bytes to the client
-                            relay.send_to(&encrypted_packet_bytes, connected_socket_addr).await.unwrap();
+                            relay.send_to(&encrypted_packet, connected_socket_addr).await.unwrap();
                         }
                     });
                 } => {},

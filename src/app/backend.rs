@@ -1869,25 +1869,22 @@ impl Voip {
         })
     }
 
-    /// This function sends the audio and the uuid wrapped in a ```ClientVoipPacket```, this struct is encrypted.
-    /// The first 4 bytes of this message is the byte lenght of the encrypted packet
-    pub async fn send_audio(&self, _uuid: String, bytes: Vec<u8>, encryption_key: &[u8]) -> anyhow::Result<()> {
-        let packet = ClientVoipPacket::new(bytes, _uuid);
-
-        let packet_as_string = serde_json::to_string(&packet)?;
+    /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
+    /// The first 10800 bytes of this packet (sent by this function) is the audio itself, the rest is the uuid who has sent this message
+    pub async fn send_audio(&self, uuid: String, mut bytes: Vec<u8>, encryption_key: &[u8]) -> anyhow::Result<()> {
+        //Append the uuid to the audio bytes
+        bytes.append(uuid.as_bytes().to_vec().as_mut());
 
         //Encrypt message
-        let encrypted_message = encrypt_aes256(packet_as_string, encryption_key)?;
+        let encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
-        let message_bytes = encrypted_message.as_bytes();
-
-        let message_lenght_in_bytes = (message_bytes.len() as u32).to_be_bytes().to_vec();
+        let message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
         //first sedn the message size
         self.socket.send(&message_lenght_in_bytes).await?;
 
         //Send the actual message
-        self.socket.send(&message_bytes).await?;
+        self.socket.send(&encrypted_message).await?;
 
         Ok(())
     }
@@ -2210,7 +2207,7 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
     Ok(String::from_utf8(plaintext)?)
 }
 
-/// aes256 is encrypted by this function by a fixed key
+/// This function decrypts a provided ```String```, with the provided key using ```Aes-256```
 pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Result<String> {
     ensure!(key.len() == 32);
 
@@ -2222,11 +2219,46 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
 
     let ciphertext = cipher
         .encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref())
-        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+        .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
     let ciphertext = hex::encode(ciphertext);
 
     Ok(ciphertext)
 }
+
+/// The provided byte array is encrypted with aes256 with the given key
+pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>> {
+    ensure!(key.len() == 32);
+
+    let key = Key::<Aes256Gcm>::from_slice(key);
+
+    let cipher = Aes256Gcm::new(key);
+
+    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+
+    let encrypted_bytes = cipher
+        .encrypt(&nonce, bytes)
+        .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
+
+    Ok(encrypted_bytes)
+}
+
+#[inline]
+/// This function decrypts a provided array of ```Bytes```, with the provided key using ```Aes-256```
+pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let key = Key::<Aes256Gcm>::from_slice(key);
+
+    let cipher = Aes256Gcm::new(key);
+
+    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+
+    let decrypted_bytes = cipher
+        .decrypt(&nonce, bytes_to_be_decrypted)
+        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+
+    Ok(decrypted_bytes)
+}
+
+
 
 #[inline]
 /// Argon is used to encrypt this

@@ -11,7 +11,7 @@ use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipPacket, ServerVoipReply, Voip
+    decrypt_aes256, decrypt_aes256_bytes, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipPacket, ServerVoipReply, Voip
 };
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
@@ -945,7 +945,6 @@ impl Application {
                             playbackable_audio = async {
                                 create_playbackable_audio(record_audio_for_set_duration(Duration::from_millis(35)).unwrap_or_default())
                             } => {
-                                dbg!(playbackable_audio.len());
                                 match voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await {
                                     //This function doesnt return anything wrapped
                                     Ok(_) => (),
@@ -964,15 +963,13 @@ impl Application {
                         }
                     }
                 });
-                let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
-                
-                
+                // self.client_ui.audio_playback. 
+
+                //Create sink
+                let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
 
                 //Reciver thread
                 tokio::spawn(async move {
-                    //Create sink
-                    let sink = Arc::new(rodio::Sink::try_new(&handle).unwrap());
-
                     //Listen on socket, play audio
                     loop {
                         select! {
@@ -994,18 +991,17 @@ impl Application {
                                 reciver_socket_part.recv(&mut body_buffer).await.unwrap();
 
                                 //Decrypt message
-                                let decrypted_message = decrypt_aes256(&String::from_utf8(body_buffer).unwrap(), &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
+                                let decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
 
-                                //Cnvert into server packet
-                                let server_voip_packet: ServerVoipPacket = serde_json::from_str(&decrypted_message).unwrap();
+                                let audio_bytes = decrypted_bytes[..10820].to_vec();
+                                let uuid = String::from_utf8(decrypted_bytes[10820..].to_vec()).unwrap();
 
                                 //Play recived bytes
-                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(server_voip_packet.bytes))).unwrap());
+                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(audio_bytes.clone()))).unwrap());
                             } => {}
                         }
                     }
                 });
-
             });
         }
     }
