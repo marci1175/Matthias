@@ -21,7 +21,7 @@ use super::backend::{
     ServerVoipState,
 };
 
-use crate::app::backend::{decrypt_aes256, decrypt_aes256_bytes, encrypt_aes256_bytes, ClientVoipPacket, ServerMaster, ServerVoipPacket};
+use crate::app::backend::{decrypt_aes256_bytes, encrypt_aes256_bytes, ServerMaster};
 use crate::app::backend::{
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
@@ -340,68 +340,68 @@ where
     Ok(())
 }
 
-pub fn create_voip_management(voip: ServerVoip, shutdown_token: CancellationToken, decryption_key: [u8; 32]) {
+/// This function will create a management thread, but only if the ```voip.threads``` field is None (Preventing spawning multiple threads)
+pub fn create_voip_management(mut voip: ServerVoip, shutdown_token: CancellationToken, decryption_key: [u8; 32]) {
     //Clone so we can move it into the thread
     let listener = voip.socket.clone();
     
-    //Spawn listener thread
-    tokio::spawn(async move {
-        loop {
-            //Clone so we can move the value
-            let voip_connected_clients = voip.connected_clients.clone();
-            
-            select! {
-                _ = shutdown_token.cancelled() => {
-
-                    //Shutdown thread by exiting the loop
-                    break;
-                },
-                //recive_message lenght by reading its first 4 bytes
-                _ = async {
-                    //Clone so we can move it into the thread
-                    let relay = voip.socket.clone();
-
-                    //Create buffer for header
-                    let mut header_buf = vec![0; 4];
-
-                    //Get header
-                    listener.recv(&mut header_buf).await.unwrap();
-                    
-                    //Get message lenght
-                    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
-
-                    //Create body according to message size indicated by eader
-                    let mut body_buf = vec![0; header_lenght as usize];
-
-                    //Get body
-                    listener.recv(&mut body_buf).await.unwrap();
-
-                    //Decrypt message
-                    //This is what we relay to all the other clients
-                    let decrypted_bytes = decrypt_aes256_bytes(&body_buf, &decryption_key).unwrap();
-
-                    // let audio = &decrypted_bytes[..10800];
-                    // let uuid = String::from_utf8(decrypted_bytes[10800..].to_vec()).unwrap();
-
-                    //Spawn relay thread
-                    //Relay message
-                    tokio::spawn(async move {
-                        for (connected_socket_addr, authentication) in voip_connected_clients.iter().map(|entry| entry.value().clone()) {
-                            //Encrypt it with the client's session ID
-                            let encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
-
-                            let message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
-
-                            //Send the header indicating message lenght
-                            relay.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
-                            
-                            //Send the encrypted relay bytes to the client
-                            relay.send_to(&encrypted_packet, connected_socket_addr).await.unwrap();
-                        }
-                    });
-                } => {},
+    //Spawn management thread
+    voip.threads.get_or_insert_with(|| {
+        tokio::spawn(async move {
+            loop {
+                //Clone so we can move the value
+                let voip_connected_clients = voip.connected_clients.clone();
+                
+                select! {
+                    _ = shutdown_token.cancelled() => {
+                        //Shutdown thread by exiting the loop
+                        break;
+                    },
+    
+                    //recive_message lenght by reading its first 4 bytes
+                    _ = async {
+                        //Clone so we can move it into the thread
+                        let relay = voip.socket.clone();
+    
+                        //Create buffer for header
+                        let mut header_buf = vec![0; 4];
+    
+                        //Get header
+                        listener.recv(&mut header_buf).await.unwrap();
+                        
+                        //Get message lenght
+                        let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
+    
+                        //Create body according to message size indicated by eader
+                        let mut body_buf = vec![0; header_lenght as usize];
+    
+                        //Get body
+                        listener.recv(&mut body_buf).await.unwrap();
+    
+                        //Decrypt message
+                        //This is what we relay to all the other clients
+                        let decrypted_bytes = decrypt_aes256_bytes(&body_buf, &decryption_key).unwrap();
+    
+                        //Spawn relay thread
+                        //Relay message
+                        tokio::spawn(async move {
+                            for (connected_socket_addr, authentication) in voip_connected_clients.iter().map(|entry| entry.value().clone()) {
+                                //Encrypt it with the client's session ID
+                                let encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
+    
+                                let message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
+    
+                                //Send the header indicating message lenght
+                                relay.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                
+                                //Send the encrypted relay bytes to the client
+                                relay.send_to(&encrypted_packet, connected_socket_addr).await.unwrap();
+                            }
+                        });
+                    } => {},
+                }
             }
-        }
+        });
     });
 
     //Spawn relay thread
@@ -612,7 +612,7 @@ impl MessageService {
 
                             let session_authenticator = ServerVoipAuthenticate::new()?;
 
-                            //Send important ifno to client (Session ID, etc)
+                            //Send important info to client (Session ID, etc)
                             send_message_to_client(
                                 &mut *client_handle.try_lock()?,
                                 encrypt_aes256(
@@ -630,23 +630,21 @@ impl MessageService {
                             }
                             // If there is no ongoing call, we should create it
                             else {
-                                let voip_server =
+                                let voip_server_instance =
                                     self.create_voip_server(self.opened_on_port.clone()).await?;
 
                                 //Immediately connect the user who has requested the voip call
-                                voip_server.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
+                                voip_server_instance.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
 
                                 //Set voip server
-                                self.voip = Some(voip_server);
+                                self.voip = Some(voip_server_instance);
                             }
 
-                            //We can safely unwrap here since the value cannot be None
-                            if let Some(voip) = &self.voip {
-                                create_voip_management(voip.clone(), voip.thread_cancellation_token.clone(), self.decryption_key);
-                            }
-                            else {
-                                bail!("This logically cannot happen, please investigate!")
-                            }
+                            //We can safely assume its Some(_) here
+                            let voip = self.voip.clone().unwrap();
+
+                            //Try to create a new management thread, this function will only create just ONE function, and if that one is alive it wont create a new one
+                            create_voip_management(voip.clone(), voip.thread_cancellation_token.clone(), self.decryption_key);
 
                             //Sync connected users with all users
                             sync_message_with_clients(
@@ -687,6 +685,10 @@ impl MessageService {
 
                                 if ongoing_voip.connected_clients.is_empty() {
                                     //If the voip has no connected clients we can shut down the whole service
+                                    
+                                    ongoing_voip.thread_cancellation_token.cancel();
+                                    
+                                    //Reset voip's state
                                     self.voip = None;
                                 }
                             }

@@ -56,6 +56,8 @@ mlua-sys = {version = "0.6.1", features = ["luajit", "vendored"]}
 speed_test = "0.1.8"
 pipe = "0.4.0"
 num-traits = "0.2.19"
+opus = "0.3.0"
+egui-notify = "0.15.0"
 
 [dependencies.uuid]
 version = "1.6.1"

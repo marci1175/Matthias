@@ -898,12 +898,19 @@ pub enum ClientMessageType {
     VoipConnection(ClientVoipRequest),
 }
 
-///This is what gets to be sent out by the client
+/// This is what gets to be sent out by the client
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ClientMessage {
+    /// Which message in the message stack its replying to
     pub replying_to: Option<usize>,
+
+    /// The message type of the message
     pub message_type: ClientMessageType,
+
+    /// The every uuid takes up 120 bytes
     pub uuid: String,
+    
+    /// When was this message sent
     pub message_date: String,
 }
 
@@ -1887,29 +1894,6 @@ impl Voip {
         self.socket.send(&encrypted_message).await?;
 
         Ok(())
-    }
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-pub struct ClientVoipPacket {
-    pub bytes: Vec<u8>,
-    pub uuid: String,
-}
-
-impl ClientVoipPacket {
-    pub fn new(bytes: Vec<u8>, uuid: String) -> Self {
-        Self { bytes, uuid }
-    }
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-pub struct ServerVoipPacket {
-    pub bytes: Vec<u8>,
-}
-
-impl ServerVoipPacket {
-    pub fn new(bytes: Vec<u8>) -> Self {
-        Self { bytes }
     }
 }
 

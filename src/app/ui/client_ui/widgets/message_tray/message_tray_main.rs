@@ -2,7 +2,7 @@ use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    audio_recording_with_recv, create_playbackable_audio, record_audio_for_set_duration,
+    audio_recording_with_recv, create_wav_file, record_audio_for_set_duration,
 };
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
@@ -460,7 +460,7 @@ impl Application {
                             let bytes = audio_recording_with_recv(rx).unwrap();
 
                             //These bytes can be played back with rodio (Wav format)
-                            let playback_bytes = create_playbackable_audio(bytes);
+                            let playback_bytes = create_wav_file(bytes);
 
                             audio_bytes_sender.send(playback_bytes).unwrap();
                         });

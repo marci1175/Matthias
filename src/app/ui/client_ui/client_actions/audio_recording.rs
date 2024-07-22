@@ -3,8 +3,9 @@
 //! The input data is recorded to "$APPDATA/szeChat/Client/(base64) - self.send_on_ip/recorded.wav".
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, FromSample, Sample, SupportedStreamConfig};
+use cpal::{Device, FromSample, Sample, SupportedStreamConfig, I24};
 use hound::WavWriter;
+use opus::Encoder;
 use pipe::PipeWriter;
 use std::f32;
 use std::fs::File;
@@ -13,6 +14,11 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
+
+pub const SAMPLE_RATE: u64 = 48000;
+pub const STEREO_PACKET_BUFFER_LENGHT: u64 = SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
 
 struct Opt {
     /// The audio device to use
@@ -56,7 +62,7 @@ pub fn record_audio_for_set_duration(dur: Duration) -> anyhow::Result<Vec<f32>> 
         .default_input_config()
         .expect("Failed to get default input config");
 
-    let mut wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
+    let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
 
     let wav_buffer_clone = wav_buffer.clone();
 
@@ -65,24 +71,6 @@ pub fn record_audio_for_set_duration(dur: Duration) -> anyhow::Result<Vec<f32>> 
     };
 
     let stream = match config.sample_format() {
-        cpal::SampleFormat::I8 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i8, i8>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
-        cpal::SampleFormat::I16 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i16, i16>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
-        cpal::SampleFormat::I32 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i32, i32>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone()),
@@ -100,7 +88,9 @@ pub fn record_audio_for_set_duration(dur: Duration) -> anyhow::Result<Vec<f32>> 
 
     std::thread::sleep(dur);
 
-    return Ok(wav_buffer_clone.lock().unwrap().clone());
+    let recording = wav_buffer_clone.lock().unwrap().clone();
+
+    return Ok(recording);
 }
 
 fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
@@ -137,24 +127,6 @@ pub fn audio_recording_with_recv(receiver: mpsc::Receiver<bool>) -> anyhow::Resu
     };
 
     let stream = match config.sample_format() {
-        cpal::SampleFormat::I8 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i8, i8>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
-        cpal::SampleFormat::I16 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i16, i16>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
-        cpal::SampleFormat::I32 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| write_input_data::<i32, i32>(data, wav_buffer.clone()),
-            err_fn,
-            None,
-        )?,
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone()),
@@ -195,7 +167,8 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
     }
 }
 
-pub fn create_playbackable_audio(recording: Vec<f32>) -> Vec<u8> {
+/// This function creates a wav foramtted audio file, containing the samples provided to this function
+pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8> {
     let writer = Arc::new(Mutex::new(Vec::new()));
 
     let (config, _) = get_config_and_device().unwrap();
@@ -208,7 +181,7 @@ pub fn create_playbackable_audio(recording: Vec<f32>) -> Vec<u8> {
 
     let mut wav_buffer = WavWriter::new(BufWriter::new(&mut buf), spec).unwrap();
 
-    for sample in recording {
+    for sample in samples {
         wav_buffer.write_sample(sample).unwrap();
     }
 
@@ -217,9 +190,21 @@ pub fn create_playbackable_audio(recording: Vec<f32>) -> Vec<u8> {
     buf.into_inner().to_vec()
 }
 
-type WavWriterHandle = Arc<Mutex<Vec<f32>>>;
+/// This function creates a wav foramtted audio file, containing the samples provided to this function
+/// This function doesnt work properly
+pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8> {
+    let mut opus_encoder = Encoder::new(SAMPLE_RATE as u32, opus::Channels::Stereo, opus::Application::Voip).unwrap();
 
-fn write_input_data<T, U>(input: &[T], writer: WavWriterHandle)
+    samples.resize(STEREO_PACKET_BUFFER_LENGHT as usize, 0.);
+
+    let output = opus_encoder.encode_vec_float(&samples, 512).inspect_err(|err| {
+        dbg!(err.description());
+    }).unwrap();
+
+    output
+}
+
+fn write_input_data<T, U>(input: &[T], writer: Arc<Mutex<Vec<f32>>>)
 where
     T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
 {

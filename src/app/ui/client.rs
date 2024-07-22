@@ -1,3 +1,5 @@
+pub const VOIP_PACKET_BUFFER_LENGHT_MS: u64 = 35;
+
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
     RichText, Sense, Stroke,
@@ -11,13 +13,13 @@ use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, decrypt_aes256_bytes, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipPacket, ServerVoipReply, Voip
+    decrypt_aes256, decrypt_aes256_bytes, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipReply, Voip
 };
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_playbackable_audio, record_audio_for_set_duration,
+    create_opus_file, create_wav_file, record_audio_for_set_duration
 };
 
 impl Application {
@@ -943,8 +945,8 @@ impl Application {
                     loop {
                         select! {
                             playbackable_audio = async {
-                                create_playbackable_audio(record_audio_for_set_duration(Duration::from_millis(35)).unwrap_or_default())
-                            } => {
+                                create_wav_file(record_audio_for_set_duration(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS)).unwrap())
+                            } => {            
                                 match voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await {
                                     //This function doesnt return anything wrapped
                                     Ok(_) => (),
@@ -963,7 +965,6 @@ impl Application {
                         }
                     }
                 });
-                // self.client_ui.audio_playback. 
 
                 //Create sink
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
@@ -991,13 +992,14 @@ impl Application {
                                 reciver_socket_part.recv(&mut body_buffer).await.unwrap();
 
                                 //Decrypt message
-                                let decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
+                                let mut decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
 
-                                let audio_bytes = decrypted_bytes[..10820].to_vec();
-                                let uuid = String::from_utf8(decrypted_bytes[10820..].to_vec()).unwrap();
+                                //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio 
+                                //I have no idea why I have to subtract 104, please keep this in mind in future code
+                                let uuid = String::from_utf8(decrypted_bytes.drain(decrypted_bytes.len() - 104..).collect()).unwrap();
 
                                 //Play recived bytes
-                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(audio_bytes.clone()))).unwrap());
+                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(decrypted_bytes))).unwrap());
                             } => {}
                         }
                     }
