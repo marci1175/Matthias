@@ -23,7 +23,7 @@ use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
@@ -1836,6 +1836,8 @@ pub struct ServerVoip {
 
     /// This entry makes sure the 2 threads are only spawned once
     pub threads: Option<()>,
+
+    pub client_messages: BTreeMap<MessageIdentifier, UdpMessage>,
 }
 
 impl ServerVoip {
@@ -1855,6 +1857,22 @@ impl ServerVoip {
 
         Ok(())
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+
+pub struct MessageIdentifier {
+    pub owner: String,
+    pub index: i8,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum UdpMessage {
+    /// This enums inner value is the lenght of the message this is indicating
+    MessageLenght(u32),
+
+    /// The inner value of this message is the raw bytes of the Voice bytes and the UUID
+    Message(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]

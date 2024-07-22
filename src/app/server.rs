@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
+    collections::{BTreeMap, HashMap}, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
     time::Duration,
 };
 
@@ -839,6 +839,7 @@ impl MessageService {
             socket: Arc::new(socket),
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
+            client_messages: BTreeMap::new(), 
         })
     }
 

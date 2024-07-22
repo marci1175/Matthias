@@ -67,13 +67,12 @@ impl eframe::App for backend::Application {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
-            TODO: fix audio playback (egui's fault)
             TODO: add notfications
             TODO: Restructure files
 
             TODO: Api docs
             TODO: Implement callbacks
-            TODO: try to make ipv4 support
+            TODO: Create nice ui for voice calls
         */
 
         //Set global lua table before everything
