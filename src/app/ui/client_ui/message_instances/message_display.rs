@@ -359,17 +359,15 @@ impl Application {
                             .incoming_messages
                             .connected_clients_profile
                             .get(client_uuid.as_str())
-                            {
-                                Some(profile) => {
-                                    profile
-                                },
-                                //If we dont have the profile we ask for it then return to avoid panicing
-                                None => {
-                                    self.request_client(client_uuid.to_string());
+                        {
+                            Some(profile) => profile,
+                            //If we dont have the profile we ask for it then return to avoid panicing
+                            None => {
+                                self.request_client(client_uuid.to_string());
 
-                                    return;
-                                },
-                            };
+                                return;
+                            }
+                        };
 
                         ui.horizontal(|ui| {
                             ui.label(
@@ -387,17 +385,15 @@ impl Application {
                             .incoming_messages
                             .connected_clients_profile
                             .get(client_uuid.as_str())
-                            {
-                                Some(profile) => {
-                                    profile
-                                },
-                                //If we dont have the profile we ask for it then return to avoid panicing
-                                None => {
-                                    self.request_client(client_uuid.to_string());
+                        {
+                            Some(profile) => profile,
+                            //If we dont have the profile we ask for it then return to avoid panicing
+                            None => {
+                                self.request_client(client_uuid.to_string());
 
-                                    return;
-                                },
-                            };
+                                return;
+                            }
+                        };
 
                         ui.horizontal(|ui| {
                             ui.label(

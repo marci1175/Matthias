@@ -660,7 +660,6 @@ impl MessageService {
                                     //Clone so we can move it into the thread
                                     let socket = voip.socket.clone();
                                     let connected_clients = voip.connected_client_thread_channels.clone();
-                                    
                                     //Spawn manager thread
                                     tokio::spawn(async move {
                                         loop {
@@ -669,7 +668,6 @@ impl MessageService {
 
                                             //Recive header size
                                             socket.peek_from(&mut header_buf).await.unwrap();
-                                            
                                             //Get message lenght
                                             let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 

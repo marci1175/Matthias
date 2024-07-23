@@ -1001,7 +1001,7 @@ impl Application {
                         }));
                         select! {
                             function_return = voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key)
-                            => {            
+                            => {
                                 match function_return {
                                     //This function doesnt return anything wrapped
                                     Ok(_) => (),
