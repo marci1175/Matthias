@@ -1,4 +1,4 @@
-pub const VOIP_PACKET_BUFFER_LENGHT_MS: u64 = 35;
+pub const VOIP_PACKET_BUFFER_LENGHT_MS: u64 = 40;
 
 use anyhow::Error;
 use egui::{
@@ -177,7 +177,7 @@ impl Application {
                     ui.horizontal(|ui| {
                         for connected_client_uuid in connected_clients.iter() {
                             //Display each "node"
-                            ui.vertical_centered(|ui| {
+                            ui.vertical(|ui| {
                                 self.display_icon_from_server(
                                     ctx,
                                     connected_client_uuid.clone(),
@@ -194,6 +194,8 @@ impl Application {
                                         ui.label(RichText::from(&profile.username).weak());
                                     }
                                     None => {
+                                        self.request_client(connected_client_uuid.to_string());
+
                                         ui.label(RichText::from(format!(
                                             "Profile not found for: {connected_client_uuid}"
                                         )));
@@ -982,7 +984,7 @@ impl Application {
 
                 let reciver_socket_part = voip.socket.clone();
                 let microphone_precentage = self.client_ui.microphone_volume.clone();
-                
+
                 //Sender thread
                 tokio::spawn(async move {
                     //Conect socket to destination
@@ -1037,7 +1039,7 @@ impl Application {
                                 match recive_server_relay(reciver_socket_part.clone(), auth_session_id.clone(), sink.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
-                                        dbg!(err);
+                                        // dbg!(err);
                                     },
                                 }
                             } => {}
@@ -1049,26 +1051,47 @@ impl Application {
     }
 }
 
-async fn recive_server_relay(reciver_socket_part: Arc<tokio::net::UdpSocket>, auth_session_id: String, sink: Arc<Sink>) -> anyhow::Result<()> {
-    let mut header_buf = vec![0; 4];
+async fn recive_server_relay(
+    reciver_socket_part: Arc<tokio::net::UdpSocket>,
+    auth_session_id: String,
+    sink: Arc<Sink>,
+) -> anyhow::Result<()> {
+    //Create buffer for header, this is the size of the maximum udp packet so no error will appear
+    let mut header_buf = vec![0; 65536];
 
-    reciver_socket_part.recv(&mut header_buf).await?;
+    //Recive header size
+    reciver_socket_part
+        .peek_from(&mut header_buf)
+        .await
+        .unwrap();
 
-    let body_lenght = u32::from_be_bytes(header_buf.try_into().map_err(|vec| Error::msg(format!("Could not turn bytes into u32, please check message order: {vec:?}")))?);
+    //Get message lenght
+    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
-    let mut body_buffer = vec![0; body_lenght as usize];
+    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
+    let mut body_buf = vec![0; header_lenght as usize + 4];
 
-    reciver_socket_part.recv(&mut body_buffer).await?;
+    reciver_socket_part.recv(&mut body_buf).await.unwrap();
 
     //Decrypt message
-    let mut decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone()))?)?;
+    let mut decrypted_bytes = decrypt_aes256_bytes(
+        //Only take the bytes from the 4th byte because thats the header
+        &body_buf[4..],
+        &hex::decode(sha256::digest(auth_session_id.clone()))?,
+    )?;
 
-    //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio 
+    //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio
     //I have no idea why I have to subtract 104, please keep this in mind in future code
-    let uuid = String::from_utf8(decrypted_bytes.drain(decrypted_bytes.len() - 104..).collect())?;
+    let uuid = String::from_utf8(
+        decrypted_bytes
+            .drain(decrypted_bytes.len() - 104..)
+            .collect(),
+    )?;
 
     //Play recived bytes
-    sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(decrypted_bytes)))?);
+    sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(
+        decrypted_bytes,
+    )))?);
 
     Ok(())
 }

@@ -354,13 +354,22 @@ impl Application {
             crate::app::backend::ServerMessageType::VoipConnection(connection_type) => {
                 match connection_type {
                     crate::app::backend::ServerVoipEvent::Connected(client_uuid) => {
-                        let profile = self
+                        let profile = match self
                             .client_ui
                             .incoming_messages
                             .connected_clients_profile
                             .get(client_uuid.as_str())
-                            .unwrap()
-                            .clone();
+                            {
+                                Some(profile) => {
+                                    profile
+                                },
+                                //If we dont have the profile we ask for it then return to avoid panicing
+                                None => {
+                                    self.request_client(client_uuid.to_string());
+
+                                    return;
+                                },
+                            };
 
                         ui.horizontal(|ui| {
                             ui.label(
@@ -373,13 +382,22 @@ impl Application {
                         });
                     }
                     crate::app::backend::ServerVoipEvent::Disconnected(client_uuid) => {
-                        let profile = self
+                        let profile = match self
                             .client_ui
                             .incoming_messages
                             .connected_clients_profile
-                            .get(client_uuid)
-                            .unwrap()
-                            .clone();
+                            .get(client_uuid.as_str())
+                            {
+                                Some(profile) => {
+                                    profile
+                                },
+                                //If we dont have the profile we ask for it then return to avoid panicing
+                                None => {
+                                    self.request_client(client_uuid.to_string());
+
+                                    return;
+                                },
+                            };
 
                         ui.horizontal(|ui| {
                             ui.label(

@@ -456,7 +456,11 @@ impl Application {
                         let microphone_precentage = self.client_ui.microphone_volume.clone();
 
                         tokio::spawn(async move {
-                            let bytes = audio_recording_with_recv(rx, *microphone_precentage.lock().unwrap()).unwrap();
+                            let bytes = audio_recording_with_recv(
+                                rx,
+                                *microphone_precentage.lock().unwrap(),
+                            )
+                            .unwrap();
 
                             //These bytes can be played back with rodio (Wav format)
                             let playback_bytes = create_wav_file(bytes);

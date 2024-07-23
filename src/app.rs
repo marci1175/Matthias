@@ -5,7 +5,9 @@ use crate::app::lua::ExtensionProperties;
 use anyhow::Error;
 use base64::engine::general_purpose;
 use base64::Engine;
-use egui::{vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit};
+use egui::{
+    vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
+};
 use egui_extras::{Column, TableBuilder};
 use lua::execute_code;
 use std::fs::{self};
@@ -456,7 +458,10 @@ impl backend::Application {
 
             ui.horizontal(|ui| {
                 ui.label("Microphone volume precentage");
-                ui.add(Slider::new(&mut *self.client_ui.microphone_volume.lock().unwrap(), 50.0..=500.0));
+                ui.add(Slider::new(
+                    &mut *self.client_ui.microphone_volume.lock().unwrap(),
+                    50.0..=500.0,
+                ));
             });
         });
     }
@@ -487,6 +492,7 @@ impl backend::Application {
         self.client_connection.reset_state();
     }
 
+    /// Draw the extension part of the ui in the settings
     fn client_extension(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             ui.label("Extensions");

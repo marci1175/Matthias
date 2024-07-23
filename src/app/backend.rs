@@ -658,7 +658,7 @@ impl Default for Client {
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
             voip: None,
-            microphone_volume: Arc::new(Mutex::new(100.))
+            microphone_volume: Arc::new(Mutex::new(100.)),
         }
     }
 }
@@ -1828,6 +1828,11 @@ pub struct ServerVoip {
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr``` and ```ServerVoipAuthenticate```
     pub connected_clients: Arc<DashMap<String, (SocketAddr, ServerVoipAuthenticate)>>,
 
+    /// This field contains a ```HashMap``` which pairs the SocketAddr to the client's listening thread's sender (So that the reciver thread can recive the ```Vec<u8>``` sent by the sender)
+    /// The secound part of the tuple is for shutting down the client manager thread, if they disconnect
+    pub connected_client_thread_channels:
+        Arc<DashMap<SocketAddr, (Arc<tokio::sync::mpsc::Sender<Vec<u8>>>, CancellationToken)>>,
+
     /// This field contains the amount of time the call has been established for
     pub established_since: chrono::DateTime<Utc>,
 
@@ -1917,15 +1922,14 @@ impl Voip {
         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
         //Encrypt message
-        let encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
+        let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
-        let message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
+        let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
-        //first sedn the message size
+        message_lenght_in_bytes.append(&mut encrypted_message);
+
+        //Send the message with the header in one
         self.socket.send(&message_lenght_in_bytes).await?;
-
-        //Send the actual message
-        self.socket.send(&encrypted_message).await?;
 
         Ok(())
     }

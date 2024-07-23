@@ -2,6 +2,7 @@
 //!
 //! The input data is recorded to "$APPDATA/szeChat/Client/(base64) - self.send_on_ip/recorded.wav".
 
+use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SupportedStreamConfig};
 use hound::WavWriter;
@@ -42,7 +43,10 @@ impl Default for Opt {
 
 /// This function records audio for the passed in duration, then it reutrns the recorded bytes wrapped in a result
 /// The amplification precentage is the precent the microphone's volume should be present, this is later turned into a multiplier
-pub fn record_audio_for_set_duration(dur: Duration, amplification_precentage: f32) -> anyhow::Result<Vec<f32>> {
+pub fn record_audio_for_set_duration(
+    dur: Duration,
+    amplification_precentage: f32,
+) -> anyhow::Result<Vec<f32>> {
     let opt = Opt::default();
 
     let host = cpal::default_host();
@@ -71,7 +75,13 @@ pub fn record_audio_for_set_duration(dur: Duration, amplification_precentage: f3
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone(), amplification_precentage / 100.),
+            move |data, _: &_| {
+                write_input_data::<f32, f32>(
+                    data,
+                    wav_buffer.clone(),
+                    amplification_precentage / 100.,
+                )
+            },
             err_fn,
             None,
         )?,
@@ -114,7 +124,10 @@ fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
 
 /// This function records audio on a different thread, until the reciver recives something, then the recorded buffer is returned
 /// The amplification precentage is the precent the microphone's volume should be present, this is later turned into a multiplier
-pub fn audio_recording_with_recv(receiver: mpsc::Receiver<bool>, amplification_precentage: f32) -> anyhow::Result<Vec<f32>> {
+pub fn audio_recording_with_recv(
+    receiver: mpsc::Receiver<bool>,
+    amplification_precentage: f32,
+) -> anyhow::Result<Vec<f32>> {
     let (config, device) = get_config_and_device()?;
 
     let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -128,7 +141,13 @@ pub fn audio_recording_with_recv(receiver: mpsc::Receiver<bool>, amplification_p
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
-            move |data, _: &_| write_input_data::<f32, f32>(data, wav_buffer.clone(), amplification_precentage / 100.),
+            move |data, _: &_| {
+                write_input_data::<f32, f32>(
+                    data,
+                    wav_buffer.clone(),
+                    amplification_precentage / 100.,
+                )
+            },
             err_fn,
             None,
         )?,
@@ -144,7 +163,11 @@ pub fn audio_recording_with_recv(receiver: mpsc::Receiver<bool>, amplification_p
     //Block until further notice by user
     receiver.recv()?;
 
-    let recoreded_bytes = wav_buffer_clone.clone().lock().unwrap().clone();
+    let recoreded_bytes = wav_buffer_clone
+        .clone()
+        .lock()
+        .map_err(|err| Error::msg(err.to_string()))?
+        .clone();
 
     Ok(recoreded_bytes)
 }
