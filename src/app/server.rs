@@ -1,9 +1,17 @@
+pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
+pub const SERVER_AUTHOR: &str = "Server";
+
 use std::{
-    collections::{BTreeMap, HashMap}, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
+    collections::{BTreeMap, HashMap},
+    env, fs,
+    io::Write,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
     time::Duration,
 };
 
-use anyhow::{bail, Error, Result};
+use anyhow::{Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
@@ -341,17 +349,20 @@ where
 }
 
 /// This function will create a management thread, but only if the ```voip.threads``` field is None (Preventing spawning multiple threads)
-pub fn create_voip_management(mut voip: ServerVoip, shutdown_token: CancellationToken, decryption_key: [u8; 32]) {
+pub fn create_voip_management(
+    mut voip: ServerVoip,
+    shutdown_token: CancellationToken,
+    decryption_key: [u8; 32],
+) {
     //Clone so we can move it into the thread
     let listener = voip.socket.clone();
-    
+
     //Spawn management thread
     voip.threads.get_or_insert_with(|| {
         tokio::spawn(async move {
             loop {
                 //Clone so we can move the value
                 let voip_connected_clients = voip.connected_clients.clone();
-                
                 select! {
                     _ = shutdown_token.cancelled() => {
                         //Shutdown thread by exiting the loop
@@ -362,10 +373,8 @@ pub fn create_voip_management(mut voip: ServerVoip, shutdown_token: Cancellation
                     _ = async {
                         //Clone so we can move it into the thread
                         let relay = voip.socket.clone();
-    
                         //Create buffer for header
                         let mut header_buf = vec![0; 4];
-    
                         //Get header
                         listener.recv(&mut header_buf).await.unwrap();
                         
@@ -405,7 +414,6 @@ pub fn create_voip_management(mut voip: ServerVoip, shutdown_token: Cancellation
     });
 
     //Spawn relay thread
-    
 }
 
 impl MessageService {
@@ -495,11 +503,11 @@ impl MessageService {
                                     message_type: ServerMessageType::Server(
                                         super::backend::ServerMessage::Connect(profile.clone()),
                                     ),
-                                    author: "Server".to_string(),
+                                    author: SERVER_AUTHOR.to_string(),
                                     message_date: {
                                         Utc::now().format("%Y.%m.%d. %H:%M").to_string()
                                     },
-                                    uuid: String::from("00000000-0000-0000-0000-000000000000"),
+                                    uuid: SERVER_UUID.to_string(),
                                 };
 
                                 self.messages.lock().await.push(server_msg.clone());
@@ -626,7 +634,11 @@ impl MessageService {
                             .await?;
 
                             if let Some(ongoing_call) = &self.voip {
-                                ongoing_call.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
+                                ongoing_call.connect(
+                                    req.uuid.clone(),
+                                    socket_addr,
+                                    session_authenticator,
+                                )?;
                             }
                             // If there is no ongoing call, we should create it
                             else {
@@ -634,7 +646,11 @@ impl MessageService {
                                     self.create_voip_server(self.opened_on_port.clone()).await?;
 
                                 //Immediately connect the user who has requested the voip call
-                                voip_server_instance.connect(req.uuid.clone(), socket_addr, session_authenticator)?;
+                                voip_server_instance.connect(
+                                    req.uuid.clone(),
+                                    socket_addr,
+                                    session_authenticator,
+                                )?;
 
                                 //Set voip server
                                 self.voip = Some(voip_server_instance);
@@ -644,7 +660,11 @@ impl MessageService {
                             let voip = self.voip.clone().unwrap();
 
                             //Try to create a new management thread, this function will only create just ONE function, and if that one is alive it wont create a new one
-                            create_voip_management(voip.clone(), voip.thread_cancellation_token.clone(), self.decryption_key);
+                            create_voip_management(
+                                voip.clone(),
+                                voip.thread_cancellation_token.clone(),
+                                self.decryption_key,
+                            );
 
                             //Sync connected users with all users
                             sync_message_with_clients(
@@ -653,14 +673,15 @@ impl MessageService {
                                 ServerOutput {
                                     replying_to: None,
                                     message_type: ServerMessageType::VoipState(ServerVoipState {
-                                        connected_clients: self
-                                            .voip
-                                            .as_ref()
-                                            .unwrap()
-                                            .connected_clients
-                                            .iter()
-                                            .map(|f| f.key().clone())
-                                            .collect(),
+                                        connected_clients: Some(
+                                            self.voip
+                                                .as_ref()
+                                                .unwrap()
+                                                .connected_clients
+                                                .iter()
+                                                .map(|f| f.key().clone())
+                                                .collect(),
+                                        ),
                                     }),
                                     message_date: {
                                         Utc::now().format("%Y.%m.%d. %H:%M").to_string()
@@ -685,20 +706,52 @@ impl MessageService {
 
                                 if ongoing_voip.connected_clients.is_empty() {
                                     //If the voip has no connected clients we can shut down the whole service
-                                    
+
                                     ongoing_voip.thread_cancellation_token.cancel();
-                                    
+
                                     //Reset voip's state
                                     self.voip = None;
+
+                                    sync_message_with_clients(
+                                        self.connected_clients.clone(),
+                                        self.clients_last_seen_index.clone(),
+                                        ServerOutput {
+                                            replying_to: None,
+                                            message_type: ServerMessageType::VoipState(
+                                                ServerVoipState {
+                                                    connected_clients: {
+                                                        //Match server Voip state
+                                                        match &self.voip {
+                                                            //If its still still Some that means there are still users connected to the Service 
+                                                            Some(server_voip) => {
+                                                                Some(
+                                                                    server_voip.connected_clients.iter().map(|entry| entry.key().clone()).collect()
+                                                                )
+                                                            },
+                                                            //If its None that means the Service has closed, thus having no clients connected to it
+                                                            None => {
+                                                                None
+                                                            },
+                                                        }
+                                                            
+                                                    },
+                                                },
+                                            ),
+                                            message_date: {
+                                                Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                            },
+                                            uuid: req.uuid.clone(),
+                                            author: String::new(),
+                                        },
+                                        self.decryption_key,
+                                    )
+                                    .await?;
                                 }
-                            }
-                            else {
+                            } else {
                                 println!("Voip disconnected from an offline server")
                             }
                         }
                     }
-                
-                    
                 }
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
@@ -831,7 +884,7 @@ impl MessageService {
     async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip> {
         // Create socket
         let socket = UdpSocket::bind(format!("[::]:{port}")).await?;
-        
+
         //Return ServerVoip
         Ok(ServerVoip {
             connected_clients: Arc::new(DashMap::new()),
@@ -839,7 +892,7 @@ impl MessageService {
             socket: Arc::new(socket),
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
-            client_messages: BTreeMap::new(), 
+            client_messages: BTreeMap::new(),
         })
     }
 
@@ -986,15 +1039,18 @@ impl MessageService {
             connected_clients_profile: self.connected_clients_profile.try_lock().unwrap().clone(),
             ongoing_voip_call: {
                 if let Some(voip) = &self.voip {
-                    Some(ServerVoipState {
-                        connected_clients: voip
-                            .connected_clients
-                            .iter()
-                            .map(|entry| entry.key().clone())
-                            .collect(),
-                    })
+                    ServerVoipState {
+                        connected_clients: Some(
+                            voip.connected_clients
+                                .iter()
+                                .map(|entry| entry.key().clone())
+                                .collect(),
+                        ),
+                    }
                 } else {
-                    None
+                    ServerVoipState {
+                        connected_clients: None,
+                    }
                 }
             },
         };

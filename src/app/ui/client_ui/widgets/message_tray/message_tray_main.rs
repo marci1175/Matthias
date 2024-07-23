@@ -2,7 +2,7 @@ use crate::app::backend::{
     Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
 };
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    audio_recording_with_recv, create_wav_file, record_audio_for_set_duration,
+    audio_recording_with_recv, create_wav_file,
 };
 use chrono::Utc;
 use egui::load::{BytesPoll, LoadError};
@@ -11,12 +11,9 @@ use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Image, Key, KeyboardShortcut, Layout,
     Modifiers, RichText, Rounding, ScrollArea, Stroke,
 };
-use hound::WavWriter;
 use rand::Rng;
 use rfd::FileDialog;
-use std::fs::{self};
-use std::io::{BufRead, BufReader, Cursor, Write};
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc;
 
 impl Application {
     pub fn message_tray(
@@ -439,6 +436,7 @@ impl Application {
                                 ))
                                 .size(self.font_size),
                             );
+                            ctx.request_repaint();
                         });
                     } else if ui
                         .add(egui::ImageButton::new(egui::include_image!(
@@ -455,9 +453,10 @@ impl Application {
 
                         //Move into thread
                         let audio_bytes_sender = self.audio_bytes_tx.clone();
+                        let microphone_precentage = self.client_ui.microphone_volume.clone();
 
                         tokio::spawn(async move {
-                            let bytes = audio_recording_with_recv(rx).unwrap();
+                            let bytes = audio_recording_with_recv(rx, *microphone_precentage.lock().unwrap()).unwrap();
 
                             //These bytes can be played back with rodio (Wav format)
                             let playback_bytes = create_wav_file(bytes);

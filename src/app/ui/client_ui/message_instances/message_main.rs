@@ -3,6 +3,7 @@ use crate::app::{
         decrypt_aes256, Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
         ServerMessageType,
     },
+    server::SERVER_UUID,
     ui::client_ui::widgets::emoji_tray::emoji::display_emoji,
 };
 use egui::{
@@ -194,7 +195,7 @@ impl Application {
                                 message_group.response.context_menu(|ui|{
                                     let profile_menu_button = ui.menu_button("Profile", |ui| {
                                         //Check if the message was sent by the server, create a custom profile for it
-                                        if item.uuid == "00000000-0000-0000-0000-000000000000" {
+                                        if item.uuid == SERVER_UUID {
                                             //Add verification or somthing like that
                                             ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                                                 ui.horizontal_centered(|ui| {
@@ -323,7 +324,7 @@ impl Application {
         ui: &mut egui::Ui,
     ) {
         //If uuid is the server's we just include the image of the server
-        if uuid == "00000000-0000-0000-0000-000000000000" {
+        if uuid == SERVER_UUID {
             ui.add(Image::new(egui::include_image!(
                 "../../../../../icons/server_white64.png"
             )));

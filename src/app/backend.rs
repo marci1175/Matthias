@@ -15,7 +15,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
 use egui::load::BytesPoll;
 use egui::load::LoadError;
-use egui::{vec2, Color32, Id, Image, Pos2, Rect, Response, RichText, Stroke, Ui};
+use egui::{vec2, Color32, Image, Pos2, Rect, Response, RichText, Stroke, Ui};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -600,6 +600,9 @@ pub struct Client {
 
     #[serde(skip)]
     pub voip: Option<Voip>,
+
+    /// This entry contains the volume precentage of the microphone, this is modified in the settings
+    pub microphone_volume: Arc<Mutex<f32>>,
 }
 
 impl Default for Client {
@@ -655,6 +658,7 @@ impl Default for Client {
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
             voip: None,
+            microphone_volume: Arc::new(Mutex::new(100.))
         }
     }
 }
@@ -909,7 +913,7 @@ pub struct ClientMessage {
 
     /// The every uuid takes up 120 bytes
     pub uuid: String,
-    
+
     /// When was this message sent
     pub message_date: String,
 }
@@ -1668,7 +1672,7 @@ pub struct ServerMaster {
     pub connected_clients_profile: HashMap<String, ClientProfile>,
 
     ///This entry shows all the client connected to the Voip call, if there is a a call
-    pub ongoing_voip_call: Option<ServerVoipState>,
+    pub ongoing_voip_call: ServerVoipState,
 }
 
 impl ServerMaster {
@@ -1756,7 +1760,7 @@ pub enum ServerVoipEvent {
 ///The struct contains all the useful information for displaying an ongoing voip connection.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct ServerVoipState {
-    pub connected_clients: Vec<String>,
+    pub connected_clients: Option<Vec<String>>,
 }
 
 /// This num contains the actions the server can take, these are sent to the client
@@ -1837,14 +1841,21 @@ pub struct ServerVoip {
     /// This entry makes sure the 2 threads are only spawned once
     pub threads: Option<()>,
 
+    /// This field contains all the incoming / pending messages
     pub client_messages: BTreeMap<MessageIdentifier, UdpMessage>,
 }
 
 impl ServerVoip {
     /// Add the ```SocketAddr``` to the ```UDP``` server's destinations
     /// This function can take Self as a clone since we are only accessing entries which implement ```Sync```
-    pub fn connect(&self, uuid: String, socket_addr: SocketAddr, session_authenticator: ServerVoipAuthenticate) -> anyhow::Result<()> {
-        self.connected_clients.insert(uuid, (socket_addr, session_authenticator));
+    pub fn connect(
+        &self,
+        uuid: String,
+        socket_addr: SocketAddr,
+        session_authenticator: ServerVoipAuthenticate,
+    ) -> anyhow::Result<()> {
+        self.connected_clients
+            .insert(uuid, (socket_addr, session_authenticator));
 
         Ok(())
     }
@@ -1896,7 +1907,12 @@ impl Voip {
 
     /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
     /// The first 10800 bytes of this packet (sent by this function) is the audio itself, the rest is the uuid who has sent this message
-    pub async fn send_audio(&self, uuid: String, mut bytes: Vec<u8>, encryption_key: &[u8]) -> anyhow::Result<()> {
+    pub async fn send_audio(
+        &self,
+        uuid: String,
+        mut bytes: Vec<u8>,
+        encryption_key: &[u8],
+    ) -> anyhow::Result<()> {
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
@@ -2259,8 +2275,6 @@ pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow:
 
     Ok(decrypted_bytes)
 }
-
-
 
 #[inline]
 /// Argon is used to encrypt this

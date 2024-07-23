@@ -1,5 +1,6 @@
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: u64 = 35;
 
+use anyhow::Error;
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
     RichText, Sense, Stroke,
@@ -13,13 +14,15 @@ use std::time::Duration;
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, decrypt_aes256_bytes, display_error_message, fetch_incoming_message_lenght, write_audio, write_file, ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipReply, Voip
+    decrypt_aes256, decrypt_aes256_bytes, display_error_message, write_audio, write_file,
+    ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction,
+    ServerReplyType, ServerSync, ServerVoipReply, Voip,
 };
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_opus_file, create_wav_file, record_audio_for_set_duration
+    create_wav_file, record_audio_for_set_duration,
 };
 
 impl Application {
@@ -102,10 +105,9 @@ impl Application {
 
                         ui.allocate_ui(vec2(40., 40.), |ui| {
                             if let Some(_) = self.client_ui.voip.as_mut() {
-                                let disconnect_button = ui.add(ImageButton::new(
-                                    Image::new(egui::include_image!("..\\..\\..\\icons\\call.png"))
-                                        .tint(Color32::RED),
-                                ));
+                                let disconnect_button = ui.add(ImageButton::new(Image::new(
+                                    egui::include_image!("..\\..\\..\\icons\\call_red.png"),
+                                )));
 
                                 if disconnect_button.clicked() {
                                     //Shut down listener server, and disconnect from server
@@ -153,6 +155,55 @@ impl Application {
                 ui.allocate_space(vec2(ui.available_width(), 5.));
             },
         );
+
+        //IF there is an existing Voice call we can assume there are people connected to it
+        if let Some(connected_clients) = self
+            .client_ui
+            .incoming_messages
+            .ongoing_voip_call
+            .clone()
+            .connected_clients
+        {
+            egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "voip_connected_users")
+                .show(ctx, |ui| {
+                    //Display the name of this part of the ui
+                    ui.label(
+                        RichText::from("Users connected to the voice chat:")
+                            .weak()
+                            .size(self.font_size / 2.),
+                    );
+
+                    //Put all of the connected users nxt to eachother
+                    ui.horizontal(|ui| {
+                        for connected_client_uuid in connected_clients.iter() {
+                            //Display each "node"
+                            ui.vertical_centered(|ui| {
+                                self.display_icon_from_server(
+                                    ctx,
+                                    connected_client_uuid.clone(),
+                                    ui,
+                                );
+
+                                match self
+                                    .client_ui
+                                    .incoming_messages
+                                    .connected_clients_profile
+                                    .get(connected_client_uuid)
+                                {
+                                    Some(profile) => {
+                                        ui.label(RichText::from(&profile.username).weak());
+                                    }
+                                    None => {
+                                        ui.label(RichText::from(format!(
+                                            "Profile not found for: {connected_client_uuid}"
+                                        )));
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
+        }
 
         //Message input panel
         let usr_panel = egui::TopBottomPanel::bottom("usr_input")
@@ -736,15 +787,11 @@ impl Application {
                                                 }
                                             }
                                             ServerMessageType::VoipState(state) => {
-                                                if let Some(voip_connected_client) = self
-                                                    .client_ui
+                                                self.client_ui
                                                     .incoming_messages
                                                     .ongoing_voip_call
-                                                    .as_mut()
-                                                {
-                                                    voip_connected_client.connected_clients =
-                                                        state.connected_clients.clone();
-                                                }
+                                                    .connected_clients =
+                                                    state.connected_clients.clone();
                                             }
                                             _ => {
                                                 //Allocate Message vec for the new message
@@ -934,7 +981,8 @@ impl Application {
                 let auth_session_id = voip.auth.clone().unwrap().session_id;
 
                 let reciver_socket_part = voip.socket.clone();
-
+                let microphone_precentage = self.client_ui.microphone_volume.clone();
+                
                 //Sender thread
                 tokio::spawn(async move {
                     //Conect socket to destination
@@ -943,11 +991,16 @@ impl Application {
                     //Record 35ms of audio, send it to the server
                     //We can just send it becasue we have already set the default destination address
                     loop {
+                        let playbackable_audio = create_wav_file(record_audio_for_set_duration(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS), *microphone_precentage.lock().unwrap()).unwrap_or_else(|err| {
+                            dbg!("Failed to record audio", err);
+
+                            //Return empty vector
+                            vec![]
+                        }));
                         select! {
-                            playbackable_audio = async {
-                                create_wav_file(record_audio_for_set_duration(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS)).unwrap())
-                            } => {            
-                                match voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await {
+                            function_return = voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key)
+                            => {            
+                                match function_return {
                                     //This function doesnt return anything wrapped
                                     Ok(_) => (),
                                     Err(err) => {
@@ -981,25 +1034,12 @@ impl Application {
 
                             //Recive bytes
                             _recived_bytes_count = async {
-                                let mut header_buf = vec![0; 4];
-
-                                reciver_socket_part.recv(&mut header_buf).await.unwrap();
-
-                                let body_lenght = u32::from_be_bytes(header_buf.try_into().unwrap());
-
-                                let mut body_buffer = vec![0; body_lenght as usize];
-
-                                reciver_socket_part.recv(&mut body_buffer).await.unwrap();
-
-                                //Decrypt message
-                                let mut decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone())).unwrap()).unwrap();
-
-                                //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio 
-                                //I have no idea why I have to subtract 104, please keep this in mind in future code
-                                let uuid = String::from_utf8(decrypted_bytes.drain(decrypted_bytes.len() - 104..).collect()).unwrap();
-
-                                //Play recived bytes
-                                sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(decrypted_bytes))).unwrap());
+                                match recive_server_relay(reciver_socket_part.clone(), auth_session_id.clone(), sink.clone()).await {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        dbg!(err);
+                                    },
+                                }
                             } => {}
                         }
                     }
@@ -1007,4 +1047,28 @@ impl Application {
             });
         }
     }
+}
+
+async fn recive_server_relay(reciver_socket_part: Arc<tokio::net::UdpSocket>, auth_session_id: String, sink: Arc<Sink>) -> anyhow::Result<()> {
+    let mut header_buf = vec![0; 4];
+
+    reciver_socket_part.recv(&mut header_buf).await?;
+
+    let body_lenght = u32::from_be_bytes(header_buf.try_into().map_err(|vec| Error::msg(format!("Could not turn bytes into u32, please check message order: {vec:?}")))?);
+
+    let mut body_buffer = vec![0; body_lenght as usize];
+
+    reciver_socket_part.recv(&mut body_buffer).await?;
+
+    //Decrypt message
+    let mut decrypted_bytes = decrypt_aes256_bytes(&body_buffer, &hex::decode(sha256::digest(auth_session_id.clone()))?)?;
+
+    //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio 
+    //I have no idea why I have to subtract 104, please keep this in mind in future code
+    let uuid = String::from_utf8(decrypted_bytes.drain(decrypted_bytes.len() - 104..).collect())?;
+
+    //Play recived bytes
+    sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(decrypted_bytes)))?);
+
+    Ok(())
 }
