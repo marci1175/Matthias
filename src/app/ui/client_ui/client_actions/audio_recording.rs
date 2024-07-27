@@ -7,9 +7,10 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SupportedStreamConfig};
 use hound::WavWriter;
 use opus::Encoder;
+use std::collections::VecDeque;
 use std::f32;
 use std::io::{BufWriter, Cursor};
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -99,6 +100,64 @@ pub fn record_audio_for_set_duration(
     let recording = wav_buffer_clone.lock().unwrap().clone();
 
     return Ok(recording);
+}
+
+pub fn record_audio_with_interrupt(
+    interrupt: Receiver<()>,
+    amplification_precentage: f32,
+) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>> {
+    let opt = Opt::default();
+
+    let host = cpal::default_host();
+
+    // Set up the input device and stream with the default input config.
+    let device = if opt.device == "default" {
+        host.default_input_device()
+    } else {
+        host.input_devices()?
+            .find(|x| x.name().map(|y| y == opt.device).unwrap_or(false))
+    }
+    .expect("failed to find input device");
+
+    let config = device
+        .default_input_config()
+        .expect("Failed to get default input config");
+
+    let recording_buffer_handle: Arc<Mutex<VecDeque<f32>>> = Arc::new(Mutex::new(VecDeque::new()));
+
+    let wav_buffer_clone = recording_buffer_handle.clone();
+
+    let err_fn = move |err| {
+        eprintln!("an error occurred on stream: {}", err);
+    };
+
+    let stream = match config.sample_format() {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &config.into(),
+            move |data, _: &_| {
+                write_input_data_to_buffer_with_set_len::<f32, f32>(
+                    data,
+                    recording_buffer_handle.clone(),
+                    amplification_precentage / 100.,
+                    100,
+                )
+            },
+            err_fn,
+            None,
+        )?,
+        sample_format => {
+            return Err(anyhow::Error::msg(format!(
+                "Unsupported sample format '{sample_format}'"
+            )))
+        }
+    };
+
+    stream.play()?;
+
+    //Wait for interrupt
+    interrupt.recv()?;
+
+    return Ok(wav_buffer_clone);
 }
 
 fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
@@ -245,4 +304,23 @@ where
         .collect::<Vec<f32>>();
 
     writer.lock().unwrap().append(&mut inp_vec);
+}
+
+/// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the lenght of ```len``` 
+fn write_input_data_to_buffer_with_set_len<T, U>(input: &[T], buffer_handle: Arc<Mutex<VecDeque<f32>>>, amplification_multiplier: f32, len: usize)
+where
+    T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
+{
+    let mut buffer_handle = buffer_handle.lock().unwrap();
+
+    for sample in input.iter() {
+        let sample_as_f32 = sample.to_f32().unwrap() * amplification_multiplier;
+
+        buffer_handle.push_back(sample_as_f32);
+        
+        //Help me figure out the lenght
+        if buffer_handle.len() > len {
+            buffer_handle.pop_front();
+        }
+    }
 }
