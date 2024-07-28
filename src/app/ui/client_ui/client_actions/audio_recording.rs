@@ -7,17 +7,19 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SupportedStreamConfig};
 use hound::WavWriter;
 use opus::Encoder;
+use std::thread::JoinHandle;
 use std::collections::VecDeque;
 use std::f32;
 use std::io::{BufWriter, Cursor};
 use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
 
-pub const SAMPLE_RATE: u64 = 48000;
-pub const STEREO_PACKET_BUFFER_LENGHT: u64 = SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
+pub const SAMPLE_RATE: usize = 48000;
+pub const STEREO_PACKET_BUFFER_LENGHT: usize = SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
 
 struct Opt {
     /// The audio device to use
@@ -102,70 +104,52 @@ pub fn record_audio_for_set_duration(
     return Ok(recording);
 }
 
+/// This function returns a handle to a `queue` of bytes (```Arc<Mutex<VecDeque<u8>>>```), while spawning a thread which constantly writes the incoming audio into the buffer
+/// This  `queue` or `buffer` gets updated from left to right, the new element always pushes back all the elements behind it, if the value's index reaches ```idx > queue_lenght```, it gets dropped.
 pub fn record_audio_with_interrupt(
-    interrupt: Receiver<()>,
+    interrupt: CancellationToken,
     amplification_precentage: f32,
+    buffer_handle: Arc<Mutex<VecDeque<f32>>>,
 ) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>> {
-    let opt = Opt::default();
+    let wav_buffer_clone = buffer_handle.clone();
 
-    let host = cpal::default_host();
+    let _: JoinHandle<anyhow::Result<()>> = std::thread::spawn(move || {
+        //Create scope, so it will show the compiler that the ```stream``` will NOT be used after the await
+            let (device, config) = get_recording_device()?;
 
-    // Set up the input device and stream with the default input config.
-    let device = if opt.device == "default" {
-        host.default_input_device()
-    } else {
-        host.input_devices()?
-            .find(|x| x.name().map(|y| y == opt.device).unwrap_or(false))
-    }
-    .expect("failed to find input device");
+            let err_fn = move |err| {
+                eprintln!("An error occurred on stream: {}", err);
+            };
+            
+            let stream = device.build_input_stream(
+                &config.into(),
+                move |data, _: &_| {
+                    write_input_data_to_buffer_with_set_len::<f32, f32>(
+                        data,
+                        buffer_handle.clone(),
+                        amplification_precentage / 100.,
+                    )
+                },
+                err_fn,
+                None,
+            )?;
 
-    let config = device
-        .default_input_config()
-        .expect("Failed to get default input config");
+            stream.play()?;
 
-    let recording_buffer_handle: Arc<Mutex<VecDeque<f32>>> = Arc::new(Mutex::new(VecDeque::new()));
+        //Wait for interrupt
+        while !interrupt.is_cancelled() {}
 
-    let wav_buffer_clone = recording_buffer_handle.clone();
-
-    let err_fn = move |err| {
-        eprintln!("an error occurred on stream: {}", err);
-    };
-
-    let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| {
-                write_input_data_to_buffer_with_set_len::<f32, f32>(
-                    data,
-                    recording_buffer_handle.clone(),
-                    amplification_precentage / 100.,
-                    100,
-                )
-            },
-            err_fn,
-            None,
-        )?,
-        sample_format => {
-            return Err(anyhow::Error::msg(format!(
-                "Unsupported sample format '{sample_format}'"
-            )))
-        }
-    };
-
-    stream.play()?;
-
-    //Wait for interrupt
-    interrupt.recv()?;
+        //End thread
+        Ok(())
+    });
 
     return Ok(wav_buffer_clone);
 }
 
-fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
+/// This function fetches the audio recording device, returning a result of the Device and Config handle
+fn get_recording_device() -> Result<(Device, SupportedStreamConfig), Error> {
     let opt = Opt::default();
-
     let host = cpal::default_host();
-
-    // Set up the input device and stream with the default input config.
     let device = if opt.device == "default" {
         host.default_input_device()
     } else {
@@ -173,12 +157,10 @@ fn get_config_and_device() -> anyhow::Result<(SupportedStreamConfig, Device)> {
             .find(|x| x.name().map(|y| y == opt.device).unwrap_or(false))
     }
     .expect("failed to find input device");
-
     let config = device
         .default_input_config()
         .expect("Failed to get default input config");
-
-    Ok((config, device))
+    Ok((device, config))
 }
 
 /// This function records audio on a different thread, until the reciver recives something, then the recorded buffer is returned
@@ -187,7 +169,7 @@ pub fn audio_recording_with_recv(
     receiver: mpsc::Receiver<bool>,
     amplification_precentage: f32,
 ) -> anyhow::Result<Vec<f32>> {
-    let (config, device) = get_config_and_device()?;
+    let (device, config) = get_recording_device()?;
 
     let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -252,7 +234,7 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
 pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8> {
     let writer = Arc::new(Mutex::new(Vec::new()));
 
-    let (config, _) = get_config_and_device().unwrap();
+    let (_, config) = get_recording_device().unwrap();
 
     let spec = wav_spec_from_config(&config);
 
@@ -306,9 +288,13 @@ where
     writer.lock().unwrap().append(&mut inp_vec);
 }
 
-/// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the lenght of ```len``` 
-fn write_input_data_to_buffer_with_set_len<T, U>(input: &[T], buffer_handle: Arc<Mutex<VecDeque<f32>>>, amplification_multiplier: f32, len: usize)
-where
+/// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the lenght of ```len```
+/// It will notify the Condvar if the buffer_handle's len reaches ```len```
+fn write_input_data_to_buffer_with_set_len<T, U>(
+    input: &[T],
+    buffer_handle: Arc<Mutex<VecDeque<f32>>>,
+    amplification_multiplier: f32,
+) where
     T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
 {
     let mut buffer_handle = buffer_handle.lock().unwrap();
@@ -317,10 +303,5 @@ where
         let sample_as_f32 = sample.to_f32().unwrap() * amplification_multiplier;
 
         buffer_handle.push_back(sample_as_f32);
-        
-        //Help me figure out the lenght
-        if buffer_handle.len() > len {
-            buffer_handle.pop_front();
-        }
     }
 }

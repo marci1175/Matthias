@@ -14,7 +14,8 @@ use windows_sys::{
 };
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
-    env_logger::init();
+    // env_logger::init();
+    console_subscriber::init();
 
     //set custom panic hook
     #[cfg(not(debug_assertions))]

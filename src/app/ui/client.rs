@@ -1,15 +1,15 @@
-pub const VOIP_PACKET_BUFFER_LENGHT_MS: u64 = 40;
+pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
-use anyhow::Error;
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
     RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use tokio::select;
 
@@ -22,7 +22,7 @@ use crate::app::backend::{
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_wav_file, record_audio_for_set_duration,
+    create_wav_file, record_audio_for_set_duration, record_audio_with_interrupt,
 };
 
 impl Application {
@@ -987,30 +987,39 @@ impl Application {
 
                 //Sender thread
                 tokio::spawn(async move {
+                    //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
+                    let voip_audio_buffer = Arc::new(Mutex::new(VecDeque::new()));
+
                     //Conect socket to destination
                     voip.socket.connect(destination).await.unwrap();
 
-                    //Record 35ms of audio, send it to the server
+                    //Start audio recorder
+                    let recording_handle = record_audio_with_interrupt(cancel_token.clone(), *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
+                    
                     //We can just send it becasue we have already set the default destination address
                     loop {
-                        let playbackable_audio = create_wav_file(record_audio_for_set_duration(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS), *microphone_precentage.lock().unwrap()).unwrap_or_else(|err| {
-                            dbg!("Failed to record audio", err);
-
-                            //Return empty vector
-                            vec![]
-                        }));
                         select! {
-                            function_return = voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key)
-                            => {
-                                match function_return {
-                                    //This function doesnt return anything wrapped
-                                    Ok(_) => (),
-                                    Err(err) => {
-                                        dbg!(err);
+                            //Wait until we should send the buffer
+                            //Record 35ms of audio, send it to the server
+                            _ = tokio::time::sleep(Duration::from_millis(35)) => {
+                                //We create this scope to tell the compiler the recording handle wont be sent across any awaits
+                                let playbackable_audio: Vec<u8> = {
+                                    //Lock handle
+                                    let mut recording_handle = recording_handle.lock().unwrap();
 
-                                        //Handle error
-                                    },
-                                }
+                                    //Create wav bytes
+                                    let playbackable_audio: Vec<u8> = create_wav_file(
+                                        recording_handle.clone().into()
+                                    );
+
+                                    //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
+                                    recording_handle.clear();
+
+                                    //Return wav bytes
+                                    playbackable_audio
+                                };
+
+                                voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await.unwrap();
                             },
 
                             _ = cancel_token.cancelled() => {

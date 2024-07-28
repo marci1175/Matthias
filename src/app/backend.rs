@@ -1911,13 +1911,22 @@ impl Voip {
     }
 
     /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
-    /// The first 10800 bytes of this packet (sent by this function) is the audio itself, the rest is the uuid who has sent this message
+    /// Any lenght of audio can be sent because the header is included with the packet
     pub async fn send_audio(
         &self,
         uuid: String,
         mut bytes: Vec<u8>,
         encryption_key: &[u8],
     ) -> anyhow::Result<()> {
+        let bytes_lenght = bytes.len();
+
+        //Check for packet lenght overflow
+        if bytes_lenght > 65531 {
+            bail!(format!(
+                "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+            ))
+        }
+
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
