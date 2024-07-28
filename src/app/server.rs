@@ -613,7 +613,7 @@ impl MessageService {
         {
             match &req.message_type {
                 VoipConnection(request) => {
-                    match request {
+                    match dbg!(request) {
                         super::backend::ClientVoipRequest::Connect(port) => {
                             let socket_addr = SocketAddr::new(socket_addr.ip(), *port);
 
@@ -756,43 +756,6 @@ impl MessageService {
                         }
                         super::backend::ClientVoipRequest::Disconnect => {
                             if let Some(ongoing_voip) = self.voip.clone() {
-                                if ongoing_voip.connected_clients.is_empty() {
-                                    //If the voip has no connected clients we can shut down the whole service
-                                    ongoing_voip.thread_cancellation_token.cancel();
-
-                                    //Reset voip's state
-                                    self.voip = None;
-
-                                    sync_message_with_clients(
-                                        self.connected_clients.clone(),
-                                        self.clients_last_seen_index.clone(),
-                                        ServerOutput {
-                                            replying_to: None,
-                                            message_type: ServerMessageType::VoipState(
-                                                ServerVoipState {
-                                                    connected_clients: {
-                                                        //Match server Voip state
-                                                        self.voip.as_ref().map(|server_voip| server_voip
-                                                                    .connected_clients
-                                                                    .iter()
-                                                                    .map(|entry| {
-                                                                        entry.key().clone()
-                                                                    })
-                                                                    .collect())
-                                                    },
-                                                },
-                                            ),
-                                            message_date: {
-                                                Utc::now().format("%Y.%m.%d. %H:%M").to_string()
-                                            },
-                                            uuid: req.uuid.clone(),
-                                            author: String::new(),
-                                        },
-                                        self.decryption_key,
-                                    )
-                                    .await?;
-                                }
-
                                 //Get who disconnected
                                 let connected_client = ongoing_voip
                                     .connected_clients
@@ -807,14 +770,56 @@ impl MessageService {
 
                                 //Cancel client manager thread
                                 client_manager_thread.1.cancel();
+                                
+                                //Make sure to drop the reference so we will not deadlock upon calling ```voip.disconnect```
+                                drop(connected_client);
 
+                                //Blocks here
                                 ongoing_voip.disconnect(req.uuid.clone())?;
+
+                                if ongoing_voip.connected_clients.is_empty() {
+                                    //If the voip has no connected clients we can shut down the whole service
+                                    ongoing_voip.thread_cancellation_token.cancel();
+
+                                    //Reset voip's state
+                                    self.voip = None;
+                                }
+
+                                sync_message_with_clients(
+                                    self.connected_clients.clone(),
+                                    self.clients_last_seen_index.clone(),
+                                    ServerOutput {
+                                        replying_to: None,
+                                        message_type: ServerMessageType::VoipState(
+                                            ServerVoipState {
+                                                connected_clients: {
+                                                    //Match server Voip state
+                                                    self.voip.as_ref().map(|server_voip| server_voip
+                                                                .connected_clients
+                                                                .iter()
+                                                                .map(|entry| {
+                                                                    entry.key().clone()
+                                                                })
+                                                                .collect())
+                                                },
+                                            },
+                                        ),
+                                        message_date: {
+                                            Utc::now().format("%Y.%m.%d. %H:%M").to_string()
+                                        },
+                                        uuid: req.uuid.clone(),
+                                        author: String::new(),
+                                    },
+                                    self.decryption_key,
+                                )
+                                .await?;
                             } else {
                                 println!("Voip disconnected from an offline server")
                             }
                         }
                     }
                 }
+                
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
                 SyncMessage(_msg) => {
@@ -880,7 +885,7 @@ impl MessageService {
                 self.connected_clients.clone(),
                 self.clients_last_seen_index.clone(),
                 ServerOutput::convert_clientmsg_to_servermsg(
-                    req.clone(),
+                    dbg!(req.clone()),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
                         VoipConnection(_) => String::new(),
