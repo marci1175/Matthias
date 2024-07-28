@@ -1,6 +1,6 @@
 use crate::app::{
     backend::{
-        decrypt_aes256, Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
+        Application, AudioSettings, ClientMessage, MessagingMode, ScrollToMessage,
         ServerMessageType,
     },
     server::SERVER_UUID,
@@ -223,7 +223,7 @@ impl Application {
 
                                             ui.separator();
 
-                                            ui.label(format!("Uuid: {}", decrypt_aes256(&item.uuid, &[42; 32]).unwrap()));
+                                            ui.label(format!("Uuid: {}", item.uuid));
 
                                             if !user_profile.full_name.is_empty() {
                                                 ui.separator();

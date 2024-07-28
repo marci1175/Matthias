@@ -7,19 +7,20 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SupportedStreamConfig};
 use hound::WavWriter;
 use opus::Encoder;
-use std::thread::JoinHandle;
 use std::collections::VecDeque;
 use std::f32;
 use std::io::{BufWriter, Cursor};
-use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::mpsc::{self};
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
 
 pub const SAMPLE_RATE: usize = 48000;
-pub const STEREO_PACKET_BUFFER_LENGHT: usize = SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
+pub const STEREO_PACKET_BUFFER_LENGHT: usize =
+    SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
 
 struct Opt {
     /// The audio device to use
@@ -75,25 +76,18 @@ pub fn record_audio_for_set_duration(
         eprintln!("an error occurred on stream: {}", err);
     };
 
-    let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| {
-                write_input_data::<f32, f32>(
-                    data,
-                    wav_buffer.clone(),
-                    amplification_precentage / 100.,
-                )
-            },
-            err_fn,
-            None,
-        )?,
-        sample_format => {
-            return Err(anyhow::Error::msg(format!(
-                "Unsupported sample format '{sample_format}'"
-            )))
-        }
-    };
+    let stream = device.build_input_stream(
+        &config.into(),
+        move |data, _: &_| {
+            write_input_data::<f32>(
+                data,
+                wav_buffer.clone(),
+                amplification_precentage / 100.,
+            )
+        },
+        err_fn,
+        None,
+    )?;
 
     stream.play()?;
 
@@ -101,7 +95,7 @@ pub fn record_audio_for_set_duration(
 
     let recording = wav_buffer_clone.lock().unwrap().clone();
 
-    return Ok(recording);
+    Ok(recording)
 }
 
 /// This function returns a handle to a `queue` of bytes (```Arc<Mutex<VecDeque<u8>>>```), while spawning a thread which constantly writes the incoming audio into the buffer
@@ -115,26 +109,26 @@ pub fn record_audio_with_interrupt(
 
     let _: JoinHandle<anyhow::Result<()>> = std::thread::spawn(move || {
         //Create scope, so it will show the compiler that the ```stream``` will NOT be used after the await
-            let (device, config) = get_recording_device()?;
+        let (device, config) = get_recording_device()?;
 
-            let err_fn = move |err| {
-                eprintln!("An error occurred on stream: {}", err);
-            };
-            
-            let stream = device.build_input_stream(
-                &config.into(),
-                move |data, _: &_| {
-                    write_input_data_to_buffer_with_set_len::<f32, f32>(
-                        data,
-                        buffer_handle.clone(),
-                        amplification_precentage / 100.,
-                    )
-                },
-                err_fn,
-                None,
-            )?;
+        let err_fn = move |err| {
+            eprintln!("An error occurred on stream: {}", err);
+        };
 
-            stream.play()?;
+        let stream = device.build_input_stream(
+            &config.into(),
+            move |data, _: &_| {
+                write_input_data_to_buffer_with_set_len::<f32>(
+                    data,
+                    buffer_handle.clone(),
+                    amplification_precentage / 100.,
+                )
+            },
+            err_fn,
+            None,
+        )?;
+
+        stream.play()?;
 
         //Wait for interrupt
         while !interrupt.is_cancelled() {}
@@ -143,7 +137,7 @@ pub fn record_audio_with_interrupt(
         Ok(())
     });
 
-    return Ok(wav_buffer_clone);
+    Ok(wav_buffer_clone)
 }
 
 /// This function fetches the audio recording device, returning a result of the Device and Config handle
@@ -179,25 +173,18 @@ pub fn audio_recording_with_recv(
         eprintln!("an error occurred on stream: {}", err);
     };
 
-    let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => device.build_input_stream(
-            &config.into(),
-            move |data, _: &_| {
-                write_input_data::<f32, f32>(
-                    data,
-                    wav_buffer.clone(),
-                    amplification_precentage / 100.,
-                )
-            },
-            err_fn,
-            None,
-        )?,
-        sample_format => {
-            return Err(anyhow::Error::msg(format!(
-                "Unsupported sample format '{sample_format}'"
-            )))
-        }
-    };
+    let stream = device.build_input_stream(
+        &config.into(),
+        move |data, _: &_| {
+            write_input_data::<f32>(
+                data,
+                wav_buffer.clone(),
+                amplification_precentage / 100.,
+            )
+        },
+        err_fn,
+        None,
+    )?;
 
     stream.play()?;
 
@@ -263,20 +250,20 @@ pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8> {
     )
     .unwrap();
 
-    samples.resize(STEREO_PACKET_BUFFER_LENGHT as usize, 0.);
+    samples.resize(STEREO_PACKET_BUFFER_LENGHT, 0.);
 
-    let output = opus_encoder
+    
+
+    opus_encoder
         .encode_vec_float(&samples, 512)
         .inspect_err(|err| {
             dbg!(err.description());
         })
-        .unwrap();
-
-    output
+        .unwrap()
 }
 
 /// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```writer```
-fn write_input_data<T, U>(input: &[T], writer: Arc<Mutex<Vec<f32>>>, amplification_multiplier: f32)
+fn write_input_data<T>(input: &[T], writer: Arc<Mutex<Vec<f32>>>, amplification_multiplier: f32)
 where
     T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
 {
@@ -290,7 +277,7 @@ where
 
 /// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the lenght of ```len```
 /// It will notify the Condvar if the buffer_handle's len reaches ```len```
-fn write_input_data_to_buffer_with_set_len<T, U>(
+fn write_input_data_to_buffer_with_set_len<T>(
     input: &[T],
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
     amplification_multiplier: f32,

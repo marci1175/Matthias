@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Error, Result};
+use anyhow::{Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
@@ -479,6 +479,8 @@ impl MessageService {
                                 return Err(Error::msg("Client has been banned!"));
                             } else {
                                 let mut clients = self.connected_clients.lock().await;
+
+                                //Check if the client has already been connected once
                                 for client in clients.iter() {
                                     //If found, then the client is already connected
                                     if client.uuid == req.uuid {
@@ -708,11 +710,11 @@ impl MessageService {
                                         client_manager_cancellation_token.clone(),
                                         self.decryption_key,
                                         reciver,
-                                        socket_addr.clone(),
+                                        socket_addr,
                                     );
 
                                     voip.connected_client_thread_channels.insert(
-                                        socket_addr.clone(),
+                                        socket_addr,
                                         (Arc::new(sender), client_manager_cancellation_token),
                                     );
                                 }
@@ -754,11 +756,8 @@ impl MessageService {
                         }
                         super::backend::ClientVoipRequest::Disconnect => {
                             if let Some(ongoing_voip) = self.voip.clone() {
-                                ongoing_voip.disconnect(req.uuid.clone())?;
-
                                 if ongoing_voip.connected_clients.is_empty() {
                                     //If the voip has no connected clients we can shut down the whole service
-
                                     ongoing_voip.thread_cancellation_token.cancel();
 
                                     //Reset voip's state
@@ -773,20 +772,13 @@ impl MessageService {
                                                 ServerVoipState {
                                                     connected_clients: {
                                                         //Match server Voip state
-                                                        match &self.voip {
-                                                            //If its still still Some that means there are still users connected to the Service
-                                                            Some(server_voip) => Some(
-                                                                server_voip
+                                                        self.voip.as_ref().map(|server_voip| server_voip
                                                                     .connected_clients
                                                                     .iter()
                                                                     .map(|entry| {
                                                                         entry.key().clone()
                                                                     })
-                                                                    .collect(),
-                                                            ),
-                                                            //If its None that means the Service has closed, thus having no clients connected to it
-                                                            None => None,
-                                                        }
+                                                                    .collect())
                                                     },
                                                 },
                                             ),
@@ -802,10 +794,12 @@ impl MessageService {
                                 }
 
                                 //Get who disconnected
-                                let connected_client =
-                                    ongoing_voip.connected_clients.get(&req.uuid).ok_or_else(
-                                        || Error::msg("Connected client not found pased on UUID"),
-                                    )?;
+                                let connected_client = ongoing_voip
+                                    .connected_clients
+                                    .get(&req.uuid)
+                                    .ok_or_else(|| {
+                                        Error::msg("Connected client not found based on UUID")
+                                    })?;
 
                                 let (socket_addr, _) = connected_client.value();
 
@@ -813,6 +807,8 @@ impl MessageService {
 
                                 //Cancel client manager thread
                                 client_manager_thread.1.cancel();
+
+                                ongoing_voip.disconnect(req.uuid.clone())?;
                             } else {
                                 println!("Voip disconnected from an offline server")
                             }

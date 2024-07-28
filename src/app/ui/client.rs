@@ -5,11 +5,12 @@ use egui::{
     RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
+use uuid::Uuid;
 use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
 
@@ -22,139 +23,135 @@ use crate::app::backend::{
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 use crate::app::client::ServerReply;
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_wav_file, record_audio_for_set_duration, record_audio_with_interrupt,
+    create_wav_file, record_audio_with_interrupt,
 };
 
 impl Application {
     pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
-        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "settings_area").show(
-            ctx,
-            |ui| {
-                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                    ui.allocate_ui(vec2(300., 40.), |ui| {
-                        if ui
-                            .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../../../icons/logout.png"
-                            )))
-                            .clicked()
-                        {
-                            self.main.client_mode = false;
+        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "menu_area").show(ctx, |ui| {
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                ui.allocate_ui(vec2(300., 40.), |ui| {
+                    if ui
+                        .add(egui::widgets::ImageButton::new(egui::include_image!(
+                            "../../../icons/logout.png"
+                        )))
+                        .clicked()
+                    {
+                        self.main.client_mode = false;
 
-                            if self.server_has_started {
-                                display_error_message("Can not log out while server is running.");
-                                return;
-                            }
-
-                            self.autosync_shutdown_token.cancel();
-                            self.server_sender_thread = None;
-
-                            self.main.client_mode = false;
-                        };
-                    })
-                    .response
-                    .on_hover_text("Logout");
-
-                    ui.allocate_ui(vec2(300., 40.), |ui| {
-                        if ui
-                            .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../../../icons/settings.png"
-                            )))
-                            .clicked()
-                        {
-                            self.settings_window = !self.settings_window;
-                        };
-                    });
-                    ui.allocate_ui(vec2(300., 40.), |ui| {
-                        if ui
-                            .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../../../icons/search.png"
-                            )))
-                            .clicked()
-                        {
-                            self.client_ui.search_mode = !self.client_ui.search_mode;
-                        };
-                    });
-                    ui.allocate_ui(vec2(300., 50.), |ui| {
-                        ui.label(RichText::from("Welcome,").weak().size(20.));
-                        ui.label(
-                            RichText::from(self.opened_user_information.username.to_string())
-                                .strong()
-                                .size(20.),
-                        );
-                    });
-
-                    ui.allocate_ui(vec2(10., 40.), |ui| {
-                        ui.separator();
-                    });
-
-                    if matches!(self.client_connection.state, ConnectionState::Connected(_)) {
-                        let port = self
-                            .client_ui
-                            .send_on_ip
-                            .split(":")
-                            .last()
-                            .unwrap_or_default()
-                            .to_string();
-
-                        //Check for invalid port
-                        if port.is_empty() {
-                            display_error_message("Invalid address to send the message on.");
-
+                        if self.server_has_started {
+                            display_error_message("Can not log out while server is running.");
                             return;
                         }
 
-                        ui.allocate_ui(vec2(40., 40.), |ui| {
-                            if let Some(_) = self.client_ui.voip.as_mut() {
-                                let disconnect_button = ui.add(ImageButton::new(Image::new(
-                                    egui::include_image!("..\\..\\..\\icons\\call_red.png"),
-                                )));
+                        self.autosync_shutdown_token.cancel();
+                        self.server_sender_thread = None;
 
-                                if disconnect_button.clicked() {
-                                    //Shut down listener server, and disconnect from server
+                        self.main.client_mode = false;
+                    };
+                })
+                .response
+                .on_hover_text("Logout");
 
-                                    self.send_msg(ClientMessage::construct_voip_disconnect(
-                                        &self.opened_user_information.uuid,
-                                    ));
-
-                                    //Reset state
-                                    self.client_ui.voip = None;
-                                    self.voip_thread = None;
-
-                                    //Shutdown listener and recorder thread
-                                    self.voip_shutdown_token.cancel();
-                                }
-                            } else {
-                                let call_button = ui.add(ImageButton::new(Image::new(
-                                    egui::include_image!("..\\..\\..\\icons\\call.png"),
-                                )));
-
-                                if call_button.clicked() {
-                                    //Move sender into thread
-                                    let sender = self.voip_connection_sender.clone();
-
-                                    //Spawn thread which will create the ```Voip``` instance
-                                    tokio::spawn(async move {
-                                        match Voip::new().await {
-                                            Ok(voip) => {
-                                                // It is okay to unwrap since it doesnt matter if we panic
-                                                sender.send(voip).unwrap();
-                                            }
-                                            Err(err) => {
-                                                display_error_message(err);
-                                            }
-                                        }
-                                    });
-                                }
-
-                                call_button.on_hover_text("Start a group call");
-                            }
-                        });
-                    }
+                ui.allocate_ui(vec2(300., 40.), |ui| {
+                    if ui
+                        .add(egui::widgets::ImageButton::new(egui::include_image!(
+                            "../../../icons/settings.png"
+                        )))
+                        .clicked()
+                    {
+                        self.settings_window = !self.settings_window;
+                    };
+                });
+                ui.allocate_ui(vec2(300., 40.), |ui| {
+                    if ui
+                        .add(egui::widgets::ImageButton::new(egui::include_image!(
+                            "../../../icons/search.png"
+                        )))
+                        .clicked()
+                    {
+                        self.client_ui.search_mode = !self.client_ui.search_mode;
+                    };
+                });
+                ui.allocate_ui(vec2(300., 50.), |ui| {
+                    ui.label(RichText::from("Welcome,").weak().size(20.));
+                    ui.label(
+                        RichText::from(self.opened_user_information.username.to_string())
+                            .strong()
+                            .size(20.),
+                    );
                 });
 
-                ui.allocate_space(vec2(ui.available_width(), 5.));
-            },
-        );
+                ui.allocate_ui(vec2(10., 40.), |ui| {
+                    ui.separator();
+                });
+
+                if matches!(self.client_connection.state, ConnectionState::Connected(_)) {
+                    let port = self
+                        .client_ui
+                        .send_on_ip
+                        .split(":")
+                        .last()
+                        .unwrap_or_default()
+                        .to_string();
+
+                    //Check for invalid port
+                    if port.is_empty() {
+                        display_error_message("Invalid address to send the message on.");
+
+                        return;
+                    }
+
+                    ui.allocate_ui(vec2(40., 40.), |ui| {
+                        if self.client_ui.voip.as_mut().is_some() {
+                            let disconnect_button = ui.add(ImageButton::new(Image::new(
+                                egui::include_image!("..\\..\\..\\icons\\call_red.png"),
+                            )));
+
+                            if disconnect_button.clicked() {
+                                //Shut down listener server, and disconnect from server
+                                self.send_msg(ClientMessage::construct_voip_disconnect(
+                                    &self.opened_user_information.uuid,
+                                ));
+
+                                //Shutdown listener and recorder thread
+                                self.voip_shutdown_token.cancel();
+
+                                //Reset state
+                                self.client_ui.voip = None;
+                                self.voip_thread = None;
+                            }
+                        } else {
+                            let call_button = ui.add(ImageButton::new(Image::new(
+                                egui::include_image!("..\\..\\..\\icons\\call.png"),
+                            )));
+
+                            if call_button.clicked() {
+                                //Move sender into thread
+                                let sender = self.voip_connection_sender.clone();
+
+                                //Spawn thread which will create the ```Voip``` instance
+                                tokio::spawn(async move {
+                                    match Voip::new().await {
+                                        Ok(voip) => {
+                                            // It is okay to unwrap since it doesnt matter if we panic
+                                            sender.send(voip).unwrap();
+                                        }
+                                        Err(err) => {
+                                            display_error_message(err);
+                                        }
+                                    }
+                                });
+                            }
+
+                            call_button.on_hover_text("Start a group call");
+                        }
+                    });
+                }
+            });
+
+            ui.allocate_space(vec2(ui.available_width(), 5.));
+        });
 
         //IF there is an existing Voice call we can assume there are people connected to it
         if let Some(connected_clients) = self
@@ -1001,7 +998,7 @@ impl Application {
                         select! {
                             //Wait until we should send the buffer
                             //Record 35ms of audio, send it to the server
-                            _ = tokio::time::sleep(Duration::from_millis(35)) => {
+                            _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS as u64)) => {
                                 //We create this scope to tell the compiler the recording handle wont be sent across any awaits
                                 let playbackable_audio: Vec<u8> = {
                                     //Lock handle
@@ -1048,7 +1045,7 @@ impl Application {
                                 match recive_server_relay(reciver_socket_part.clone(), auth_session_id.clone(), sink.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
-                                        // dbg!(err);
+                                        dbg!(err);
                                     },
                                 }
                             } => {}
@@ -1089,12 +1086,21 @@ async fn recive_server_relay(
         &hex::decode(sha256::digest(auth_session_id.clone()))?,
     )?;
 
+    //Get the byte lenght of a Uuid
+    let uuid_ddefault_byte_lenght = Uuid::max().as_bytes().len() * 2 + 4;
+
     //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio
-    //I have no idea why I have to subtract 104, please keep this in mind in future code
     let uuid = String::from_utf8(
         decrypted_bytes
-            .drain(decrypted_bytes.len() - 104..)
+            .drain(decrypted_bytes.len() - uuid_ddefault_byte_lenght..)
             .collect(),
+    )?;
+
+    //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
+    uuid::Uuid::parse_str(&uuid).map_err(|err|
+        {
+            anyhow::Error::msg(format!("Error: {}, in uuid {}", err.to_string(), uuid.to_string()))
+        }
     )?;
 
     //Play recived bytes

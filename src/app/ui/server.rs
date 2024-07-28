@@ -1,4 +1,4 @@
-use crate::app::backend::{decrypt_aes256, display_error_message, Application, ClientProfile};
+use crate::app::backend::{display_error_message, Application, ClientProfile};
 use crate::app::backend::{ipv4_get, ipv6_get};
 use crate::app::server;
 use dashmap::DashMap;
@@ -181,10 +181,7 @@ impl Application {
                                         //Uuid
                                         row.col(|ui| {
                                             ui.centered_and_justified(|ui| {
-                                                ui.label(
-                                                    decrypt_aes256(&key, &[42; 32])
-                                                        .unwrap_or_default(),
-                                                );
+                                                ui.label(key.clone());
                                             });
                                         });
                                         //Profile picture
@@ -237,9 +234,9 @@ impl Application {
 
                     let mut banned_uuids = shared_fields.banned_uuids.try_lock().unwrap();
 
-                    for (index, item) in banned_uuids.clone().iter().enumerate() {
+                    for (index, uuid) in banned_uuids.clone().iter().enumerate() {
                         ui.horizontal(|ui| {
-                            ui.label(decrypt_aes256(item, &[42; 32]).unwrap());
+                            ui.label(uuid);
                             if ui
                                 .button(RichText::from("Unban").color(Color32::RED))
                                 .clicked()

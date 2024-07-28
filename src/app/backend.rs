@@ -341,7 +341,7 @@ impl Application {
             let draw_line = data
                 .lua
                 .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                    let color = args.2.clone();
+                    let color = args.2;
 
                     //Create the hasher
                     let mut hasher = DefaultHasher::new();
@@ -379,7 +379,7 @@ impl Application {
             let draw_rect_filled = data
                 .lua
                 .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                    let color = args.2.clone();
+                    let color = args.2;
 
                     //Create the hasher
                     let mut hasher = DefaultHasher::new();
@@ -935,7 +935,7 @@ impl ClientMessage {
             message_type: ClientMessageType::FileUpload(ClientFileUpload {
                 extension: Some(file_extension),
                 name: None,
-                bytes: bytes,
+                bytes,
             }),
             uuid,
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1905,7 +1905,7 @@ impl Voip {
     /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
     pub async fn new() -> anyhow::Result<Self> {
         Ok(Self {
-            socket: Arc::new(UdpSocket::bind(format!("[::]:0")).await?),
+            socket: Arc::new(UdpSocket::bind("[::]:0".to_string()).await?),
             auth: None,
         })
     }
@@ -2117,20 +2117,13 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
 /// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-
-/*
-full_name: user_information.full_name,
-                                            gender: user_information.gender,
-                                            birth_date: user_information.birth_date,
-                                            small_profile_picture: user_information.small_profile_picture,
-                                            normal_profile_picture: user_information.normal_profile_picture, */
 pub struct UserInformation {
     pub profile: ClientProfile,
     /// the client's username
     pub username: String,
     /// IMPORTANT: PASSWORD *IS* ENCRYPTED BY FUNCTIONS IMPLEMENTED BY THIS TYPE
     pub password: String,
-    /// uuids are encrypted by the new function
+    /// The uuid isnt encrypted
     pub uuid: String,
     /// bookmarked ips are empty by default, IMPORTANT: THESE ARE *NOT* ENCRYPTED BY DEFAULT
     pub bookmarked_ips: Vec<String>,
@@ -2220,7 +2213,6 @@ impl UserInformation {
     }
 }
 
-#[inline]
 /// aes256 is decrypted by this function by a fixed key
 pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Result<String> {
     let ciphertext = hex::decode(string_to_be_decrypted)?;
@@ -2346,7 +2338,7 @@ pub fn register(register: Register) -> anyhow::Result<UserInformation> {
     let user_info = UserInformation::new(
         register.username,
         register.password,
-        encrypt_aes256(generate_uuid().to_string(), &[42; 32]).unwrap(),
+        generate_uuid().to_string(),
         register.full_name,
         register.gender,
         register.birth_date,

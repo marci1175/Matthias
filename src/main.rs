@@ -14,7 +14,10 @@ use windows_sys::{
 };
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
-    // env_logger::init();
+    #[cfg(not(debug_assertions))]
+    env_logger::init();
+
+    #[cfg(debug_assertions)]
     console_subscriber::init();
 
     //set custom panic hook
@@ -62,7 +65,7 @@ async fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
+    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA"))).await;
 
     eframe::run_native(
         "Matthias",
