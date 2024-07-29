@@ -1,7 +1,3 @@
-//! Records a WAV file (roughly 3 seconds long) using the default input device and config.
-//!
-//! The input data is recorded to "$APPDATA/szeChat/Client/(base64) - self.send_on_ip/recorded.wav".
-
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SupportedStreamConfig};
@@ -79,11 +75,7 @@ pub fn record_audio_for_set_duration(
     let stream = device.build_input_stream(
         &config.into(),
         move |data, _: &_| {
-            write_input_data::<f32>(
-                data,
-                wav_buffer.clone(),
-                amplification_precentage / 100.,
-            )
+            write_input_data::<f32>(data, wav_buffer.clone(), amplification_precentage / 100.)
         },
         err_fn,
         None,
@@ -176,11 +168,7 @@ pub fn audio_recording_with_recv(
     let stream = device.build_input_stream(
         &config.into(),
         move |data, _: &_| {
-            write_input_data::<f32>(
-                data,
-                wav_buffer.clone(),
-                amplification_precentage / 100.,
-            )
+            write_input_data::<f32>(data, wav_buffer.clone(), amplification_precentage / 100.)
         },
         err_fn,
         None,
@@ -251,8 +239,6 @@ pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8> {
     .unwrap();
 
     samples.resize(STEREO_PACKET_BUFFER_LENGHT, 0.);
-
-    
 
     opus_encoder
         .encode_vec_float(&samples, 512)

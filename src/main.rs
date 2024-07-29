@@ -19,6 +19,9 @@ async fn main() -> eframe::Result<()> {
 
     #[cfg(debug_assertions)]
     console_subscriber::init();
+    
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_BACKTRACE", "1");
 
     //set custom panic hook
     #[cfg(not(debug_assertions))]

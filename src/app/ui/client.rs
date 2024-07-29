@@ -5,7 +5,7 @@ use egui::{
     RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
-use uuid::Uuid;
+use tokio_util::sync::CancellationToken;
 use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufReader, Cursor};
@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
+use uuid::Uuid;
 
 use crate::app::backend::{
     decrypt_aes256, decrypt_aes256_bytes, display_error_message, write_audio, write_file,
@@ -129,6 +130,10 @@ impl Application {
                             if call_button.clicked() {
                                 //Move sender into thread
                                 let sender = self.voip_connection_sender.clone();
+                                
+                                //Reset shutdown token State, if we had cancelled this token we must create a new one in order to reset its state
+                                //else its going to be cancelled and new threads will shut dwon immediately
+                                self.voip_shutdown_token = CancellationToken::new();
 
                                 //Spawn thread which will create the ```Voip``` instance
                                 tokio::spawn(async move {
@@ -918,15 +923,8 @@ impl Application {
                                                 match incoming_reply {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
-                                                            ServerVoipReply::Success(voip_auth) => {
-                                                                if let Some(voip) =
-                                                                    self.client_ui.voip.as_mut()
-                                                                {
-                                                                    voip.auth = Some(voip_auth);
-                                                                } else {
-                                                                    //This shouldnt happen
-                                                                    dbg!("UpdSocket timing error");
-                                                                }
+                                                            ServerVoipReply::Success => {
+                                                                //Nothing lol, all is good
                                                             }
                                                             ServerVoipReply::Fail(err) => {
                                                                 display_error_message(err.reason);
@@ -975,9 +973,6 @@ impl Application {
                 let decryption_key = self.client_connection.client_secret.clone();
                 let cancel_token = self.voip_shutdown_token.clone();
                 let cancel_token_child = cancel_token.child_token();
-
-                //Clone session id field
-                let auth_session_id = voip.auth.clone().unwrap().session_id;
 
                 let reciver_socket_part = voip.socket.clone();
                 let microphone_precentage = self.client_ui.microphone_volume.clone();
@@ -1029,6 +1024,8 @@ impl Application {
 
                 //Create sink
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
+                
+                let decryption_key = self.client_connection.client_secret.clone();
 
                 //Reciver thread
                 tokio::spawn(async move {
@@ -1042,7 +1039,7 @@ impl Application {
 
                             //Recive bytes
                             _recived_bytes_count = async {
-                                match recive_server_relay(reciver_socket_part.clone(), auth_session_id.clone(), sink.clone()).await {
+                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         dbg!(err);
@@ -1057,9 +1054,15 @@ impl Application {
     }
 }
 
+/// Recives audio packets on the given UdpSocket, messages are decrypted with the decrpytion key
+/// Automaticly appends the decrypted audio bytes to the ```Sink```
+/// I might rework this function so that we can see whos talking based on uuid
 async fn recive_server_relay(
+    //Socket this function is Listening on
     reciver_socket_part: Arc<tokio::net::UdpSocket>,
-    auth_session_id: String,
+    //Decryption key
+    decryption_key: &[u8],
+    //The sink its appending the bytes to
     sink: Arc<Sink>,
 ) -> anyhow::Result<()> {
     //Create buffer for header, this is the size of the maximum udp packet so no error will appear
@@ -1077,19 +1080,20 @@ async fn recive_server_relay(
     //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
     let mut body_buf = vec![0; header_lenght as usize + 4];
 
+    //Recive the whole message
     reciver_socket_part.recv(&mut body_buf).await.unwrap();
 
     //Decrypt message
     let mut decrypted_bytes = decrypt_aes256_bytes(
         //Only take the bytes from the 4th byte because thats the header
         &body_buf[4..],
-        &hex::decode(sha256::digest(auth_session_id.clone()))?,
+        decryption_key,
     )?;
 
     //Get the byte lenght of a Uuid
     let uuid_ddefault_byte_lenght = Uuid::max().as_bytes().len() * 2 + 4;
 
-    //The generated uuids are always 120 bytes, so we can safely extract them, and we know that the the left over bytes are audio
+    //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
     let uuid = String::from_utf8(
         decrypted_bytes
             .drain(decrypted_bytes.len() - uuid_ddefault_byte_lenght..)
@@ -1097,11 +1101,13 @@ async fn recive_server_relay(
     )?;
 
     //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
-    uuid::Uuid::parse_str(&uuid).map_err(|err|
-        {
-            anyhow::Error::msg(format!("Error: {}, in uuid {}", err.to_string(), uuid.to_string()))
-        }
-    )?;
+    uuid::Uuid::parse_str(&uuid).map_err(|err| {
+        anyhow::Error::msg(format!(
+            "Error: {}, in uuid {}",
+            err.to_string(),
+            uuid.to_string()
+        ))
+    })?;
 
     //Play recived bytes
     sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(

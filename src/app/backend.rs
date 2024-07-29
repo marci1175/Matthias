@@ -1179,24 +1179,18 @@ impl ClientConnection {
         }
     }
 
-    /// This function
-    // pub async fn connect_to_voip(addr: String) -> anyhow::Result<UdpSocket> {
-    //     let udp_socket = UdpSocket::bind("[::1]").await?;
-
-    //     udp_socket.connect(addr).await?;
-
-    //     udp_socket.send(buf).await?;
-
-    //     Ok(udp_socket)
-    // }
-
     /// Ip arg to know where to connect, username so we can register with the sever, used to spawn a valid ClientConnection instance
     /// This function also hashes the password argument which it sends, and then if the connection was successful the returned struct's password field will contain the already hashed password
     pub async fn connect_to_server(
+        //Destination
         ip: String,
+        //Whoami
         author: String,
+        //Password for connecting if the value is Some we are still sending an argon2 hash of the pass and not the original one
         password: Option<String>,
+        //Uuid
         uuid: &str,
+        //Profile
         profile: ClientProfile,
     ) -> anyhow::Result<(Self, String)> {
         let hashed_password = encrypt(password.clone().unwrap_or(String::from("")));
@@ -1783,7 +1777,7 @@ pub struct ServerVoipStart {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum ServerVoipReply {
     /// This enum is when the connection request is successful
-    Success(ServerVoipAuthenticate),
+    Success,
     /// This enum is when the connection request is unsuccessful, it also contains the reason
     Fail(ServerVoipClose),
 }
@@ -1796,37 +1790,10 @@ pub struct ServerVoipClose {
     pub reason: String,
 }
 
-/// This struct is a result of sucessful authentication, this gets handed out once the connection is successfull
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerVoipAuthenticate {
-    /// The decryption key used to decrypt the packets sent by the server
-    /// The decryption key is derived from the session id
-    pub decryption_key: Vec<u8>,
-
-    /// The session id of the user used to identify the user
-    pub session_id: String,
-}
-
-impl ServerVoipAuthenticate {
-    /// This function creates a new instance of ```Self```, it automaticly generates a session_id
-    pub fn new() -> anyhow::Result<Self> {
-        let session_id = Uuid::new_v4().to_string();
-
-        let decryption_key = hex::decode(sha256::digest(&session_id)).map_err(|err| {
-            anyhow::Error::msg(format!("Sha256 hash could not be turned into hex: {err}"))
-        })?;
-
-        Ok(Self {
-            decryption_key,
-            session_id,
-        })
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct ServerVoip {
-    /// This field contains all the connected client's ```uuid``` with their ```SocketAddr``` and ```ServerVoipAuthenticate```
-    pub connected_clients: Arc<DashMap<String, (SocketAddr, ServerVoipAuthenticate)>>,
+    /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
+    pub connected_clients: Arc<DashMap<String, (SocketAddr)>>,
 
     /// This field contains a ```HashMap``` which pairs the SocketAddr to the client's listening thread's sender (So that the reciver thread can recive the ```Vec<u8>``` sent by the sender)
     /// The secound part of the tuple is for shutting down the client manager thread, if they disconnect
@@ -1857,10 +1824,9 @@ impl ServerVoip {
         &self,
         uuid: String,
         socket_addr: SocketAddr,
-        session_authenticator: ServerVoipAuthenticate,
     ) -> anyhow::Result<()> {
         self.connected_clients
-            .insert(uuid, (socket_addr, session_authenticator));
+            .insert(uuid, socket_addr);
 
         Ok(())
     }
@@ -1895,18 +1861,17 @@ pub enum UdpMessage {
 pub struct Voip {
     /// The clients socket, which theyre listening on
     pub socket: Arc<UdpSocket>,
-
-    /// The authentication info given by the server
-    /// If this is None but the voip instance is Some that means that the server hasnt replied with the authentication, but the socket is open
-    pub auth: Option<ServerVoipAuthenticate>,
 }
 
 impl Voip {
     /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
     pub async fn new() -> anyhow::Result<Self> {
+        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+        let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
+        socket_2.set_reuse_address(true)?;
+        let socket_handle = UdpSocket::from_std(socket_2.into())?;
         Ok(Self {
-            socket: Arc::new(UdpSocket::bind("[::]:0".to_string()).await?),
-            auth: None,
+            socket: Arc::new(socket_handle),
         })
     }
 

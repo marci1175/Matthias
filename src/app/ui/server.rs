@@ -232,19 +232,24 @@ impl Application {
 
                     let shared_fields = self.client_ui.shared_fields.lock().unwrap();
 
-                    let mut banned_uuids = shared_fields.banned_uuids.try_lock().unwrap();
-
-                    for (index, uuid) in banned_uuids.clone().iter().enumerate() {
-                        ui.horizontal(|ui| {
-                            ui.label(uuid);
-                            if ui
-                                .button(RichText::from("Unban").color(Color32::RED))
-                                .clicked()
-                            {
-                                banned_uuids.remove(index);
+                    match shared_fields.banned_uuids.try_lock(){
+                        Ok(mut banned_uuids) => {
+                            for (index, uuid) in banned_uuids.clone().iter().enumerate() {
+                                ui.horizontal(|ui| {
+                                    ui.label(uuid);
+                                    if ui
+                                        .button(RichText::from("Unban").color(Color32::RED))
+                                        .clicked()
+                                    {
+                                        banned_uuids.remove(index);
+                                    }
+                                });
                             }
-                        });
-                    }
+                        },
+                        Err(err) => {
+                            dbg!(err);
+                        },
+                    };
                 }
             });
         });

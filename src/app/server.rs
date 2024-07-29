@@ -16,6 +16,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
 use tokio_util::sync::CancellationToken;
+use uuid::serde::braced;
 
 use super::backend::{
     encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
@@ -25,7 +26,7 @@ use super::backend::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
         Upload, VoipConnection as Voip,
     },
-    ServerReplyType, ServerSync, ServerVoip, ServerVoipAuthenticate, ServerVoipReply,
+    ServerReplyType, ServerSync, ServerVoip, ServerVoipReply,
     ServerVoipState,
 };
 
@@ -258,7 +259,8 @@ fn spawn_client_reader(
             {
                 Ok(_) => {}
                 Err(err) => {
-                    println!("Error processing a message: {err}");
+                    println!("Listener on {socket_addr} shutting down, error processing a message: {err}");
+                    dbg!(err.root_cause());
                     break;
                 }
             }
@@ -353,7 +355,7 @@ where
 pub fn create_client_voip_manager(
     voip: ServerVoip,
     shutdown_token: CancellationToken,
-    decryption_key: [u8; 32],
+    key: [u8; 32],
     mut reciver: Receiver<Vec<u8>>,
     #[allow(unused_variables)] listening_to: SocketAddr,
 ) {
@@ -374,14 +376,14 @@ pub fn create_client_voip_manager(
                     let recived_bytes = recived_bytes.unwrap();
                     //Decrypt message
                         //This is what we relay to all the other clients
-                        let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &decryption_key).unwrap();
+                        let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
 
                         //Spawn relay thread
                         tokio::spawn(async move {
                         //Relay message to all of the clients
-                            for (connected_socket_addr, authentication) in voip_connected_clients.iter().filter(|entry| {
+                            for connected_socket_addr in voip_connected_clients.iter().filter(|entry| {
                                 #[allow(unused_variables)]
-                                let (socket_addr, _) = entry.value();
+                                let socket_addr = entry.value();
 
                                 //We dont send the user's voice to them in release builds
                                 #[cfg(not(debug_assertions))]
@@ -396,7 +398,7 @@ pub fn create_client_voip_manager(
                                 }
                             }).map(|entry| entry.value().clone()) {
                                 //Encrypt it with the client's session ID
-                                let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &hex::decode(sha256::digest(authentication.session_id)).unwrap()).unwrap();
+                                let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
 
                                 let mut message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
 
@@ -613,20 +615,15 @@ impl MessageService {
         {
             match &req.message_type {
                 VoipConnection(request) => {
-                    match dbg!(request) {
+                    match request {
                         super::backend::ClientVoipRequest::Connect(port) => {
                             let socket_addr = SocketAddr::new(socket_addr.ip(), *port);
-
-                            let session_authenticator = ServerVoipAuthenticate::new()?;
 
                             //Send important info to client (Session ID, etc)
                             send_message_to_client(
                                 &mut *client_handle.try_lock()?,
                                 encrypt_aes256(
-                                    serde_json::to_string(&ServerVoipReply::Success(
-                                        //Create session auth
-                                        session_authenticator.clone(),
-                                    ))?,
+                                    serde_json::to_string(&ServerVoipReply::Success)?,
                                     &self.decryption_key,
                                 )?,
                             )
@@ -636,7 +633,6 @@ impl MessageService {
                                 ongoing_call.connect(
                                     req.uuid.clone(),
                                     socket_addr,
-                                    session_authenticator,
                                 )?;
                             }
                             // If there is no ongoing call, we should create it
@@ -648,7 +644,6 @@ impl MessageService {
                                 voip_server_instance.connect(
                                     req.uuid.clone(),
                                     socket_addr,
-                                    session_authenticator,
                                 )?;
 
                                 //Set voip server
@@ -662,32 +657,44 @@ impl MessageService {
                                     //Clone so we can move it into the thread
                                     let socket = voip.socket.clone();
                                     let connected_clients = voip.connected_client_thread_channels.clone();
+                                    let cancellation_token = voip.thread_cancellation_token.clone();
+
                                     //Spawn manager thread
                                     tokio::spawn(async move {
                                         loop {
                                             //Create buffer for header, this is the size of the maximum udp packet so no error will appear
                                             let mut header_buf = vec![0; 65536];
 
-                                            //Recive header size
-                                            socket.peek_from(&mut header_buf).await.unwrap();
-                                            //Get message lenght
-                                            let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
+                                            //Wait until we get a new message or until the thread token gets cancelled
+                                            select! {
+                                                //Wait until we recive a new message
+                                                //Recive header size
+                                                _ = socket.peek_from(&mut header_buf) => {
+                                                    //Get message lenght
+                                                    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
-                                            //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
-                                            let mut body_buf = vec![0; header_lenght as usize + 4];
+                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
+                                                    let mut body_buf = vec![0; header_lenght as usize + 4];
 
-                                            let (_, socket_addr) = socket.recv_from(&mut body_buf).await.unwrap();
+                                                    let (_, socket_addr) = socket.recv_from(&mut body_buf).await.unwrap();
 
-                                            match connected_clients.get(&socket_addr) {
-                                                Some(client) => {
-                                                    //We send everythin from the 4th byte since that is the part of the header
-                                                    //We dont care about the result since it will panic when the thread is shut down
-                                                    let _ = client.0.send(body_buf[4..].to_vec()).await;
-                                                },
-                                                None => {
-                                                    println!("Client hasnt been added to the client connected list");
-                                                },
-                                            };
+                                                    match connected_clients.get(&socket_addr) {
+                                                        Some(client) => {
+                                                            //We send everythin from the 4th byte since that is the part of the header
+                                                            //We dont care about the result since it will panic when the thread is shut down
+                                                            let _ = client.0.send(body_buf[4..].to_vec()).await;
+                                                        },
+                                                        None => {
+                                                            println!("Client hasnt been added to the client connected list");
+                                                        },
+                                                    };
+                                                }
+                                                //Wait until the token gets cancelled
+                                                _ = cancellation_token.cancelled() => {
+                                                    //End loop once the token gets cancelled
+                                                    break;
+                                                }
+                                            }
                                         }
                                     });
                                 });
@@ -757,20 +764,18 @@ impl MessageService {
                         super::backend::ClientVoipRequest::Disconnect => {
                             if let Some(ongoing_voip) = self.voip.clone() {
                                 //Get who disconnected
-                                let connected_client = ongoing_voip
-                                    .connected_clients
-                                    .get(&req.uuid)
-                                    .ok_or_else(|| {
-                                        Error::msg("Connected client not found based on UUID")
-                                    })?;
+                                let connected_client =
+                                    ongoing_voip.connected_clients.get(&req.uuid).ok_or_else(
+                                        || Error::msg("Connected client not found based on UUID"),
+                                    )?;
 
-                                let (socket_addr, _) = connected_client.value();
+                                let socket_addr = connected_client.value();
 
                                 let client_manager_thread = ongoing_voip.connected_client_thread_channels.get(socket_addr).ok_or_else(|| Error::msg("Client not found in connected client list based on SocketAddr"))?;
 
                                 //Cancel client manager thread
                                 client_manager_thread.1.cancel();
-                                
+
                                 //Make sure to drop the reference so we will not deadlock upon calling ```voip.disconnect```
                                 drop(connected_client);
 
@@ -794,13 +799,13 @@ impl MessageService {
                                             ServerVoipState {
                                                 connected_clients: {
                                                     //Match server Voip state
-                                                    self.voip.as_ref().map(|server_voip| server_voip
-                                                                .connected_clients
-                                                                .iter()
-                                                                .map(|entry| {
-                                                                    entry.key().clone()
-                                                                })
-                                                                .collect())
+                                                    self.voip.as_ref().map(|server_voip| {
+                                                        server_voip
+                                                            .connected_clients
+                                                            .iter()
+                                                            .map(|entry| entry.key().clone())
+                                                            .collect()
+                                                    })
                                                 },
                                             },
                                         ),
@@ -819,7 +824,7 @@ impl MessageService {
                         }
                     }
                 }
-                
+
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
                 SyncMessage(_msg) => {
@@ -881,11 +886,12 @@ impl MessageService {
 
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
             //Please rework this, we should always be sending the latest message to all the clients so we are kept in sync, we only send all of them when we are connecting
+            //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             sync_message_with_clients(
                 self.connected_clients.clone(),
                 self.clients_last_seen_index.clone(),
                 ServerOutput::convert_clientmsg_to_servermsg(
-                    dbg!(req.clone()),
+                    req.clone(),
                     //Server file indexing, this is used as a handle for the client to ask files from the server
                     match &req.message_type {
                         VoipConnection(_) => String::new(),
@@ -938,7 +944,6 @@ impl MessageService {
             .await
             .expect("Syncing failed");
 
-            //We should send the incoming message to all of the clients, we are already storing the messages in self.messages
             Ok(())
         } else {
             send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
