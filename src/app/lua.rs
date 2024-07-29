@@ -14,20 +14,27 @@ pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// This struct holds all the information of an extension
 #[derive(Clone, Default, Debug, serde::Deserialize, serde::Serialize)]
 pub struct ExtensionProperties {
+    /// The contents of said extension (This is plain text as its a .lua script)
     pub contents: String,
 
+    /// The name of the extension
     pub name: String,
 
+    /// If the extension is running
     pub is_running: bool,
 
+    /// The path to this extension
     pub path_to_extension: PathBuf,
 
+    /// The buffer of the texteditor to this extension
     pub text_edit_buffer: String,
 }
 
 impl ExtensionProperties {
+    /// Create a new instance of an extension
     pub fn new(contents: String, path: PathBuf, name: String) -> Self {
         Self {
             text_edit_buffer: contents.clone(),
@@ -38,6 +45,8 @@ impl ExtensionProperties {
         }
     }
 
+    /// Write changes to the file
+    /// This writes the ```self.text_edit_buffer``` to the file itself
     pub fn write_change_to_file(&mut self) -> anyhow::Result<()> {
         fs::write(
             self.path_to_extension.clone(),
@@ -50,6 +59,7 @@ impl ExtensionProperties {
     }
 }
 
+/// This enum contains all the types of lua outputs
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum LuaOutput {
     /// This enum type is used to report code panics (In the lua runtime)
