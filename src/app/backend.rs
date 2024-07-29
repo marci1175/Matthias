@@ -144,6 +144,7 @@ pub struct Application {
     #[table(skip)]
     pub client_ui: Client,
 
+    #[table(save)]
     #[serde(skip)]
     pub client_connection: ClientConnection,
 
@@ -297,6 +298,8 @@ impl Application {
     pub fn set_global_lua_table(&self) {
         self.client_ui.clone().set_lua_table_function(&self.lua);
         self.clone().set_lua_table_function(&self.lua);
+        self.client_connection.clone().set_lua_table_function(&self.lua);
+        self.opened_user_information.clone().set_lua_table_function(&self.lua);
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -664,7 +667,7 @@ impl Default for Client {
 }
 
 ///Main, Global stuff for the Ui
-#[derive(serde::Deserialize, serde::Serialize, Default, ToTable, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone)]
 pub struct Main {
     ///Checks if the emoji tray is on
     #[serde(skip)]
@@ -1152,15 +1155,18 @@ impl ClientMessage {
 }
 
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
 pub struct ClientConnection {
+    #[table(save)]
     #[serde(skip)]
     pub client_secret: Vec<u8>,
 
+    #[table(save)]
     #[serde(skip)]
     ///This enum wraps the server handle ```Connected(_)```, it also functions as a Sort of Option wrapper
     pub state: ConnectionState,
 
+    #[table(save)]
     #[serde(skip)]
     //Password which was used to connect (and could connect with, it has been password matched with the server)
     pub password: String,
@@ -2081,7 +2087,7 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
 /// Account management
 /// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
 pub struct UserInformation {
     pub profile: ClientProfile,
     /// the client's username

@@ -74,15 +74,10 @@ impl eframe::App for backend::Application {
 
             TODO: Api docs
             TODO: Implement callbacks
+        */
 
-            */
-
-        //Set global lua table before everything
-        //Slows down app
-        //Only allow it if its release build
-        {
-            self.set_global_lua_table();
-        }
+        //Set global lua getter functions before everything
+        self.set_global_lua_table();
 
         //Run lua scripts when rendering a frame (I should impl callbacks)
         for extension in self.client_ui.extension.extension_list.iter_mut() {
@@ -99,7 +94,7 @@ impl eframe::App for backend::Application {
                             Ok(mut output) => {
                                 output.push(crate::app::lua::LuaOutput::Error(err.to_string()));
 
-                                //Stop the exectuion of this script
+                                //Stop the execution of this script
                                 extension.is_running = false;
 
                                 output
