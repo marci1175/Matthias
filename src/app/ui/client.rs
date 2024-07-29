@@ -123,33 +123,35 @@ impl Application {
                                 self.voip_thread = None;
                             }
                         } else {
-                            let call_button = ui.add(ImageButton::new(Image::new(
-                                egui::include_image!("..\\..\\..\\icons\\call.png"),
-                            )));
-
-                            if call_button.clicked() {
-                                //Move sender into thread
-                                let sender = self.voip_connection_sender.clone();
-                                
-                                //Reset shutdown token State, if we had cancelled this token we must create a new one in order to reset its state
-                                //else its going to be cancelled and new threads will shut dwon immediately
-                                self.voip_shutdown_token = CancellationToken::new();
-
-                                //Spawn thread which will create the ```Voip``` instance
-                                tokio::spawn(async move {
-                                    match Voip::new().await {
-                                        Ok(voip) => {
-                                            // It is okay to unwrap since it doesnt matter if we panic
-                                            sender.send(voip).unwrap();
+                            ui.add_enabled_ui(self.atx.is_none(), |ui| {
+                                let call_button = ui.add(ImageButton::new(Image::new(
+                                    egui::include_image!("..\\..\\..\\icons\\call.png"),
+                                )));
+    
+                                if call_button.clicked() {
+                                    //Move sender into thread
+                                    let sender = self.voip_connection_sender.clone();
+                                    
+                                    //Reset shutdown token State, if we had cancelled this token we must create a new one in order to reset its state
+                                    //else its going to be cancelled and new threads will shut dwon immediately
+                                    self.voip_shutdown_token = CancellationToken::new();
+    
+                                    //Spawn thread which will create the ```Voip``` instance
+                                    tokio::spawn(async move {
+                                        match Voip::new().await {
+                                            Ok(voip) => {
+                                                // It is okay to unwrap since it doesnt matter if we panic
+                                                sender.send(voip).unwrap();
+                                            }
+                                            Err(err) => {
+                                                display_error_message(err);
+                                            }
                                         }
-                                        Err(err) => {
-                                            display_error_message(err);
-                                        }
-                                    }
-                                });
-                            }
-
-                            call_button.on_hover_text("Start a group call");
+                                    });
+                                }
+    
+                                call_button.on_hover_text("Start a group call");
+                            });
                         }
                     });
                 }

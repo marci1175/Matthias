@@ -438,34 +438,38 @@ impl Application {
                             );
                             ctx.request_repaint();
                         });
-                    } else if ui
-                        .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../../../../icons/record.png"
-                        )))
-                        .clicked()
-                    {
-                        let (tx, rx) = mpsc::channel::<bool>();
+                    } else {
+                        ui.add_enabled_ui(self.client_ui.voip.is_none(), |ui| {
+                            if ui
+                                .add(egui::ImageButton::new(egui::include_image!(
+                                    "../../../../../../icons/record.png"
+                                )))
+                                .clicked()
+                            {
+                                let (tx, rx) = mpsc::channel::<bool>();
 
-                        self.atx = Some(tx);
+                                self.atx = Some(tx);
 
-                        //Set audio recording start
-                        self.client_ui.voice_recording_start = Some(Utc::now());
+                                //Set audio recording start
+                                self.client_ui.voice_recording_start = Some(Utc::now());
 
-                        //Move into thread
-                        let audio_bytes_sender = self.audio_bytes_tx.clone();
-                        let microphone_precentage = self.client_ui.microphone_volume.clone();
+                                //Move into thread
+                                let audio_bytes_sender = self.audio_bytes_tx.clone();
+                                let microphone_precentage = self.client_ui.microphone_volume.clone();
 
-                        tokio::spawn(async move {
-                            let bytes = audio_recording_with_recv(
-                                rx,
-                                *microphone_precentage.lock().unwrap(),
-                            )
-                            .unwrap();
+                                tokio::spawn(async move {
+                                    let bytes = audio_recording_with_recv(
+                                        rx,
+                                        *microphone_precentage.lock().unwrap(),
+                                    )
+                                    .unwrap();
 
-                            //These bytes can be played back with rodio (Wav format)
-                            let playback_bytes = create_wav_file(bytes);
+                                    //These bytes can be played back with rodio (Wav format)
+                                    let playback_bytes = create_wav_file(bytes);
 
-                            audio_bytes_sender.send(playback_bytes).unwrap();
+                                    audio_bytes_sender.send(playback_bytes).unwrap();
+                                });
+                            }
                         });
                     }
                 });
