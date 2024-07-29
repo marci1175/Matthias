@@ -56,6 +56,9 @@ impl eframe::App for backend::Application {
                 if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
                     println!("{err}");
                 };
+                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
+                    println!("{err}");
+                };
             }
             Err(err) => println!("{err}"),
         }
