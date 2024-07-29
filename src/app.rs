@@ -72,8 +72,10 @@ impl eframe::App for backend::Application {
             TODO: add egui notfications
             TODO: Restructure files
 
-            TODO: Api docs
             TODO: Implement callbacks
+
+            TODO: Make api able to draw Images and text
+            TODO: Finish Api docs
         */
 
         //Set global lua getter functions before everything
