@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use egui::Rect;
+use egui::{Rect, Vec2};
 use mlua::Lua;
 
 pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
@@ -82,6 +82,8 @@ pub struct Extension {
     pub output: Arc<Mutex<Vec<LuaOutput>>>,
 
     pub output_rect: Rect,
+
+    pub extension_table_size: Vec2,
 }
 
 /// These are the events which trigger a function call in the extensions
@@ -128,6 +130,7 @@ impl Default for Extension {
             extension_list: Vec::new(),
             output: Arc::new(Mutex::new(Vec::new())),
             output_rect: Rect::NOTHING,
+            extension_table_size: Vec2::default(),
         }
     }
 }

@@ -455,7 +455,8 @@ impl Application {
 
                                 //Move into thread
                                 let audio_bytes_sender = self.audio_bytes_tx.clone();
-                                let microphone_precentage = self.client_ui.microphone_volume.clone();
+                                let microphone_precentage =
+                                    self.client_ui.microphone_volume.clone();
 
                                 tokio::spawn(async move {
                                     let bytes = audio_recording_with_recv(

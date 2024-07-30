@@ -15,7 +15,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
 use egui::load::BytesPoll;
 use egui::load::LoadError;
-use egui::{vec2, Color32, Image, Pos2, Rect, Response, RichText, Stroke, Ui};
+use egui::{vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -295,11 +295,16 @@ impl Default for Application {
 
 impl Application {
     /// Set global lua table so that the luas can use it
+    /// This function is called when creating a new ```Application``` instance
     pub fn set_global_lua_table(&self) {
         self.client_ui.clone().set_lua_table_function(&self.lua);
         self.clone().set_lua_table_function(&self.lua);
-        self.client_connection.clone().set_lua_table_function(&self.lua);
-        self.opened_user_information.clone().set_lua_table_function(&self.lua);
+        self.client_connection
+            .clone()
+            .set_lua_table_function(&self.lua);
+        self.opened_user_information
+            .clone()
+            .set_lua_table_function(&self.lua);
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -321,114 +326,177 @@ impl Application {
 
             let output_list = data.client_ui.extension.output.clone();
 
-            //Insert lua function
-            let print = data
-                .lua
-                .create_function(move |_, msg: String| {
-                    match output_list.lock() {
-                        Ok(mut list) => list.push(LuaOutput::Standard(msg)),
-                        Err(err) => {
-                            dbg!(err);
-                        }
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
-
-            //Clone contex
-            let ctx_clone_line = cc.egui_ctx.clone();
-            let ctx_clone_rect = cc.egui_ctx.clone();
-
-            //Create draw line function
-            let draw_line = data
-                .lua
-                .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                    let color = args.2;
-
-                    //Create the hasher
-                    let mut hasher = DefaultHasher::new();
-
-                    //Hash the input
-                    args.hash(&mut hasher);
-
-                    //We get the hashed string
-                    let area_name = hasher.finish().to_string().into();
-
-                    //Create area
-                    egui::Area::new(area_name).show(&ctx_clone_line, |ui| {
-                        //Draw line based on args
-                        ui.painter().line_segment(
-                            [
-                                Pos2::new(args.0[0] as f32, args.0[1] as f32),
-                                Pos2::new(args.1[0] as f32, args.1[1] as f32),
-                            ],
-                            Stroke::new(
-                                5.,
-                                Color32::from_rgba_premultiplied(
-                                    color[0] as u8,
-                                    color[1] as u8,
-                                    color[2] as u8,
-                                    color[3] as u8,
-                                ),
-                            ),
-                        );
-                    });
-
-                    Ok(())
-                })
-                .unwrap();
-
-            let draw_rect_filled = data
-                .lua
-                .create_function(move |_, args: ([i32; 2], [i32; 2], [i32; 4])| {
-                    let color = args.2;
-
-                    //Create the hasher
-                    let mut hasher = DefaultHasher::new();
-
-                    //Hash the input
-                    args.hash(&mut hasher);
-
-                    //We get the hashed string
-                    let area_name = hasher.finish().to_string().into();
-
-                    //Create area
-                    egui::Area::new(area_name).show(&ctx_clone_rect, |ui| {
-                        //Draw line based on args
-                        ui.painter().rect_filled(
-                            Rect::from_points(&[
-                                Pos2::new(args.0[0] as f32, args.0[1] as f32),
-                                Pos2::new(args.1[0] as f32, args.1[1] as f32),
-                            ]),
-                            0.,
-                            Color32::from_rgba_premultiplied(
-                                color[0] as u8,
-                                color[1] as u8,
-                                color[2] as u8,
-                                color[3] as u8,
-                            ),
-                        );
-                        ctx_clone_rect.request_repaint();
-                    });
-
-                    Ok(())
-                })
-                .unwrap();
-
-            //Set functions
-            data.lua.globals().set("print", print).unwrap();
-            data.lua.globals().set("draw_line", draw_line).unwrap();
-            data.lua
-                .globals()
-                .set("draw_rect_filled", draw_rect_filled)
-                .unwrap();
-
-            return data;
+            return set_lua_functions(data, output_list, cc);
         }
 
         Default::default()
     }
+}
+
+fn set_lua_functions(
+    data: Application,
+    output_list: Arc<Mutex<Vec<LuaOutput>>>,
+    cc: &eframe::CreationContext,
+) -> Application {
+    let print = data
+        .lua
+        .create_function(move |_, msg: String| {
+            match output_list.lock() {
+                Ok(mut list) => list.push(LuaOutput::Standard(msg)),
+                Err(err) => {
+                    dbg!(err);
+                }
+            }
+
+            Ok(())
+        })
+        .unwrap();
+
+    let ctx_clone_rect = cc.egui_ctx.clone();
+    let ctx_clone_circle = cc.egui_ctx.clone();
+    let ctx_clone_line = cc.egui_ctx.clone();
+    let ctx_clone_text = cc.egui_ctx.clone();
+    let ctx_clone_image = cc.egui_ctx.clone();
+    let ctx_clone_image_buffer_clean = cc.egui_ctx.clone();
+
+    let draw_line = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], [f32; 2], [u8; 4])| {
+            let color = args.2;
+
+            //Create area
+            egui::Area::new("draw_line".into()).show(&ctx_clone_line, |ui| {
+                //Draw line based on args
+                ui.painter().line_segment(
+                    [
+                        Pos2::new(args.0[0], args.0[1]),
+                        Pos2::new(args.1[0], args.1[1]),
+                    ],
+                    Stroke::new(
+                        5.,
+                        Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
+                    ),
+                );
+            });
+
+            Ok(())
+        })
+        .unwrap();
+
+    let draw_rect = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
+            let (start_pos, end_pos, is_filled, color) = args;
+
+            //Create area
+            egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
+                match is_filled {
+                    true => {
+                        ui.painter().rect_filled(
+                            Rect::from_points(&[
+                                start_pos.into(),
+                                end_pos.into(),
+                            ]),
+                            0.,
+                            Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
+                        );
+                    },
+                    false => {
+                        ui.painter().rect_stroke(
+                            Rect::from_points(&[
+                                start_pos.into(),
+                                end_pos.into(),
+                            ]),
+                            0.,
+                            Stroke::new(5., Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3])),
+                        );
+                    },
+                }
+                
+            });
+
+            Ok(())
+        })
+        .unwrap();
+
+    let draw_circle = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], f32, bool, [u8; 4])| {
+            let (position, radius, is_filled, color) = args;
+
+            //Create area
+            egui::Area::new("draw_circle".into()).show(&ctx_clone_circle, |ui| {
+                let painter = ui.painter();
+
+                //Is the circle filled
+                match is_filled {
+                    true => {
+                        painter.circle_filled(
+                            position.into(),
+                            radius,
+                            Color32::from_rgba_premultiplied(
+                                color[0], color[1], color[2], color[3],
+                            ),
+                        );
+                    }
+                    false => {
+                        painter.circle_stroke(
+                            position.into(),
+                            radius,
+                            Stroke::new(
+                                5.,
+                                Color32::from_rgba_premultiplied(
+                                    color[0], color[1], color[2], color[3],
+                                ),
+                            ),
+                        );
+                    }
+                }
+            });
+
+            Ok(())
+        })
+        .unwrap();
+
+    let draw_text = data.lua.create_function(move |_, args: ([f32; 2], f32, String, [u8; 4])| {
+        let (pos, size, text, color) = args;
+
+        egui::Area::new("draw_text".into()).show(&ctx_clone_text, |ui| {
+            ui.painter().text(pos.into(), Align2::LEFT_TOP, text, FontId::new(size, egui::FontFamily::Monospace), Color32::from_rgba_premultiplied(
+                color[0], color[1], color[2], color[3],
+            ))
+        });
+
+        Ok(())
+    }).unwrap();
+
+    let draw_image = data.lua.create_function(move |_, args: ([f32; 2], [f32; 2], String)| {
+        let (pos, size, path) = args;
+
+        egui::Area::new("draw_image".into()).anchor(Align2::LEFT_TOP, Vec2::from(pos)).show(&ctx_clone_image, |ui| {
+            ui.add(Image::from_uri(format!("file://{}", path)).fit_to_exact_size(size.into()));
+        });
+
+        Ok(())
+    }).unwrap();
+
+    let forget_all_images = data.lua.create_function(move |_, ()| {
+        ctx_clone_image_buffer_clean.forget_all_images();
+
+        Ok(())
+    }).unwrap();
+
+    data.lua.globals().set("print", print).unwrap();
+    data.lua.globals().set("draw_line", draw_line).unwrap();
+    data.lua.globals().set("draw_rect", draw_rect).unwrap();
+    data.lua.globals().set("draw_circle", draw_circle).unwrap();
+    data.lua.globals().set("draw_text", draw_text).unwrap();
+    data.lua.globals().set("draw_image", draw_image).unwrap();
+    data.lua.globals().set("forget_all_images", forget_all_images).unwrap();
+
+    data.set_global_lua_table();
+
+    return data;
 }
 
 //Include emoji image header file
@@ -1826,13 +1894,8 @@ pub struct ServerVoip {
 impl ServerVoip {
     /// Add the ```SocketAddr``` to the ```UDP``` server's destinations
     /// This function can take Self as a clone since we are only accessing entries which implement ```Sync```
-    pub fn connect(
-        &self,
-        uuid: String,
-        socket_addr: SocketAddr,
-    ) -> anyhow::Result<()> {
-        self.connected_clients
-            .insert(uuid, socket_addr);
+    pub fn connect(&self, uuid: String, socket_addr: SocketAddr) -> anyhow::Result<()> {
+        self.connected_clients.insert(uuid, socket_addr);
 
         Ok(())
     }

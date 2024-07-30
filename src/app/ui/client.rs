@@ -5,7 +5,6 @@ use egui::{
     RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
-use tokio_util::sync::CancellationToken;
 use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufReader, Cursor};
@@ -13,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::app::backend::{
@@ -127,15 +127,15 @@ impl Application {
                                 let call_button = ui.add(ImageButton::new(Image::new(
                                     egui::include_image!("..\\..\\..\\icons\\call.png"),
                                 )));
-    
+
                                 if call_button.clicked() {
                                     //Move sender into thread
                                     let sender = self.voip_connection_sender.clone();
-                                    
+
                                     //Reset shutdown token State, if we had cancelled this token we must create a new one in order to reset its state
                                     //else its going to be cancelled and new threads will shut dwon immediately
                                     self.voip_shutdown_token = CancellationToken::new();
-    
+
                                     //Spawn thread which will create the ```Voip``` instance
                                     tokio::spawn(async move {
                                         match Voip::new().await {
@@ -149,7 +149,7 @@ impl Application {
                                         }
                                     });
                                 }
-    
+
                                 call_button.on_hover_text("Start a group call");
                             });
                         }
@@ -989,7 +989,6 @@ impl Application {
 
                     //Start audio recorder
                     let recording_handle = record_audio_with_interrupt(cancel_token.clone(), *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
-                    
                     //We can just send it becasue we have already set the default destination address
                     loop {
                         select! {
@@ -1023,12 +1022,9 @@ impl Application {
                         }
                     }
                 });
-
                 //Create sink
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
-                
                 let decryption_key = self.client_connection.client_secret.clone();
-
                 //Reciver thread
                 tokio::spawn(async move {
                     //Listen on socket, play audio

@@ -232,7 +232,7 @@ impl Application {
 
                     let shared_fields = self.client_ui.shared_fields.lock().unwrap();
 
-                    match shared_fields.banned_uuids.try_lock(){
+                    match shared_fields.banned_uuids.try_lock() {
                         Ok(mut banned_uuids) => {
                             for (index, uuid) in banned_uuids.clone().iter().enumerate() {
                                 ui.horizontal(|ui| {
@@ -245,10 +245,10 @@ impl Application {
                                     }
                                 });
                             }
-                        },
+                        }
                         Err(err) => {
                             dbg!(err);
-                        },
+                        }
                     };
                 }
             });

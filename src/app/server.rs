@@ -26,8 +26,7 @@ use super::backend::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
         Upload, VoipConnection as Voip,
     },
-    ServerReplyType, ServerSync, ServerVoip, ServerVoipReply,
-    ServerVoipState,
+    ServerReplyType, ServerSync, ServerVoip, ServerVoipReply, ServerVoipState,
 };
 
 use crate::app::backend::{decrypt_aes256_bytes, encrypt_aes256_bytes, ServerMaster};
@@ -630,10 +629,7 @@ impl MessageService {
                             .await?;
 
                             if let Some(ongoing_call) = &self.voip {
-                                ongoing_call.connect(
-                                    req.uuid.clone(),
-                                    socket_addr,
-                                )?;
+                                ongoing_call.connect(req.uuid.clone(), socket_addr)?;
                             }
                             // If there is no ongoing call, we should create it
                             else {
@@ -641,10 +637,7 @@ impl MessageService {
                                     self.create_voip_server(self.opened_on_port.clone()).await?;
 
                                 //Immediately connect the user who has requested the voip call
-                                voip_server_instance.connect(
-                                    req.uuid.clone(),
-                                    socket_addr,
-                                )?;
+                                voip_server_instance.connect(req.uuid.clone(), socket_addr)?;
 
                                 //Set voip server
                                 self.voip = Some(voip_server_instance);

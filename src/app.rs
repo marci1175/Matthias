@@ -76,13 +76,7 @@ impl eframe::App for backend::Application {
             TODO: Restructure files
 
             TODO: Implement callbacks
-
-            TODO: Make api able to draw Images and text
-            TODO: Finish Api docs
         */
-
-        //Set global lua getter functions before everything
-        self.set_global_lua_table();
 
         //Run lua scripts when rendering a frame (I should impl callbacks)
         for extension in self.client_ui.extension.extension_list.iter_mut() {
@@ -512,6 +506,9 @@ impl backend::Application {
                     }
                 }
             };
+
+            //Documentation
+            ui.hyperlink_to("Documentation", "https://matthias.gitbook.io/matthias").on_hover_text("For more information read the documentation.");
         });
 
         ui.horizontal(|ui| {
@@ -669,7 +666,7 @@ impl backend::Application {
     ///Draw the extension's output into the little "console"
     fn draw_extension_output(&mut self, columns: &mut [egui::Ui]) {
         columns[1]
-            .painter_at(self.client_ui.extension.output_rect.expand(15.))
+            .painter()
             .rect_stroke(
                 self.client_ui.extension.output_rect.expand(5.),
                 5.,
@@ -677,9 +674,9 @@ impl backend::Application {
             );
 
         columns[1]
-            .painter_at(self.client_ui.extension.output_rect)
+            .painter()
             .rect_filled(
-                self.client_ui.extension.output_rect.expand(10.),
+                self.client_ui.extension.output_rect,
                 5.,
                 Color32::BLACK,
             );
