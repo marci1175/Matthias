@@ -18,7 +18,7 @@ use egui::load::LoadError;
 use egui::{
     vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
 };
-use egui_notify::{Toast, Toasts};
+use egui_notify::{Toast, ToastOptions, Toasts};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -2289,7 +2289,7 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
 
     let plaintext = cipher
         .decrypt(&nonce, ciphertext.as_ref())
-        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+        .map_err(|_| Error::msg("Invalid password!"))?;
 
     Ok(String::from_utf8(plaintext)?)
 }
@@ -2340,7 +2340,7 @@ pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow:
 
     let decrypted_bytes = cipher
         .decrypt(&nonce, bytes_to_be_decrypted)
-        .map_err(|_| Error::msg("Invalid key, couldnt decrypt the specified item."))?;
+        .map_err(|_| Error::msg("Invalid password!"))?;
 
     Ok(decrypted_bytes)
 }
@@ -2372,10 +2372,6 @@ pub fn login(username: String, password: String) -> Result<(UserInformation, Pat
     let user_check = username == file_contents.username;
 
     ensure!(user_check, "File corrupted at the username entry");
-
-    //Password is "checked" twice, first is when we try to decrypt the file
-    // let password_check = file_contents.verify_password(password);
-    // ensure!(password_check, "Invalid password");
 
     Ok((file_contents, path))
 }
@@ -2477,6 +2473,7 @@ where
     T: ToString + std::marker::Send + 'static,
 {
     let mut toast = Toast::error(display.to_string());
+    
     toast.set_duration(Some(Duration::from_secs(4)));
     toast.set_show_progress_bar(true);
 

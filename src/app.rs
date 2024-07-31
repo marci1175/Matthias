@@ -9,9 +9,7 @@ use egui::{
     vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
-use egui_notify::Toast;
 use lua::execute_code;
-use std::any::Any;
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -84,7 +82,6 @@ impl eframe::App for backend::Application {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         /* TODOS:
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
-            TODO: add egui notfications
             TODO: Restructure files
 
             TODO: Implement callbacks
