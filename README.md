@@ -1,9 +1,23 @@
-## Matthias
+---
+layout:
+  title:
+    visible: true
+  description:
+    visible: false
+  tableOfContents:
+    visible: true
+  outline:
+    visible: true
+  pagination:
+    visible: true
+---
 
-# Independent chat application with encryption, made from scratch
+# 👋 Welcome
 
-### This chat app features aes-256 encryption, and argon2 password hashing.
-### You can send files, images, voice recordings and many more!
-### It also has a small amount of markdown support. (Im going to improve on this later)
-### It features almost everything a major messaging platform has. (eg. Editing messages, reacting to messages, etc.)
-### With Version 5 an Api is also available for scripting purposes.
+Welcome to the Matthias API documentation! Here you'll get an overview of all the amazing scripting features Matthias offers to help you build fun and useful extensions.
+
+You'll see code snippets which work out of box, so you can try them out directly.
+
+### Jump right in
+
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-cover data-type="files"></th><th data-hidden></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Getting Started</strong></td><td>Create your first script</td><td></td><td></td><td><a href="getting-started.md">getting-started.md</a></td></tr><tr><td><strong>Visuals</strong></td><td>Utilize visuals in your extension</td><td></td><td></td><td><a href="broken-reference">Broken link</a></td></tr><tr><td><strong>Variables</strong></td><td>Access application variables</td><td></td><td></td><td><a href="broken-reference">Broken link</a></td></tr></tbody></table>
