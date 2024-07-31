@@ -1,7 +1,3 @@
----
-description: This page is servers as an introduction to the Matthias scripting API's usage.
----
-
 # 👶 Getting started
 
 ### Language
