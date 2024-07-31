@@ -104,7 +104,16 @@ impl Application {
                                             self.opened_user_information = user_information;
                                         }
                                         Err(err) => {
-                                            display_error_message(err);
+                                            //Avoid panicking when trying to display a Notification
+                                            //This is very rare but can still happen
+                                            match self.toasts.lock() {
+                                                Ok(mut toasts) => {
+                                                    display_error_message(err, &mut *toasts);
+                                                }
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                }
+                                            }
                                         }
                                     }
                                 };
@@ -201,7 +210,16 @@ impl Application {
                                         if let Err(err) =
                                             self.save_image(cropped_img, app_data_path, ctx)
                                         {
-                                            display_error_message(err);
+                                            //Avoid panicking when trying to display a Notification
+                                            //This is very rare but can still happen
+                                            match self.toasts.lock() {
+                                                Ok(mut toasts) => {
+                                                    display_error_message(err, &mut *toasts);
+                                                }
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                }
+                                            }
                                         };
                                     }
                                 });
@@ -256,7 +274,16 @@ impl Application {
                                         self.register.image.selected_image_bytes = Some(image);
                                     }
                                     Err(err) => {
-                                        display_error_message(err);
+                                        //Avoid panicking when trying to display a Notification
+                                        //This is very rare but can still happen
+                                        match self.toasts.lock() {
+                                            Ok(mut toasts) => {
+                                                display_error_message(err, &mut *toasts);
+                                            }
+                                            Err(err) => {
+                                                dbg!(err);
+                                            }
+                                        }
                                     }
                                 }
                                 self.register.image.image_path = app_data_path;

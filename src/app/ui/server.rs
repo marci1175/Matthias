@@ -70,7 +70,16 @@ impl Application {
                                 true
                             }
                             Err(err) => {
-                                display_error_message(err);
+                                //Avoid panicking when trying to display a Notification
+                                //This is very rare but can still happen
+                                match self.toasts.lock() {
+                                    Ok(mut toasts) => {
+                                        display_error_message(err, &mut *toasts);
+                                    }
+                                    Err(err) => {
+                                        dbg!(err);
+                                    }
+                                }
 
                                 false
                             }

@@ -41,7 +41,19 @@ impl Application {
                         self.main.client_mode = false;
 
                         if self.server_has_started {
-                            display_error_message("Can not log out while server is running.");
+                            //Avoid panicking when trying to display a Notification
+                            //This is very rare but can still happen
+                            match self.toasts.lock() {
+                                Ok(mut toasts) => {
+                                    display_error_message(
+                                        "Can not log out while server is running.",
+                                        &mut *toasts,
+                                    );
+                                }
+                                Err(err) => {
+                                    dbg!(err);
+                                }
+                            }
                             return;
                         }
 
@@ -98,7 +110,19 @@ impl Application {
 
                     //Check for invalid port
                     if port.is_empty() {
-                        display_error_message("Invalid address to send the message on.");
+                        //Avoid panicking when trying to display a Notification
+                        //This is very rare but can still happen
+                        match self.toasts.lock() {
+                            Ok(mut toasts) => {
+                                display_error_message(
+                                    "Invalid address to send the message on.",
+                                    &mut *toasts,
+                                );
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                            }
+                        }
 
                         return;
                     }
@@ -136,6 +160,8 @@ impl Application {
                                     //else its going to be cancelled and new threads will shut dwon immediately
                                     self.voip_shutdown_token = CancellationToken::new();
 
+                                    let toasts = self.toasts.clone();
+
                                     //Spawn thread which will create the ```Voip``` instance
                                     tokio::spawn(async move {
                                         match Voip::new().await {
@@ -144,7 +170,16 @@ impl Application {
                                                 sender.send(voip).unwrap();
                                             }
                                             Err(err) => {
-                                                display_error_message(err);
+                                                //Avoid panicking when trying to display a Notification
+                                                //This is very rare but can still happen
+                                                match toasts.lock() {
+                                                    Ok(mut toasts) => {
+                                                        display_error_message(err, &mut *toasts);
+                                                    }
+                                                    Err(err) => {
+                                                        dbg!(err);
+                                                    }
+                                                }
                                             }
                                         }
                                     });
@@ -586,7 +621,16 @@ impl Application {
                         sink.play();
                     }
                     Err(err) => {
-                        display_error_message(err);
+                        //Avoid panicking when trying to display a Notification
+                        //This is very rare but can still happen
+                        match self.toasts.lock() {
+                            Ok(mut toasts) => {
+                                display_error_message(err, &mut *toasts);
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                            }
+                        }
                     }
                 }
 
@@ -621,6 +665,8 @@ impl Application {
                 //We have to clone for the 2nd thread
                 let shutdown_token_clone = shutdown_token.clone();
 
+                let toasts = self.toasts.clone();
+
                 //Spawn server reader thread
                 tokio::spawn(async move {
                     loop {
@@ -652,7 +698,14 @@ impl Application {
                                         dbg!(&err);
                                         eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                         eprintln!("Early end of file error is a normal occurence after disconnecting");
-                                        display_error_message(err);
+                                        //Avoid panicking when trying to display a Notification
+                                                //This is very rare but can still happen 
+                                                match toasts.lock() {
+                                                    Ok(mut toasts) => {
+                                                        display_error_message(err, &mut *toasts);
+                                                    },
+                                                    Err(err) => {dbg!(err);},
+                                                }
 
                                         //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                                         let _ = sender_clone.send(None);
@@ -929,7 +982,19 @@ impl Application {
                                                                 //Nothing lol, all is good
                                                             }
                                                             ServerVoipReply::Fail(err) => {
-                                                                display_error_message(err.reason);
+                                                                //Avoid panicking when trying to display a Notification
+                                                                //This is very rare but can still happen
+                                                                match self.toasts.lock() {
+                                                                    Ok(mut toasts) => {
+                                                                        display_error_message(
+                                                                            err.reason,
+                                                                            &mut *toasts,
+                                                                        );
+                                                                    }
+                                                                    Err(err) => {
+                                                                        dbg!(err);
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -943,7 +1008,7 @@ impl Application {
                                 }
                             }
                             Err(_err) => {
-                                display_error_message(message);
+                                display_error_message(message, &mut *self.toasts.lock().unwrap());
 
                                 //Assuming the connection is faulty we reset state
                                 self.reset_client_connection();

@@ -9,7 +9,9 @@ use egui::{
     vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
+use egui_notify::Toast;
 use lua::execute_code;
+use std::any::Any;
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -36,6 +38,7 @@ impl eframe::App for backend::Application {
         let mut connection = self.client_connection.clone();
         let password = self.client_connection.password.clone();
         let uuid = self.opened_user_information.uuid.clone();
+        let toasts = self.toasts.clone();
 
         //Disconnect from server
         if let ConnectionState::Connected(_) = self.client_connection.state {
@@ -44,7 +47,16 @@ impl eframe::App for backend::Application {
                 {
                     Ok(_) => {}
                     Err(err) => {
-                        display_error_message(err);
+                        //Avoid panicking when trying to display a Notification
+                        //This is very rare but can still happen
+                        match toasts.lock() {
+                            Ok(mut toasts) => {
+                                display_error_message(err, &mut *toasts);
+                            }
+                            Err(err) => {
+                                dbg!(err);
+                            }
+                        }
                     }
                 };
             });
@@ -53,11 +65,11 @@ impl eframe::App for backend::Application {
         //clean up after server and client
         match std::env::var("APPDATA") {
             Ok(app_data) => {
-                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
-                    println!("{err}");
+                if let Err(_err) = fs::remove_dir_all(format!("{}\\Matthias\\Server", app_data)) {
+                    // println!("{_err}");
                 };
-                if let Err(err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
-                    println!("{err}");
+                if let Err(_err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
+                    // println!("{_err}");
                 };
             }
             Err(err) => println!("{err}"),
@@ -77,6 +89,9 @@ impl eframe::App for backend::Application {
 
             TODO: Implement callbacks
         */
+
+        //Display notifications
+        self.toasts.lock().unwrap().show(ctx);
 
         //Run lua scripts when rendering a frame (I should impl callbacks)
         for extension in self.client_ui.extension.extension_list.iter_mut() {
@@ -365,6 +380,8 @@ impl backend::Application {
                                 //Forget all imaes so the cahced imges will be deleted
                                 ctx.forget_all_images();
 
+                                let toasts = self.toasts.clone();
+
                                 tokio::task::spawn(async move {
                                     match ClientConnection::connect_to_server(
                                         ip,
@@ -382,7 +399,16 @@ impl backend::Application {
                                             };
                                         }
                                         Err(err) => {
-                                            display_error_message(err);
+                                            //Avoid panicking when trying to display a Notification
+                                            //This is very rare but can still happen
+                                            match toasts.lock() {
+                                                Ok(mut toasts) => {
+                                                    display_error_message(err, &mut *toasts);
+                                                }
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                }
+                                            }
                                             if let Err(err) = sender.send(None) {
                                                 dbg!(err);
                                             };
@@ -469,6 +495,8 @@ impl backend::Application {
 
         let uuid = self.opened_user_information.uuid.clone();
 
+        let toasts = self.toasts.clone();
+
         //Shut down threadsa nad reset state
         self.reset_client_connection();
 
@@ -477,7 +505,16 @@ impl backend::Application {
             match connection.disconnect(username, password, uuid).await {
                 Ok(_) => {}
                 Err(err) => {
-                    display_error_message(err);
+                    //Avoid panicking when trying to display a Notification
+                    //This is very rare but can still happen
+                    match toasts.lock() {
+                        Ok(mut toasts) => {
+                            display_error_message(err, &mut *toasts);
+                        }
+                        Err(err) => {
+                            dbg!(err);
+                        }
+                    }
                 }
             };
         });
@@ -508,7 +545,8 @@ impl backend::Application {
             };
 
             //Documentation
-            ui.hyperlink_to("Documentation", "https://matthias.gitbook.io/matthias").on_hover_text("For more information read the documentation.");
+            ui.hyperlink_to("Documentation", "https://matthias.gitbook.io/matthias")
+                .on_hover_text("For more information read the documentation.");
         });
 
         ui.horizontal(|ui| {
@@ -607,7 +645,16 @@ impl backend::Application {
                                     ui.horizontal(|ui| {
                                         if ui.button("Save").clicked() {
                                             if let Err(err) = extension.write_change_to_file() {
-                                                display_error_message(err);
+                                                //Avoid panicking when trying to display a Notification
+                                                //This is very rare but can still happen
+                                                match self.toasts.lock() {
+                                                    Ok(mut toasts) => {
+                                                        display_error_message(err, &mut *toasts);
+                                                    }
+                                                    Err(err) => {
+                                                        dbg!(err);
+                                                    }
+                                                }
                                             };
                                         }
 
@@ -653,7 +700,16 @@ impl backend::Application {
                             ctx.input_mut(|writer| {
                                 if writer.consume_key(Modifiers::CTRL, egui::Key::S) {
                                     if let Err(err) = extension.write_change_to_file() {
-                                        display_error_message(err);
+                                        //Avoid panicking when trying to display a Notification
+                                        //This is very rare but can still happen
+                                        match self.toasts.lock() {
+                                            Ok(mut toasts) => {
+                                                display_error_message(err, &mut *toasts);
+                                            }
+                                            Err(err) => {
+                                                dbg!(err);
+                                            }
+                                        }
                                     };
                                 }
                             });
@@ -665,21 +721,15 @@ impl backend::Application {
 
     ///Draw the extension's output into the little "console"
     fn draw_extension_output(&mut self, columns: &mut [egui::Ui]) {
-        columns[1]
-            .painter()
-            .rect_stroke(
-                self.client_ui.extension.output_rect.expand(5.),
-                5.,
-                Stroke::new(2., Color32::GRAY),
-            );
+        columns[1].painter().rect_stroke(
+            self.client_ui.extension.output_rect.expand(5.),
+            5.,
+            Stroke::new(2., Color32::GRAY),
+        );
 
         columns[1]
             .painter()
-            .rect_filled(
-                self.client_ui.extension.output_rect,
-                5.,
-                Color32::BLACK,
-            );
+            .rect_filled(self.client_ui.extension.output_rect, 5., Color32::BLACK);
 
         let scroll_area = ScrollArea::vertical()
             .stick_to_bottom(true)

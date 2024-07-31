@@ -15,7 +15,10 @@ use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
 use egui::load::BytesPoll;
 use egui::load::LoadError;
-use egui::{vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2};
+use egui::{
+    vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
+};
+use egui_notify::{Toast, Toasts};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -27,13 +30,14 @@ use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
+use std::task::Context;
+use std::time::Duration;
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
@@ -48,6 +52,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
 pub struct Application {
+    /// This is field is used to display notifications
+    #[serde(skip)]
+    pub toasts: Arc<Mutex<Toasts>>,
+
     #[serde(skip)]
     pub lua: Arc<Lua>,
 
@@ -211,6 +219,8 @@ impl Default for Application {
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
+            toasts: Arc::new(Mutex::new(Toasts::new())),
+
             voip_shutdown_token: CancellationToken::new(),
             voip_thread: None,
 
@@ -383,41 +393,41 @@ fn set_lua_functions(
         })
         .unwrap();
 
-    let draw_rect = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
-            let (start_pos, end_pos, is_filled, color) = args;
+    let draw_rect =
+        data.lua
+            .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
+                let (start_pos, end_pos, is_filled, color) = args;
 
-            //Create area
-            egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
-                match is_filled {
-                    true => {
-                        ui.painter().rect_filled(
-                            Rect::from_points(&[
-                                start_pos.into(),
-                                end_pos.into(),
-                            ]),
-                            0.,
-                            Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
-                        );
-                    },
-                    false => {
-                        ui.painter().rect_stroke(
-                            Rect::from_points(&[
-                                start_pos.into(),
-                                end_pos.into(),
-                            ]),
-                            0.,
-                            Stroke::new(5., Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3])),
-                        );
-                    },
-                }
-                
-            });
+                //Create area
+                egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
+                    match is_filled {
+                        true => {
+                            ui.painter().rect_filled(
+                                Rect::from_points(&[start_pos.into(), end_pos.into()]),
+                                0.,
+                                Color32::from_rgba_premultiplied(
+                                    color[0], color[1], color[2], color[3],
+                                ),
+                            );
+                        }
+                        false => {
+                            ui.painter().rect_stroke(
+                                Rect::from_points(&[start_pos.into(), end_pos.into()]),
+                                0.,
+                                Stroke::new(
+                                    5.,
+                                    Color32::from_rgba_premultiplied(
+                                        color[0], color[1], color[2], color[3],
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                });
 
-            Ok(())
-        })
-        .unwrap();
+                Ok(())
+            })
+            .unwrap();
 
     let draw_circle = data
         .lua
@@ -458,33 +468,50 @@ fn set_lua_functions(
         })
         .unwrap();
 
-    let draw_text = data.lua.create_function(move |_, args: ([f32; 2], f32, String, [u8; 4])| {
-        let (pos, size, text, color) = args;
+    let draw_text = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], f32, String, [u8; 4])| {
+            let (pos, size, text, color) = args;
 
-        egui::Area::new("draw_text".into()).show(&ctx_clone_text, |ui| {
-            ui.painter().text(pos.into(), Align2::LEFT_TOP, text, FontId::new(size, egui::FontFamily::Monospace), Color32::from_rgba_premultiplied(
-                color[0], color[1], color[2], color[3],
-            ))
-        });
+            egui::Area::new("draw_text".into()).show(&ctx_clone_text, |ui| {
+                ui.painter().text(
+                    pos.into(),
+                    Align2::LEFT_TOP,
+                    text,
+                    FontId::new(size, egui::FontFamily::Monospace),
+                    Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
+                )
+            });
 
-        Ok(())
-    }).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
-    let draw_image = data.lua.create_function(move |_, args: ([f32; 2], [f32; 2], String)| {
-        let (pos, size, path) = args;
+    let draw_image = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], [f32; 2], String)| {
+            let (pos, size, path) = args;
 
-        egui::Area::new("draw_image".into()).anchor(Align2::LEFT_TOP, Vec2::from(pos)).show(&ctx_clone_image, |ui| {
-            ui.add(Image::from_uri(format!("file://{}", path)).fit_to_exact_size(size.into()));
-        });
+            egui::Area::new("draw_image".into())
+                .anchor(Align2::LEFT_TOP, Vec2::from(pos))
+                .show(&ctx_clone_image, |ui| {
+                    ui.add(
+                        Image::from_uri(format!("file://{}", path)).fit_to_exact_size(size.into()),
+                    );
+                });
 
-        Ok(())
-    }).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
-    let forget_all_images = data.lua.create_function(move |_, ()| {
-        ctx_clone_image_buffer_clean.forget_all_images();
+    let forget_all_images = data
+        .lua
+        .create_function(move |_, ()| {
+            ctx_clone_image_buffer_clean.forget_all_images();
 
-        Ok(())
-    }).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
     data.lua.globals().set("print", print).unwrap();
     data.lua.globals().set("draw_line", draw_line).unwrap();
@@ -492,7 +519,10 @@ fn set_lua_functions(
     data.lua.globals().set("draw_circle", draw_circle).unwrap();
     data.lua.globals().set("draw_text", draw_text).unwrap();
     data.lua.globals().set("draw_image", draw_image).unwrap();
-    data.lua.globals().set("forget_all_images", forget_all_images).unwrap();
+    data.lua
+        .globals()
+        .set("forget_all_images", forget_all_images)
+        .unwrap();
 
     data.set_global_lua_table();
 
@@ -2442,21 +2472,15 @@ pub fn generate_uuid() -> Uuid {
 }
 
 ///Display Error message with a messagebox
-pub fn display_error_message<T>(display: T)
+pub fn display_error_message<T>(display: T, toasts: &mut Toasts)
 where
     T: ToString + std::marker::Send + 'static,
 {
-    std::thread::spawn(move || unsafe {
-        MessageBoxW(
-            0,
-            str::encode_utf16(display.to_string().as_str())
-                .chain(std::iter::once(0))
-                .collect::<Vec<_>>()
-                .as_ptr(),
-            w!("Error"),
-            MB_ICONERROR,
-        );
-    });
+    let mut toast = Toast::error(display.to_string());
+    toast.set_duration(Some(Duration::from_secs(4)));
+    toast.set_show_progress_bar(true);
+
+    toasts.add(toast);
 }
 
 /// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
