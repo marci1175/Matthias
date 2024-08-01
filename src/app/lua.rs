@@ -6,6 +6,7 @@ use std::{
 
 use egui::{Rect, Vec2};
 use mlua::Lua;
+use strum::{Display, ToString};
 
 /// This function executes code provided, and if its a function adds it to the global register
 pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
@@ -115,6 +116,7 @@ pub struct Extension {
     pub extension_table_size: Vec2,
 }
 
+#[derive(Display)]
 /// These are the events which trigger a function call in the extensions
 pub enum EventCall {
     /// Triggered when sending a message
@@ -139,6 +141,9 @@ pub enum EventCall {
 
     /// Triggered when connecting to a server
     OnConnect,
+
+    /// Triggered when disconnecting from a server
+    OnDisconnect,
 }
 
 impl Extension {
@@ -148,112 +153,25 @@ impl Extension {
         lua: &Lua,
         arg: Option<String>,
     ) {
-        match event {
-            EventCall::OnChatSend => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
+        for mut ext in self.extension_list.iter_mut() {
+            //If the extension should be running we skip that entry
+            if !ext.is_running {
+                continue;
+            }
+
+            match Self::load_and_call_function(lua, ext, &arg, String::from(event.to_string())) {
+                Ok(_) => (),
+                Err(err) => {
+                    //If the lua returned this error it means the callback couldnt be called
+                    //This should be ignored, thats why we return
+                    if err.to_string() == "error converting Lua nil to function" {
+                        let _ = execute_code(lua, ext.contents.clone());
+                        return;
                     }
 
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnChatSend")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        },
-                    };
-                }
-            }
-            EventCall::OnChatRecive => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnChatRecive")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
-            EventCall::OnServerChatRecive => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnServerChatRecive")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
-            EventCall::OnDraw => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnDraw")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
-            EventCall::OnConnect => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnConnect")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
-            EventCall::OnCallSend => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnCallSend")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
-            EventCall::OnCallRecive => {
-                for mut ext in self.extension_list.iter_mut() {
-                    //If the extension should be running we skip that entry
-                    if !ext.is_running {
-                        continue;
-                    }
-
-                    match Self::load_and_call_function(lua, ext, &arg, String::from("OnCallRecive")) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                        }
-                    }
-                }
-            }
+                    Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
+                },
+            };
         }
     }
 
@@ -265,12 +183,6 @@ impl Extension {
     }
     
     pub fn add_msg_to_log(output: Arc<Mutex<Vec<LuaOutput>>>, extension: &mut ExtensionProperties, log_inner: String) {
-        //If the lua returned this error it means the callback couldnt be called
-        //This should be ignored, thats why we return
-        if &log_inner == "error converting Lua nil to function" {
-            return;
-        }
-
         match output.lock() {
             Ok(mut output) => {
                 output.push(crate::app::lua::LuaOutput::Error(log_inner.to_string()));
