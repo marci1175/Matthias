@@ -2,12 +2,7 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::{BTreeMap, HashMap},
-    env, fs,
-    io::Write,
-    net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
     time::Duration,
 };
 
@@ -16,7 +11,6 @@ use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
 use tokio_util::sync::CancellationToken;
-use uuid::serde::braced;
 
 use super::backend::{
     encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
@@ -395,7 +389,7 @@ pub fn create_client_voip_manager(
                                 {
                                     true
                                 }
-                            }).map(|entry| entry.value().clone()) {
+                            }).map(|entry| *entry.value()) {
                                 //Encrypt it with the client's session ID
                                 let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
 
@@ -958,7 +952,6 @@ impl MessageService {
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
             connected_client_thread_channels: Arc::new(DashMap::new()),
-            client_messages: BTreeMap::new(),
         })
     }
 

@@ -310,6 +310,9 @@ impl Application {
                                     self.client_ui.messaging_mode.get_reply_index(),
                                 )),
                             }
+
+                            //Callback
+                            self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnChatSend, &self.lua, Some(self.client_ui.message_buffer.clone()));
                         }
 
                         for file_path in &self.client_ui.files_to_send {

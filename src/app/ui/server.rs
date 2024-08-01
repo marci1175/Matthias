@@ -74,7 +74,7 @@ impl Application {
                                 //This is very rare but can still happen
                                 match self.toasts.lock() {
                                     Ok(mut toasts) => {
-                                        display_error_message(err, &mut *toasts);
+                                        display_error_message(err, &mut toasts);
                                     }
                                     Err(err) => {
                                         dbg!(err);

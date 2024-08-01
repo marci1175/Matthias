@@ -47,7 +47,7 @@ impl Application {
                                 Ok(mut toasts) => {
                                     display_error_message(
                                         "Can not log out while server is running.",
-                                        &mut *toasts,
+                                        &mut toasts,
                                     );
                                 }
                                 Err(err) => {
@@ -116,7 +116,7 @@ impl Application {
                             Ok(mut toasts) => {
                                 display_error_message(
                                     "Invalid address to send the message on.",
-                                    &mut *toasts,
+                                    &mut toasts,
                                 );
                             }
                             Err(err) => {
@@ -174,7 +174,7 @@ impl Application {
                                                 //This is very rare but can still happen
                                                 match toasts.lock() {
                                                     Ok(mut toasts) => {
-                                                        display_error_message(err, &mut *toasts);
+                                                        display_error_message(err, &mut toasts);
                                                     }
                                                     Err(err) => {
                                                         dbg!(err);
@@ -625,7 +625,7 @@ impl Application {
                         //This is very rare but can still happen
                         match self.toasts.lock() {
                             Ok(mut toasts) => {
-                                display_error_message(err, &mut *toasts);
+                                display_error_message(err, &mut toasts);
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -702,7 +702,7 @@ impl Application {
                                                 //This is very rare but can still happen 
                                                 match toasts.lock() {
                                                     Ok(mut toasts) => {
-                                                        display_error_message(err, &mut *toasts);
+                                                        display_error_message(err, &mut toasts);
                                                     },
                                                     Err(err) => {dbg!(err);},
                                                 }
@@ -846,11 +846,24 @@ impl Application {
                                                 }
                                             }
                                             ServerMessageType::VoipState(state) => {
+                                                //Check if the call was alive before the state update
+                                                let was_call_alive = self.client_ui
+                                                    .incoming_messages
+                                                    .ongoing_voip_call
+                                                    .connected_clients.is_none();
+
+                                                //Set state
                                                 self.client_ui
                                                     .incoming_messages
                                                     .ongoing_voip_call
                                                     .connected_clients =
                                                     state.connected_clients.clone();
+                                                
+                                                //This is true only if the call was JUST started
+                                                if was_call_alive || state.connected_clients.is_some() {
+                                                    //Callback
+                                                    self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallRecive, &self.lua, None);
+                                                }
                                             }
                                             _ => {
                                                 //Allocate Message vec for the new message
@@ -863,7 +876,10 @@ impl Application {
                                                 self.client_ui
                                                     .incoming_messages
                                                     .message_list
-                                                    .push(msg.message);
+                                                    .push(msg.message.clone());
+
+                                                //Callback
+                                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnChatRecive, &self.lua, Some(msg.message._struct_into_string()));
                                             }
                                         }
                                     }
@@ -979,7 +995,8 @@ impl Application {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
                                                             ServerVoipReply::Success => {
-                                                                //Nothing lol, all is good
+                                                                //Callback
+                                                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallSend, &self.lua, None);
                                                             }
                                                             ServerVoipReply::Fail(err) => {
                                                                 //Avoid panicking when trying to display a Notification
@@ -988,7 +1005,7 @@ impl Application {
                                                                     Ok(mut toasts) => {
                                                                         display_error_message(
                                                                             err.reason,
-                                                                            &mut *toasts,
+                                                                            &mut toasts,
                                                                         );
                                                                     }
                                                                     Err(err) => {
@@ -1008,7 +1025,7 @@ impl Application {
                                 }
                             }
                             Err(_err) => {
-                                display_error_message(message, &mut *self.toasts.lock().unwrap());
+                                display_error_message(message, &mut self.toasts.lock().unwrap());
 
                                 //Assuming the connection is faulty we reset state
                                 self.reset_client_connection();
@@ -1164,13 +1181,8 @@ async fn recive_server_relay(
     )?;
 
     //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
-    uuid::Uuid::parse_str(&uuid).map_err(|err| {
-        anyhow::Error::msg(format!(
-            "Error: {}, in uuid {}",
-            err.to_string(),
-            uuid.to_string()
-        ))
-    })?;
+    uuid::Uuid::parse_str(&uuid)
+        .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
 
     //Play recived bytes
     sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(

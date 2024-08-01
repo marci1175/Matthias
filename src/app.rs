@@ -9,7 +9,7 @@ use egui::{
     vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
-use lua::execute_code;
+use lua::{execute_code, load_code};
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -49,7 +49,7 @@ impl eframe::App for backend::Application {
                         //This is very rare but can still happen
                         match toasts.lock() {
                             Ok(mut toasts) => {
-                                display_error_message(err, &mut *toasts);
+                                display_error_message(err, &mut toasts);
                             }
                             Err(err) => {
                                 dbg!(err);
@@ -84,44 +84,17 @@ impl eframe::App for backend::Application {
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
 
-            TODO: Implement callbacks
+            TODO: Add notifcations to lua API, callbacks
         */
 
         //Display notifications
         self.toasts.lock().unwrap().show(ctx);
 
-        //Run lua scripts when rendering a frame (I should impl callbacks)
-        for extension in self.client_ui.extension.extension_list.iter_mut() {
-            //Check if the extension is supposed to run
-            if extension.is_running {
-                //Run script
-                match execute_code(&self.lua, extension.contents.clone()) {
-                    Ok(_) => {
-                        //Code executed successfully
-                    }
-                    Err(err) => {
-                        //Save error message
-                        match self.client_ui.extension.output.lock() {
-                            Ok(mut output) => {
-                                output.push(crate::app::lua::LuaOutput::Error(err.to_string()));
-
-                                //Stop the execution of this script
-                                extension.is_running = false;
-
-                                output
-                                        .push(crate::app::lua::LuaOutput::Info(format!(
-                                            r#"Extension "{}" was forcibly stopped due to a runtime error."#,
-                                            extension.name
-                                        )));
-                            }
-                            Err(err) => {
-                                dbg!(err);
-                            }
-                        }
-                    }
-                };
-            }
-        }
+        self.client_ui.extension.event_call_extensions(
+            lua::EventCall::OnDraw,
+            &self.lua,
+            None,
+        );
 
         //Truncate the vector from the other way around so the newest messages will stay
         //This will only start working if ```self.client_ui.extension.output.len() > LUA_OUTPUT_BUFFER_SIZE```
@@ -250,6 +223,9 @@ impl eframe::App for backend::Application {
 
                     if let Ok(incoming_message) = incoming_sync_message {
                         self.client_ui.incoming_messages = incoming_message;
+
+                        //Callback
+                        self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnConnect, &self.lua, None);
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
@@ -400,7 +376,7 @@ impl backend::Application {
                                             //This is very rare but can still happen
                                             match toasts.lock() {
                                                 Ok(mut toasts) => {
-                                                    display_error_message(err, &mut *toasts);
+                                                    display_error_message(err, &mut toasts);
                                                 }
                                                 Err(err) => {
                                                     dbg!(err);
@@ -506,7 +482,7 @@ impl backend::Application {
                     //This is very rare but can still happen
                     match toasts.lock() {
                         Ok(mut toasts) => {
-                            display_error_message(err, &mut *toasts);
+                            display_error_message(err, &mut toasts);
                         }
                         Err(err) => {
                             dbg!(err);
@@ -646,7 +622,7 @@ impl backend::Application {
                                                 //This is very rare but can still happen
                                                 match self.toasts.lock() {
                                                     Ok(mut toasts) => {
-                                                        display_error_message(err, &mut *toasts);
+                                                        display_error_message(err, &mut toasts);
                                                     }
                                                     Err(err) => {
                                                         dbg!(err);
@@ -701,7 +677,7 @@ impl backend::Application {
                                         //This is very rare but can still happen
                                         match self.toasts.lock() {
                                             Ok(mut toasts) => {
-                                                display_error_message(err, &mut *toasts);
+                                                display_error_message(err, &mut toasts);
                                             }
                                             Err(err) => {
                                                 dbg!(err);

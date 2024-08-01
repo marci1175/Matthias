@@ -18,7 +18,7 @@ use egui::load::LoadError;
 use egui::{
     vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
 };
-use egui_notify::{Toast, ToastOptions, Toasts};
+use egui_notify::{Toast, Toasts};
 use image::DynamicImage;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -26,7 +26,7 @@ use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::fs;
@@ -36,7 +36,6 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
-use std::task::Context;
 use std::time::Duration;
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
@@ -45,9 +44,6 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-use windows_sys::w;
-use windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW;
-use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
@@ -526,7 +522,7 @@ fn set_lua_functions(
 
     data.set_global_lua_table();
 
-    return data;
+    data
 }
 
 //Include emoji image header file
@@ -1897,7 +1893,7 @@ pub struct ServerVoipClose {
 #[derive(Debug, Clone)]
 pub struct ServerVoip {
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
-    pub connected_clients: Arc<DashMap<String, (SocketAddr)>>,
+    pub connected_clients: Arc<DashMap<String, SocketAddr>>,
 
     /// This field contains a ```HashMap``` which pairs the SocketAddr to the client's listening thread's sender (So that the reciver thread can recive the ```Vec<u8>``` sent by the sender)
     /// The secound part of the tuple is for shutting down the client manager thread, if they disconnect
@@ -1916,9 +1912,6 @@ pub struct ServerVoip {
 
     /// This entry makes sure the 2 threads are only spawned once
     pub threads: Option<()>,
-
-    /// This field contains all the incoming / pending messages
-    pub client_messages: BTreeMap<MessageIdentifier, UdpMessage>,
 }
 
 impl ServerVoip {
@@ -1938,13 +1931,6 @@ impl ServerVoip {
 
         Ok(())
     }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-
-pub struct MessageIdentifier {
-    pub owner: String,
-    pub index: i8,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
@@ -2473,7 +2459,7 @@ where
     T: ToString + std::marker::Send + 'static,
 {
     let mut toast = Toast::error(display.to_string());
-    
+
     toast.set_duration(Some(Duration::from_secs(4)));
     toast.set_show_progress_bar(true);
 
