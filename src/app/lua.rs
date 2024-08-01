@@ -138,13 +138,13 @@ pub enum EventCall {
     /// Triggered when reciving a message from the server
     /// This is unused and will be reused for something else in the future
     #[allow(dead_code)]
-    OnServerChatRecive,
+    OnServerChatReceive,
 
     /// Triggered when sending a group voice call request
     OnCallSend,
 
     /// Triggered when reciving a group voice call,
-    OnCallRecive,
+    OnCallReceive,
 
     /// Triggered every draw of the ui
     OnDraw,

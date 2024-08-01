@@ -865,7 +865,7 @@ impl Application {
                                                 //This is true only if the call was JUST started
                                                 if was_call_alive || state.connected_clients.is_some() {
                                                     //Callback
-                                                    self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallRecive, &self.lua, None);
+                                                    self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallReceive, &self.lua, None);
                                                 }
                                             }
                                             _ => {
