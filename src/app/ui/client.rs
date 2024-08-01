@@ -186,6 +186,9 @@ impl Application {
                                 }
 
                                 call_button.on_hover_text("Start a group call");
+
+                                //Callback
+                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallSend, &self.lua, None);
                             });
                         }
                     });
@@ -995,8 +998,7 @@ impl Application {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
                                                             ServerVoipReply::Success => {
-                                                                //Callback
-                                                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallSend, &self.lua, None);
+                                                               
                                                             }
                                                             ServerVoipReply::Fail(err) => {
                                                                 //Avoid panicking when trying to display a Notification

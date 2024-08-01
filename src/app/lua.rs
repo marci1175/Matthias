@@ -5,7 +5,7 @@ use std::{
 };
 
 use egui::{Rect, Vec2};
-use mlua::Lua;
+use mlua::{Lua, Value::Nil};
 use strum::{Display, ToString};
 
 /// This function executes code provided, and if its a function adds it to the global register
@@ -117,9 +117,19 @@ pub struct Extension {
 }
 
 #[derive(Display)]
-/// These are the events which trigger a function call in the extensions
+/// These are the events which trigger a function call in the extensions.
+/// Please refer to the [Documentation](https://matthias.gitbook.io/matthias)
 pub enum EventCall {
     /// Triggered when sending a message
+    /// If this Event is invoked the function will recive what the user has sent, this is optional to "recive"
+    /// ``` lua
+    /// function OnChatSend(message)
+    ///     --Do anything with the message
+    /// end
+    /// function OnChatSend()
+    ///     --The function will still be called
+    /// end
+    /// ```
     OnChatSend,
 
     /// Triggered when reciving a message
@@ -175,9 +185,14 @@ impl Extension {
         }
     }
 
+    /// This function loads and calls the function
+    /// This function also sets the loaded function to a ```Nil``` to reset it and avoid the function being called from a different script
     fn load_and_call_function(lua: &Lua, ext: &mut ExtensionProperties, arg: &Option<String>, fn_name: String) -> Result<(), anyhow::Error> {
         load_code(lua, ext.contents.clone())?;
-        call_function(lua, arg.clone(), fn_name)?;
+        call_function(lua, arg.clone(), fn_name.clone())?;
+
+        //Set the function called here to a Nil, to avoid cross script exploiting
+        lua.globals().set(fn_name, Nil)?;
 
         Ok(())
     }

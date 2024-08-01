@@ -365,6 +365,10 @@ fn set_lua_functions(
     let ctx_clone_image = cc.egui_ctx.clone();
     let ctx_clone_image_buffer_clean = cc.egui_ctx.clone();
 
+    let toasts = data.toasts.clone();
+    let toasts_clone1 = data.toasts.clone();
+    let toasts_clone2 = data.toasts.clone();
+
     let draw_line = data
         .lua
         .create_function(move |_, args: ([f32; 2], [f32; 2], [u8; 4])| {
@@ -508,18 +512,94 @@ fn set_lua_functions(
             Ok(())
         })
         .unwrap();
+    
+    let notification_error = data
+        .lua
+        .create_function(move |_, caption: String| {
+            match toasts.lock() {
+                Ok(mut toasts) => {
+                    let mut toast = Toast::error(caption);
+                    
+                    toast.set_duration(Some(Duration::from_secs(4)));
+                    toast.set_closable(true);
 
-    data.lua.globals().set("print", print).unwrap();
+                    toasts.add(
+                        toast
+                    );
+                },
+                Err(_err) => {
+                    dbg!(_err);
+                },
+            }
+
+            Ok(())
+        })
+        .unwrap();
+
+        let notification_basic = data
+        .lua
+        .create_function(move |_, caption: String| {
+            match toasts_clone1.lock() {
+                Ok(mut toasts) => {
+                    let mut toast = Toast::basic(caption);
+                    
+                    toast.set_duration(Some(Duration::from_secs(4)));
+                    toast.set_closable(true);
+
+                    toasts.add(
+                        toast
+                    );
+                },
+                Err(_err) => {
+                    dbg!(_err);
+                },
+            }
+
+            Ok(())
+        })
+        .unwrap();
+
+        let notification_info = data
+        .lua
+        .create_function(move |_, caption: String| {
+            match toasts_clone2.lock() {
+                Ok(mut toasts) => {
+                    let mut toast = Toast::info(caption);
+                    
+                    toast.set_duration(Some(Duration::from_secs(4)));
+                    toast.set_closable(true);
+
+                    toasts.add(
+                        toast
+                    );
+                },
+                Err(_err) => {
+                    dbg!(_err);
+                },
+            }
+
+            Ok(())
+        })
+        .unwrap();
+    
+
     data.lua.globals().set("draw_line", draw_line).unwrap();
     data.lua.globals().set("draw_rect", draw_rect).unwrap();
     data.lua.globals().set("draw_circle", draw_circle).unwrap();
     data.lua.globals().set("draw_text", draw_text).unwrap();
+
+    data.lua.globals().set("notification_error", notification_error).unwrap();
+    data.lua.globals().set("notification_info", notification_info).unwrap();
+    data.lua.globals().set("notification_basic", notification_basic).unwrap();
+    
     data.lua.globals().set("draw_image", draw_image).unwrap();
+    data.lua.globals().set("print", print).unwrap();
+    
     data.lua
         .globals()
         .set("forget_all_images", forget_all_images)
         .unwrap();
-
+    
     data.set_global_lua_table();
 
     data

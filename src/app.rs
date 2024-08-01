@@ -225,7 +225,7 @@ impl eframe::App for backend::Application {
                         self.client_ui.incoming_messages = incoming_message;
 
                         //Callback
-                        self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnConnect, &self.lua, None);
+                        self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnConnect, &self.lua, Some(self.client_ui.send_on_ip.clone()));
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
@@ -313,6 +313,9 @@ impl backend::Application {
                                 .clicked()
                             {
                                 self.disconnect_from_server();
+
+                                //Callback
+                                self.client_ui.extension.event_call_extensions(lua::EventCall::OnDisconnect, &self.lua, None);
                             }
                         }
                         ConnectionState::Connecting => {
