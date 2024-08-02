@@ -11,6 +11,7 @@ A decentralized chat application built completely in rust.
 - Custom emojies
 - Windows installer (Using a Visual Studio project)
 - Intuitive user interface
+- Experimental MD (Markdown) support
 __All this__ with great preformance, due to the project using multiple threads, async calls, egui and many more optmizatations!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
 ## Preview
