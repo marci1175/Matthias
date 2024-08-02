@@ -1,7 +1,8 @@
-//Define the maximum amount of entries in the lua output vector
+///Define the maximum amount of entries in the lua output vector
 const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
 
-//Define custom url of this application
+///Define custom url of this application
+/// The registry keys for opening this url should already be added by the installer
 const CUSTOM_URL: &str = "matthias://";
 
 use crate::app::lua::ExtensionProperties;
@@ -9,7 +10,7 @@ use anyhow::Error;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{
-    vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
+    vec2, Align, Color32, KeyboardShortcut, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit
 };
 use egui_extras::{Column, TableBuilder};
 use std::fs::{self};
@@ -706,19 +707,23 @@ impl backend::Application {
 
                             //Catch ctrl + c shortcut for cooler text edit
                             ctx.input_mut(|writer| {
-                                if writer.consume_key(Modifiers::CTRL, egui::Key::S) {
-                                    if let Err(err) = extension.write_change_to_file() {
-                                        //Avoid panicking when trying to display a Notification
-                                        //This is very rare but can still happen
-                                        match self.toasts.lock() {
-                                            Ok(mut toasts) => {
-                                                display_error_message(err, &mut toasts);
+                                //Check if theyre actually pressed
+                                if writer.key_pressed(egui::Key::S) && writer.modifiers.matches_exact(Modifiers::SHIFT) {
+                                    //Consume them if yes, removing them from InputState in this frame
+                                    if writer.consume_shortcut(&KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::S)) {
+                                        if let Err(err) = extension.write_change_to_file() {
+                                            //Avoid panicking when trying to display a Notification
+                                            //This is very rare but can still happen
+                                            match self.toasts.lock() {
+                                                Ok(mut toasts) => {
+                                                    display_error_message(err, &mut toasts);
+                                                }
+                                                Err(err) => {
+                                                    dbg!(err);
+                                                }
                                             }
-                                            Err(err) => {
-                                                dbg!(err);
-                                            }
-                                        }
-                                    };
+                                        };
+                                    }
                                 }
                             });
                         });
