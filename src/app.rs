@@ -9,7 +9,6 @@ use egui::{
     vec2, Align, Color32, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
-use lua::{execute_code, load_code};
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -77,6 +76,9 @@ impl eframe::App for backend::Application {
         self.server_shutdown_token.cancel();
         self.autosync_shutdown_token.cancel();
         self.voip_shutdown_token.cancel();
+
+        //Signal the voice recorder function to stop
+        let _ = self.record_audio_interrupter.send(());
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -90,11 +92,9 @@ impl eframe::App for backend::Application {
         //Display notifications
         self.toasts.lock().unwrap().show(ctx);
 
-        self.client_ui.extension.event_call_extensions(
-            lua::EventCall::OnDraw,
-            &self.lua,
-            None,
-        );
+        self.client_ui
+            .extension
+            .event_call_extensions(lua::EventCall::OnDraw, &self.lua, None);
 
         //Truncate the vector from the other way around so the newest messages will stay
         //This will only start working if ```self.client_ui.extension.output.len() > LUA_OUTPUT_BUFFER_SIZE```
@@ -225,7 +225,11 @@ impl eframe::App for backend::Application {
                         self.client_ui.incoming_messages = incoming_message;
 
                         //Callback
-                        self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnConnect, &self.lua, Some(self.client_ui.send_on_ip.clone()));
+                        self.client_ui.extension.event_call_extensions(
+                            crate::app::lua::EventCall::OnConnect,
+                            &self.lua,
+                            Some(self.client_ui.send_on_ip.clone()),
+                        );
                     } else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
@@ -315,7 +319,11 @@ impl backend::Application {
                                 self.disconnect_from_server();
 
                                 //Callback
-                                self.client_ui.extension.event_call_extensions(lua::EventCall::OnDisconnect, &self.lua, None);
+                                self.client_ui.extension.event_call_extensions(
+                                    lua::EventCall::OnDisconnect,
+                                    &self.lua,
+                                    None,
+                                );
                             }
                         }
                         ConnectionState::Connecting => {

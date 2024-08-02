@@ -6,7 +6,7 @@ use opus::Encoder;
 use std::collections::VecDeque;
 use std::f32;
 use std::io::{BufWriter, Cursor};
-use std::sync::mpsc::{self};
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -93,7 +93,7 @@ pub fn record_audio_for_set_duration(
 /// This function returns a handle to a `queue` of bytes (```Arc<Mutex<VecDeque<u8>>>```), while spawning a thread which constantly writes the incoming audio into the buffer
 /// This  `queue` or `buffer` gets updated from left to right, the new element always pushes back all the elements behind it, if the value's index reaches ```idx > queue_lenght```, it gets dropped.
 pub fn record_audio_with_interrupt(
-    interrupt: CancellationToken,
+    interrupt: Receiver<()>,
     amplification_precentage: f32,
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
 ) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>> {
@@ -123,7 +123,7 @@ pub fn record_audio_with_interrupt(
         stream.play()?;
 
         //Wait for interrupt
-        while !interrupt.is_cancelled() {}
+        interrupt.recv()?;
 
         //End thread
         Ok(())

@@ -130,6 +130,10 @@ pub struct Application {
     #[serde(skip)]
     pub audio_bytes_rx: Arc<mpsc::Receiver<Vec<u8>>>,
 
+    /// This is used as an interrupt to the voice recording function
+    #[serde(skip)]
+    pub record_audio_interrupter: mpsc::Sender<()>,
+
     /*
         Register
     */
@@ -215,6 +219,7 @@ impl Default for Application {
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
+            record_audio_interrupter: mpsc::channel::<()>().0,
             toasts: Arc::new(Mutex::new(Toasts::new())),
 
             voip_shutdown_token: CancellationToken::new(),
@@ -512,94 +517,96 @@ fn set_lua_functions(
             Ok(())
         })
         .unwrap();
-    
+
     let notification_error = data
         .lua
         .create_function(move |_, caption: String| {
             match toasts.lock() {
                 Ok(mut toasts) => {
                     let mut toast = Toast::error(caption);
-                    
+
                     toast.set_duration(Some(Duration::from_secs(4)));
                     toast.set_closable(true);
 
-                    toasts.add(
-                        toast
-                    );
-                },
+                    toasts.add(toast);
+                }
                 Err(_err) => {
                     dbg!(_err);
-                },
+                }
             }
 
             Ok(())
         })
         .unwrap();
 
-        let notification_basic = data
+    let notification_basic = data
         .lua
         .create_function(move |_, caption: String| {
             match toasts_clone1.lock() {
                 Ok(mut toasts) => {
                     let mut toast = Toast::basic(caption);
-                    
+
                     toast.set_duration(Some(Duration::from_secs(4)));
                     toast.set_closable(true);
 
-                    toasts.add(
-                        toast
-                    );
-                },
+                    toasts.add(toast);
+                }
                 Err(_err) => {
                     dbg!(_err);
-                },
+                }
             }
 
             Ok(())
         })
         .unwrap();
 
-        let notification_info = data
+    let notification_info = data
         .lua
         .create_function(move |_, caption: String| {
             match toasts_clone2.lock() {
                 Ok(mut toasts) => {
                     let mut toast = Toast::info(caption);
-                    
+
                     toast.set_duration(Some(Duration::from_secs(4)));
                     toast.set_closable(true);
 
-                    toasts.add(
-                        toast
-                    );
-                },
+                    toasts.add(toast);
+                }
                 Err(_err) => {
                     dbg!(_err);
-                },
+                }
             }
 
             Ok(())
         })
         .unwrap();
-    
 
     data.lua.globals().set("draw_line", draw_line).unwrap();
     data.lua.globals().set("draw_rect", draw_rect).unwrap();
     data.lua.globals().set("draw_circle", draw_circle).unwrap();
     data.lua.globals().set("draw_text", draw_text).unwrap();
 
-    data.lua.globals().set("notification_error", notification_error).unwrap();
-    data.lua.globals().set("notification_info", notification_info).unwrap();
-    data.lua.globals().set("notification_basic", notification_basic).unwrap();
-    
+    data.lua
+        .globals()
+        .set("notification_error", notification_error)
+        .unwrap();
+    data.lua
+        .globals()
+        .set("notification_info", notification_info)
+        .unwrap();
+    data.lua
+        .globals()
+        .set("notification_basic", notification_basic)
+        .unwrap();
+
     data.lua.globals().set("draw_image", draw_image).unwrap();
     data.lua.globals().set("print", print).unwrap();
-    
+
     data.lua
         .globals()
         .set("forget_all_images", forget_all_images)
         .unwrap();
-    
+
     data.set_global_lua_table();
 
     data

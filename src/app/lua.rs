@@ -157,12 +157,7 @@ pub enum EventCall {
 }
 
 impl Extension {
-    pub fn event_call_extensions(
-        &mut self,
-        event: EventCall,
-        lua: &Lua,
-        arg: Option<String>,
-    ) {
+    pub fn event_call_extensions(&mut self, event: EventCall, lua: &Lua, arg: Option<String>) {
         for mut ext in self.extension_list.iter_mut() {
             //If the extension should be running we skip that entry
             if !ext.is_running {
@@ -180,14 +175,19 @@ impl Extension {
                     }
 
                     Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
-                },
+                }
             };
         }
     }
 
     /// This function loads and calls the function
     /// This function also sets the loaded function to a ```Nil``` to reset it and avoid the function being called from a different script
-    fn load_and_call_function(lua: &Lua, ext: &mut ExtensionProperties, arg: &Option<String>, fn_name: String) -> Result<(), anyhow::Error> {
+    fn load_and_call_function(
+        lua: &Lua,
+        ext: &mut ExtensionProperties,
+        arg: &Option<String>,
+        fn_name: String,
+    ) -> Result<(), anyhow::Error> {
         load_code(lua, ext.contents.clone())?;
         call_function(lua, arg.clone(), fn_name.clone())?;
 
@@ -196,8 +196,12 @@ impl Extension {
 
         Ok(())
     }
-    
-    pub fn add_msg_to_log(output: Arc<Mutex<Vec<LuaOutput>>>, extension: &mut ExtensionProperties, log_inner: String) {
+
+    pub fn add_msg_to_log(
+        output: Arc<Mutex<Vec<LuaOutput>>>,
+        extension: &mut ExtensionProperties,
+        log_inner: String,
+    ) {
         match output.lock() {
             Ok(mut output) => {
                 output.push(crate::app::lua::LuaOutput::Error(log_inner.to_string()));

@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -142,6 +142,9 @@ impl Application {
                                 //Shutdown listener and recorder thread
                                 self.voip_shutdown_token.cancel();
 
+                                //Signal the voice recorder function to stop
+                                let _ = self.record_audio_interrupter.send(());
+
                                 //Reset state
                                 self.client_ui.voip = None;
                                 self.voip_thread = None;
@@ -188,7 +191,11 @@ impl Application {
                                 call_button.on_hover_text("Start a group call");
 
                                 //Callback
-                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallSend, &self.lua, None);
+                                self.client_ui.extension.event_call_extensions(
+                                    crate::app::lua::EventCall::OnCallSend,
+                                    &self.lua,
+                                    None,
+                                );
                             });
                         }
                     });
@@ -850,10 +857,12 @@ impl Application {
                                             }
                                             ServerMessageType::VoipState(state) => {
                                                 //Check if the call was alive before the state update
-                                                let was_call_alive = self.client_ui
+                                                let was_call_alive = self
+                                                    .client_ui
                                                     .incoming_messages
                                                     .ongoing_voip_call
-                                                    .connected_clients.is_none();
+                                                    .connected_clients
+                                                    .is_none();
 
                                                 //Set state
                                                 self.client_ui
@@ -861,11 +870,17 @@ impl Application {
                                                     .ongoing_voip_call
                                                     .connected_clients =
                                                     state.connected_clients.clone();
-                                                
+
                                                 //This is true only if the call was JUST started
-                                                if was_call_alive || state.connected_clients.is_some() {
+                                                if was_call_alive
+                                                    || state.connected_clients.is_some()
+                                                {
                                                     //Callback
-                                                    self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallReceive, &self.lua, None);
+                                                    self.client_ui.extension.event_call_extensions(
+                                                        crate::app::lua::EventCall::OnCallReceive,
+                                                        &self.lua,
+                                                        None,
+                                                    );
                                                 }
                                             }
                                             _ => {
@@ -882,7 +897,11 @@ impl Application {
                                                     .push(msg.message.clone());
 
                                                 //Callback
-                                                self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnChatRecive, &self.lua, Some(msg.message._struct_into_string()));
+                                                self.client_ui.extension.event_call_extensions(
+                                                    crate::app::lua::EventCall::OnChatRecive,
+                                                    &self.lua,
+                                                    Some(msg.message._struct_into_string()),
+                                                );
                                             }
                                         }
                                     }
@@ -997,9 +1016,7 @@ impl Application {
                                                 match incoming_reply {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
-                                                            ServerVoipReply::Success => {
-                                                               
-                                                            }
+                                                            ServerVoipReply::Success => {}
                                                             ServerVoipReply::Fail(err) => {
                                                                 //Avoid panicking when trying to display a Notification
                                                                 //This is very rare but can still happen
@@ -1063,6 +1080,10 @@ impl Application {
                 let reciver_socket_part = voip.socket.clone();
                 let microphone_precentage = self.client_ui.microphone_volume.clone();
 
+                let (tx, rx) = mpsc::channel::<()>();
+
+                self.record_audio_interrupter = tx;
+
                 //Sender thread
                 tokio::spawn(async move {
                     //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
@@ -1072,7 +1093,7 @@ impl Application {
                     voip.socket.connect(destination).await.unwrap();
 
                     //Start audio recorder
-                    let recording_handle = record_audio_with_interrupt(cancel_token.clone(), *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
+                    let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
                     //We can just send it becasue we have already set the default destination address
                     loop {
                         select! {
