@@ -14,3 +14,9 @@ A decentralized chat application built completely in rust.
 __All this__ with great preformance, due to the project using multiple threads, async calls, egui and many more optmizatations!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
 ## Preview
+### Lua api
+![lua api](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/luaapi.png)
+### Messages
+![Messages](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/messages.png)
+### Register page
+![Register page](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/register.png)
