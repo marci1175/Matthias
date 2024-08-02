@@ -10,7 +10,8 @@ use anyhow::Error;
 use base64::engine::general_purpose;
 use base64::Engine;
 use egui::{
-    vec2, Align, Color32, KeyboardShortcut, Layout, Modifiers, RichText, ScrollArea, Slider, Stroke, TextEdit
+    vec2, Align, Color32, KeyboardShortcut, Layout, Modifiers, RichText, ScrollArea, Slider,
+    Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
 use std::fs::{self};
@@ -100,7 +101,6 @@ impl eframe::App for backend::Application {
 
             //Check for URL
             if startup_link.contains(CUSTOM_URL) {
-                
                 //Get the address the link connects to
                 let address = &startup_link[CUSTOM_URL.len()..];
 
@@ -436,25 +436,25 @@ impl backend::Application {
             .req_passw
             .then_some(&self.client_ui.client_password)
             .cloned();
-    
+
         let sender = self.connection_sender.clone();
-    
+
         //Reset shutdown token
         self.autosync_shutdown_token = CancellationToken::new();
-    
+
         //Clone ctx so we can call request repaint from another thread
         let ctx = ctx.clone();
-    
+
         let user_information = self.opened_user_information.clone();
-    
+
         //Reset all messages and everything else
         self.client_ui.incoming_messages = ServerMaster::default();
-    
+
         //Forget all imaes so the cahced imges will be deleted
         ctx.forget_all_images();
-    
+
         let toasts = self.toasts.clone();
-    
+
         tokio::task::spawn(async move {
             match ClientConnection::connect_to_server(
                 address,
@@ -488,13 +488,13 @@ impl backend::Application {
                 }
             };
         });
-    
+
         //reset autosync
         self.server_sender_thread = None;
-    
+
         self.client_connection.state = ConnectionState::Connecting;
     }
-    
+
     fn disconnect_from_server(&mut self) {
         let username = self.login_username.clone();
 
@@ -650,7 +650,7 @@ impl backend::Application {
                         //Edit
                         row.col(|ui| {
                             ui.horizontal_centered(|ui| {
-                                ui.menu_button("Edit", |ui| {
+                                let menu_button = ui.menu_button("Edit", |ui| {
                                     ui.horizontal(|ui| {
                                         if ui.button("Save").clicked() {
                                             if let Err(err) = extension.write_change_to_file() {
@@ -697,33 +697,34 @@ impl backend::Application {
                                             .code_editor()
                                             .layouter(&mut layouter),
                                     );
+
+                                    //Catch ctrl + c shortcut for cooler text edit
+                                    ctx.input_mut(|writer| {
+                                        //Consume them if yes, removing them from InputState in this frame
+                                        //Check if the menu is open
+                                        if writer.consume_shortcut(&KeyboardShortcut::new(
+                                            Modifiers::CTRL,
+                                            egui::Key::S,
+                                        )) {
+                                            if let Err(err) = extension.write_change_to_file() {
+                                                //Avoid panicking when trying to display a Notification
+                                                //This is very rare but can still happen
+                                                match self.toasts.lock() {
+                                                    Ok(mut toasts) => {
+                                                        display_error_message(err, &mut toasts);
+                                                    }
+                                                    Err(err) => {
+                                                        dbg!(err);
+                                                    }
+                                                }
+                                            };
+                                        }
+                                    });
                                 });
 
                                 //Display unsaved state
                                 if extension.contents != extension.text_edit_buffer {
                                     ui.label(RichText::new("Unsaved").color(Color32::RED));
-                                }
-                            });
-
-                            //Catch ctrl + c shortcut for cooler text edit
-                            ctx.input_mut(|writer| {
-                                //Check if theyre actually pressed
-                                if writer.key_pressed(egui::Key::S) && writer.modifiers.matches_exact(Modifiers::SHIFT) {
-                                    //Consume them if yes, removing them from InputState in this frame
-                                    if writer.consume_shortcut(&KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::S)) {
-                                        if let Err(err) = extension.write_change_to_file() {
-                                            //Avoid panicking when trying to display a Notification
-                                            //This is very rare but can still happen
-                                            match self.toasts.lock() {
-                                                Ok(mut toasts) => {
-                                                    display_error_message(err, &mut toasts);
-                                                }
-                                                Err(err) => {
-                                                    dbg!(err);
-                                                }
-                                            }
-                                        };
-                                    }
                                 }
                             });
                         });

@@ -19,8 +19,6 @@ async fn main() -> eframe::Result<()> {
     //Get args
     let args: Vec<String> = args().collect();
 
-
-
     #[cfg(not(debug_assertions))]
     env_logger::init();
 
