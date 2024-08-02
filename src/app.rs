@@ -1,6 +1,9 @@
 //Define the maximum amount of entries in the lua output vector
 const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
 
+//Define custom url of this application
+const CUSTOM_URL: &str = "matthias://";
+
 use crate::app::lua::ExtensionProperties;
 use anyhow::Error;
 use base64::engine::general_purpose;
@@ -86,8 +89,27 @@ impl eframe::App for backend::Application {
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
 
-            TODO: Add notifcations to lua API, callbacks
+            TODO: make custom urls open up the chat app and automaticly connect
         */
+
+        //Check for startup args
+        if let Some(startup_args) = &self.startup_args {
+            //Get startup link
+            let startup_link = startup_args[1].clone();
+
+            //Check for URL
+            if startup_link.contains(CUSTOM_URL) {
+                
+                //Get the address the link connects to
+                let address = &startup_link[CUSTOM_URL.len()..];
+
+                //Connect to server
+                self.connect_to_server(ctx, address.to_string());
+
+                //Show settings window to alert user
+                self.settings_window = true;
+            }
+        }
 
         //Display notifications
         self.toasts.lock().unwrap().show(ctx);
@@ -339,71 +361,7 @@ impl backend::Application {
                         }
                         _ => {
                             if ui.button("Connect").clicked() {
-                                let ip = self.client_ui.send_on_ip.clone();
-
-                                let username = self.login_username.clone();
-                                let password = self
-                                    .client_ui
-                                    .req_passw
-                                    .then_some(&self.client_ui.client_password)
-                                    .cloned();
-
-                                let sender = self.connection_sender.clone();
-
-                                //Reset shutdown token
-                                self.autosync_shutdown_token = CancellationToken::new();
-
-                                //Clone ctx so we can call request repaint from another thread
-                                let ctx = ctx.clone();
-
-                                let user_information = self.opened_user_information.clone();
-
-                                //Reset all messages and everything else
-                                self.client_ui.incoming_messages = ServerMaster::default();
-
-                                //Forget all imaes so the cahced imges will be deleted
-                                ctx.forget_all_images();
-
-                                let toasts = self.toasts.clone();
-
-                                tokio::task::spawn(async move {
-                                    match ClientConnection::connect_to_server(
-                                        ip,
-                                        username,
-                                        password,
-                                        &user_information.uuid,
-                                        user_information.profile,
-                                    )
-                                    .await
-                                    {
-                                        Ok(ok) => {
-                                            ctx.request_repaint();
-                                            if let Err(err) = sender.send(Some(ok)) {
-                                                dbg!(err);
-                                            };
-                                        }
-                                        Err(err) => {
-                                            //Avoid panicking when trying to display a Notification
-                                            //This is very rare but can still happen
-                                            match toasts.lock() {
-                                                Ok(mut toasts) => {
-                                                    display_error_message(err, &mut toasts);
-                                                }
-                                                Err(err) => {
-                                                    dbg!(err);
-                                                }
-                                            }
-                                            if let Err(err) = sender.send(None) {
-                                                dbg!(err);
-                                            };
-                                        }
-                                    };
-                                });
-
-                                //reset autosync
-                                self.server_sender_thread = None;
-
-                                self.client_connection.state = ConnectionState::Connecting;
+                                self.connect_to_server(ctx, self.client_ui.send_on_ip.clone());
                             }
                         }
                     }
@@ -470,6 +428,72 @@ impl backend::Application {
         });
     }
 
+    pub fn connect_to_server(&mut self, ctx: &egui::Context, address: String) {
+        let username = self.login_username.clone();
+        let password = self
+            .client_ui
+            .req_passw
+            .then_some(&self.client_ui.client_password)
+            .cloned();
+    
+        let sender = self.connection_sender.clone();
+    
+        //Reset shutdown token
+        self.autosync_shutdown_token = CancellationToken::new();
+    
+        //Clone ctx so we can call request repaint from another thread
+        let ctx = ctx.clone();
+    
+        let user_information = self.opened_user_information.clone();
+    
+        //Reset all messages and everything else
+        self.client_ui.incoming_messages = ServerMaster::default();
+    
+        //Forget all imaes so the cahced imges will be deleted
+        ctx.forget_all_images();
+    
+        let toasts = self.toasts.clone();
+    
+        tokio::task::spawn(async move {
+            match ClientConnection::connect_to_server(
+                address,
+                username,
+                password,
+                &user_information.uuid,
+                user_information.profile,
+            )
+            .await
+            {
+                Ok(ok) => {
+                    ctx.request_repaint();
+                    if let Err(err) = sender.send(Some(ok)) {
+                        dbg!(err);
+                    };
+                }
+                Err(err) => {
+                    //Avoid panicking when trying to display a Notification
+                    //This is very rare but can still happen
+                    match toasts.lock() {
+                        Ok(mut toasts) => {
+                            display_error_message(err, &mut toasts);
+                        }
+                        Err(err) => {
+                            dbg!(err);
+                        }
+                    }
+                    if let Err(err) = sender.send(None) {
+                        dbg!(err);
+                    };
+                }
+            };
+        });
+    
+        //reset autosync
+        self.server_sender_thread = None;
+    
+        self.client_connection.state = ConnectionState::Connecting;
+    }
+    
     fn disconnect_from_server(&mut self) {
         let username = self.login_username.clone();
 

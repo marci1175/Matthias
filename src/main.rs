@@ -5,6 +5,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
 
+use std::env::args;
+
 use egui::ViewportBuilder;
 use egui::{Style, Visuals};
 use tokio::fs;
@@ -14,6 +16,11 @@ use windows_sys::{
 };
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
+    //Get args
+    let args: Vec<String> = args().collect();
+
+
+
     #[cfg(not(debug_assertions))]
     env_logger::init();
 
@@ -83,7 +90,13 @@ async fn main() -> eframe::Result<()> {
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            let application = matthias::app::backend::Application::new(cc);
+            let mut application = matthias::app::backend::Application::new(cc);
+
+            //Check if there are any custom startup args
+            if args.len() > 1 {
+                //Modify args
+                application.startup_args = Some(args);
+            }
 
             //Create application
             Ok(Box::new(application))

@@ -48,6 +48,10 @@ use uuid::Uuid;
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
 pub struct Application {
+    /// These are the args the application was started with
+    #[serde(skip)]
+    pub startup_args: Option<Vec<String>>,
+
     /// This is field is used to display notifications
     #[serde(skip)]
     pub toasts: Arc<Mutex<Toasts>>,
@@ -219,6 +223,7 @@ impl Default for Application {
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
+            startup_args: None,
             record_audio_interrupter: mpsc::channel::<()>().0,
             toasts: Arc::new(Mutex::new(Toasts::new())),
 
