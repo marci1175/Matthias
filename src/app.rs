@@ -14,6 +14,7 @@ use egui::{
     Stroke, TextEdit,
 };
 use egui_extras::{Column, TableBuilder};
+use egui_notify::Toast;
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;
@@ -91,8 +92,7 @@ impl eframe::App for backend::Application {
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
 
-            TODO: make custom urls open up the chat app and automaticly connect
-            TODO: Reowrk logging (We already have tracing for that, replace dbg!)
+            TODO: Rework logging (We already have tracing for that, replace dbg!)
         */
 
         //Check for startup args
@@ -115,8 +115,26 @@ impl eframe::App for backend::Application {
                         .cloned(),
                 );
 
+                //Set address so itll be displayed in the ui too
+                self.client_ui.send_on_ip = address.to_string();
+
                 //Show settings window to alert user
                 self.settings_window = true;
+
+                //If set up the connection nitify the user
+                match self.toasts.lock() {
+                    Ok(mut toasts) => {
+                        //Set toast
+                        let mut toast = Toast::info("Link successfully opened! You will able to chat once you have signed in!");
+                        toast.set_duration(None);
+                        toast.set_closable(true);
+
+                        toasts.add(toast);
+                    },
+                    Err(_err) => {
+                        dbg!(_err);
+                    },
+                }
             }
 
             //Reset startup args
@@ -159,7 +177,7 @@ impl eframe::App for backend::Application {
         }
 
         //Create value
-        let mut settings_window = self.settings_window;
+        let mut settings_window = self.settings_window && self.main.client_mode;
 
         //Settings window
         egui::Window::new("Settings")
