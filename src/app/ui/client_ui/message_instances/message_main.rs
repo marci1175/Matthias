@@ -281,8 +281,16 @@ impl Application {
                                     }
 
                                     ui.menu_button("React", |ui| {
-                                        if let Some(emoji_name) = self.draw_emoji_selector(ui, ctx) {
-                                            self.send_msg(ClientMessage::construct_reaction_msg(emoji_name, iter_index, &self.opened_user_information.uuid));
+                                        if let Some(selected_emoji_name) = self.draw_emoji_selector(ui, ctx) {
+                                            //Check if we have already sent this emoji once
+                                            //If No send it
+                                            if !self.client_ui.incoming_messages.reaction_list[iter_index].message_reactions.iter().any(|emoji| &emoji.emoji_name == &selected_emoji_name) {
+                                                self.send_msg(ClientMessage::construct_reaction_msg(selected_emoji_name, iter_index, &self.opened_user_information.uuid));
+                                            }
+                                            //If yes we send deletion message
+                                            else {
+                                                self.send_msg(ClientMessage::construct_reaction_remove_msg(selected_emoji_name, iter_index, &self.opened_user_information.uuid));
+                                            }
                                         }
                                     });
 

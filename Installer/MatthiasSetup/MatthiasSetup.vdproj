@@ -163,7 +163,7 @@
         {
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_D6C27F0C96B8402C9C5D9B86D44C56BF"
             {
-            "SourcePath" = "8:..\\..\\..\\..\\Desktop\\szeChat\\target\\release\\matthias.exe"
+            "SourcePath" = "8:..\\..\\target\\release\\matthias.exe"
             "TargetName" = "8:matthias.exe"
             "Tag" = "8:"
             "Folder" = "8:_A83CD10A04134DA4BBA2C9AD1F266D25"

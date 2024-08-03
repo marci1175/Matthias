@@ -828,31 +828,88 @@ impl Application {
                                             }
                                             ServerMessageType::Reaction(message) => {
                                                 //Search if there has already been a reaction added
-                                                if let Some(index) =
-                                                    self.client_ui.incoming_messages.reaction_list
-                                                        [message.index as usize]
-                                                        .message_reactions
-                                                        .iter()
-                                                        .position(|item| {
-                                                            item.emoji_name == message.emoji_name
-                                                        })
-                                                {
-                                                    //If yes, increment the reaction counter
-                                                    self.client_ui
-                                                        .incoming_messages
-                                                        .reaction_list
-                                                        [message.index as usize]
-                                                        .message_reactions[index]
-                                                        .times += 1;
-                                                } else {
-                                                    //If no, add a new reaction counter
-                                                    self.client_ui.incoming_messages.reaction_list
-                                                        [message.index as usize]
-                                                        .message_reactions
-                                                        .push(Reaction {
-                                                            emoji_name: message.emoji_name.clone(),
-                                                            times: 1,
-                                                        })
+                                                match &message.reaction_type {
+                                                    crate::app::backend::ReactionType::Add(
+                                                        reaction,
+                                                    ) => {
+                                                        if let Some(index) = self
+                                                            .client_ui
+                                                            .incoming_messages
+                                                            .reaction_list
+                                                            [reaction.message_index as usize]
+                                                            .message_reactions
+                                                            .iter()
+                                                            .position(|item| {
+                                                                item.emoji_name
+                                                                    == reaction.emoji_name
+                                                            })
+                                                        {
+                                                            //If yes, increment the reaction counter
+                                                            self.client_ui
+                                                                .incoming_messages
+                                                                .reaction_list
+                                                                [reaction.message_index
+                                                                    as usize]
+                                                                .message_reactions[index]
+                                                                .times += 1;
+                                                        } else {
+                                                            //If no, add a new reaction counter
+                                                            self.client_ui
+                                                                .incoming_messages
+                                                                .reaction_list
+                                                                [reaction.message_index as usize]
+                                                                .message_reactions
+                                                                .push(Reaction {
+                                                                    emoji_name: reaction
+                                                                        .emoji_name
+                                                                        .clone(),
+                                                                    times: 1,
+                                                                })
+                                                        }
+                                                    }
+                                                    crate::app::backend::ReactionType::Remove(
+                                                        reaction,
+                                                    ) => {
+                                                        //Search for emoji in the emoji list
+                                                        //If its not found, it a serious issue, or just internet inconsistency
+                                                        if let Some(index) = self
+                                                            .client_ui
+                                                            .incoming_messages
+                                                            .reaction_list
+                                                            [reaction.message_index as usize]
+                                                            .message_reactions
+                                                            .iter()
+                                                            .position(|item| {
+                                                                item.emoji_name
+                                                                    == reaction.emoji_name
+                                                            })
+                                                        {
+                                                            //Borrow counter as mutable
+                                                            let emoji_reaction_times = &mut self
+                                                                .client_ui
+                                                                .incoming_messages
+                                                                .reaction_list
+                                                                [reaction.message_index as usize]
+                                                                .message_reactions[index]
+                                                                .times;
+
+                                                            //Subtract 1 from the emoji counter
+                                                            *emoji_reaction_times -= 1;
+
+                                                            //If the emoji is reacted with 0 times, it means it has been fully deleted from the list
+                                                            if *emoji_reaction_times == 0 {
+                                                                self.client_ui
+                                                                    .incoming_messages
+                                                                    .reaction_list
+                                                                    [reaction.message_index
+                                                                        as usize]
+                                                                    .message_reactions
+                                                                    .remove(index);
+                                                            }
+                                                        } else {
+                                                            dbg!("Emoji was already deleted before requesting removal");
+                                                        }
+                                                    }
                                                 }
                                             }
                                             ServerMessageType::VoipState(state) => {

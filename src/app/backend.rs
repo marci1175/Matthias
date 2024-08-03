@@ -1043,7 +1043,7 @@ pub struct ClientAudioRequest {
 }
 
 ///Reaction packet, defines which message its reacting to and with which char
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ClientReaction {
     pub emoji_name: String,
     pub message_index: usize,
@@ -1084,11 +1084,18 @@ pub enum ClientMessageType {
     ///Used for syncing with client and server
     SyncMessage(ClientSnycMessage),
 
-    Reaction(ClientReaction),
+    Reaction(ReactionType),
 
     MessageEdit(ClientMessageEdit),
 
     VoipConnection(ClientVoipRequest),
+}
+
+/// The variant of the reaction message
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum ReactionType {
+    Add(ClientReaction),
+    Remove(ClientReaction),
 }
 
 /// This is what gets to be sent out by the client
@@ -1180,10 +1187,26 @@ impl ClientMessage {
     pub fn construct_reaction_msg(emoji_name: String, index: usize, uuid: &str) -> ClientMessage {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::Reaction(ClientReaction {
+            message_type: ClientMessageType::Reaction(ReactionType::Add(ClientReaction {
                 emoji_name,
                 message_index: index,
-            }),
+            })),
+            uuid: uuid.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
+
+    pub fn construct_reaction_remove_msg(
+        emoji_name: String,
+        index: usize,
+        uuid: &str,
+    ) -> ClientMessage {
+        ClientMessage {
+            replying_to: None,
+            message_type: ClientMessageType::Reaction(ReactionType::Remove(ClientReaction {
+                emoji_name,
+                message_index: index,
+            })),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
@@ -1654,11 +1677,7 @@ pub struct ServerMessageEdit {
 /// This struct contains all the necesarily information for the client to update its own message list's reactions
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerMessageReaction {
-    /// The message's index it belongs to
-    pub index: i32,
-
-    /// The emoji's name added to the message specified by the index field
-    pub emoji_name: String,
+    pub reaction_type: ReactionType,
 }
 
 /// This struct is empty as its just a placeholder, because the info is provided in the struct which this message is wrapped in, and is provided directly when sending a message from the server to the client
@@ -1828,7 +1847,20 @@ impl ServerOutput {
                     //These messages also have a side effect on the server's list of the messages
                     //The client will interpret these messages and modify its own message list
                     ClientMessageType::Reaction(message) => {
-                        ServerMessageType::Reaction(ServerMessageReaction { index: message.message_index as i32, emoji_name: message.emoji_name })
+                        ServerMessageType::Reaction(
+                            //Match the incoming ReactionType
+                            match message {
+                                //The client will increment its emoji counter
+                                ReactionType::Add(message) => {
+                                    ServerMessageReaction { reaction_type: ReactionType::Add(ClientReaction { emoji_name: message.emoji_name, message_index: message.message_index }) }
+                                },
+                                //The client will decrement its emoji counter
+                                //If the index is 0 the client will automaticly remove that emoji entry
+                                ReactionType::Remove(message) => {
+                                    ServerMessageReaction { reaction_type: ReactionType::Remove(ClientReaction { emoji_name: message.emoji_name, message_index: message.message_index }) }
+                                },
+                            }
+                        )
                     },
                     ClientMessageType::MessageEdit(message) => {
                         ServerMessageType::Edit(ServerMessageEdit { index: message.index as i32, new_message: message.new_message })

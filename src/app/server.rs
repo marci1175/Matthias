@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use super::backend::{
     encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
     ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
-    ServerClientReply, ServerMessageType,
+    ReactionType, ServerClientReply, ServerMessageType,
     ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
         Upload, VoipConnection as Voip,
@@ -54,6 +54,8 @@ pub struct MessageService {
     pub messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
 
     /// Contains all of the reactions added to the messages
+    /// Please note that the ```MessageReaction struct contains the emoji list itself```
+    /// Needs rework
     pub reactions: Arc<tokio::sync::Mutex<Vec<MessageReaction>>>,
 
     /// This is the required password by the server this password is hashed with argon2, and is compared with the hashed client password
@@ -1411,33 +1413,74 @@ impl MessageService {
     }
 
     /// handle reaction requests
-    pub async fn handle_reaction(&self, reaction: &ClientReactionStruct) {
-        match &mut self.reactions.try_lock() {
-            Ok(reaction_vec) => {
-                //Borrow as mutable so we dont have to clone
-                for item in reaction_vec[reaction.message_index]
-                    .message_reactions
-                    .iter_mut()
-                {
-                    //Check if it has already been reacted before, if yes add one to the counter
-                    if item.emoji_name == reaction.emoji_name {
-                        item.times += 1;
+    pub async fn handle_reaction(&self, reaction: &ReactionType) {
+        match reaction {
+            ReactionType::Add(reaction) => {
+                match &mut self.reactions.try_lock() {
+                    Ok(reaction_vec) => {
+                        //Borrow as mutable so we dont have to clone
+                        for item in reaction_vec[reaction.message_index]
+                            .message_reactions
+                            .iter_mut()
+                        {
+                            //Check if it has already been reacted before, if yes add one to the counter
+                            if item.emoji_name == reaction.emoji_name {
+                                item.times += 1;
 
-                        //Quit the function immediately, so we can add the new reaction
-                        return;
+                                //Quit the function immediately, so we can add the new reaction
+                                return;
+                            }
+                        }
+
+                        //After we have checked all the reactions if there is already one, we can add out *new* one
+                        reaction_vec[reaction.message_index]
+                            .message_reactions
+                            .push(Reaction {
+                                emoji_name: reaction.emoji_name.clone(),
+                                //Set default amount, start from 1
+                                times: 1,
+                            });
                     }
+                    Err(err) => println!("{err}"),
                 }
-
-                //After we have checked all the reactions if there is already one, we can add out *new* one
-                reaction_vec[reaction.message_index]
-                    .message_reactions
-                    .push(Reaction {
-                        emoji_name: reaction.emoji_name.clone(),
-                        //Set default amount, start from 1
-                        times: 1,
-                    });
             }
-            Err(err) => println!("{err}"),
+            ReactionType::Remove(reaction) => {
+                match &mut self.reactions.try_lock() {
+                    Ok(reaction_vec) => {
+                        let mut was_last_rection = false;
+
+                        //Borrow as mutable so we dont have to clone
+                        for item in reaction_vec[reaction.message_index]
+                            .message_reactions
+                            .iter_mut()
+                        {
+                            //Check if it has already been reacted before, if yes add one to the counter
+                            if item.emoji_name == reaction.emoji_name {
+                                item.times -= 1;
+
+                                //Check if the item.times is 0 that means we removed the last reaction
+                                //If yes, set flag
+                                if item.times == 0 {
+                                    was_last_rection = true;
+                                }
+                            }
+                        }
+
+                        //Check if we removed the last emoji, if yes remove the whole emoji entry
+                        if was_last_rection {
+                            match reaction_vec[reaction.message_index].message_reactions.clone().get(reaction.message_index) {
+                                Some(_) => {
+                                    reaction_vec[reaction.message_index].message_reactions.remove(reaction.message_index);
+                                },
+                                None => {
+                                    dbg!("The emoji requested to be removed was not in the emoji list");
+                                },
+                            }
+                        }
+                    }
+                    Err(err) => println!("{err}"),
+                }
+            }
         }
     }
 }

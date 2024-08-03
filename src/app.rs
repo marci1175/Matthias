@@ -92,6 +92,7 @@ impl eframe::App for backend::Application {
             TODO: Restructure files
 
             TODO: make custom urls open up the chat app and automaticly connect
+            TODO: Reowrk logging (We already have tracing for that, replace dbg!s)
         */
 
         //Check for startup args
@@ -105,7 +106,14 @@ impl eframe::App for backend::Application {
                 let address = &startup_link[CUSTOM_URL.len()..];
 
                 //Connect to server
-                self.connect_to_server(ctx, address.to_string());
+                self.connect_to_server(
+                    ctx,
+                    address.to_string(),
+                    self.client_ui
+                        .req_passw
+                        .then_some(&self.client_ui.client_password)
+                        .cloned(),
+                );
 
                 //Show settings window to alert user
                 self.settings_window = true;
@@ -362,7 +370,14 @@ impl backend::Application {
                         }
                         _ => {
                             if ui.button("Connect").clicked() {
-                                self.connect_to_server(ctx, self.client_ui.send_on_ip.clone());
+                                self.connect_to_server(
+                                    ctx,
+                                    self.client_ui.send_on_ip.clone(),
+                                    self.client_ui
+                                        .req_passw
+                                        .then_some(&self.client_ui.client_password)
+                                        .cloned(),
+                                );
                             }
                         }
                     }
@@ -429,13 +444,13 @@ impl backend::Application {
         });
     }
 
-    pub fn connect_to_server(&mut self, ctx: &egui::Context, address: String) {
+    pub fn connect_to_server(
+        &mut self,
+        ctx: &egui::Context,
+        address: String,
+        password: Option<String>,
+    ) {
         let username = self.login_username.clone();
-        let password = self
-            .client_ui
-            .req_passw
-            .then_some(&self.client_ui.client_password)
-            .cloned();
 
         let sender = self.connection_sender.clone();
 
@@ -650,7 +665,7 @@ impl backend::Application {
                         //Edit
                         row.col(|ui| {
                             ui.horizontal_centered(|ui| {
-                                let menu_button = ui.menu_button("Edit", |ui| {
+                                ui.menu_button("Edit", |ui| {
                                     ui.horizontal(|ui| {
                                         if ui.button("Save").clicked() {
                                             if let Err(err) = extension.write_change_to_file() {
