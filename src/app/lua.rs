@@ -6,7 +6,7 @@ use std::{
 
 use egui::{Rect, Vec2};
 use mlua::{Lua, Value::Nil};
-use strum::{Display, ToString};
+use strum::Display;
 
 /// This function executes code provided, and if its a function adds it to the global register
 pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
@@ -158,13 +158,13 @@ pub enum EventCall {
 
 impl Extension {
     pub fn event_call_extensions(&mut self, event: EventCall, lua: &Lua, arg: Option<String>) {
-        for mut ext in self.extension_list.iter_mut() {
+        for ext in self.extension_list.iter_mut() {
             //If the extension should be running we skip that entry
             if !ext.is_running {
                 continue;
             }
 
-            match Self::load_and_call_function(lua, ext, &arg, String::from(event.to_string())) {
+            match Self::load_and_call_function(lua, ext, &arg, event.to_string()) {
                 Ok(_) => (),
                 Err(err) => {
                     //If the lua returned this error it means the callback couldnt be called
@@ -174,7 +174,7 @@ impl Extension {
                         return;
                     }
 
-                    Self::add_msg_to_log(self.output.clone(), &mut ext, err.to_string());
+                    Self::add_msg_to_log(self.output.clone(), ext, err.to_string());
                 }
             };
         }

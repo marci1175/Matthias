@@ -30,8 +30,7 @@ use crate::app::backend::{
     ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    },
-    ClientReaction as ClientReactionStruct, ServerFileReply, ServerImageReply,
+    }, ServerFileReply, ServerImageReply,
 };
 use tokio::{
     io::AsyncWrite,

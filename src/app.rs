@@ -92,7 +92,7 @@ impl eframe::App for backend::Application {
             TODO: Restructure files
 
             TODO: make custom urls open up the chat app and automaticly connect
-            TODO: Reowrk logging (We already have tracing for that, replace dbg!s)
+            TODO: Reowrk logging (We already have tracing for that, replace dbg!)
         */
 
         //Check for startup args
@@ -118,6 +118,9 @@ impl eframe::App for backend::Application {
                 //Show settings window to alert user
                 self.settings_window = true;
             }
+
+            //Reset startup args
+            self.startup_args = None;
         }
 
         //Display notifications

@@ -836,7 +836,7 @@ impl Application {
                                                             .client_ui
                                                             .incoming_messages
                                                             .reaction_list
-                                                            [reaction.message_index as usize]
+                                                            [reaction.message_index]
                                                             .message_reactions
                                                             .iter()
                                                             .position(|item| {
@@ -848,8 +848,7 @@ impl Application {
                                                             self.client_ui
                                                                 .incoming_messages
                                                                 .reaction_list
-                                                                [reaction.message_index
-                                                                    as usize]
+                                                                [reaction.message_index]
                                                                 .message_reactions[index]
                                                                 .times += 1;
                                                         } else {
@@ -857,7 +856,7 @@ impl Application {
                                                             self.client_ui
                                                                 .incoming_messages
                                                                 .reaction_list
-                                                                [reaction.message_index as usize]
+                                                                [reaction.message_index]
                                                                 .message_reactions
                                                                 .push(Reaction {
                                                                     emoji_name: reaction
@@ -876,7 +875,7 @@ impl Application {
                                                             .client_ui
                                                             .incoming_messages
                                                             .reaction_list
-                                                            [reaction.message_index as usize]
+                                                            [reaction.message_index]
                                                             .message_reactions
                                                             .iter()
                                                             .position(|item| {
@@ -889,7 +888,7 @@ impl Application {
                                                                 .client_ui
                                                                 .incoming_messages
                                                                 .reaction_list
-                                                                [reaction.message_index as usize]
+                                                                [reaction.message_index]
                                                                 .message_reactions[index]
                                                                 .times;
 
@@ -901,8 +900,7 @@ impl Application {
                                                                 self.client_ui
                                                                     .incoming_messages
                                                                     .reaction_list
-                                                                    [reaction.message_index
-                                                                        as usize]
+                                                                    [reaction.message_index]
                                                                     .message_reactions
                                                                     .remove(index);
                                                             }

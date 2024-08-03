@@ -10,7 +10,6 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use tokio_util::sync::CancellationToken;
 
 use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
 
