@@ -7,7 +7,7 @@ A decentralized chat application built completely in rust.
 - Text, audio, image, file messages furthermore images are also displayed
 - Voice call
 - Exrtensive lua (using luajit) API with documentation at [Gitbook](https://matthias.gitbook.io/) with external libs available
-- Custom urls (If the app is installed through the installer)
+- Custom connection urls (If the app is installed through the installer) this allows the user to connect to a server with just a link 
 - Custom emojies
 - Windows installer (Using a Visual Studio project)
 - Intuitive user interface
