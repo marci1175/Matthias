@@ -133,10 +133,7 @@ impl Application {
 
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
 
-                    let formatted_ip = format!(
-                        "[{}]:{}",
-                        pub_ip[0], self.open_on_port
-                    ); 
+                    let formatted_ip = format!("[{}]:{}", pub_ip[0], self.open_on_port);
 
                     ui.horizontal(|ui| {
                         ui.label("Server address (Public ipv6 address)");
@@ -155,7 +152,10 @@ impl Application {
                     ui.horizontal(|ui| {
                         ui.label(RichText::from("Share").weak().size(self.font_size / 2.));
                         if ui.button("Copy connection link").clicked() {
-                            ctx.copy_text(format!("matthias://{formatted_ip}&{}", self.server_password));
+                            ctx.copy_text(format!(
+                                "matthias://{formatted_ip}&{}",
+                                self.server_password
+                            ));
                         }
                     });
 

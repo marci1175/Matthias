@@ -104,21 +104,17 @@ impl eframe::App for backend::Application {
             if startup_link.contains(CUSTOM_URL) && self.main.client_mode {
                 //Get the address the link connects to
                 let link = &startup_link[CUSTOM_URL.len()..];
-                
+
                 let (address, password) = link.split_at(link.find("&").unwrap());
 
-                let password = dbg!(&password[1..]);
+                let password = &password[1..];
 
                 //Connect to server
-                self.connect_to_server(
-                    ctx,
-                    address.to_string(),
-                    Some(password.to_string()),
-                );
+                self.connect_to_server(ctx, address.to_string(), Some(password.to_string()));
 
                 //Set address so itll be displayed in the ui too
                 self.client_ui.send_on_ip = address.to_string();
-                
+
                 //Set password so itll be displayed in the ui too
                 self.client_ui.client_password = password.to_string();
 
@@ -134,10 +130,10 @@ impl eframe::App for backend::Application {
                         toast.set_closable(true);
 
                         toasts.add(toast);
-                    },
+                    }
                     Err(_err) => {
                         dbg!(_err);
-                    },
+                    }
                 }
 
                 //Reset startup args if we have already ran this code
@@ -439,7 +435,7 @@ impl backend::Application {
 
             ui.add_enabled(
                 matches!(self.client_connection.state, ConnectionState::Disconnected)
-                            || matches!(self.client_connection.state, ConnectionState::Error),
+                    || matches!(self.client_connection.state, ConnectionState::Error),
                 |ui: &mut egui::Ui| {
                     ui.add(
                         TextEdit::singleline(&mut self.client_ui.client_password)

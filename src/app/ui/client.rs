@@ -835,8 +835,7 @@ impl Application {
                                                         if let Some(index) = self
                                                             .client_ui
                                                             .incoming_messages
-                                                            .reaction_list
-                                                            [reaction.message_index]
+                                                            .reaction_list[reaction.message_index]
                                                             .message_reactions
                                                             .iter()
                                                             .position(|item| {
@@ -874,8 +873,7 @@ impl Application {
                                                         if let Some(index) = self
                                                             .client_ui
                                                             .incoming_messages
-                                                            .reaction_list
-                                                            [reaction.message_index]
+                                                            .reaction_list[reaction.message_index]
                                                             .message_reactions
                                                             .iter()
                                                             .position(|item| {

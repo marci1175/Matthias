@@ -30,7 +30,8 @@ use crate::app::backend::{
     ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    }, ServerFileReply, ServerImageReply,
+    },
+    ServerFileReply, ServerImageReply,
 };
 use tokio::{
     io::AsyncWrite,
@@ -1467,13 +1468,19 @@ impl MessageService {
 
                         //Check if we removed the last emoji, if yes remove the whole emoji entry
                         if was_last_rection {
-                            match reaction_vec[reaction.message_index].message_reactions.clone().get(reaction.message_index) {
+                            match reaction_vec[reaction.message_index]
+                                .message_reactions
+                                .clone()
+                                .get(reaction.message_index)
+                            {
                                 Some(_) => {
-                                    reaction_vec[reaction.message_index].message_reactions.remove(reaction.message_index);
-                                },
+                                    reaction_vec[reaction.message_index]
+                                        .message_reactions
+                                        .remove(reaction.message_index);
+                                }
                                 None => {
                                     dbg!("The emoji requested to be removed was not in the emoji list");
-                                },
+                                }
                             }
                         }
                     }
