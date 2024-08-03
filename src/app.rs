@@ -100,23 +100,27 @@ impl eframe::App for backend::Application {
             //Get startup link
             let startup_link = startup_args[1].clone();
 
-            //Check for URL
-            if startup_link.contains(CUSTOM_URL) {
+            //Check for URL, and also only run this code if we have signed in
+            if startup_link.contains(CUSTOM_URL) && self.main.client_mode {
                 //Get the address the link connects to
-                let address = &startup_link[CUSTOM_URL.len()..];
+                let link = &startup_link[CUSTOM_URL.len()..];
+                
+                let (address, password) = link.split_at(link.find("&").unwrap());
+
+                let password = dbg!(&password[1..]);
 
                 //Connect to server
                 self.connect_to_server(
                     ctx,
                     address.to_string(),
-                    self.client_ui
-                        .req_passw
-                        .then_some(&self.client_ui.client_password)
-                        .cloned(),
+                    Some(password.to_string()),
                 );
 
                 //Set address so itll be displayed in the ui too
                 self.client_ui.send_on_ip = address.to_string();
+                
+                //Set password so itll be displayed in the ui too
+                self.client_ui.client_password = password.to_string();
 
                 //Show settings window to alert user
                 self.settings_window = true;
@@ -135,10 +139,10 @@ impl eframe::App for backend::Application {
                         dbg!(_err);
                     },
                 }
-            }
 
-            //Reset startup args
-            self.startup_args = None;
+                //Reset startup args if we have already ran this code
+                self.startup_args = None;
+            }
         }
 
         //Display notifications
@@ -434,7 +438,8 @@ impl backend::Application {
             let compare_passwords = self.client_ui.client_password.clone();
 
             ui.add_enabled(
-                !matches!(self.client_connection.state, ConnectionState::Connected(_)),
+                matches!(self.client_connection.state, ConnectionState::Disconnected)
+                            || matches!(self.client_connection.state, ConnectionState::Error),
                 |ui: &mut egui::Ui| {
                     ui.add(
                         TextEdit::singleline(&mut self.client_ui.client_password)

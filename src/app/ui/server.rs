@@ -133,20 +133,31 @@ impl Application {
 
                     let pub_ip: Vec<&str> = self.public_ip.rsplit(';').collect();
 
+                    let formatted_ip = format!(
+                        "[{}]:{}",
+                        pub_ip[0], self.open_on_port
+                    ); 
+
                     ui.horizontal(|ui| {
                         ui.label("Server address (Public ipv6 address)");
-                        ui.text_edit_singleline(&mut format!(
-                            "[{}]:{}",
-                            pub_ip[0], self.open_on_port
-                        ));
+                        ui.label(formatted_ip.clone());
                     });
 
                     if self.server_req_password && !self.server_password.is_empty() {
                         ui.label(RichText::from(format!(
                             "Password: {}",
-                            self.server_password
+                            self.server_password.clone()
                         )));
                     }
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::from("Share").weak().size(self.font_size / 2.));
+                        if ui.button("Copy connection link").clicked() {
+                            ctx.copy_text(format!("matthias://{formatted_ip}&{}", self.server_password));
+                        }
+                    });
 
                     ui.separator();
 
