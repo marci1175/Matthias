@@ -10,8 +10,7 @@ const DOCUMENTATION_URL: &str = "https://matthias.gitbook.io/matthiasdocu";
 
 use crate::app::lua::ExtensionProperties;
 use anyhow::Error;
-use base64::engine::general_purpose;
-use base64::Engine;
+use base64::{engine::general_purpose, Engine};
 use egui::{
     vec2, Align, Color32, KeyboardShortcut, Layout, Modifiers, RichText, ScrollArea, Slider,
     Stroke, TextEdit,
@@ -33,12 +32,15 @@ use self::backend::{display_error_message, ClientMessage, UserInformation};
 
 use self::backend::{ClientConnection, ConnectionState, ServerMaster};
 
-impl eframe::App for backend::Application {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+impl eframe::App for backend::Application
+{
+    fn save(&mut self, storage: &mut dyn eframe::Storage)
+    {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>)
+    {
         //try to close connection if there is one
         let username = self.login_username.clone();
         let mut connection = self.client_connection.clone();
@@ -51,12 +53,12 @@ impl eframe::App for backend::Application {
             tokio::task::spawn(async move {
                 match ClientConnection::disconnect(&mut connection, username, password, uuid).await
                 {
-                    Ok(_) => {}
+                    Ok(_) => {},
                     Err(err) => {
                         //Avoid panicking when trying to display a Notification
                         //This is very rare but can still happen
                         display_error_message(err, toasts);
-                    }
+                    },
                 };
             });
         }
@@ -70,7 +72,7 @@ impl eframe::App for backend::Application {
                 if let Err(_err) = fs::remove_dir_all(format!("{}\\Matthias\\Client", app_data)) {
                     // println!("{_err}");
                 };
-            }
+            },
             Err(err) => println!("{err}"),
         }
 
@@ -83,12 +85,13 @@ impl eframe::App for backend::Application {
         let _ = self.record_audio_interrupter.send(());
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame)
+    {
         /* TODOS:
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
 
-            TODO: Rework logging (We already have tracing for that, replace dbg!)
+            TODO: Add AI (Neural network) powered hand drawing recognition
         */
 
         //Check for startup args
@@ -132,15 +135,15 @@ impl eframe::App for backend::Application {
                                 toast.set_closable(true);
 
                                 toasts.add(toast);
-                            }
+                            },
                             Err(_err) => {
                                 tracing::error!("{}", _err.to_string());
-                            }
+                            },
                         }
-                    }
+                    },
                     None => {
                         display_error_message("Invalid link.", self.toasts.clone());
-                    }
+                    },
                 }
 
                 //Reset startup args if we have already ran this code
@@ -162,10 +165,10 @@ impl eframe::App for backend::Application {
                 if let Some(desired_idx) = output.len().checked_sub(LUA_OUTPUT_BUFFER_SIZE) {
                     output.drain(0..desired_idx);
                 }
-            }
+            },
             Err(err) => {
                 tracing::error!("{}", err.to_string());
-            }
+            },
         }
 
         if self.main.register_mode {
@@ -256,11 +259,12 @@ impl eframe::App for backend::Application {
                                         });
                                     }
                                 });
-                            } else {
+                            }
+                            else {
                                 ui.label(RichText::from("Add your favorite servers!").strong());
                             }
                         });
-                    }
+                    },
                     Err(err) => eprintln!("{err}"),
                 };
             });
@@ -289,10 +293,12 @@ impl eframe::App for backend::Application {
                             &self.lua,
                             Some(self.client_ui.send_on_ip.clone()),
                         );
-                    } else {
+                    }
+                    else {
                         eprintln!("Failed to convert {} to ServerMaster", connection.1)
                     }
-                } else {
+                }
+                else {
                     // A race condition will occur if we connected succesfully after getting a connection error (request timed out)
                     // So we check if we have already made the connection before actually modifying the value based on the timed out request
                     if !matches!(self.client_connection.state, ConnectionState::Connected(_)) {
@@ -300,10 +306,10 @@ impl eframe::App for backend::Application {
                         self.client_connection.state = ConnectionState::Error;
                     }
                 }
-            }
+            },
             Err(_err) => {
                 // tracing::error!("{}", _err.to_string());
-            }
+            },
         }
 
         //Voip instance listener
@@ -315,31 +321,34 @@ impl eframe::App for backend::Application {
                     &self.opened_user_information.uuid,
                     voip.socket.local_addr().unwrap().port(),
                 ))
-            }
-            Err(_err) => {}
+            },
+            Err(_err) => {},
         }
     }
 }
 
-impl backend::Application {
+impl backend::Application
+{
     /// This function spawn an async tokio thread, to send the message passed in as the argument, this function does not await a response from the server
-    pub fn send_msg(&self, message: ClientMessage) {
+    pub fn send_msg(&self, message: ClientMessage)
+    {
         let connection = self.client_connection.clone();
 
         tokio::spawn(async move {
             match connection.send_message(message).await {
                 //We dont need the server's reply since we dont handle it here
-                Ok(_server_reply) => {}
+                Ok(_server_reply) => {},
                 Err(err) => {
                     tracing::error!("{:?}", err.source());
                     tracing::error!("{}", err);
-                }
+                },
             };
         });
     }
 
     /// This function resets clientconnection and all of its other attributes (self.client_ui.incoming_msg, self.autosync_should_run)
-    fn reset_client_connection(&mut self) {
+    fn reset_client_connection(&mut self)
+    {
         self.client_ui.incoming_messages = ServerMaster::default();
 
         self.autosync_shutdown_token.cancel();
@@ -347,7 +356,8 @@ impl backend::Application {
         self.client_connection.state = ConnectionState::Disconnected;
     }
 
-    fn client_settings_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn client_settings_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context)
+    {
         ui.collapsing("Client", |ui| {
             ui.label("Connect to an ip address");
 
@@ -384,7 +394,7 @@ impl backend::Application {
                                     None,
                                 );
                             }
-                        }
+                        },
                         ConnectionState::Connecting => {
                             if ui
                                 .button(
@@ -395,7 +405,7 @@ impl backend::Application {
                                 //Reset client
                                 self.reset_client_connection();
                             }
-                        }
+                        },
                         _ => {
                             if ui.button("Connect").clicked() {
                                 self.connect_to_server(
@@ -407,22 +417,22 @@ impl backend::Application {
                                         .cloned(),
                                 );
                             }
-                        }
+                        },
                     }
 
                     ui.label(match self.client_connection.state {
                         ConnectionState::Connected(_) => {
                             RichText::from("Connected").color(Color32::GREEN)
-                        }
+                        },
                         ConnectionState::Disconnected => {
                             RichText::from("Disconnected").color(Color32::LIGHT_RED)
-                        }
+                        },
                         ConnectionState::Connecting => {
                             RichText::from("Connecting").color(Color32::LIGHT_GREEN)
-                        }
+                        },
                         ConnectionState::Error => {
                             RichText::from("Error when trying to connect").color(Color32::RED)
-                        }
+                        },
                     });
 
                     ui.allocate_ui(vec2(25., 25.), |ui| {
@@ -478,7 +488,8 @@ impl backend::Application {
         ctx: &egui::Context,
         address: String,
         password: Option<String>,
-    ) {
+    )
+    {
         let username = self.login_username.clone();
 
         let sender = self.connection_sender.clone();
@@ -514,7 +525,7 @@ impl backend::Application {
                     if let Err(err) = sender.send(Some(ok)) {
                         tracing::error!("{}", err);
                     };
-                }
+                },
                 Err(err) => {
                     //Avoid panicking when trying to display a Notification
                     //This is very rare but can still happen
@@ -523,7 +534,7 @@ impl backend::Application {
                     if let Err(err) = sender.send(None) {
                         tracing::error!("{}", err);
                     };
-                }
+                },
             };
         });
 
@@ -533,7 +544,8 @@ impl backend::Application {
         self.client_connection.state = ConnectionState::Connecting;
     }
 
-    fn disconnect_from_server(&mut self) {
+    fn disconnect_from_server(&mut self)
+    {
         let username = self.login_username.clone();
 
         let mut connection = self.client_connection.clone();
@@ -550,12 +562,12 @@ impl backend::Application {
         //Disconnect from server
         tokio::task::spawn(async move {
             match connection.disconnect(username, password, uuid).await {
-                Ok(_) => {}
+                Ok(_) => {},
                 Err(err) => {
                     //Avoid panicking when trying to display a Notification
                     //This is very rare but can still happen
                     display_error_message(err, toasts);
-                }
+                },
             };
         });
 
@@ -564,7 +576,8 @@ impl backend::Application {
     }
 
     /// Draw the extension part of the ui in the settings
-    fn client_extension(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn client_extension(&mut self, ui: &mut egui::Ui, ctx: &egui::Context)
+    {
         ui.horizontal(|ui| {
             ui.label("Extensions");
 
@@ -574,13 +587,13 @@ impl backend::Application {
                 match read_extensions_dir() {
                     Ok(extension_list) => {
                         self.client_ui.extension.extension_list = extension_list;
-                    }
+                    },
                     //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
                     Err(err) => {
                         dbg!(err);
                         let _ =
                             fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
-                    }
+                    },
                 }
             };
 
@@ -598,7 +611,8 @@ impl backend::Application {
         });
     }
 
-    fn draw_extension_table(&mut self, columns: &mut [egui::Ui], ctx: &egui::Context) {
+    fn draw_extension_table(&mut self, columns: &mut [egui::Ui], ctx: &egui::Context)
+    {
         let available_width = columns[0].available_width();
 
         TableBuilder::new(&mut columns[0])
@@ -647,7 +661,8 @@ impl backend::Application {
                                 //If extension is stopped
                                 let has_been_clicked = if !extension.is_running {
                                     ui.button("Start")
-                                } else {
+                                }
+                                else {
                                     ui.button("Stop")
                                 }
                                 .clicked();
@@ -657,18 +672,20 @@ impl backend::Application {
                                     extension.is_running = !extension.is_running;
 
                                     match self.client_ui.extension.output.try_lock() {
-                                        Ok(mut output) => match extension.is_running {
-                                            true => {
-                                                output.push(lua::LuaOutput::Info(format!(
-                                                    r#"Extension "{}" has been started."#,
-                                                    extension.name
-                                                )));
-                                            }
-                                            false => {
-                                                output.push(lua::LuaOutput::Info(format!(
-                                                    r#"Extension "{}" has been stopped."#,
-                                                    extension.name
-                                                )));
+                                        Ok(mut output) => {
+                                            match extension.is_running {
+                                                true => {
+                                                    output.push(lua::LuaOutput::Info(format!(
+                                                        r#"Extension "{}" has been started."#,
+                                                        extension.name
+                                                    )));
+                                                },
+                                                false => {
+                                                    output.push(lua::LuaOutput::Info(format!(
+                                                        r#"Extension "{}" has been stopped."#,
+                                                        extension.name
+                                                    )));
+                                                },
                                             }
                                         },
                                         Err(err) => {
@@ -676,7 +693,7 @@ impl backend::Application {
                                                 err.to_string(),
                                                 self.toasts.clone(),
                                             );
-                                        }
+                                        },
                                     }
                                 }
                             });
@@ -754,7 +771,8 @@ impl backend::Application {
     }
 
     ///Draw the extension's output into the little "console"
-    fn draw_extension_output(&mut self, columns: &mut [egui::Ui]) {
+    fn draw_extension_output(&mut self, columns: &mut [egui::Ui])
+    {
         columns[1].painter().rect_stroke(
             self.client_ui.extension.output_rect.expand(5.),
             5.,
@@ -781,15 +799,15 @@ impl backend::Application {
                     match output {
                         lua::LuaOutput::Error(error) => {
                             ui.label(RichText::from(error).color(Color32::RED));
-                        }
+                        },
                         lua::LuaOutput::Standard(output) => {
                             ui.label(RichText::from(output).color(Color32::LIGHT_YELLOW));
-                        }
+                        },
                         lua::LuaOutput::Info(info) => {
                             ui.label(
                                 RichText::from(format!("INFO: {info}")).color(Color32::LIGHT_BLUE),
                             );
-                        }
+                        },
                     }
                 }
             });
@@ -799,7 +817,8 @@ impl backend::Application {
 }
 
 ///Read all the extensions from the folder
-pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>> {
+pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>>
+{
     let mut extensions: Vec<ExtensionProperties> = Vec::new();
 
     for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))? {

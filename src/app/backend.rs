@@ -1,21 +1,20 @@
-use super::client::{connect_to_server, ServerReply};
-use super::lua::{Extension, LuaOutput};
-use super::read_extensions_dir;
-use super::server::SharedFields;
-use aes_gcm::aead::generic_array::GenericArray;
+use super::{
+    client::{connect_to_server, ServerReply},
+    lua::{Extension, LuaOutput},
+    read_extensions_dir,
+    server::SharedFields,
+};
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{generic_array::GenericArray, Aead, KeyInit},
     Aes256Gcm, Key,
 };
 use anyhow::{bail, ensure, Error, Result};
 use argon2::Config;
-use base64::engine::general_purpose;
-use base64::Engine;
+use base64::{engine::general_purpose, Engine};
 use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
-use egui::load::BytesPoll;
-use egui::load::LoadError;
 use egui::{
+    load::{BytesPoll, LoadError},
     vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
 };
 use egui_notify::{Toast, Toasts};
@@ -26,28 +25,37 @@ use rand::rngs::ThreadRng;
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use std::collections::HashMap;
-use std::env;
-use std::fmt::{Debug, Display};
-use std::fs;
-use std::io;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    env,
+    fmt::{Debug, Display},
+    fs, io,
+    io::{Read, Seek, SeekFrom, Write},
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+        Arc, Mutex,
+    },
+    time::Duration,
+};
 use strum::{EnumDiscriminants, EnumMessage};
 use strum_macros::EnumString;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::UdpSocket;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        UdpSocket,
+    },
+};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
-pub struct Application {
+pub struct Application
+{
     /// These are the args the application was started with
     #[serde(skip)]
     pub startup_args: Option<Vec<String>>,
@@ -207,8 +215,10 @@ pub struct Application {
     pub opened_user_information: UserInformation,
 }
 
-impl Default for Application {
-    fn default() -> Self {
+impl Default for Application
+{
+    fn default() -> Self
+    {
         let (dtx, drx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
             mpsc::channel::<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>();
@@ -309,10 +319,12 @@ impl Default for Application {
     }
 }
 
-impl Application {
+impl Application
+{
     /// Set global lua table so that the luas can use it
     /// This function is called when creating a new ```Application``` instance
-    pub fn set_global_lua_table(&self) {
+    pub fn set_global_lua_table(&self)
+    {
         self.client_ui.clone().set_lua_table_function(&self.lua);
         self.clone().set_lua_table_function(&self.lua);
         self.client_connection
@@ -323,7 +335,8 @@ impl Application {
             .set_lua_table_function(&self.lua);
     }
 
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self
+    {
         if let Some(storage) = cc.storage {
             let mut data: Application =
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
@@ -332,13 +345,13 @@ impl Application {
             match read_extensions_dir() {
                 Ok(extension_list) => {
                     data.client_ui.extension.extension_list = extension_list;
-                }
+                },
                 //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
                 Err(err) => {
                     tracing::error!("{}", err);
 
                     let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
-                }
+                },
             }
 
             let output_list = data.client_ui.extension.output.clone();
@@ -354,7 +367,8 @@ fn set_lua_functions(
     data: Application,
     output_list: Arc<Mutex<Vec<LuaOutput>>>,
     cc: &eframe::CreationContext<'_>,
-) -> Application {
+) -> Application
+{
     let print = data
         .lua
         .create_function(move |_, msg: String| {
@@ -362,7 +376,7 @@ fn set_lua_functions(
                 Ok(mut list) => list.push(LuaOutput::Standard(msg)),
                 Err(err) => {
                     tracing::error!("{}", err);
-                }
+                },
             }
 
             Ok(())
@@ -404,41 +418,41 @@ fn set_lua_functions(
         })
         .unwrap();
 
-    let draw_rect =
-        data.lua
-            .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
-                let (start_pos, end_pos, is_filled, color) = args;
+    let draw_rect = data
+        .lua
+        .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
+            let (start_pos, end_pos, is_filled, color) = args;
 
-                //Create area
-                egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
-                    match is_filled {
-                        true => {
-                            ui.painter().rect_filled(
-                                Rect::from_points(&[start_pos.into(), end_pos.into()]),
-                                0.,
+            //Create area
+            egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
+                match is_filled {
+                    true => {
+                        ui.painter().rect_filled(
+                            Rect::from_points(&[start_pos.into(), end_pos.into()]),
+                            0.,
+                            Color32::from_rgba_premultiplied(
+                                color[0], color[1], color[2], color[3],
+                            ),
+                        );
+                    },
+                    false => {
+                        ui.painter().rect_stroke(
+                            Rect::from_points(&[start_pos.into(), end_pos.into()]),
+                            0.,
+                            Stroke::new(
+                                5.,
                                 Color32::from_rgba_premultiplied(
                                     color[0], color[1], color[2], color[3],
                                 ),
-                            );
-                        }
-                        false => {
-                            ui.painter().rect_stroke(
-                                Rect::from_points(&[start_pos.into(), end_pos.into()]),
-                                0.,
-                                Stroke::new(
-                                    5.,
-                                    Color32::from_rgba_premultiplied(
-                                        color[0], color[1], color[2], color[3],
-                                    ),
-                                ),
-                            );
-                        }
-                    }
-                });
+                            ),
+                        );
+                    },
+                }
+            });
 
-                Ok(())
-            })
-            .unwrap();
+            Ok(())
+        })
+        .unwrap();
 
     let draw_circle = data
         .lua
@@ -459,7 +473,7 @@ fn set_lua_functions(
                                 color[0], color[1], color[2], color[3],
                             ),
                         );
-                    }
+                    },
                     false => {
                         painter.circle_stroke(
                             position.into(),
@@ -471,7 +485,7 @@ fn set_lua_functions(
                                 ),
                             ),
                         );
-                    }
+                    },
                 }
             });
 
@@ -535,10 +549,10 @@ fn set_lua_functions(
                     toast.set_closable(true);
 
                     toasts.add(toast);
-                }
+                },
                 Err(_err) => {
                     tracing::error!("{}", _err);
-                }
+                },
             }
 
             Ok(())
@@ -556,10 +570,10 @@ fn set_lua_functions(
                     toast.set_closable(true);
 
                     toasts.add(toast);
-                }
+                },
                 Err(_err) => {
                     tracing::error!("{}", _err);
-                }
+                },
             }
 
             Ok(())
@@ -577,10 +591,10 @@ fn set_lua_functions(
                     toast.set_closable(true);
 
                     toasts.add(toast);
-                }
+                },
                 Err(_err) => {
                     tracing::error!("{}", _err);
-                }
+                },
             }
 
             Ok(())
@@ -622,15 +636,18 @@ fn set_lua_functions(
 include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
 //Define a deafult for the discriminant
-impl Default for EmojiTypesDiscriminants {
-    fn default() -> Self {
+impl Default for EmojiTypesDiscriminants
+{
+    fn default() -> Self
+    {
         EmojiTypesDiscriminants::Blobs
     }
 }
 
 /// Client side variables
 #[derive(serde::Deserialize, serde::Serialize, Clone, ToTable)]
-pub struct Client {
+pub struct Client
+{
     #[table(skip)]
     /// This entry contains all the extensions and their output
     pub extension: Extension,
@@ -795,8 +812,10 @@ pub struct Client {
     pub microphone_volume: Arc<Mutex<f32>>,
 }
 
-impl Default for Client {
-    fn default() -> Self {
+impl Default for Client
+{
+    fn default() -> Self
+    {
         Self {
             extension: Extension::default(),
             emojis_display_rect: None,
@@ -855,7 +874,8 @@ impl Default for Client {
 
 ///Main, Global stuff for the Ui
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone)]
-pub struct Main {
+pub struct Main
+{
     ///Checks if the emoji tray is on
     #[serde(skip)]
     pub emoji_mode: bool,
@@ -874,7 +894,8 @@ pub struct Main {
 
 ///All the stuff important to the registration process
 #[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug)]
-pub struct Register {
+pub struct Register
+{
     /// client's username
     pub username: String,
 
@@ -902,7 +923,8 @@ pub struct Register {
 
 /// Holds additional information for the ui
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
-pub struct ProfileImage {
+pub struct ProfileImage
+{
     #[serde(skip)]
     /// This shows whether the image selector should be displayed (If its Some), and also contains the path the image is accessed on
     pub image_path: PathBuf,
@@ -917,8 +939,10 @@ pub struct ProfileImage {
     pub image_rect: Rect,
 }
 
-impl Default for ProfileImage {
-    fn default() -> Self {
+impl Default for ProfileImage
+{
+    fn default() -> Self
+    {
         Self {
             image_path: PathBuf::new(),
             selected_image_bytes: None,
@@ -934,7 +958,8 @@ impl Default for ProfileImage {
 /// This struct is sent to the server upon successful connection
 /// If you are searching for the uuid in this struct, please note that most of the times this struct is used in a hashmap where the key is the uuid
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug, PartialEq)]
-pub struct ClientProfile {
+pub struct ClientProfile
+{
     /// The client's username
     /// We might not need it in some contexts
     pub username: String,
@@ -961,7 +986,8 @@ pub struct ClientProfile {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
-pub enum MessagingMode {
+pub enum MessagingMode
+{
     #[default]
     Normal,
     /// The inner value of this enum holds the index which this message is editing
@@ -970,8 +996,10 @@ pub enum MessagingMode {
     Reply(usize),
 }
 
-impl MessagingMode {
-    pub fn get_reply_index(&self) -> Option<usize> {
+impl MessagingMode
+{
+    pub fn get_reply_index(&self) -> Option<usize>
+    {
         match self {
             MessagingMode::Reply(i) => Some(*i),
             _ => None,
@@ -981,7 +1009,8 @@ impl MessagingMode {
 
 ///When the client is uploading a file, this packet gets sent
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientFileUpload {
+pub struct ClientFileUpload
+{
     pub extension: Option<String>,
     pub name: Option<String>,
     pub bytes: Vec<u8>,
@@ -989,13 +1018,15 @@ pub struct ClientFileUpload {
 
 ///Normal message
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientNormalMessage {
+pub struct ClientNormalMessage
+{
     pub message: String,
 }
 
 // Used for syncing or connecting & disconnecting
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientSnycMessage {
+pub struct ClientSnycMessage
+{
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<ConnectionType>,
@@ -1016,7 +1047,8 @@ pub struct ClientSnycMessage {
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum ConnectionType {
+pub enum ConnectionType
+{
     #[default]
     Disconnect,
     Connect(ClientProfile),
@@ -1024,35 +1056,40 @@ pub enum ConnectionType {
 
 ///This is used by the client for requesting file
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientFileRequest {
+pub struct ClientFileRequest
+{
     /// This is the signature of the file which has been uploaded, this acts like a handle to the file
     pub signature: String,
 }
 
 ///This is used by the client for requesting images
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientImageRequest {
+pub struct ClientImageRequest
+{
     /// This is the signature of the file which has been uploaded, this acts like a handle to the file
     pub signature: String,
 }
 
 ///Client requests audio file in server
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientAudioRequest {
+pub struct ClientAudioRequest
+{
     /// This is the signature of the file which has been uploaded, this acts like a handle to the file
     pub signature: String,
 }
 
 ///Reaction packet, defines which message its reacting to and with which char
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ClientReaction {
+pub struct ClientReaction
+{
     pub emoji_name: String,
     pub message_index: usize,
 }
 
 ///Lets the client edit their *OWN* message, a client check is implemented TODO: please write a server check for this
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientMessageEdit {
+pub struct ClientMessageEdit
+{
     ///The message which is edited
     pub index: usize,
     ///The new message
@@ -1061,7 +1098,8 @@ pub struct ClientMessageEdit {
 
 ///These are the types of requests the client can ask
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum ClientFileRequestType {
+pub enum ClientFileRequestType
+{
     ///this is when you want to display an image and you have to make a request to the server file
     ImageRequest(ClientImageRequest),
     FileRequest(ClientFileRequest),
@@ -1074,7 +1112,8 @@ pub enum ClientFileRequestType {
 
 ///Client outgoing message types
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum ClientMessageType {
+pub enum ClientMessageType
+{
     FileRequestType(ClientFileRequestType),
 
     FileUpload(ClientFileUpload),
@@ -1094,14 +1133,16 @@ pub enum ClientMessageType {
 
 /// The variant of the reaction message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ReactionType {
+pub enum ReactionType
+{
     Add(ClientReaction),
     Remove(ClientReaction),
 }
 
 /// This is what gets to be sent out by the client
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientMessage {
+pub struct ClientMessage
+{
     /// Which message in the message stack its replying to
     pub replying_to: Option<usize>,
 
@@ -1115,9 +1156,11 @@ pub struct ClientMessage {
     pub message_date: String,
 }
 
-impl ClientMessage {
+impl ClientMessage
+{
     ///struct into string, it makes sending information easier by putting it all in a string
-    pub fn struct_into_string(&self) -> String {
+    pub fn struct_into_string(&self) -> String
+    {
         serde_json::to_string(self).unwrap_or_default()
     }
 
@@ -1126,7 +1169,8 @@ impl ClientMessage {
         file_extension: String,
         replying_to: Option<usize>,
         uuid: String,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to,
             message_type: ClientMessageType::FileUpload(ClientFileUpload {
@@ -1140,11 +1184,9 @@ impl ClientMessage {
     }
 
     ///this is used when sending a normal message
-    pub fn construct_normal_msg(
-        msg: &str,
-        uuid: &str,
-        replying_to: Option<usize>,
-    ) -> ClientMessage {
+    pub fn construct_normal_msg(msg: &str, uuid: &str, replying_to: Option<usize>)
+        -> ClientMessage
+    {
         ClientMessage {
             replying_to,
             message_type: ClientMessageType::NormalMessage(ClientNormalMessage {
@@ -1161,7 +1203,8 @@ impl ClientMessage {
         file_path: PathBuf,
         uuid: &str,
         replying_to: Option<usize>,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to,
             //Dont execute me please :3 |
@@ -1185,7 +1228,8 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_reaction_msg(emoji_name: String, index: usize, uuid: &str) -> ClientMessage {
+    pub fn construct_reaction_msg(emoji_name: String, index: usize, uuid: &str) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::Reaction(ReactionType::Add(ClientReaction {
@@ -1201,7 +1245,8 @@ impl ClientMessage {
         emoji_name: String,
         index: usize,
         uuid: &str,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::Reaction(ReactionType::Remove(ClientReaction {
@@ -1221,7 +1266,8 @@ impl ClientMessage {
         uuid: &str,
         client_message_counter: usize,
         last_seen_message_index: Option<usize>,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
@@ -1244,7 +1290,8 @@ impl ClientMessage {
         uuid: &str,
         last_seen_message_index: Option<usize>,
         profile: ClientProfile,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
@@ -1266,7 +1313,8 @@ impl ClientMessage {
         password: String,
         author: String,
         uuid: String,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
@@ -1283,7 +1331,8 @@ impl ClientMessage {
     }
 
     ///this is used for asking for a file
-    pub fn construct_file_request_msg(signature: String, uuid: &str) -> ClientMessage {
+    pub fn construct_file_request_msg(signature: String, uuid: &str) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::FileRequest(
@@ -1295,7 +1344,8 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_image_request_msg(signature: String, uuid: &str) -> ClientMessage {
+    pub fn construct_image_request_msg(signature: String, uuid: &str) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ImageRequest(
@@ -1307,7 +1357,8 @@ impl ClientMessage {
     }
 
     ///this is used for asking for an image
-    pub fn construct_audio_request_msg(signature: String, uuid: &str) -> ClientMessage {
+    pub fn construct_audio_request_msg(signature: String, uuid: &str) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::AudioRequest(
@@ -1321,7 +1372,8 @@ impl ClientMessage {
     pub fn construct_client_request_msg(
         uuid_of_requested_client: String,
         uuid: &str,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::ClientRequest(
@@ -1336,7 +1388,8 @@ impl ClientMessage {
         index: usize,
         new_message: Option<String>,
         uuid: &str,
-    ) -> ClientMessage {
+    ) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::MessageEdit(ClientMessageEdit { index, new_message }),
@@ -1345,7 +1398,8 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_voip_connect(uuid: &str, port: u16) -> ClientMessage {
+    pub fn construct_voip_connect(uuid: &str, port: u16) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Connect(port)),
@@ -1354,7 +1408,8 @@ impl ClientMessage {
         }
     }
 
-    pub fn construct_voip_disconnect(uuid: &str) -> ClientMessage {
+    pub fn construct_voip_disconnect(uuid: &str) -> ClientMessage
+    {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::VoipConnection(ClientVoipRequest::Disconnect),
@@ -1366,7 +1421,8 @@ impl ClientMessage {
 
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
-pub struct ClientConnection {
+pub struct ClientConnection
+{
     #[table(save)]
     #[serde(skip)]
     pub client_secret: Vec<u8>,
@@ -1382,15 +1438,18 @@ pub struct ClientConnection {
     pub password: String,
 }
 
-impl ClientConnection {
+impl ClientConnection
+{
     /// This is a wrapper function for ```client::send_message```
-    pub async fn send_message(self, message: ClientMessage) -> anyhow::Result<ServerReply> {
+    pub async fn send_message(self, message: ClientMessage) -> anyhow::Result<ServerReply>
+    {
         if let ConnectionState::Connected(connection) = &self.state {
             #[allow(unused_must_use)]
             {
                 Ok(connection.send_message(message).await?)
             }
-        } else {
+        }
+        else {
             bail!("There is no active connection to send the message on.")
         }
     }
@@ -1408,7 +1467,8 @@ impl ClientConnection {
         uuid: &str,
         //Profile
         profile: ClientProfile,
-    ) -> anyhow::Result<(Self, String)> {
+    ) -> anyhow::Result<(Self, String)>
+    {
         let hashed_password = encrypt(password.clone().unwrap_or(String::from("")));
         let connection_msg = ClientMessage::construct_connection_msg(
             hashed_password.clone(),
@@ -1467,7 +1527,8 @@ impl ClientConnection {
         ))
     }
 
-    pub fn reset_state(&mut self) {
+    pub fn reset_state(&mut self)
+    {
         self.client_secret = Vec::new();
         self.state = ConnectionState::default();
     }
@@ -1478,7 +1539,8 @@ impl ClientConnection {
         author: String,
         password: String,
         uuid: String,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    {
         if let ConnectionState::Connected(connection) = &self.state {
             //We pray it doesnt deadlock, amen
             connection
@@ -1489,7 +1551,8 @@ impl ClientConnection {
 
             //Shutdown connection from the client side
             connection.writer.lock().await.shutdown().await?;
-        } else {
+        }
+        else {
             bail!("There is no active connection to send the message on.")
         }
 
@@ -1501,20 +1564,24 @@ impl ClientConnection {
 }
 
 #[derive(Clone, Debug)]
-pub struct ConnectionPair {
+pub struct ConnectionPair
+{
     pub writer: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     pub reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
 }
 
-impl ConnectionPair {
-    pub fn new(writer: OwnedWriteHalf, reader: OwnedReadHalf) -> Self {
+impl ConnectionPair
+{
+    pub fn new(writer: OwnedWriteHalf, reader: OwnedReadHalf) -> Self
+    {
         Self {
             writer: Arc::new(tokio::sync::Mutex::new(writer)),
             reader: Arc::new(tokio::sync::Mutex::new(reader)),
         }
     }
 
-    pub async fn send_message(&self, message: ClientMessage) -> anyhow::Result<ServerReply> {
+    pub async fn send_message(&self, message: ClientMessage) -> anyhow::Result<ServerReply>
+    {
         let mut writer: tokio::sync::MutexGuard<'_, OwnedWriteHalf> = self.writer.lock().await;
 
         let message_string = message.struct_into_string();
@@ -1537,7 +1604,8 @@ impl ConnectionPair {
 
 ///Used to show state of the connection
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
-pub enum ConnectionState {
+pub enum ConnectionState
+{
     #[serde(skip)]
     Connected(ConnectionPair),
 
@@ -1547,8 +1615,10 @@ pub enum ConnectionState {
     Error,
 }
 
-impl Debug for ConnectionState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for ConnectionState
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
         f.write_str(match self {
             ConnectionState::Connected(_) => "Connected",
             ConnectionState::Disconnected => "Disconnected",
@@ -1577,7 +1647,8 @@ impl Debug for ConnectionState {
 
 ///This is what the server sends back (pushes to message vector), when reciving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerFileUpload {
+pub struct ServerFileUpload
+{
     /// The uploaded file's name
     pub file_name: String,
     /// The uploaded file's sha256 singnature
@@ -1586,7 +1657,8 @@ pub struct ServerFileUpload {
 
 /// This enum holds all the Server reply types so it can be decoded more easily on the client side
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum ServerReplyType {
+pub enum ServerReplyType
+{
     /// Returns the requested file
     File(ServerFileReply),
 
@@ -1603,7 +1675,8 @@ pub enum ServerReplyType {
 
 /// This struct holds everything important so the client can save and handle client profiles
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerClientReply {
+pub struct ServerClientReply
+{
     /// The uuid of the user's profile we requested
     pub uuid: String,
     /// The profile of the user
@@ -1612,7 +1685,8 @@ pub struct ServerClientReply {
 
 ///When client asks for the image based on the provided index, reply with the image bytes
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerImageReply {
+pub struct ServerImageReply
+{
     /// The requested image's bytes
     pub bytes: Vec<u8>,
 
@@ -1622,7 +1696,8 @@ pub struct ServerImageReply {
 
 ///This is what the server sends back, when asked for a file (FIleRequest)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerFileReply {
+pub struct ServerFileReply
+{
     /// The requested file's bytes
     pub bytes: Vec<u8>,
 
@@ -1633,7 +1708,8 @@ pub struct ServerFileReply {
 
 ///When client asks for the image based on the provided index, reply with the audio bytes, which gets written so it can be opened by a readbuf
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerAudioReply {
+pub struct ServerAudioReply
+{
     /// The requested audio file's bytes
     pub bytes: Vec<u8>,
     /// The requested audio file's signature
@@ -1644,14 +1720,16 @@ pub struct ServerAudioReply {
 
 ///This is what the server sends back (pushes to message vector), when reciving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerNormalMessage {
+pub struct ServerNormalMessage
+{
     pub has_been_edited: bool,
     pub message: String,
 }
 
 ///REFER TO -> ServerImageUpload; logic      ||      same thing but with audio files
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerAudioUpload {
+pub struct ServerAudioUpload
+{
     /// The signature of the uploaded image file
     pub signature: String,
     /// The file name of the uploaded audio
@@ -1660,14 +1738,16 @@ pub struct ServerAudioUpload {
 
 ///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerImageUpload {
+pub struct ServerImageUpload
+{
     /// The signature of the uploaded image, this is the "handle" the clients asks the file on
     pub signature: String,
 }
 
 /// This struct contains all the important information for the client to edit / update its own message list
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerMessageEdit {
+pub struct ServerMessageEdit
+{
     /// The message's index it belongs to
     pub index: i32,
 
@@ -1677,7 +1757,8 @@ pub struct ServerMessageEdit {
 
 /// This struct contains all the necesarily information for the client to update its own message list's reactions
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerMessageReaction {
+pub struct ServerMessageReaction
+{
     pub reaction_type: ReactionType,
 }
 
@@ -1689,7 +1770,8 @@ pub struct ServerMessageSync {}
 /// Why do we have to implement PartialEq for all of the structs? This is so funny
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(EnumString, EnumMessage))]
-pub enum ServerMessageType {
+pub enum ServerMessageType
+{
     #[strum_discriminants(strum(message = "Upload"))]
     Upload(ServerFileUpload),
     #[strum_discriminants(strum(message = "Normal"))]
@@ -1732,7 +1814,8 @@ pub enum ServerMessageType {
 
 /// The types of message the server can "send"
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerMessage {
+pub enum ServerMessage
+{
     /// This is sent when a user is connected to the server
     Connect(ClientProfile),
     /// This is sent when a user is disconnecting from the server
@@ -1744,7 +1827,8 @@ pub enum ServerMessage {
 
 ///This is one msg (packet), which gets bundled when sending ServerMain
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerOutput {
+pub struct ServerOutput
+{
     /// The ```usize``` shows which message its a reply to in the message stack
     /// The server stores all messages in a vector so this index shows which message its a reply to (if it is)
     pub replying_to: Option<usize>,
@@ -1758,8 +1842,10 @@ pub struct ServerOutput {
     pub uuid: String,
 }
 
-impl ServerOutput {
-    pub fn _struct_into_string(&self) -> String {
+impl ServerOutput
+{
+    pub fn _struct_into_string(&self) -> String
+    {
         serde_json::to_string(self).unwrap_or_default()
     }
 
@@ -1772,7 +1858,8 @@ impl ServerOutput {
         upload_type: ServerMessageTypeDiscriminants,
         uuid: String,
         username: String,
-    ) -> ServerOutput {
+    ) -> ServerOutput
+    {
         ServerOutput {
             replying_to: normal_msg.replying_to,
             message_type:
@@ -1877,7 +1964,8 @@ impl ServerOutput {
 /// Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
 /// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-pub struct ServerMaster {
+pub struct ServerMaster
+{
     ///All of the messages recived from the server
     pub message_list: Vec<ServerOutput>,
 
@@ -1894,8 +1982,10 @@ pub struct ServerMaster {
     pub ongoing_voip_call: ServerVoipState,
 }
 
-impl ServerMaster {
-    pub fn struct_into_string(&self) -> String {
+impl ServerMaster
+{
+    pub fn struct_into_string(&self) -> String
+    {
         serde_json::to_string(self).unwrap_or_default()
     }
 }
@@ -1905,22 +1995,26 @@ impl ServerMaster {
 /// And the message the client has sent
 /// We dont need to provide any other information since, the ```ServerMaster``` struct ensures all the clients have the same field when connecting
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ServerSync {
+pub struct ServerSync
+{
     ///Users last seen message index
     pub user_seen_list: Vec<ClientLastSeenMessage>,
     /// The inner message
     pub message: ServerOutput,
 }
 
-impl ServerSync {
-    pub fn struct_into_string(&self) -> String {
+impl ServerSync
+{
+    pub fn struct_into_string(&self) -> String
+    {
         serde_json::to_string(self).unwrap_or_default()
     }
 }
 
 //When a client is connected this is where the client gets saved
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ConnectedClient {
+pub struct ConnectedClient
+{
     /// The reason one gets EOF when disconnecting is because this field is dropped (With this struct)
     /// This handle wouldnt have to be sent so its all okay, its only present on the server's side
     #[serde(skip)]
@@ -1929,12 +2023,14 @@ pub struct ConnectedClient {
     pub username: String,
 }
 
-impl ConnectedClient {
+impl ConnectedClient
+{
     pub fn new(
         uuid: String,
         username: String,
         handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> Self {
+    ) -> Self
+    {
         Self {
             uuid,
             username,
@@ -1945,20 +2041,24 @@ impl ConnectedClient {
 
 //This contains the client's name and their last seen message's index
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientLastSeenMessage {
+pub struct ClientLastSeenMessage
+{
     pub index: usize,
     pub uuid: String,
 }
 
-impl ClientLastSeenMessage {
-    pub fn new(index: usize, uuid: String) -> Self {
+impl ClientLastSeenMessage
+{
+    pub fn new(index: usize, uuid: String) -> Self
+    {
         Self { index, uuid }
     }
 }
 
 /// This enum contains the actions the client can take, these are sent to the server
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum ClientVoipRequest {
+pub enum ClientVoipRequest
+{
     /// A voip a call will be automaticly issued if there is no ongoing call
     /// The inner value of conncect is the port the Client ```UdpScoket``` is opened on
     Connect(u16),
@@ -1969,7 +2069,8 @@ pub enum ClientVoipRequest {
 
 /// This enum is used to display if a client has joined or left the Voip call, this is a ServerMessageType
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerVoipEvent {
+pub enum ServerVoipEvent
+{
     /// Client connected, the inner value is their uuid
     Connected(String),
     /// Client disconnected, the inner value is their uuid
@@ -1978,13 +2079,15 @@ pub enum ServerVoipEvent {
 
 ///The struct contains all the useful information for displaying an ongoing voip connection.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, PartialEq)]
-pub struct ServerVoipState {
+pub struct ServerVoipState
+{
     pub connected_clients: Option<Vec<String>>,
 }
 
 /// This num contains the actions the server can take, these are sent to the client
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerVoipRequest {
+pub enum ServerVoipRequest
+{
     /// This enum acts as a ```packet``` and is handed out to all the clients if a connection is started / established
     ConnectionStart(ServerVoipStart),
     /// This enum acts as a ```packet``` and i handed out to all the clients connected to the call
@@ -1993,14 +2096,16 @@ pub enum ServerVoipRequest {
 
 /// This struct contains all the infomation important for the non connected clients
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerVoipStart {
+pub struct ServerVoipStart
+{
     /// The clients connected to the Voip call
     pub connected_clients: Vec<ClientProfile>,
 }
 
 /// This enum holds the two outcomes of a connection request
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerVoipReply {
+pub enum ServerVoipReply
+{
     /// This enum is when the connection request is successful
     Success,
     /// This enum is when the connection request is unsuccessful, it also contains the reason
@@ -2010,13 +2115,15 @@ pub enum ServerVoipReply {
 /// This struct contains the reason for closing the voip connection
 /// This maybe at any point of the Voip call, or the connection
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerVoipClose {
+pub struct ServerVoipClose
+{
     /// The reason for closing the Voip connection
     pub reason: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct ServerVoip {
+pub struct ServerVoip
+{
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
     pub connected_clients: Arc<DashMap<String, SocketAddr>>,
 
@@ -2039,17 +2146,20 @@ pub struct ServerVoip {
     pub threads: Option<()>,
 }
 
-impl ServerVoip {
+impl ServerVoip
+{
     /// Add the ```SocketAddr``` to the ```UDP``` server's destinations
     /// This function can take Self as a clone since we are only accessing entries which implement ```Sync```
-    pub fn connect(&self, uuid: String, socket_addr: SocketAddr) -> anyhow::Result<()> {
+    pub fn connect(&self, uuid: String, socket_addr: SocketAddr) -> anyhow::Result<()>
+    {
         self.connected_clients.insert(uuid, socket_addr);
 
         Ok(())
     }
 
     /// Remove the ```SocketAddr``` to the ```UDP``` server's destiantions
-    pub fn disconnect(&self, uuid: String) -> anyhow::Result<()> {
+    pub fn disconnect(&self, uuid: String) -> anyhow::Result<()>
+    {
         self.connected_clients
             .remove(&uuid)
             .ok_or_else(|| anyhow::Error::msg("Client was not connected"))?;
@@ -2059,7 +2169,8 @@ impl ServerVoip {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum UdpMessage {
+pub enum UdpMessage
+{
     /// This enums inner value is the lenght of the message this is indicating
     MessageLenght(u32),
 
@@ -2068,14 +2179,17 @@ pub enum UdpMessage {
 }
 
 #[derive(Debug, Clone)]
-pub struct Voip {
+pub struct Voip
+{
     /// The clients socket, which theyre listening on
     pub socket: Arc<UdpSocket>,
 }
 
-impl Voip {
+impl Voip
+{
     /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
-    pub async fn new() -> anyhow::Result<Self> {
+    pub async fn new() -> anyhow::Result<Self>
+    {
         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
         socket_2.set_reuse_address(true)?;
@@ -2092,7 +2206,8 @@ impl Voip {
         uuid: String,
         mut bytes: Vec<u8>,
         encryption_key: &[u8],
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    {
         let bytes_lenght = bytes.len();
 
         //Check for packet lenght overflow
@@ -2125,7 +2240,8 @@ impl Voip {
 
 #[derive(Clone)]
 ///Struct for global audio playback
-pub struct AudioPlayback {
+pub struct AudioPlayback
+{
     ///Output stream
     pub stream: Arc<OutputStream>,
     ///Output stream handle
@@ -2136,8 +2252,10 @@ pub struct AudioPlayback {
     pub settings_list: Vec<AudioSettings>,
 }
 
-impl Default for AudioPlayback {
-    fn default() -> Self {
+impl Default for AudioPlayback
+{
+    fn default() -> Self
+    {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         Self {
             stream: Arc::new(stream),
@@ -2150,7 +2268,8 @@ impl Default for AudioPlayback {
 
 #[derive(Clone)]
 ///This is used by the audio player, this is where you can set the speed and volume etc
-pub struct AudioSettings {
+pub struct AudioSettings
+{
     ///Volume for audio stream
     pub volume: f32,
     ///Speed for audio stream
@@ -2166,8 +2285,10 @@ pub struct AudioSettings {
 }
 
 ///Initialize default values
-impl Default for AudioSettings {
-    fn default() -> Self {
+impl Default for AudioSettings
+{
+    fn default() -> Self
+    {
         Self {
             volume: 0.8,
             speed: 1.,
@@ -2186,43 +2307,53 @@ Maunally create a struct which implements the following traits:
 So it can be used as a Arc<Mutex<()>>
 */
 #[derive(Clone)]
-pub struct PlaybackCursor {
+pub struct PlaybackCursor
+{
     pub cursor: Arc<Mutex<io::Cursor<Vec<u8>>>>,
 }
 
 ///Impl new so It can probe a file (in `vec<u8>` format)
-impl PlaybackCursor {
-    pub fn new(data: Vec<u8>) -> Self {
+impl PlaybackCursor
+{
+    pub fn new(data: Vec<u8>) -> Self
+    {
         let cursor = Arc::new(Mutex::new(io::Cursor::new(data)));
         PlaybackCursor { cursor }
     }
 }
 
 ///Implement the Read trait
-impl Read for PlaybackCursor {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+impl Read for PlaybackCursor
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>
+    {
         let mut cursor = self.cursor.lock().unwrap();
         std::io::Read::read(&mut *cursor, buf)
     }
 }
 
 ///Implement the Seek trait
-impl Seek for PlaybackCursor {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+impl Seek for PlaybackCursor
+{
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>
+    {
         let mut cursor = self.cursor.lock().unwrap();
         std::io::Seek::seek(&mut *cursor, pos)
     }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub struct ScrollToMessage {
+pub struct ScrollToMessage
+{
     #[serde(skip)]
     pub messages: Vec<egui::Response>,
     pub index: usize,
 }
 
-impl ScrollToMessage {
-    pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage {
+impl ScrollToMessage
+{
+    pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage
+    {
         ScrollToMessage { messages, index }
     }
 }
@@ -2232,7 +2363,8 @@ impl ScrollToMessage {
 */
 ///Used to decide what to search for (In the Message search bar), defined by the user
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Default)]
-pub enum SearchType {
+pub enum SearchType
+{
     Date,
     File,
     #[default]
@@ -2242,8 +2374,10 @@ pub enum SearchType {
 }
 
 ///Implement display for SearchType so its easier to display
-impl Display for SearchType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SearchType
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
         f.write_str(match self {
             SearchType::Name => "Name",
             SearchType::Message => "Message",
@@ -2255,7 +2389,8 @@ impl Display for SearchType {
 }
 
 ///Get ipv4 ip address from an external website
-pub fn ipv4_get() -> Result<String, std::io::Error> {
+pub fn ipv4_get() -> Result<String, std::io::Error>
+{
     // Send an HTTP GET request to a service that returns your public IPv4 address
     let response = reqwest::blocking::get("https://ipv4.icanhazip.com/");
     // Check if the request was successful
@@ -2263,7 +2398,8 @@ pub fn ipv4_get() -> Result<String, std::io::Error> {
         let public_ipv4 = response.unwrap().text();
 
         Ok(public_ipv4.unwrap())
-    } else {
+    }
+    else {
         Err(std::io::Error::new(
             std::io::ErrorKind::ConnectionRefused,
             "Failed to fetch ip address",
@@ -2272,7 +2408,8 @@ pub fn ipv4_get() -> Result<String, std::io::Error> {
 }
 
 ///Get ipv6 ip address from an external website
-pub fn ipv6_get() -> Result<String, std::io::Error> {
+pub fn ipv6_get() -> Result<String, std::io::Error>
+{
     // Send an HTTP GET request to a service that returns your public IPv4 address
     let response = reqwest::blocking::get("https://ipv6.icanhazip.com/");
     // Check if the request was successful
@@ -2280,7 +2417,8 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
         let public_ipv4 = response.unwrap().text();
 
         Ok(public_ipv4.unwrap())
-    } else {
+    }
+    else {
         Err(std::io::Error::new(
             std::io::ErrorKind::ConnectionRefused,
             "Failed to fetch ip address",
@@ -2292,7 +2430,8 @@ pub fn ipv6_get() -> Result<String, std::io::Error> {
 /// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
-pub struct UserInformation {
+pub struct UserInformation
+{
     pub profile: ClientProfile,
     /// the client's username
     pub username: String,
@@ -2306,7 +2445,8 @@ pub struct UserInformation {
     pub path: PathBuf,
 }
 
-impl UserInformation {
+impl UserInformation
+{
     ///All of the args are encrypted
     pub fn new(
         username: String,
@@ -2318,7 +2458,8 @@ impl UserInformation {
         normal_profile_picture: Vec<u8>,
         small_profile_picture: Vec<u8>,
         path: PathBuf,
-    ) -> Self {
+    ) -> Self
+    {
         Self {
             username: username.clone(),
             password: encrypt(password),
@@ -2337,12 +2478,14 @@ impl UserInformation {
     }
 
     /// Automaticly check hash with argon2 encrypted password (from the file)
-    pub fn verify_password(&self, password: String) -> bool {
+    pub fn verify_password(&self, password: String) -> bool
+    {
         pass_hash_match(password, self.password.clone())
     }
 
     /// This serializer function automaticly encrypts the struct with the *encrypt_aes256* fn to string
-    pub fn serialize(&self) -> anyhow::Result<String> {
+    pub fn serialize(&self) -> anyhow::Result<String>
+    {
         //Hash password so it can be used to encrypt a file
         let hashed_password = sha256::digest(self.password.clone());
         let encryption_key = hex::decode(hashed_password)?;
@@ -2351,7 +2494,8 @@ impl UserInformation {
     }
 
     /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
-    pub fn deserialize(serialized_struct: &str, password: String) -> anyhow::Result<Self> {
+    pub fn deserialize(serialized_struct: &str, password: String) -> anyhow::Result<Self>
+    {
         let hashed_password = sha256::digest(password);
         let encryption_key = hex::decode(hashed_password)?;
 
@@ -2362,7 +2506,8 @@ impl UserInformation {
     }
 
     /// Write file to the specified path
-    pub fn write_file(&self, user_path: PathBuf) -> anyhow::Result<()> {
+    pub fn write_file(&self, user_path: PathBuf) -> anyhow::Result<()>
+    {
         let serialized_self = self.serialize()?;
 
         let mut file = fs::File::create(user_path)?;
@@ -2383,13 +2528,15 @@ impl UserInformation {
     }
 
     /// Remove bookmark at index from the list, this can panic if the wrong index is passed in
-    pub fn delete_bookmark_entry(&mut self, index: usize) {
+    pub fn delete_bookmark_entry(&mut self, index: usize)
+    {
         self.bookmarked_ips.remove(index);
     }
 }
 
 /// aes256 is decrypted by this function by a fixed key
-pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Result<String> {
+pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Result<String>
+{
     let ciphertext = hex::decode(string_to_be_decrypted)?;
 
     let key = Key::<Aes256Gcm>::from_slice(key);
@@ -2406,7 +2553,8 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
 }
 
 /// This function decrypts a provided ```String```, with the provided key using ```Aes-256```
-pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Result<String> {
+pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Result<String>
+{
     ensure!(key.len() == 32);
 
     let key = Key::<Aes256Gcm>::from_slice(key);
@@ -2424,7 +2572,8 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
 }
 
 /// The provided byte array is encrypted with aes256 with the given key
-pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
+{
     ensure!(key.len() == 32);
 
     let key = Key::<Aes256Gcm>::from_slice(key);
@@ -2442,7 +2591,8 @@ pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
 
 #[inline]
 /// This function decrypts a provided array of ```Bytes```, with the provided key using ```Aes-256```
-pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
+{
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
@@ -2458,7 +2608,8 @@ pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow:
 
 #[inline]
 /// Argon is used to encrypt this
-pub fn encrypt(string_to_be_encrypted: String) -> String {
+pub fn encrypt(string_to_be_encrypted: String) -> String
+{
     let password = string_to_be_encrypted.as_bytes();
     let salt = b"c1eaa94ec38ab7aa16e9c41d029256d3e423f01defb0a2760b27117ad513ccd2";
     let config = Config::owasp1();
@@ -2467,12 +2618,14 @@ pub fn encrypt(string_to_be_encrypted: String) -> String {
 }
 
 #[inline]
-fn pass_hash_match(to_be_verified: String, encoded: String) -> bool {
+fn pass_hash_match(to_be_verified: String, encoded: String) -> bool
+{
     argon2::verify_encoded(&encoded, to_be_verified.as_bytes()).unwrap()
 }
 
 ///Check login
-pub fn login(username: String, password: String) -> Result<(UserInformation, PathBuf)> {
+pub fn login(username: String, password: String) -> Result<(UserInformation, PathBuf)>
+{
     let app_data = env::var("APPDATA")?;
 
     let path = PathBuf::from(format!("{app_data}\\Matthias\\{username}.szch"));
@@ -2488,7 +2641,8 @@ pub fn login(username: String, password: String) -> Result<(UserInformation, Pat
 }
 
 ///Register a new profile
-pub fn register(register: Register) -> anyhow::Result<UserInformation> {
+pub fn register(register: Register) -> anyhow::Result<UserInformation>
+{
     if register.username.contains(' ')
         || register.username.contains('@')
         || register.username.contains(' ')
@@ -2524,7 +2678,8 @@ pub fn register(register: Register) -> anyhow::Result<UserInformation> {
 }
 
 ///Write general file, this function takes in a custom pathsrc/app/backend.rs
-pub fn write_file(file_response: ServerFileReply) -> Result<()> {
+pub fn write_file(file_response: ServerFileReply) -> Result<()>
+{
     let files = FileDialog::new()
         .set_title("Save to")
         .set_directory("/")
@@ -2553,7 +2708,8 @@ pub fn write_file(file_response: ServerFileReply) -> Result<()> {
 
 ///Write an audio file to the appdata folder
 #[inline]
-pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
+pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()>
+{
     //secondly create the folder labeled with the specified server ip
     let folder_path = format!(
         "{}\\matthias\\Client\\{}\\Audios",
@@ -2574,7 +2730,8 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
 }
 
 ///Generate uuid
-pub fn generate_uuid() -> Uuid {
+pub fn generate_uuid() -> Uuid
+{
     uuid::Uuid::new_v4()
 }
 
@@ -2591,10 +2748,10 @@ where
             toast.set_show_progress_bar(true);
 
             toasts.add(toast);
-        }
+        },
         Err(_err) => {
             tracing::error!("{}", _err);
-        }
+        },
     }
 }
 
@@ -2611,15 +2768,18 @@ where
     Ok(u32::from_be_bytes(buf[..4].try_into()?))
 }
 
-pub struct Message {
+pub struct Message
+{
     pub inner_message: MessageDisplay,
     pub size: f32,
 }
 
 use egui::style::Spacing;
 
-impl Message {
-    pub fn display(&self, ui: &mut Ui, ctx: &egui::Context) -> Response {
+impl Message
+{
+    pub fn display(&self, ui: &mut Ui, ctx: &egui::Context) -> Response
+    {
         ui.style_mut().spacing = Spacing {
             item_spacing: vec2(0., 10.),
             ..Default::default()
@@ -2660,18 +2820,21 @@ impl Message {
                     }
                 })
                 .response
-            }
-            MessageDisplay::Link(inner) => ui.hyperlink_to(
-                RichText::from(inner.label.clone()).size(self.size),
-                inner.destination.clone(),
-            ),
+            },
+            MessageDisplay::Link(inner) => {
+                ui.hyperlink_to(
+                    RichText::from(inner.label.clone()).size(self.size),
+                    inner.destination.clone(),
+                )
+            },
             MessageDisplay::NewLine => unreachable!(),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-struct RegexMatch {
+struct RegexMatch
+{
     //Where does this match begin in the main string
     start_idx: usize,
     //Where does this match end in the main string
@@ -2687,7 +2850,8 @@ struct RegexMatch {
     header_level: Option<usize>,
 }
 
-pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
+pub fn parse_incoming_message(rhs: String) -> Vec<Message>
+{
     let mut message_stack: Vec<Message> = Vec::new();
 
     //Create regex where it captures the #-s in the beginning or after \n-s
@@ -2743,7 +2907,8 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
                 //If the header level equals 0 that means the current message part doesnt have a specified header level
                 if *header_level != 0 {
                     Some(*header_level)
-                } else {
+                }
+                else {
                     None
                 }
             },
@@ -2757,7 +2922,8 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message> {
 }
 
 /// Push back all the captured regexes, info to the ```message_stack```, whatever is in the ```message_stack``` gets displayed at the end
-fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>) {
+fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
+{
     //Iter over all the captures we've made
     for regex_match in matches {
         //Default font size
@@ -2785,7 +2951,7 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
                         size,
                     })
                 }
-            }
+            },
 
             //This was matched by the link capturing regex
             MessageDisplayDiscriminants::Link => {
@@ -2815,19 +2981,23 @@ fn parse_regex_match(matches: Vec<RegexMatch>, message_stack: &mut Vec<Message>)
                     }),
                     size,
                 })
-            }
+            },
 
             //This means it was manually added
-            MessageDisplayDiscriminants::Text => message_stack.push(Message {
-                inner_message: MessageDisplay::Text(regex_match.capture.trim().to_string()),
-                size,
-            }),
+            MessageDisplayDiscriminants::Text => {
+                message_stack.push(Message {
+                    inner_message: MessageDisplay::Text(regex_match.capture.trim().to_string()),
+                    size,
+                })
+            },
 
             //The size of a Newline doesnt matter lmao
-            MessageDisplayDiscriminants::NewLine => message_stack.push(Message {
-                inner_message: MessageDisplay::NewLine,
-                size: 1.,
-            }),
+            MessageDisplayDiscriminants::NewLine => {
+                message_stack.push(Message {
+                    inner_message: MessageDisplay::NewLine,
+                    size: 1.,
+                })
+            },
         }
     }
 }
@@ -2841,7 +3011,8 @@ fn filter_string(
     header_level: Option<usize>,
     // The regexes which need to be used to get the important information from the message
     regexes: &Vec<(MessageDisplayDiscriminants, Regex)>,
-) -> Vec<RegexMatch> {
+) -> Vec<RegexMatch>
+{
     //We clone the message we need to examine, this value will be modifed by the regexes (Deleting the captured information)
     let mut match_message_part = message_part.clone();
 
@@ -2886,7 +3057,8 @@ fn filter_plain_text(
     message_part: String,
     // This is used to decide the font size
     header_level: Option<usize>,
-) {
+)
+{
     //This buffer will contain the captures as a string in the original form, Emoji("Smile") => :Smile:
     let captured_message_display_enum_as_string: Vec<String> = matches
         .clone()
@@ -2942,7 +3114,8 @@ fn filter_plain_text(
 /// The discriminants of this enum are used to diffrenciate the types of regex captures
 #[derive(EnumDiscriminants, PartialEq)]
 /// These are the types of messages which can be displayed within a normal message
-pub enum MessageDisplay {
+pub enum MessageDisplay
+{
     /// This is used to display normal plain text
     Text(String),
     /// This is used to display emojies, and holds the important info for displaying an emoji
@@ -2956,14 +3129,16 @@ pub enum MessageDisplay {
 
 /// This struct serves as the information struct for the MessageDisplay's Emoji enum
 #[derive(PartialEq)]
-pub struct EmojiDisplay {
+pub struct EmojiDisplay
+{
     /// The name of the emoji wanting to be displayed, we make sure to load in all the emojies into the egui buffer when theyre displayed
     pub name: String,
 }
 
 /// This struct serves as the information struct for the MessageDisplay's Link enum
 #[derive(PartialEq)]
-pub struct HyperLink {
+pub struct HyperLink
+{
     /// This is the part of the hyperlink which gets to be displayed
     pub label: String,
     /// This is the part of the hyperlink which it redirects to
@@ -2972,13 +3147,15 @@ pub struct HyperLink {
 
 ///This struct contains all the reactions of one message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
-pub struct MessageReaction {
+pub struct MessageReaction
+{
     /// The list of reactions added to a message
     pub message_reactions: Vec<Reaction>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct Reaction {
+pub struct Reaction
+{
     /// The reaction's corresponding emoji name
     pub emoji_name: String,
     /// The coutner of how many times this emoji has been sent

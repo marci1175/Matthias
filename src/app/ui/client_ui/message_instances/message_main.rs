@@ -11,12 +11,14 @@ use egui::{
     vec2, Align, Button, Color32, Image, Layout, Response, RichText,
 };
 
-impl Application {
+impl Application
+{
     pub fn client_ui_message_main(
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> egui::InnerResponse<()> {
+    ) -> egui::InnerResponse<()>
+    {
         ui.allocate_ui(vec2(ui.available_width(), ui.available_height()), |ui|{
             egui::ScrollArea::vertical()
                     .id_source("msg_area")
@@ -315,7 +317,8 @@ impl Application {
         })
     }
 
-    pub fn request_client(&mut self, uuid: String) {
+    pub fn request_client(&mut self, uuid: String)
+    {
         //Ask the server for the specified client's profile picture
         self.send_msg(ClientMessage::construct_client_request_msg(
             uuid.clone(),
@@ -325,12 +328,8 @@ impl Application {
 
     /// This function displays the 64x64 icon of a client based on their uuid
     /// This function also requests the server for the image if the image isnt available on the given URI
-    pub fn display_icon_from_server(
-        &mut self,
-        ctx: &egui::Context,
-        uuid: String,
-        ui: &mut egui::Ui,
-    ) {
+    pub fn display_icon_from_server(&mut self, ctx: &egui::Context, uuid: String, ui: &mut egui::Ui)
+    {
         //If uuid is the server's we just include the image of the server
         if uuid == SERVER_UUID {
             ui.add(Image::new(egui::include_image!(
@@ -352,11 +351,12 @@ impl Application {
                     //If there is only a 0 in the bytes that indicates its a placeholder, thus we can display the spinner
                     if bytes.to_vec() == vec![0] {
                         ui.spinner();
-                    } else {
+                    }
+                    else {
                         ui.add(egui::Image::from_uri(format!("bytes://{}", &uuid)));
                     }
                 }
-            }
+            },
             //If the image was not found on the URI
             Err(err) => {
                 ui.spinner();
@@ -376,13 +376,15 @@ impl Application {
                         //If the server takees a lot of time to respond, we will prevent asking multiple times by creating a placeholder just as in the image displaying code
                         //We will forget this URI when loading in the real image
                         ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);
-                    } else {
+                    }
+                    else {
                         tracing::error!("{}", inner);
                     }
-                } else {
+                }
+                else {
                     tracing::error!("{}", err);
                 }
-            }
+            },
         };
     }
 }

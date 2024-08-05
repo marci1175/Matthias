@@ -9,8 +9,10 @@ use egui::{
 use egui_extras::DatePickerButton;
 use image::{io::Reader as ImageReader, DynamicImage};
 
-impl Application {
-    pub fn state_register(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
+impl Application
+{
+    pub fn state_register(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context)
+    {
         egui::TopBottomPanel::top("register_menu").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
@@ -102,12 +104,12 @@ impl Application {
                                             self.main.register_mode = false;
 
                                             self.opened_user_information = user_information;
-                                        }
+                                        },
                                         Err(err) => {
                                             //Avoid panicking when trying to display a Notification
                                             //This is very rare but can still happen
                                             display_error_message(err, self.toasts.clone());
-                                        }
+                                        },
                                     }
                                 };
                             },
@@ -178,7 +180,8 @@ impl Application {
                                                 &mut self.register.image.image_size,
                                                 0.0..=image.height() as f32,
                                             ));
-                                        } else {
+                                        }
+                                        else {
                                             ui.add(Slider::new(
                                                 &mut self.register.image.image_size,
                                                 0.0..=image.width() as f32,
@@ -248,7 +251,8 @@ impl Application {
                                     );
                                     self.register.image.image_rect = allocated_img.response.rect;
                                 });
-                        } else if ui.button("Upload picture").clicked() {
+                        }
+                        else if ui.button("Upload picture").clicked() {
                             let app_data_path = rfd::FileDialog::new()
                                 .add_filter("Supported formats", &["png"])
                                 .pick_file();
@@ -258,12 +262,12 @@ impl Application {
                                     Ok(image) => {
                                         //This shouldnt panic as we limit the types of file which can be seletected as a pfp
                                         self.register.image.selected_image_bytes = Some(image);
-                                    }
+                                    },
                                     Err(err) => {
                                         //Avoid panicking when trying to display a Notification
                                         //This is very rare but can still happen
                                         display_error_message(err, self.toasts.clone());
-                                    }
+                                    },
                                 }
                                 self.register.image.image_path = app_data_path;
                                 ctx.forget_image("bytes://register_image");
@@ -306,7 +310,8 @@ impl Application {
         image: DynamicImage,
         app_data_path: String,
         ctx: &egui::Context,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    {
         image
             .resize(256, 256, image::imageops::FilterType::CatmullRom)
             .save(format!(
@@ -353,33 +358,34 @@ impl Application {
                     "{}\\matthias\\{}_temp_pfp64.png",
                     app_data_path, self.register.username
                 ))?;
-            }
+            },
             (Ok(_), Err(err)) => {
                 bail!(
                     "Successfully read 256 file, but failed to read 64 file: {:?}",
                     err
                 );
-            }
+            },
             (Err(err), Ok(_)) => {
                 bail!(
                     "Successfully read 64 file, but failed to read 256 file: {:?}",
                     err
                 );
-            }
+            },
             (Err(err256), Err(err64)) => {
                 bail!(
                     "Failed to read both files:\n256: {:?}\n64: {:?}",
                     err256,
                     err64
                 );
-            }
+            },
         }
 
         Ok(())
     }
 }
 
-fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage> {
+fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage>
+{
     let image_reader = ImageReader::new(Cursor::new(fs::read(app_data_path)?))
         .with_guessed_format()?
         .decode()?;
@@ -387,7 +393,8 @@ fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage> {
     Ok(image_reader)
 }
 
-fn draw_rect(ui: &mut egui::Ui, stroke: Stroke, center_pos: Pos2, size_of_side: f32) {
+fn draw_rect(ui: &mut egui::Ui, stroke: Stroke, center_pos: Pos2, size_of_side: f32)
+{
     let a_point = Pos2::new(
         center_pos.x - (size_of_side / 2.),
         center_pos.y - (size_of_side / 2.),

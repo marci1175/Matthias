@@ -1,13 +1,16 @@
-use crate::app::backend::{display_error_message, Application, ClientProfile};
-use crate::app::backend::{ipv4_get, ipv6_get};
-use crate::app::server;
+use crate::app::{
+    backend::{display_error_message, ipv4_get, ipv6_get, Application, ClientProfile},
+    server,
+};
 use dashmap::DashMap;
 use egui::{vec2, Align, Color32, Context, Image, Layout, RichText};
 use egui_extras::{Column, TableBuilder};
 use tokio_util::sync::CancellationToken;
 
-impl Application {
-    pub fn server_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &Context) {
+impl Application
+{
+    pub fn server_setup_ui(&mut self, ui: &mut egui::Ui, ctx: &Context)
+    {
         ui.collapsing("Server", |ui| {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
                 if !self.server_has_started {
@@ -61,21 +64,21 @@ impl Application {
                                                 *shared_fileds_clone.lock().unwrap() =
                                                     shared_fields.lock().await.clone();
                                             });
-                                        }
+                                        },
                                         Err(err) => {
                                             println!("ln 208 {:?}", err);
-                                        }
+                                        },
                                     };
                                 });
                                 true
-                            }
+                            },
                             Err(err) => {
                                 //Avoid panicking when trying to display a Notification
                                 //This is very rare but can still happen
                                 display_error_message(err, self.toasts.clone());
 
                                 false
-                            }
+                            },
                         };
                     }
 
@@ -84,7 +87,8 @@ impl Application {
                     if self.server_req_password {
                         ui.text_edit_singleline(&mut self.server_password);
                     }
-                } else {
+                }
+                else {
                     ui.label("Server settings");
                     if ui.button("Shutdown server").clicked() {
                         let token = self.server_shutdown_token.clone();
@@ -117,10 +121,10 @@ impl Application {
 
                                 self.client_ui.send_on_ip =
                                     format!("[{}]:{}", pub_ip[0], self.open_on_port);
-                            }
+                            },
                             Err(err) => {
                                 eprintln!("{}", err)
-                            }
+                            },
                         }
                     }
 
@@ -258,10 +262,10 @@ impl Application {
                                     }
                                 });
                             }
-                        }
+                        },
                         Err(err) => {
                             tracing::error!("{}", err);
-                        }
+                        },
                     };
                 }
             });

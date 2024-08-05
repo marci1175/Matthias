@@ -8,7 +8,8 @@ include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
 use crate::app::backend;
 
-fn char_name(chr: char) -> String {
+fn char_name(chr: char) -> String
+{
     special_char_name(chr)
         .map(|s| s.to_owned())
         //Deleted unciode names crate cuz of big bin size
@@ -16,7 +17,8 @@ fn char_name(chr: char) -> String {
         .unwrap_or_else(|| "unknown".to_owned())
 }
 
-fn special_char_name(chr: char) -> Option<&'static str> {
+fn special_char_name(chr: char) -> Option<&'static str>
+{
     #[allow(clippy::match_same_arms)] // many "flag"
     match chr {
         // Special private-use-area extensions found in `emoji-icon-font.ttf`:
@@ -155,9 +157,11 @@ fn special_char_name(chr: char) -> Option<&'static str> {
     }
 }
 
-impl backend::Application {
+impl backend::Application
+{
     /// Iterates over all the characters
-    pub fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String> {
+    pub fn available_characters(ui: &egui::Ui, family: egui::FontFamily) -> BTreeMap<char, String>
+    {
         ui.fonts(|f| {
             f.lock()
                 .fonts
@@ -171,49 +175,61 @@ impl backend::Application {
     }
 
     /// We return the name of the emoji selected, if none was selected in that frame we reutrn None
-    pub fn draw_emoji_selector(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-    ) -> Option<String> {
+    pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context)
+        -> Option<String>
+    {
         ui.horizontal_top(|ui| {
             for emoji_type in EMOJIS.emoji_types.iter() {
                 match emoji_type {
-                    EmojiTypes::AnimatedBlobs(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::AnimatedBlobs,
-                        "Animated Blobs",
-                    ),
-                    EmojiTypes::Blobs(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Blobs,
-                        "Blobs",
-                    ),
-                    EmojiTypes::Icons(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Icons,
-                        "Icons",
-                    ),
-                    EmojiTypes::Letters(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Letters,
-                        "Letters",
-                    ),
-                    EmojiTypes::Numbers(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Numbers,
-                        "Numbers",
-                    ),
-                    EmojiTypes::Turtles(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Turtles,
-                        "Turtles",
-                    ),
-                    EmojiTypes::Foods(_) => ui.selectable_value(
-                        &mut self.client_ui.emoji_tab_state,
-                        backend::EmojiTypesDiscriminants::Foods,
-                        "Foods",
-                    ),
+                    EmojiTypes::AnimatedBlobs(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::AnimatedBlobs,
+                            "Animated Blobs",
+                        )
+                    },
+                    EmojiTypes::Blobs(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Blobs,
+                            "Blobs",
+                        )
+                    },
+                    EmojiTypes::Icons(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Icons,
+                            "Icons",
+                        )
+                    },
+                    EmojiTypes::Letters(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Letters,
+                            "Letters",
+                        )
+                    },
+                    EmojiTypes::Numbers(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Numbers,
+                            "Numbers",
+                        )
+                    },
+                    EmojiTypes::Turtles(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Turtles,
+                            "Turtles",
+                        )
+                    },
+                    EmojiTypes::Foods(_) => {
+                        ui.selectable_value(
+                            &mut self.client_ui.emoji_tab_state,
+                            backend::EmojiTypesDiscriminants::Foods,
+                            "Foods",
+                        )
+                    },
                 };
             }
         });
@@ -251,7 +267,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Blobs => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -279,7 +295,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Icons => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -307,7 +323,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Letters => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -335,7 +351,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Numbers => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -363,7 +379,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Turtles => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -391,7 +407,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
             backend::EmojiTypesDiscriminants::Foods => {
                 //If we have selected an emoji we just return it, god forgive me for this piece of code
                 if selected_emoji.is_some() {
@@ -419,7 +435,7 @@ impl backend::Application {
                         });
                     }
                 }
-            }
+            },
         };
 
         selected_emoji
@@ -427,7 +443,8 @@ impl backend::Application {
 }
 
 /// This will display the emoji under the given name, if it is not found in the egui image buffer it will automaticly load it
-pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -> Option<String> {
+pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -> Option<String>
+{
     match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {
         Ok(bytespoll) => {
             if let BytesPoll::Ready {
@@ -452,7 +469,7 @@ pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -
                     return Some(emoji_name.to_string());
                 };
             }
-        }
+        },
         Err(err) => {
             if let LoadError::Loading(inner) = err {
                 if inner == "Bytes not found. Did you forget to call Context::include_bytes?" {
@@ -467,13 +484,15 @@ pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -
                             .get(emoji_name)
                             .map_or_else(|| vec![0], |v| v.to_vec()),
                     );
-                } else {
+                }
+                else {
                     tracing::error!("{}", inner);
                 }
-            } else {
+            }
+            else {
                 tracing::error!("{}", err);
             }
-        }
+        },
     }
 
     None

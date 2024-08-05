@@ -1,13 +1,13 @@
-use crate::app::backend::{
-    Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
-};
-use crate::app::ui::client_ui::client_actions::audio_recording::{
-    audio_recording_with_recv, create_wav_file,
+use crate::app::{
+    backend::{
+        Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
+    },
+    ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_wav_file},
 };
 use chrono::Utc;
-use egui::load::{BytesPoll, LoadError};
-use egui::text::{CCursor, CCursorRange};
 use egui::{
+    load::{BytesPoll, LoadError},
+    text::{CCursor, CCursorRange},
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Image, Key, KeyboardShortcut, Layout,
     Modifiers, RichText, Rounding, ScrollArea, Stroke,
 };
@@ -15,12 +15,14 @@ use rand::Rng;
 use rfd::FileDialog;
 use std::sync::mpsc;
 
-impl Application {
+impl Application
+{
     pub fn message_tray(
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> egui::InnerResponse<()> {
+    ) -> egui::InnerResponse<()>
+    {
         ui.allocate_space(vec2(ui.available_width(), 5.));
 
         let frame_rect = ui.max_rect().shrink(5.0);
@@ -140,7 +142,8 @@ impl Application {
             })
     }
 
-    fn display_user_recommendation(&mut self, ctx: &egui::Context) {
+    fn display_user_recommendation(&mut self, ctx: &egui::Context)
+    {
         /*We have to clone here because of the closure*/
         let user_message_clone = self.client_ui.message_buffer.clone();
 
@@ -214,7 +217,8 @@ impl Application {
         }
     }
 
-    fn display_emoji_recommendation(&mut self, ctx: &egui::Context) {
+    fn display_emoji_recommendation(&mut self, ctx: &egui::Context)
+    {
         /*We have to clone here because of the closure*/
         let user_message_clone = self.client_ui.message_buffer.clone();
 
@@ -273,7 +277,8 @@ impl Application {
         }
     }
 
-    fn buttons(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, enabled: bool) {
+    fn buttons(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, enabled: bool)
+    {
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.allocate_ui(vec2(ui.available_width(), self.font_size * 1.5), |ui| {
                 //Display buttons, check if they should be enabled or nah
@@ -302,13 +307,15 @@ impl Application {
                                         Some(self.client_ui.message_buffer.clone()),
                                         &self.opened_user_information.uuid,
                                     ))
-                                }
+                                },
                                 //If its reply or normal mode we can just send the message and call get_reply_index on it
-                                _ => self.send_msg(ClientMessage::construct_normal_msg(
-                                    &self.client_ui.message_buffer,
-                                    &self.opened_user_information.uuid,
-                                    self.client_ui.messaging_mode.get_reply_index(),
-                                )),
+                                _ => {
+                                    self.send_msg(ClientMessage::construct_normal_msg(
+                                        &self.client_ui.message_buffer,
+                                        &self.opened_user_information.uuid,
+                                        self.client_ui.messaging_mode.get_reply_index(),
+                                    ))
+                                },
                             }
 
                             //Callback
@@ -394,7 +401,8 @@ impl Application {
                                 .clone_from(&self.client_ui.emoji[random_number]);
                             self.client_ui.random_generated = true;
                         }
-                    } else {
+                    }
+                    else {
                         //check if button has been unhovered, reset variable
                         self.client_ui.random_generated = false;
                     }
@@ -445,7 +453,8 @@ impl Application {
                             );
                             ctx.request_repaint();
                         });
-                    } else {
+                    }
+                    else {
                         ui.add_enabled_ui(self.client_ui.voip.is_none(), |ui| {
                             if ui
                                 .add(egui::ImageButton::new(egui::include_image!(
@@ -485,7 +494,8 @@ impl Application {
         });
     }
 
-    fn get_connected_users(&mut self, ctx: &egui::Context) -> bool {
+    fn get_connected_users(&mut self, ctx: &egui::Context) -> bool
+    {
         let split_user_msg = self
             .client_ui
             .message_buffer
@@ -538,7 +548,8 @@ impl Application {
                                                 RichText::from(&username).color(Color32::YELLOW),
                                             );
                                         });
-                                    } else {
+                                    }
+                                    else {
                                         ui.label(RichText::from(&username));
                                     }
                                 }
@@ -588,7 +599,8 @@ impl Application {
     }
 
     /// This function draws all the recommended emojis, and returns the list of the emojis' name which contain the ```emoji_name``` arg.
-    fn get_emojis(&mut self, ctx: &egui::Context, emoji_name: String) -> Vec<String> {
+    fn get_emojis(&mut self, ctx: &egui::Context, emoji_name: String) -> Vec<String>
+    {
         let matched_emojis: Vec<String> = EMOJI_TUPLES
             .keys()
             .filter(|key| key.contains(&emoji_name))

@@ -10,7 +10,8 @@ use super::backend::{fetch_incoming_message_lenght, ClientMessage};
 pub async fn connect_to_server(
     mut connection: TcpStream,
     message: ClientMessage,
-) -> anyhow::Result<(String, TcpStream)> {
+) -> anyhow::Result<(String, TcpStream)>
+{
     let message_as_string = message.struct_into_string();
 
     let message_bytes = message_as_string.as_bytes();
@@ -38,12 +39,15 @@ pub async fn connect_to_server(
 
 use std::sync::Arc;
 
-pub struct ServerReply {
+pub struct ServerReply
+{
     pub reader: Arc<Mutex<OwnedReadHalf>>,
 }
 
-impl ServerReply {
-    pub async fn wait_for_response(&self) -> anyhow::Result<String> {
+impl ServerReply
+{
+    pub async fn wait_for_response(&self) -> anyhow::Result<String>
+    {
         let reader = &mut *self.reader.lock().await;
 
         // Read the server reply lenght
@@ -58,7 +62,8 @@ impl ServerReply {
         Ok(String::from_utf8(msg_buffer)?)
     }
 
-    pub fn new(reader: Arc<Mutex<OwnedReadHalf>>) -> Self {
+    pub fn new(reader: Arc<Mutex<OwnedReadHalf>>) -> Self
+    {
         Self { reader }
     }
 }

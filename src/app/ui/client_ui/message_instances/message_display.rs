@@ -10,7 +10,8 @@ use rodio::{Decoder, Source};
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::PlaybackCursor;
-impl Application {
+impl Application
+{
     /// This function is used to displayed the messages wrapped information (The message itself)
     pub fn message_display(
         &mut self,
@@ -18,7 +19,8 @@ impl Application {
         ui: &mut Ui,
         ctx: &egui::Context,
         current_index_in_message_list: usize,
-    ) {
+    )
+    {
         match &message.message_type {
             //File upload
             crate::app::backend::ServerMessageType::Upload(inner) => {
@@ -38,7 +40,7 @@ impl Application {
                         connection.send_message(message).await.unwrap();
                     });
                 }
-            }
+            },
             crate::app::backend::ServerMessageType::Normal(message) => {
                 let messages = parse_incoming_message(message.message.clone());
                 let mut messages_iter = messages.iter();
@@ -65,7 +67,7 @@ impl Application {
                     //Break when we have finished iterating over the messages
                     break;
                 }
-            }
+            },
             crate::app::backend::ServerMessageType::Image(picture) => {
                 ui.allocate_ui(vec2(300., 300.), |ui| {
                     match ctx.try_load_bytes(&format!("bytes://{}", picture.signature)) {
@@ -125,7 +127,7 @@ impl Application {
                         }
                     };
                 });
-            }
+            },
             crate::app::backend::ServerMessageType::Audio(audio) => {
                 //Create folder for audios for later problem avoidance
                 let _ = fs::create_dir_all(PathBuf::from(format!(
@@ -149,29 +151,31 @@ impl Application {
                         match self.client_ui.audio_playback.sink_list[current_index_in_message_list]
                             .as_mut()
                         {
-                            Some(sink) => match sink.is_paused() {
-                                //Audio is stopped
-                                true => {
-                                    if ui.button("Play").clicked() {
-                                        sink.play();
-                                    };
-                                }
-                                //Audio is running
-                                false => {
-                                    //Display cursor placement
-                                    let mut cursor = self.client_ui.audio_playback.settings_list
-                                        [current_index_in_message_list]
-                                        .cursor
-                                        .cursor
-                                        .lock()
-                                        .unwrap();
+                            Some(sink) => {
+                                match sink.is_paused() {
+                                    //Audio is stopped
+                                    true => {
+                                        if ui.button("Play").clicked() {
+                                            sink.play();
+                                        };
+                                    },
+                                    //Audio is running
+                                    false => {
+                                        //Display cursor placement
+                                        let mut cursor =
+                                            self.client_ui.audio_playback.settings_list
+                                                [current_index_in_message_list]
+                                                .cursor
+                                                .cursor
+                                                .lock()
+                                                .unwrap();
 
-                                    //Construct new decoder
-                                    if let Ok(decoder) = Decoder::new(PlaybackCursor::new(
-                                        cursor.clone().into_inner(),
-                                    )) {
-                                        // Always set the cursor_pos to the cursor's position as a temp value
-                                        let mut cursor_pos =
+                                        //Construct new decoder
+                                        if let Ok(decoder) = Decoder::new(PlaybackCursor::new(
+                                            cursor.clone().into_inner(),
+                                        )) {
+                                            // Always set the cursor_pos to the cursor's position as a temp value
+                                            let mut cursor_pos =
                                             <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(
                                                 &cursor,
                                             )
@@ -179,34 +183,36 @@ impl Application {
                                             .len()
                                                 / decoder.sample_rate() as usize;
 
-                                        //Why the fuck does this always return a None?!
-                                        tracing::debug!("{:?}", decoder.total_duration());
+                                            //Why the fuck does this always return a None?!
+                                            tracing::debug!("{:?}", decoder.total_duration());
 
-                                        if let Some(total_dur) = decoder.total_duration() {
-                                            // If it has been changed, then change the real cursors position too
-                                            if ui
-                                                .add(
-                                                    egui::Slider::new(
-                                                        &mut cursor_pos,
-                                                        0..=total_dur.as_secs() as usize,
+                                            if let Some(total_dur) = decoder.total_duration() {
+                                                // If it has been changed, then change the real cursors position too
+                                                if ui
+                                                    .add(
+                                                        egui::Slider::new(
+                                                            &mut cursor_pos,
+                                                            0..=total_dur.as_secs() as usize,
+                                                        )
+                                                        .show_value(false)
+                                                        .text("Set player"),
                                                     )
-                                                    .show_value(false)
-                                                    .text("Set player"),
-                                                )
-                                                .changed()
-                                            {
-                                                //Set cursor poition
-                                                cursor.set_position(
-                                                    (cursor_pos * decoder.sample_rate() as usize)
-                                                        as u64,
-                                                );
-                                            };
-                                        }
-                                    };
+                                                    .changed()
+                                                {
+                                                    //Set cursor poition
+                                                    cursor.set_position(
+                                                        (cursor_pos
+                                                            * decoder.sample_rate() as usize)
+                                                            as u64,
+                                                    );
+                                                };
+                                            }
+                                        };
 
-                                    if ui.button("Stop").clicked() {
-                                        sink.pause();
-                                    }
+                                        if ui.button("Stop").clicked() {
+                                            sink.pause();
+                                        }
+                                    },
                                 }
                             },
                             None => {
@@ -244,7 +250,7 @@ impl Application {
                                 })
                                 .response
                                 .paint_debug_info();
-                            }
+                            },
                         }
                     });
 
@@ -314,25 +320,25 @@ impl Application {
                         .step_by(0.01),
                     );
                 });
-            }
+            },
             crate::app::backend::ServerMessageType::Deleted => {
                 ui.label(
                     RichText::from("Deleted message")
                         .strong()
                         .size(self.font_size),
                 );
-            }
+            },
             crate::app::backend::ServerMessageType::Server(server_msg) => {
                 let message = match server_msg {
                     crate::app::backend::ServerMessage::Connect(profile) => {
                         format!("@{} has connected to the server.", profile.username)
-                    }
+                    },
                     crate::app::backend::ServerMessage::Disconnect(profile) => {
                         format!("@{} has disconnected from the server.", profile.username)
-                    }
+                    },
                     crate::app::backend::ServerMessage::Ban(profile) => {
                         format!("@{} has been banned from the server.", profile.username)
-                    }
+                    },
                 };
 
                 //We can safely unwrap here since the message is defined above
@@ -346,14 +352,16 @@ impl Application {
                     if let Some(tagged_name) = name_sent_to {
                         if *tagged_name == self.opened_user_information.username {
                             Color32::YELLOW
-                        } else {
+                        }
+                        else {
                             Color32::GRAY
                         }
-                    } else {
+                    }
+                    else {
                         Color32::GRAY
                     }
                 }));
-            }
+            },
             crate::app::backend::ServerMessageType::VoipConnection(connection_type) => {
                 match connection_type {
                     crate::app::backend::ServerVoipEvent::Connected(client_uuid) => {
@@ -369,7 +377,7 @@ impl Application {
                                 self.request_client(client_uuid.to_string());
 
                                 return;
-                            }
+                            },
                         };
 
                         ui.horizontal(|ui| {
@@ -381,7 +389,7 @@ impl Application {
                                 .size(self.font_size),
                             );
                         });
-                    }
+                    },
                     crate::app::backend::ServerVoipEvent::Disconnected(client_uuid) => {
                         let profile = match self
                             .client_ui
@@ -395,7 +403,7 @@ impl Application {
                                 self.request_client(client_uuid.to_string());
 
                                 return;
-                            }
+                            },
                         };
 
                         ui.horizontal(|ui| {
@@ -407,15 +415,15 @@ impl Application {
                                 .size(self.font_size),
                             );
                         });
-                    }
+                    },
                 };
-            }
+            },
             crate::app::backend::ServerMessageType::Edit(_)
             | ServerMessageType::VoipState(_)
             | crate::app::backend::ServerMessageType::Reaction(_)
             | crate::app::backend::ServerMessageType::Sync(_) => {
                 unimplemented!("Message type should not be displayed")
-            }
+            },
         }
     }
 
@@ -425,7 +433,8 @@ impl Application {
         ctx: &Context,
         image_bytes: Vec<u8>,
         picture: &ServerImageUpload,
-    ) {
+    )
+    {
         //Image overlay
         ui.painter().rect_filled(
             egui::Rect::EVERYTHING,

@@ -1,7 +1,8 @@
 use chrono::{Duration, Utc};
 use std::{fs, path::PathBuf};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>>
+{
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
         res.set_icon("icons/main.ico");
@@ -22,7 +23,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>> {
+fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
+{
     let path_to_output = PathBuf::from(format!("{}/emoji_header.rs", std::env::var("OUT_DIR")?));
 
     //This will get written to the output file

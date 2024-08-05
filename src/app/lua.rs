@@ -9,7 +9,8 @@ use mlua::{Lua, Value::Nil};
 use strum::Display;
 
 /// This function executes code provided, and if its a function adds it to the global register
-pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
+pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()>
+{
     //Execute code, load into the global register if fn
     lua.load(code).exec()?;
 
@@ -17,7 +18,8 @@ pub fn execute_code(lua: &Lua, code: String) -> anyhow::Result<()> {
 }
 
 /// This function loads code into the global scope, but doesnt execute it
-pub fn load_code(lua: &Lua, code: String) -> anyhow::Result<()> {
+pub fn load_code(lua: &Lua, code: String) -> anyhow::Result<()>
+{
     lua.load(code).exec()?;
 
     Ok(())
@@ -26,7 +28,8 @@ pub fn load_code(lua: &Lua, code: String) -> anyhow::Result<()> {
 /// This function calls the function from the global scope
 /// Functions must be loaded (via ```load_code(. . .)```), in order to be able to call them
 /// This function calls the function specified in the fn_name arg, an optional arg can be provided to the called function
-pub fn call_function(lua: &Lua, arg: Option<String>, fn_name: String) -> anyhow::Result<()> {
+pub fn call_function(lua: &Lua, arg: Option<String>, fn_name: String) -> anyhow::Result<()>
+{
     let function = lua.globals().get::<_, mlua::Function>(fn_name)?;
 
     //Match args
@@ -34,11 +37,11 @@ pub fn call_function(lua: &Lua, arg: Option<String>, fn_name: String) -> anyhow:
         Some(arg) => {
             //Call the function with an arg
             function.call::<_, ()>(arg)?;
-        }
+        },
         None => {
             //Call function with no args
             function.call::<_, ()>(())?;
-        }
+        },
     }
 
     Ok(())
@@ -46,7 +49,8 @@ pub fn call_function(lua: &Lua, arg: Option<String>, fn_name: String) -> anyhow:
 
 /// This struct holds all the information of an extension
 #[derive(Clone, Default, Debug, serde::Deserialize, serde::Serialize)]
-pub struct ExtensionProperties {
+pub struct ExtensionProperties
+{
     /// The contents of said extension (This is plain text as its a .lua script)
     pub contents: String,
 
@@ -63,9 +67,11 @@ pub struct ExtensionProperties {
     pub text_edit_buffer: String,
 }
 
-impl ExtensionProperties {
+impl ExtensionProperties
+{
     /// Create a new instance of an extension
-    pub fn new(contents: String, path: PathBuf, name: String) -> Self {
+    pub fn new(contents: String, path: PathBuf, name: String) -> Self
+    {
         Self {
             text_edit_buffer: contents.clone(),
             contents,
@@ -77,7 +83,8 @@ impl ExtensionProperties {
 
     /// Write changes to the file
     /// This writes the ```self.text_edit_buffer``` to the file itself
-    pub fn write_change_to_file(&mut self) -> anyhow::Result<()> {
+    pub fn write_change_to_file(&mut self) -> anyhow::Result<()>
+    {
         fs::write(
             self.path_to_extension.clone(),
             self.text_edit_buffer.clone(),
@@ -91,7 +98,8 @@ impl ExtensionProperties {
 
 /// This enum contains all the types of lua outputs
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub enum LuaOutput {
+pub enum LuaOutput
+{
     /// This enum type is used to report code panics (In the lua runtime)
     Error(String),
 
@@ -103,7 +111,8 @@ pub enum LuaOutput {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct Extension {
+pub struct Extension
+{
     /// This list shows all the Extensions read from the appdata folder, this list only gets refreshed if the user wants it
     pub extension_list: Vec<ExtensionProperties>,
 
@@ -119,7 +128,8 @@ pub struct Extension {
 #[derive(Display)]
 /// These are the events which trigger a function call in the extensions.
 /// Please refer to the [Documentation](https://matthias.gitbook.io/matthias)
-pub enum EventCall {
+pub enum EventCall
+{
     /// Triggered when sending a message
     /// If this Event is invoked the function will recive what the user has sent, this is optional to "recive"
     /// ``` lua
@@ -156,8 +166,10 @@ pub enum EventCall {
     OnDisconnect,
 }
 
-impl Extension {
-    pub fn event_call_extensions(&mut self, event: EventCall, lua: &Lua, arg: Option<String>) {
+impl Extension
+{
+    pub fn event_call_extensions(&mut self, event: EventCall, lua: &Lua, arg: Option<String>)
+    {
         for ext in self.extension_list.iter_mut() {
             //If the extension should be running we skip that entry
             if !ext.is_running {
@@ -175,7 +187,7 @@ impl Extension {
                     }
 
                     Self::add_msg_to_log(self.output.clone(), ext, err.to_string());
-                }
+                },
             };
         }
     }
@@ -187,7 +199,8 @@ impl Extension {
         ext: &mut ExtensionProperties,
         arg: &Option<String>,
         fn_name: String,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), anyhow::Error>
+    {
         load_code(lua, ext.contents.clone())?;
         call_function(lua, arg.clone(), fn_name.clone())?;
 
@@ -201,7 +214,8 @@ impl Extension {
         output: Arc<Mutex<Vec<LuaOutput>>>,
         extension: &mut ExtensionProperties,
         log_inner: String,
-    ) {
+    )
+    {
         match output.lock() {
             Ok(mut output) => {
                 output.push(crate::app::lua::LuaOutput::Error(log_inner.to_string()));
@@ -211,16 +225,18 @@ impl Extension {
                     r#"Extension "{}" was forcibly stopped due to a runtime error."#,
                     extension.name
                 )));
-            }
+            },
             Err(err) => {
                 tracing::error!("{}", err);
-            }
+            },
         }
     }
 }
 
-impl Default for Extension {
-    fn default() -> Self {
+impl Default for Extension
+{
+    fn default() -> Self
+    {
         Self {
             extension_list: Vec::new(),
             output: Arc::new(Mutex::new(Vec::new())),

@@ -5,12 +5,14 @@ use egui::{
     RichText, Sense, Stroke,
 };
 use rodio::{Decoder, Sink};
-use std::collections::VecDeque;
-use std::fs;
-use std::io::{BufReader, Cursor};
-use std::path::PathBuf;
-use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
+use std::{
+    collections::VecDeque,
+    fs,
+    io::{BufReader, Cursor},
+    path::PathBuf,
+    sync::{mpsc, Arc, Mutex},
+    time::Duration,
+};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -21,14 +23,18 @@ use crate::app::backend::{
     ServerReplyType, ServerSync, ServerVoipReply, Voip,
 };
 
-use crate::app::backend::{Application, SearchType, ServerMessageType};
-use crate::app::client::ServerReply;
-use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_wav_file, record_audio_with_interrupt,
+use crate::app::{
+    backend::{Application, SearchType, ServerMessageType},
+    client::ServerReply,
+    ui::client_ui::client_actions::audio_recording::{
+        create_wav_file, record_audio_with_interrupt,
+    },
 };
 
-impl Application {
-    pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
+impl Application
+{
+    pub fn state_client(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context)
+    {
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "menu_area").show(ctx, |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                 ui.allocate_ui(vec2(300., 40.), |ui| {
@@ -42,7 +48,8 @@ impl Application {
                             //Avoid panicking when trying to display a Notification
                             //This is very rare but can still happen
                             display_error_message("Server is running!", self.toasts.clone());
-                        } else {
+                        }
+                        else {
                             self.autosync_shutdown_token.cancel();
                             self.server_sender_thread = None;
 
@@ -105,10 +112,10 @@ impl Application {
                                     "Invalid address to send the message on.",
                                     self.toasts.clone(),
                                 );
-                            }
+                            },
                             Err(err) => {
                                 tracing::error!("{}", err);
-                            }
+                            },
                         }
 
                         return;
@@ -136,7 +143,8 @@ impl Application {
                                 self.client_ui.voip = None;
                                 self.voip_thread = None;
                             }
-                        } else {
+                        }
+                        else {
                             ui.add_enabled_ui(self.atx.is_none(), |ui| {
                                 let call_button = ui.add(ImageButton::new(Image::new(
                                     egui::include_image!("..\\..\\..\\icons\\call.png"),
@@ -158,12 +166,12 @@ impl Application {
                                             Ok(voip) => {
                                                 // It is okay to unwrap since it doesnt matter if we panic
                                                 sender.send(voip).unwrap();
-                                            }
+                                            },
                                             Err(err) => {
                                                 //Avoid panicking when trying to display a Notification
                                                 //This is very rare but can still happen
                                                 display_error_message(err, toasts);
-                                            }
+                                            },
                                         }
                                     });
                                 }
@@ -221,14 +229,14 @@ impl Application {
                                 {
                                     Some(profile) => {
                                         ui.label(RichText::from(&profile.username).weak());
-                                    }
+                                    },
                                     None => {
                                         self.request_client(connected_client_uuid.to_string());
 
                                         ui.label(RichText::from(format!(
                                             "Profile not found for: {connected_client_uuid}"
                                         )));
-                                    }
+                                    },
                                 }
                             });
                         }
@@ -575,10 +583,10 @@ impl Application {
                     self.client_ui.messaging_mode.get_reply_index(),
                     self.opened_user_information.uuid.clone(),
                 ));
-            }
+            },
             Err(_err) => {
                 // dbg!(_err);
-            }
+            },
         }
 
         match self.audio_save_rx.try_recv() {
@@ -609,24 +617,25 @@ impl Application {
                         sink.append(source);
 
                         sink.play();
-                    }
+                    },
                     Err(err) => {
                         //Avoid panicking when trying to display a Notification
                         //This is very rare but can still happen
                         display_error_message(err, self.toasts.clone());
-                    }
+                    },
                 }
 
                 self.client_ui.audio_playback.settings_list[index].cursor = cursor;
                 //Reset button state so it can be used again
                 self.client_ui.audio_playback.settings_list[index].is_loading = false;
-            }
-            Err(_err) => {}
+            },
+            Err(_err) => {},
         }
     }
 
     ///This functions is used for clients to recive messages from the server (this doesnt not check validity of the order of the messages, altough this may not be needed as tcp takes care of this)
-    fn client_recv(&mut self, ctx: &egui::Context) {
+    fn client_recv(&mut self, ctx: &egui::Context)
+    {
         //This should only run when the connection is valid
         if let ConnectionState::Connected(connection_pair) = self.client_connection.state.clone() {
             self.server_sender_thread.get_or_insert_with(|| {
@@ -790,12 +799,13 @@ impl Application {
                                                         inner.message = new_message;
                                                         inner.has_been_edited = true;
                                                     }
-                                                } else {
+                                                }
+                                                else {
                                                     self.client_ui.incoming_messages.message_list
                                                         [message.index as usize]
                                                         .message_type = ServerMessageType::Deleted;
                                                 }
-                                            }
+                                            },
                                             ServerMessageType::Reaction(message) => {
                                                 //Search if there has already been a reaction added
                                                 match &message.reaction_type {
@@ -820,7 +830,8 @@ impl Application {
                                                                 [reaction.message_index]
                                                                 .message_reactions[index]
                                                                 .times += 1;
-                                                        } else {
+                                                        }
+                                                        else {
                                                             //If no, add a new reaction counter
                                                             self.client_ui
                                                                 .incoming_messages
@@ -834,7 +845,7 @@ impl Application {
                                                                     times: 1,
                                                                 })
                                                         }
-                                                    }
+                                                    },
                                                     crate::app::backend::ReactionType::Remove(
                                                         reaction,
                                                     ) => {
@@ -872,12 +883,13 @@ impl Application {
                                                                     .message_reactions
                                                                     .remove(index);
                                                             }
-                                                        } else {
+                                                        }
+                                                        else {
                                                             tracing::error!("Emoji was already deleted before requesting removal");
                                                         }
-                                                    }
+                                                    },
                                                 }
-                                            }
+                                            },
                                             ServerMessageType::VoipState(state) => {
                                                 //Check if the call was alive before the state update
                                                 let was_call_alive = self
@@ -905,7 +917,7 @@ impl Application {
                                                         None,
                                                     );
                                                 }
-                                            }
+                                            },
                                             _ => {
                                                 //Allocate Message vec for the new message
                                                 self.client_ui
@@ -925,9 +937,9 @@ impl Application {
                                                     &self.lua,
                                                     Some(msg.message._struct_into_string()),
                                                 );
-                                            }
+                                            },
                                         }
-                                    }
+                                    },
                                     //If converting the message to a ServerSync then it was probably a ServerReplyType enum
                                     Err(_err) => {
                                         let incoming_reply: Result<
@@ -940,7 +952,7 @@ impl Application {
                                                 match inner {
                                                     ServerReplyType::File(file) => {
                                                         let _ = write_file(file);
-                                                    }
+                                                    },
                                                     ServerReplyType::Image(image) => {
                                                         //Forget image so itll be able to get displayed
                                                         ctx.forget_image(&format!(
@@ -953,7 +965,7 @@ impl Application {
                                                             format!("bytes://{}", image.signature),
                                                             image.bytes,
                                                         );
-                                                    }
+                                                    },
                                                     ServerReplyType::Audio(audio) => {
                                                         let stream_handle = self
                                                             .client_ui
@@ -1001,7 +1013,7 @@ impl Application {
                                                                 path_to_audio,
                                                             ))
                                                             .unwrap();
-                                                    }
+                                                    },
                                                     ServerReplyType::Client(client_reply) => {
                                                         self.client_ui
                                                             .incoming_messages
@@ -1027,9 +1039,9 @@ impl Application {
                                                                 .profile
                                                                 .small_profile_picture,
                                                         );
-                                                    }
+                                                    },
                                                 }
-                                            }
+                                            },
                                             Err(_err) => {
                                                 let incoming_reply: Result<
                                                     ServerVoipReply,
@@ -1039,7 +1051,7 @@ impl Application {
                                                 match incoming_reply {
                                                     Ok(voip_connection) => {
                                                         match voip_connection {
-                                                            ServerVoipReply::Success => {}
+                                                            ServerVoipReply::Success => {},
                                                             ServerVoipReply::Fail(err) => {
                                                                 //Avoid panicking when trying to display a Notification
                                                                 //This is very rare but can still happen
@@ -1047,27 +1059,28 @@ impl Application {
                                                                     err.reason,
                                                                     self.toasts.clone(),
                                                                 );
-                                                            }
+                                                            },
                                                         }
-                                                    }
+                                                    },
                                                     Err(_err) => {
                                                         tracing::error!("{}", _err);
-                                                    }
+                                                    },
                                                 }
-                                            }
+                                            },
                                         }
-                                    }
+                                    },
                                 }
-                            }
+                            },
                             Err(err) => {
                                 display_error_message(err, self.toasts.clone());
 
                                 //Assuming the connection is faulty we reset state
                                 self.reset_client_connection();
                                 self.client_connection.reset_state();
-                            }
+                            },
                         }
-                    } else {
+                    }
+                    else {
                         //Signal the remaining thread to be shut down
                         // self.autosync_shutdown_token.cancel();
                         // wtf? investigate
@@ -1075,16 +1088,17 @@ impl Application {
                         //Then the thread got an error, we should reset the state
                         tracing::error!("Client reciver or sync thread panicked");
                     }
-                }
+                },
                 Err(_err) => {
                     // dbg!(_err);
-                }
+                },
             }
         }
     }
 
     ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 35ms of your voice then sends it to the linked voip destination
-    fn client_voip_thread(&mut self) {
+    fn client_voip_thread(&mut self)
+    {
         if let Some(voip) = self.client_ui.voip.clone() {
             self.voip_thread.get_or_insert_with(|| {
                 let uuid = self.opened_user_information.uuid.clone();
@@ -1184,7 +1198,8 @@ async fn recive_server_relay(
     decryption_key: &[u8],
     //The sink its appending the bytes to
     sink: Arc<Sink>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+{
     //Create buffer for header, this is the size of the maximum udp packet so no error will appear
     let mut header_buf = vec![0; 65536];
 

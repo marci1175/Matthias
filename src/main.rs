@@ -7,15 +7,15 @@ mod app;
 
 use std::env::args;
 
-use egui::ViewportBuilder;
-use egui::{Style, Visuals};
+use egui::{Style, ViewportBuilder, Visuals};
 use tokio::fs;
 use windows_sys::{
     w,
     Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
 };
 #[tokio::main]
-async fn main() -> eframe::Result<()> {
+async fn main() -> eframe::Result<()>
+{
     //Get args
     let args: Vec<String> = args().collect();
 

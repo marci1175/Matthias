@@ -3,8 +3,10 @@ use crate::app::backend::{display_error_message, login};
 use crate::app::backend::Application;
 use egui::{Align, Layout, RichText};
 
-impl Application {
-    pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
+impl Application
+{
+    pub fn state_login(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context)
+    {
         let is_focused = ctx.input(|input| input.focused);
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -31,14 +33,14 @@ impl Application {
                                 self.opened_user_information = account;
 
                                 true
-                            }
+                            },
                             Err(err) => {
                                 //Avoid panicking when trying to display a Notification
                                 //This is very rare but can still happen
                                 display_error_message(err, self.toasts.clone());
 
                                 false
-                            }
+                            },
                         };
                 }
 

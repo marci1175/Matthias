@@ -1,15 +1,21 @@
 use anyhow::Error;
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Sample, SupportedStreamConfig};
+use cpal::{
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    Device, Sample, SupportedStreamConfig,
+};
 use hound::WavWriter;
 use opus::Encoder;
-use std::collections::VecDeque;
-use std::f32;
-use std::io::{BufWriter, Cursor};
-use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
-use std::time::Duration;
+use std::{
+    collections::VecDeque,
+    f32,
+    io::{BufWriter, Cursor},
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, Mutex,
+    },
+    thread::JoinHandle,
+    time::Duration,
+};
 
 use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
 
@@ -17,7 +23,8 @@ pub const SAMPLE_RATE: usize = 48000;
 pub const STEREO_PACKET_BUFFER_LENGHT: usize =
     SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
 
-struct Opt {
+struct Opt
+{
     /// The audio device to use
     device: String,
 
@@ -32,8 +39,10 @@ struct Opt {
     #[allow(dead_code)]
     jack: bool,
 }
-impl Default for Opt {
-    fn default() -> Self {
+impl Default for Opt
+{
+    fn default() -> Self
+    {
         Self {
             device: "default".into(),
         }
@@ -45,7 +54,8 @@ impl Default for Opt {
 pub fn record_audio_for_set_duration(
     dur: Duration,
     amplification_precentage: f32,
-) -> anyhow::Result<Vec<f32>> {
+) -> anyhow::Result<Vec<f32>>
+{
     let opt = Opt::default();
 
     let host = cpal::default_host();
@@ -53,7 +63,8 @@ pub fn record_audio_for_set_duration(
     // Set up the input device and stream with the default input config.
     let device = if opt.device == "default" {
         host.default_input_device()
-    } else {
+    }
+    else {
         host.input_devices()?
             .find(|x| x.name().map(|y| y == opt.device).unwrap_or(false))
     }
@@ -95,7 +106,8 @@ pub fn record_audio_with_interrupt(
     interrupt: Receiver<()>,
     amplification_precentage: f32,
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
-) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>> {
+) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>>
+{
     let wav_buffer_clone = buffer_handle.clone();
 
     let _: JoinHandle<anyhow::Result<()>> = std::thread::spawn(move || {
@@ -132,12 +144,14 @@ pub fn record_audio_with_interrupt(
 }
 
 /// This function fetches the audio recording device, returning a result of the Device and Config handle
-fn get_recording_device() -> Result<(Device, SupportedStreamConfig), Error> {
+fn get_recording_device() -> Result<(Device, SupportedStreamConfig), Error>
+{
     let opt = Opt::default();
     let host = cpal::default_host();
     let device = if opt.device == "default" {
         host.default_input_device()
-    } else {
+    }
+    else {
         host.input_devices()?
             .find(|x| x.name().map(|y| y == opt.device).unwrap_or(false))
     }
@@ -153,7 +167,8 @@ fn get_recording_device() -> Result<(Device, SupportedStreamConfig), Error> {
 pub fn audio_recording_with_recv(
     receiver: mpsc::Receiver<bool>,
     amplification_precentage: f32,
-) -> anyhow::Result<Vec<f32>> {
+) -> anyhow::Result<Vec<f32>>
+{
     let (device, config) = get_recording_device()?;
 
     let wav_buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -187,15 +202,18 @@ pub fn audio_recording_with_recv(
     Ok(recoreded_bytes)
 }
 
-fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
+fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat
+{
     if format.is_float() {
         hound::SampleFormat::Float
-    } else {
+    }
+    else {
         hound::SampleFormat::Int
     }
 }
 
-fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec {
+fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec
+{
     hound::WavSpec {
         channels: config.channels() as _,
         sample_rate: config.sample_rate().0 as _,
@@ -205,7 +223,8 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
 }
 
 /// This function creates a wav foramtted audio file, containing the samples provided to this function
-pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8> {
+pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8>
+{
     let writer = Arc::new(Mutex::new(Vec::new()));
 
     let (_, config) = get_recording_device().unwrap();
@@ -229,7 +248,8 @@ pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8> {
 
 /// This function creates a wav foramtted audio file, containing the samples provided to this function
 /// This function doesnt work properly
-pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8> {
+pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8>
+{
     let mut opus_encoder = Encoder::new(
         SAMPLE_RATE as u32,
         opus::Channels::Stereo,

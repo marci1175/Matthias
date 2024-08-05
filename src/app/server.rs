@@ -23,15 +23,14 @@ use super::backend::{
     ServerReplyType, ServerSync, ServerVoip, ServerVoipReply, ServerVoipState,
 };
 
-use crate::app::backend::{decrypt_aes256_bytes, encrypt_aes256_bytes, ServerMaster};
 use crate::app::backend::{
-    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
-    ClientMessage,
+    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct,
+    ClientFileUpload as ClientFileUploadStruct, ClientMessage,
     ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
     },
-    ServerFileReply, ServerImageReply,
+    ServerFileReply, ServerImageReply, ServerMaster,
 };
 use tokio::{
     io::AsyncWrite,
@@ -49,7 +48,8 @@ use tokio::{
 use super::backend::{ServerAudioReply, ServerOutput};
 
 #[derive(Debug, Default)]
-pub struct MessageService {
+pub struct MessageService
+{
     /// Contains all the messages
     pub messages: Arc<tokio::sync::Mutex<Vec<ServerOutput>>>,
 
@@ -100,7 +100,8 @@ pub struct MessageService {
 
 /// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system
 #[derive(Debug, Clone, Default)]
-pub struct SharedFields {
+pub struct SharedFields
+{
     /// This list contains the banned uuids
     pub banned_uuids: Arc<tokio::sync::Mutex<Vec<String>>>,
 }
@@ -114,7 +115,8 @@ pub async fn server_main(
     connected_clients_profile_list: Arc<DashMap<String, ClientProfile>>,
     //We pass in ctx so we can request repaint when someone connects
     ctx: Context,
-) -> Result<Arc<tokio::sync::Mutex<SharedFields>>, Box<dyn std::error::Error>> {
+) -> Result<Arc<tokio::sync::Mutex<SharedFields>>, Box<dyn std::error::Error>>
+{
     //Start listening
     let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
 
@@ -229,7 +231,8 @@ fn spawn_client_reader(
     msg_service: Arc<tokio::sync::Mutex<MessageService>>,
     cancellation_token: CancellationToken,
     socket_addr: SocketAddr,
-) {
+)
+{
     let _: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         loop {
             //Wait until client sends a message or thread gets cancelled
@@ -252,13 +255,13 @@ fn spawn_client_reader(
                 .message_main(incoming_message, writer.clone(), socket_addr)
                 .await
             {
-                Ok(_) => {}
+                Ok(_) => {},
                 Err(err) => {
                     println!("Listener on {socket_addr} shutting down, error processing a message: {err}");
                     tracing::error!("{}", err.root_cause());
 
                     break;
-                }
+                },
             }
         }
         Ok(())
@@ -266,7 +269,8 @@ fn spawn_client_reader(
 }
 
 #[inline]
-async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String> {
+async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String>
+{
     let mut reader = reader.lock().await;
 
     let incoming_message_len = fetch_incoming_message_lenght(&mut *reader).await?;
@@ -296,7 +300,8 @@ async fn sync_message_with_clients(
     message: ServerOutput,
 
     key: [u8; 32],
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+{
     let mut connected_clients_locked = connected_clients.lock().await;
 
     let server_master = ServerSync {
@@ -354,7 +359,8 @@ pub fn create_client_voip_manager(
     key: [u8; 32],
     mut reciver: Receiver<Vec<u8>>,
     #[allow(unused_variables)] listening_to: SocketAddr,
-) {
+)
+{
     //Spawn client management thread
     tokio::spawn(async move {
         loop {
@@ -411,7 +417,8 @@ pub fn create_client_voip_manager(
     });
 }
 
-impl MessageService {
+impl MessageService
+{
     /// The result returned by this function may be a real error, or an error constructed on purpose so that the thread call this function gets shut down.
     /// When experiening errors, make sure to check the error message as it may be on purpose
     #[inline]
@@ -420,7 +427,8 @@ impl MessageService {
         message: String,
         client_handle: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
         socket_addr: SocketAddr,
-    ) -> Result<()> {
+    ) -> Result<()>
+    {
         let req_result: Result<ClientMessage, serde_json::Error> = serde_json::from_str(&message);
 
         let req: ClientMessage = req_result.unwrap();
@@ -433,7 +441,8 @@ impl MessageService {
                 if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
                     //If this is true (if sync_attribute is none) that means the client is syncing its last seen message index, thefor we shouldnt allocate a new reaction
                     sync_msg.sync_attribute.is_none()
-                } else {
+                }
+                else {
                     false
                 }
             })
@@ -444,10 +453,10 @@ impl MessageService {
                     ok.push(MessageReaction {
                         message_reactions: Vec::new(),
                     });
-                }
+                },
                 Err(err) => {
                     println!("{err}")
-                }
+                },
             };
         }
 
@@ -475,7 +484,8 @@ impl MessageService {
                                 .await?;
 
                                 return Err(Error::msg("Client has been banned!"));
-                            } else {
+                            }
+                            else {
                                 let mut clients = self.connected_clients.lock().await;
 
                                 //Check if the client has already been connected once
@@ -546,7 +556,7 @@ impl MessageService {
                                 .await?;
                                 return Ok(());
                             }
-                        }
+                        },
                         //Handle disconnections
                         ConnectionType::Disconnect => {
                             let mut clients = self.connected_clients.lock().await;
@@ -569,10 +579,11 @@ impl MessageService {
                                     return Err(Error::msg("Client disconnected!"));
                                 }
                             }
-                        }
+                        },
                     }
                 }
-            } else {
+            }
+            else {
                 send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
                     .await?;
 
@@ -750,7 +761,7 @@ impl MessageService {
                                 self.decryption_key,
                             )
                             .await?;
-                        }
+                        },
                         super::backend::ClientVoipRequest::Disconnect => {
                             if let Some(ongoing_voip) = self.voip.clone() {
                                 //Get who disconnected
@@ -808,18 +819,19 @@ impl MessageService {
                                     self.decryption_key,
                                 )
                                 .await?;
-                            } else {
+                            }
+                            else {
                                 println!("Voip disconnected from an offline server")
                             }
-                        }
+                        },
                     }
-                }
+                },
 
                 NormalMessage(_msg) => self.normal_message(&req).await,
 
                 SyncMessage(_msg) => {
                     self.sync_message(&req).await;
-                }
+                },
 
                 FileRequestType(request_type) => {
                     send_message_to_client(
@@ -834,15 +846,15 @@ impl MessageService {
                     .await?;
 
                     return Ok(());
-                }
+                },
 
                 FileUpload(upload_type) => {
                     self.handle_upload(req.clone(), upload_type).await;
-                }
+                },
 
                 ClientReaction(reaction) => {
                     self.handle_reaction(reaction).await;
-                }
+                },
 
                 MessageEdit(edit) => {
                     match &mut self.messages.try_lock() {
@@ -868,10 +880,10 @@ impl MessageService {
                                     inner_msg.has_been_edited = true;
                                 }
                             }
-                        }
+                        },
                         Err(err) => println!("{err}"),
                     };
-                }
+                },
             };
 
             //We return the syncing function because after we have handled the request we return back the updated messages, which already contain the "side effects" of the client request
@@ -913,7 +925,7 @@ impl MessageService {
                                 "wav" | "mp3" | "m4a" => Audio,
                                 _ => Upload,
                             }
-                        }
+                        },
                         NormalMessage(_) => Normal,
                         SyncMessage(_) => Sync,
                         ClientReaction(_) => ServerMessageTypeDiscriminantReaction,
@@ -935,7 +947,8 @@ impl MessageService {
             .expect("Syncing failed");
 
             Ok(())
-        } else {
+        }
+        else {
             send_message_to_client(&mut *client_handle.try_lock()?, "Invalid Password!".into())
                 .await?;
 
@@ -943,7 +956,8 @@ impl MessageService {
         }
     }
 
-    async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip> {
+    async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip>
+    {
         // Create socket
         let socket = UdpSocket::bind(format!("[::]:{port}")).await?;
 
@@ -963,7 +977,8 @@ impl MessageService {
         client: &ConnectedClient,
         clients: &mut tokio::sync::MutexGuard<'_, Vec<ConnectedClient>>,
         index: usize,
-    ) -> Result<ServerOutput, Error> {
+    ) -> Result<ServerOutput, Error>
+    {
         send_message_to_client(
             &mut *client.handle.clone().unwrap().lock().await,
             "Server disconnecting from client.".to_owned(),
@@ -997,7 +1012,8 @@ impl MessageService {
         client: &ConnectedClient,
         clients: &mut tokio::sync::MutexGuard<'_, Vec<ConnectedClient>>,
         index: usize,
-    ) -> Result<ServerOutput, Error> {
+    ) -> Result<ServerOutput, Error>
+    {
         let client_handle_clone = client.handle.clone().unwrap();
 
         let mut client_handle = &mut *client_handle_clone.lock().await;
@@ -1041,7 +1057,8 @@ impl MessageService {
         &self,
         req: &ClientMessage,
         client_handle: &Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    {
         if let Some(idx) = self
             .shared_fields
             .lock()
@@ -1071,7 +1088,8 @@ impl MessageService {
     }
 
     /// all the functions the server can do
-    async fn normal_message(&self, req: &ClientMessage) {
+    async fn normal_message(&self, req: &ClientMessage)
+    {
         let mut messages = self.messages.lock().await;
         messages.push(ServerOutput::convert_clientmsg_to_servermsg(
             req.clone(),
@@ -1091,7 +1109,8 @@ impl MessageService {
 
     /// This function returns a message containing a full sync (all the messages etc)
     /// It reutrns a ```ServerMaster``` converted to an encrypted string
-    async fn full_sync_client(&self) -> anyhow::Result<String> {
+    async fn full_sync_client(&self) -> anyhow::Result<String>
+    {
         //Construct reply
         let server_master = ServerMaster {
             //Return an empty message list
@@ -1109,7 +1128,8 @@ impl MessageService {
                                 .collect(),
                         ),
                     }
-                } else {
+                }
+                else {
                     ServerVoipState {
                         connected_clients: None,
                     }
@@ -1128,7 +1148,8 @@ impl MessageService {
     }
 
     /// This function has a side effect on the user_seen_list, modifying it according to the client
-    async fn sync_message(&self, req: &ClientMessage) {
+    async fn sync_message(&self, req: &ClientMessage)
+    {
         //Dont ask me why I did it this way
         if let SyncMessage(inner) = &req.message_type {
             //if its Some(_) then modify the list, the whole updated list will get sent back to the client regardless
@@ -1141,21 +1162,23 @@ impl MessageService {
                         {
                             //Update index
                             client_vec[client_index_pos].index = last_seen_message_index;
-                        } else {
+                        }
+                        else {
                             client_vec.push(ClientLastSeenMessage::new(
                                 last_seen_message_index,
                                 req.uuid.clone(),
                             ));
                         }
-                    }
+                    },
                     Err(err) => {
                         tracing::error!("{}", err);
-                    }
+                    },
                 }
             }
         };
     }
-    async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct) {
+    async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct)
+    {
         //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
@@ -1204,26 +1227,29 @@ impl MessageService {
                                 request.uuid.clone(),
                                 file_author,
                             ));
-                        }
+                        },
                         Err(err) => {
                             println!(" [{err}\n{}]", err.kind());
-                        }
+                        },
                     }
-                }
+                },
                 Err(err) => {
                     println!("{err}")
-                }
+                },
             }
         }
     }
-    async fn serve_file(&self, signature: String) -> (Vec<u8>, PathBuf) {
+    async fn serve_file(&self, signature: String) -> (Vec<u8>, PathBuf)
+    {
         let path = self.file_list.get(&signature).unwrap().clone();
         (fs::read(&path).unwrap_or_default(), path)
     }
-    async fn serve_image(&self, signature: String) -> Vec<u8> {
+    async fn serve_image(&self, signature: String) -> Vec<u8>
+    {
         fs::read(&*self.image_list.get(&signature).unwrap()).unwrap_or_default()
     }
-    async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct) {
+    async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct)
+    {
         //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
@@ -1257,7 +1283,7 @@ impl MessageService {
                                     req.uuid.clone(),
                                     file_author,
                                 ));
-                            }
+                            },
                             Err(err) => println!("{err}"),
                         }
 
@@ -1269,18 +1295,19 @@ impl MessageService {
                                 file_signature
                             )),
                         );
-                    }
+                    },
                     Err(err) => {
                         println!(" [{err} {}]", err.kind());
-                    }
+                    },
                 }
-            }
+            },
             Err(err) => {
                 println!("{err}")
-            }
+            },
         }
     }
-    async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct) {
+    async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct)
+    {
         //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
@@ -1317,7 +1344,7 @@ impl MessageService {
                             req.uuid.clone(),
                             file_author,
                         ));
-                    }
+                    },
                     Err(err) => println!("{err}"),
                 }
 
@@ -1333,13 +1360,14 @@ impl MessageService {
 
                 //consequently save the audio_recording's name
                 self.audio_names.insert(file_signature, audio.name.clone());
-            }
+            },
             Err(err) => {
                 println!(" [{err} {}]", err.kind());
-            }
+            },
         }
     }
-    async fn serve_audio(&self, signature: String) -> (Vec<u8>, Option<String>) {
+    async fn serve_audio(&self, signature: String) -> (Vec<u8>, Option<String>)
+    {
         (
             fs::read(&*self.audio_list.get(&signature).unwrap()).unwrap_or_default(),
             self.audio_names.get(&signature).unwrap().clone(),
@@ -1351,7 +1379,8 @@ impl MessageService {
     pub async fn handle_request(
         &self,
         request_type: &ClientRequestTypeStruct,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<String>
+    {
         let reply = match request_type {
             ClientRequestTypeStruct::ImageRequest(img_request) => {
                 let read_file = self.serve_image(img_request.signature.clone()).await;
@@ -1361,7 +1390,7 @@ impl MessageService {
                     signature: img_request.signature.clone(),
                 }))
                 .unwrap_or_default()
-            }
+            },
             ClientRequestTypeStruct::FileRequest(file_request) => {
                 let (file_bytes, file_name) =
                     &self.serve_file(file_request.signature.clone()).await;
@@ -1371,7 +1400,7 @@ impl MessageService {
                     bytes: file_bytes.clone(),
                 }))
                 .unwrap_or_default()
-            }
+            },
             ClientRequestTypeStruct::AudioRequest(audio_request) => {
                 let (file_bytes, file_name) =
                     self.serve_audio(audio_request.signature.clone()).await;
@@ -1382,7 +1411,7 @@ impl MessageService {
                     file_name: file_name.unwrap_or_default(),
                 }))
                 .unwrap_or_default()
-            }
+            },
             ClientRequestTypeStruct::ClientRequest(client_request_uuid) => {
                 let connected_clients = self.connected_clients_profile.try_lock().unwrap();
 
@@ -1393,14 +1422,15 @@ impl MessageService {
                     profile: client.clone(),
                 }))
                 .unwrap_or_default()
-            }
+            },
         };
 
         Ok(reply)
     }
 
     /// handle all the file uploads
-    pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct) {
+    pub async fn handle_upload(&self, req: ClientMessage, upload_type: &ClientFileUploadStruct)
+    {
         //Create server folder, so we will have a place to put our uploads
         let _ = fs::create_dir(format!("{}\\matthias\\Server", env!("APPDATA")));
 
@@ -1414,7 +1444,8 @@ impl MessageService {
     }
 
     /// handle reaction requests
-    pub async fn handle_reaction(&self, reaction: &ReactionType) {
+    pub async fn handle_reaction(&self, reaction: &ReactionType)
+    {
         match reaction {
             ReactionType::Add(reaction) => {
                 match &mut self.reactions.try_lock() {
@@ -1441,10 +1472,10 @@ impl MessageService {
                                 //Set default amount, start from 1
                                 times: 1,
                             });
-                    }
+                    },
                     Err(err) => println!("{err}"),
                 }
-            }
+            },
             ReactionType::Remove(reaction) => {
                 match &mut self.reactions.try_lock() {
                     Ok(reaction_vec) => {
@@ -1478,16 +1509,16 @@ impl MessageService {
                                     reaction_vec[reaction.message_index]
                                         .message_reactions
                                         .remove(reaction.message_index);
-                                }
+                                },
                                 None => {
                                     tracing::error!("The emoji requested to be removed was not in the emoji list");
-                                }
+                                },
                             }
                         }
-                    }
+                    },
                     Err(err) => println!("{err}"),
                 }
-            }
+            },
         }
     }
 }
