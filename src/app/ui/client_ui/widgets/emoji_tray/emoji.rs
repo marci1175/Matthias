@@ -469,11 +469,9 @@ pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -
                     );
                 } else {
                     tracing::error!("{}", inner);
-
                 }
             } else {
                 tracing::error!("{}", err);
-
             }
         }
     }

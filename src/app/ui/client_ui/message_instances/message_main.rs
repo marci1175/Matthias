@@ -378,11 +378,9 @@ impl Application {
                         ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);
                     } else {
                         tracing::error!("{}", inner);
-
                     }
                 } else {
                     tracing::error!("{}", err);
-
                 }
             }
         };

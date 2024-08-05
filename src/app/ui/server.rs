@@ -261,7 +261,6 @@ impl Application {
                         }
                         Err(err) => {
                             tracing::error!("{}", err);
-
                         }
                     };
                 }

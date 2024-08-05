@@ -107,8 +107,7 @@ impl Application {
                                 );
                             }
                             Err(err) => {
-                                                tracing::error!("{}", err);
-
+                                tracing::error!("{}", err);
                             }
                         }
 
@@ -1075,7 +1074,6 @@ impl Application {
 
                         //Then the thread got an error, we should reset the state
                         tracing::error!("Client reciver or sync thread panicked");
-
                     }
                 }
                 Err(_err) => {

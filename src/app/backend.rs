@@ -362,7 +362,6 @@ fn set_lua_functions(
                 Ok(mut list) => list.push(LuaOutput::Standard(msg)),
                 Err(err) => {
                     tracing::error!("{}", err);
-
                 }
             }
 
@@ -539,7 +538,6 @@ fn set_lua_functions(
                 }
                 Err(_err) => {
                     tracing::error!("{}", _err);
-
                 }
             }
 
@@ -561,7 +559,6 @@ fn set_lua_functions(
                 }
                 Err(_err) => {
                     tracing::error!("{}", _err);
-
                 }
             }
 

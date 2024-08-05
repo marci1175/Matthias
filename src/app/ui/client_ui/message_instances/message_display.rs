@@ -181,7 +181,7 @@ impl Application {
 
                                         //Why the fuck does this always return a None?!
                                         tracing::debug!("{:?}", decoder.total_duration());
-                                        
+
                                         if let Some(total_dur) = decoder.total_duration() {
                                             // If it has been changed, then change the real cursors position too
                                             if ui
