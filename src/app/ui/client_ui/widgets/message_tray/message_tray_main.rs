@@ -652,10 +652,10 @@ impl Application {
                                                                 }
                                                                 ctx.include_bytes(format!("bytes://{}", &emoji_name), EMOJI_TUPLES.get(emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
                                                             } else {
-                                                                dbg!(inner);
+                                                                tracing::error!("{}", inner);
                                                             }
                                                         } else {
-                                                            dbg!(err);
+                                                            tracing::error!("{}", err);
                                                         }
                                                     },
                                                 }

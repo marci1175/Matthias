@@ -1,9 +1,12 @@
-///Define the maximum amount of entries in the lua output vector
+/// Define the maximum amount of entries in the lua output vector
 const LUA_OUTPUT_BUFFER_SIZE: usize = 100;
 
-///Define custom url of this application
+/// Define custom url of this application
 /// The registry keys for opening this url should already be added by the installer
 const CUSTOM_URL: &str = "matthias://";
+
+/// Define the url to the deocumentation
+const DOCUMENTATION_URL: &str = "https://matthias.gitbook.io/matthiasdocu";
 
 use crate::app::lua::ExtensionProperties;
 use anyhow::Error;
@@ -52,14 +55,7 @@ impl eframe::App for backend::Application {
                     Err(err) => {
                         //Avoid panicking when trying to display a Notification
                         //This is very rare but can still happen
-                        match toasts.lock() {
-                            Ok(mut toasts) => {
-                                display_error_message(err, &mut toasts);
-                            }
-                            Err(err) => {
-                                dbg!(err);
-                            }
-                        }
+                        display_error_message(err, toasts);
                     }
                 };
             });
@@ -105,34 +101,45 @@ impl eframe::App for backend::Application {
                 //Get the address the link connects to
                 let link = &startup_link[CUSTOM_URL.len()..];
 
-                let (address, password) = link.split_at(link.find("&").unwrap());
+                match link.find("&") {
+                    Some(sep_idx) => {
+                        let (address, password) = link.split_at(sep_idx);
 
-                let password = &password[1..];
+                        let password = &password[1..];
 
-                //Connect to server
-                self.connect_to_server(ctx, address.to_string(), Some(password.to_string()));
+                        //Connect to server
+                        self.connect_to_server(
+                            ctx,
+                            address.to_string(),
+                            Some(password.to_string()),
+                        );
 
-                //Set address so itll be displayed in the ui too
-                self.client_ui.send_on_ip = address.to_string();
+                        //Set address so itll be displayed in the ui too
+                        self.client_ui.send_on_ip = address.to_string();
 
-                //Set password so itll be displayed in the ui too
-                self.client_ui.client_password = password.to_string();
+                        //Set password so itll be displayed in the ui too
+                        self.client_ui.client_password = password.to_string();
 
-                //Show settings window to alert user
-                self.settings_window = true;
+                        //Show settings window to alert user
+                        self.settings_window = true;
 
-                //If set up the connection nitify the user
-                match self.toasts.lock() {
-                    Ok(mut toasts) => {
-                        //Set toast
-                        let mut toast = Toast::info("Link successfully opened! You will able to chat once you have signed in!");
-                        toast.set_duration(None);
-                        toast.set_closable(true);
+                        //If set up the connection nitify the user
+                        match self.toasts.lock() {
+                            Ok(mut toasts) => {
+                                //Set toast
+                                let mut toast = Toast::info("Link successfully opened! You will able to chat once you have signed in!");
+                                toast.set_duration(None);
+                                toast.set_closable(true);
 
-                        toasts.add(toast);
+                                toasts.add(toast);
+                            }
+                            Err(_err) => {
+                                tracing::error!("{}", _err.to_string());
+                            }
+                        }
                     }
-                    Err(_err) => {
-                        dbg!(_err);
+                    None => {
+                        display_error_message("Invalid link.", self.toasts.clone());
                     }
                 }
 
@@ -157,7 +164,7 @@ impl eframe::App for backend::Application {
                 }
             }
             Err(err) => {
-                dbg!(err);
+                tracing::error!("{}", err.to_string());
             }
         }
 
@@ -295,7 +302,7 @@ impl eframe::App for backend::Application {
                 }
             }
             Err(_err) => {
-                // dbg!(_err);
+                // tracing::error!("{}", _err.to_string());
             }
         }
 
@@ -324,8 +331,8 @@ impl backend::Application {
                 //We dont need the server's reply since we dont handle it here
                 Ok(_server_reply) => {}
                 Err(err) => {
-                    dbg!(err.source());
-                    dbg!(err);
+                    tracing::error!("{:?}", err.source());
+                    tracing::error!("{}", err);
                 }
             };
         });
@@ -505,22 +512,16 @@ impl backend::Application {
                 Ok(ok) => {
                     ctx.request_repaint();
                     if let Err(err) = sender.send(Some(ok)) {
-                        dbg!(err);
+                        tracing::error!("{}", err);
                     };
                 }
                 Err(err) => {
                     //Avoid panicking when trying to display a Notification
                     //This is very rare but can still happen
-                    match toasts.lock() {
-                        Ok(mut toasts) => {
-                            display_error_message(err, &mut toasts);
-                        }
-                        Err(err) => {
-                            dbg!(err);
-                        }
-                    }
+                    display_error_message(err, toasts);
+
                     if let Err(err) = sender.send(None) {
-                        dbg!(err);
+                        tracing::error!("{}", err);
                     };
                 }
             };
@@ -553,14 +554,7 @@ impl backend::Application {
                 Err(err) => {
                     //Avoid panicking when trying to display a Notification
                     //This is very rare but can still happen
-                    match toasts.lock() {
-                        Ok(mut toasts) => {
-                            display_error_message(err, &mut toasts);
-                        }
-                        Err(err) => {
-                            dbg!(err);
-                        }
-                    }
+                    display_error_message(err, toasts);
                 }
             };
         });
@@ -591,7 +585,7 @@ impl backend::Application {
             };
 
             //Documentation
-            ui.hyperlink_to("Documentation", "https://matthias.gitbook.io/matthias")
+            ui.hyperlink_to("Documentation", DOCUMENTATION_URL)
                 .on_hover_text("For more information read the documentation.");
         });
 
@@ -678,7 +672,10 @@ impl backend::Application {
                                             }
                                         },
                                         Err(err) => {
-                                            dbg!(err);
+                                            display_error_message(
+                                                err.to_string(),
+                                                self.toasts.clone(),
+                                            );
                                         }
                                     }
                                 }
@@ -693,14 +690,7 @@ impl backend::Application {
                                             if let Err(err) = extension.write_change_to_file() {
                                                 //Avoid panicking when trying to display a Notification
                                                 //This is very rare but can still happen
-                                                match self.toasts.lock() {
-                                                    Ok(mut toasts) => {
-                                                        display_error_message(err, &mut toasts);
-                                                    }
-                                                    Err(err) => {
-                                                        dbg!(err);
-                                                    }
-                                                }
+                                                display_error_message(err, self.toasts.clone());
                                             };
                                         }
 
@@ -746,14 +736,7 @@ impl backend::Application {
                                             if let Err(err) = extension.write_change_to_file() {
                                                 //Avoid panicking when trying to display a Notification
                                                 //This is very rare but can still happen
-                                                match self.toasts.lock() {
-                                                    Ok(mut toasts) => {
-                                                        display_error_message(err, &mut toasts);
-                                                    }
-                                                    Err(err) => {
-                                                        dbg!(err);
-                                                    }
-                                                }
+                                                display_error_message(err, self.toasts.clone());
                                             };
                                         }
                                     });

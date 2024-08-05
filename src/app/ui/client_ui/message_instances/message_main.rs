@@ -377,10 +377,12 @@ impl Application {
                         //We will forget this URI when loading in the real image
                         ctx.include_bytes(format!("bytes://{}", &uuid), vec![0]);
                     } else {
-                        dbg!(inner);
+                        tracing::error!("{}", inner);
+
                     }
                 } else {
-                    dbg!(err);
+                    tracing::error!("{}", err);
+
                 }
             }
         };

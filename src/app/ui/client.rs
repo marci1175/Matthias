@@ -38,29 +38,16 @@ impl Application {
                         )))
                         .clicked()
                     {
-                        self.main.client_mode = false;
-
                         if self.server_has_started {
                             //Avoid panicking when trying to display a Notification
                             //This is very rare but can still happen
-                            match self.toasts.lock() {
-                                Ok(mut toasts) => {
-                                    display_error_message(
-                                        "Can not log out while server is running.",
-                                        &mut toasts,
-                                    );
-                                }
-                                Err(err) => {
-                                    dbg!(err);
-                                }
-                            }
-                            return;
+                            display_error_message("Server is running!", self.toasts.clone());
+                        } else {
+                            self.autosync_shutdown_token.cancel();
+                            self.server_sender_thread = None;
+
+                            self.main.client_mode = false;
                         }
-
-                        self.autosync_shutdown_token.cancel();
-                        self.server_sender_thread = None;
-
-                        self.main.client_mode = false;
                     };
                 })
                 .response
@@ -116,11 +103,12 @@ impl Application {
                             Ok(mut toasts) => {
                                 display_error_message(
                                     "Invalid address to send the message on.",
-                                    &mut toasts,
+                                    self.toasts.clone(),
                                 );
                             }
                             Err(err) => {
-                                dbg!(err);
+                                                tracing::error!("{}", err);
+
                             }
                         }
 
@@ -175,14 +163,7 @@ impl Application {
                                             Err(err) => {
                                                 //Avoid panicking when trying to display a Notification
                                                 //This is very rare but can still happen
-                                                match toasts.lock() {
-                                                    Ok(mut toasts) => {
-                                                        display_error_message(err, &mut toasts);
-                                                    }
-                                                    Err(err) => {
-                                                        dbg!(err);
-                                                    }
-                                                }
+                                                display_error_message(err, toasts);
                                             }
                                         }
                                     });
@@ -633,14 +614,7 @@ impl Application {
                     Err(err) => {
                         //Avoid panicking when trying to display a Notification
                         //This is very rare but can still happen
-                        match self.toasts.lock() {
-                            Ok(mut toasts) => {
-                                display_error_message(err, &mut toasts);
-                            }
-                            Err(err) => {
-                                dbg!(err);
-                            }
-                        }
+                        display_error_message(err, self.toasts.clone());
                     }
                 }
 
@@ -705,17 +679,13 @@ impl Application {
                                         sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
                                     },
                                     Err(err) => {
-                                        dbg!(&err);
+                                        tracing::error!("{}", err);
+
                                         eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
                                         eprintln!("Early end of file error is a normal occurence after disconnecting");
                                         //Avoid panicking when trying to display a Notification
-                                                //This is very rare but can still happen 
-                                                match toasts.lock() {
-                                                    Ok(mut toasts) => {
-                                                        display_error_message(err, &mut toasts);
-                                                    },
-                                                    Err(err) => {dbg!(err);},
-                                                }
+                                        //This is very rare but can still happen 
+                                        display_error_message(err, toasts);
 
                                         //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                                         let _ = sender_clone.send(None);
@@ -763,7 +733,8 @@ impl Application {
                                 match connection_pair.send_message(message.clone()).await {
                                     Ok(_) => {},
                                     Err(err) => {
-                                        dbg!(err);
+                                                        tracing::error!("{}", err);
+
                                         //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                                         sender.send(None).expect("Failed to signal thread error");
                                         break;
@@ -903,7 +874,7 @@ impl Application {
                                                                     .remove(index);
                                                             }
                                                         } else {
-                                                            dbg!("Emoji was already deleted before requesting removal");
+                                                            tracing::error!("Emoji was already deleted before requesting removal");
                                                         }
                                                     }
                                                 }
@@ -1073,22 +1044,15 @@ impl Application {
                                                             ServerVoipReply::Fail(err) => {
                                                                 //Avoid panicking when trying to display a Notification
                                                                 //This is very rare but can still happen
-                                                                match self.toasts.lock() {
-                                                                    Ok(mut toasts) => {
-                                                                        display_error_message(
-                                                                            err.reason,
-                                                                            &mut toasts,
-                                                                        );
-                                                                    }
-                                                                    Err(err) => {
-                                                                        dbg!(err);
-                                                                    }
-                                                                }
+                                                                display_error_message(
+                                                                    err.reason,
+                                                                    self.toasts.clone(),
+                                                                );
                                                             }
                                                         }
                                                     }
                                                     Err(_err) => {
-                                                        dbg!(_err);
+                                                        tracing::error!("{}", _err);
                                                     }
                                                 }
                                             }
@@ -1096,8 +1060,8 @@ impl Application {
                                     }
                                 }
                             }
-                            Err(_err) => {
-                                display_error_message(message, &mut self.toasts.lock().unwrap());
+                            Err(err) => {
+                                display_error_message(err, self.toasts.clone());
 
                                 //Assuming the connection is faulty we reset state
                                 self.reset_client_connection();
@@ -1110,7 +1074,8 @@ impl Application {
                         // wtf? investigate
 
                         //Then the thread got an error, we should reset the state
-                        dbg!("Client reciver or sync thread panicked");
+                        tracing::error!("Client reciver or sync thread panicked");
+
                     }
                 }
                 Err(_err) => {
@@ -1198,7 +1163,8 @@ impl Application {
                                 match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
-                                        dbg!(err);
+                                                        tracing::error!("{}", err);
+
                                     },
                                 }
                             } => {}

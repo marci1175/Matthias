@@ -335,7 +335,8 @@ impl Application {
                 }
                 //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
                 Err(err) => {
-                    dbg!(err);
+                    tracing::error!("{}", err);
+
                     let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
                 }
             }
@@ -352,7 +353,7 @@ impl Application {
 fn set_lua_functions(
     data: Application,
     output_list: Arc<Mutex<Vec<LuaOutput>>>,
-    cc: &eframe::CreationContext,
+    cc: &eframe::CreationContext<'_>,
 ) -> Application {
     let print = data
         .lua
@@ -360,7 +361,8 @@ fn set_lua_functions(
             match output_list.lock() {
                 Ok(mut list) => list.push(LuaOutput::Standard(msg)),
                 Err(err) => {
-                    dbg!(err);
+                    tracing::error!("{}", err);
+
                 }
             }
 
@@ -536,7 +538,8 @@ fn set_lua_functions(
                     toasts.add(toast);
                 }
                 Err(_err) => {
-                    dbg!(_err);
+                    tracing::error!("{}", _err);
+
                 }
             }
 
@@ -557,7 +560,8 @@ fn set_lua_functions(
                     toasts.add(toast);
                 }
                 Err(_err) => {
-                    dbg!(_err);
+                    tracing::error!("{}", _err);
+
                 }
             }
 
@@ -578,7 +582,7 @@ fn set_lua_functions(
                     toasts.add(toast);
                 }
                 Err(_err) => {
-                    dbg!(_err);
+                    tracing::error!("{}", _err);
                 }
             }
 
@@ -2561,7 +2565,7 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()> {
     );
 
     let _ = fs::create_dir_all(&folder_path).inspect_err(|err| {
-        dbg!(err);
+        tracing::error!("{}", err);
     });
 
     fs::write(
@@ -2578,16 +2582,23 @@ pub fn generate_uuid() -> Uuid {
 }
 
 ///Display Error message with a messagebox
-pub fn display_error_message<T>(display: T, toasts: &mut Toasts)
+pub fn display_error_message<T>(display: T, toasts: Arc<Mutex<Toasts>>)
 where
     T: ToString + std::marker::Send + 'static,
 {
-    let mut toast = Toast::error(display.to_string());
+    match toasts.lock() {
+        Ok(mut toasts) => {
+            let mut toast = Toast::error(display.to_string());
 
-    toast.set_duration(Some(Duration::from_secs(4)));
-    toast.set_show_progress_bar(true);
+            toast.set_duration(Some(Duration::from_secs(4)));
+            toast.set_show_progress_bar(true);
 
-    toasts.add(toast);
+            toasts.add(toast);
+        }
+        Err(_err) => {
+            tracing::error!("{}", _err);
+        }
+    }
 }
 
 /// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
@@ -2643,10 +2654,10 @@ impl Message {
 
                                     ctx.include_bytes(format!("bytes://{}", &original_emoji_name), EMOJI_TUPLES.get(&original_emoji_name).map_or_else(|| vec![0], |v| v.to_vec()));
                                 } else {
-                                    dbg!(inner);
+                                    tracing::error!("{}", inner);
                                 }
                             } else {
-                                dbg!(err);
+                                tracing::error!("{}", err);
                             }
                         },
                     }

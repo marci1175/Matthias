@@ -118,7 +118,8 @@ impl Application {
                                     });
                                 }
                                 else {
-                                    dbg!(inner);
+                                    tracing::error!("{}", inner);
+
                                 }
                             }
                         }
@@ -179,7 +180,9 @@ impl Application {
                                                 / decoder.sample_rate() as usize;
 
                                         //Why the fuck does this always return a None?!
-                                        if let Some(total_dur) = dbg!(decoder.total_duration()) {
+                                        tracing::debug!("{:?}", decoder.total_duration());
+                                        
+                                        if let Some(total_dur) = decoder.total_duration() {
                                             // If it has been changed, then change the real cursors position too
                                             if ui
                                                 .add(

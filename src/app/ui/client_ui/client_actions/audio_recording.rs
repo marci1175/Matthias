@@ -242,7 +242,7 @@ pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8> {
     opus_encoder
         .encode_vec_float(&samples, 512)
         .inspect_err(|err| {
-            dbg!(err.description());
+            tracing::error!("{}", err.description());
         })
         .unwrap()
 }

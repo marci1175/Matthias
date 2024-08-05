@@ -255,7 +255,8 @@ fn spawn_client_reader(
                 Ok(_) => {}
                 Err(err) => {
                     println!("Listener on {socket_addr} shutting down, error processing a message: {err}");
-                    dbg!(err.root_cause());
+                    tracing::error!("{}", err.root_cause());
+
                     break;
                 }
             }
@@ -1148,7 +1149,7 @@ impl MessageService {
                         }
                     }
                     Err(err) => {
-                        dbg!(err);
+                        tracing::error!("{}", err);
                     }
                 }
             }
@@ -1479,7 +1480,7 @@ impl MessageService {
                                         .remove(reaction.message_index);
                                 }
                                 None => {
-                                    dbg!("The emoji requested to be removed was not in the emoji list");
+                                    tracing::error!("The emoji requested to be removed was not in the emoji list");
                                 }
                             }
                         }

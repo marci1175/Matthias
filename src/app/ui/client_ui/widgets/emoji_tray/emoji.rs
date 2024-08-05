@@ -468,10 +468,12 @@ pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -
                             .map_or_else(|| vec![0], |v| v.to_vec()),
                     );
                 } else {
-                    dbg!(inner);
+                    tracing::error!("{}", inner);
+
                 }
             } else {
-                dbg!(err);
+                tracing::error!("{}", err);
+
             }
         }
     }

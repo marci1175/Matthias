@@ -213,7 +213,7 @@ impl Extension {
                 )));
             }
             Err(err) => {
-                dbg!(err);
+                tracing::error!("{}", err);
             }
         }
     }
