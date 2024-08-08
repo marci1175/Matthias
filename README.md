@@ -14,6 +14,8 @@ A decentralized chat application built completely in rust.
 - Experimental MD (Markdown) support
 __All this__ with great preformance, due to the project using multiple threads, async calls, egui and many more optmizatations!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
+## Community
+Feel free to chat in the official [Matthias discord server](https://discord.gg/66KFkByMGa)!
 ## Preview
 ### Lua api
 ![lua api](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/luaapi.png)
