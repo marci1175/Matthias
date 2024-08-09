@@ -8,7 +8,7 @@ use crate::app::{
 };
 use egui::{
     load::{BytesPoll, LoadError},
-    vec2, Align, Button, Color32, Image, Layout, Response, RichText,
+    vec2, Align, Button, Color32, Image, Layout, Response, RichText, Sense,
 };
 
 impl Application
@@ -165,6 +165,7 @@ impl Application
                     });
                 });
             }
+
             //Display author
             ui.horizontal(|ui| {
                 //Profile picture
@@ -201,23 +202,42 @@ impl Application
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         //Check if there is a reaction list vector already allocated non the index of the specific message
-                        match &self
+                        match self
                             .client_ui
                             .incoming_messages
                             .reaction_list
+                            .clone()
                             .get(iter_index)
                         {
                             Some(reactions) => {
-                                for item in &reactions.message_reactions {
-                                    ui.group(|ui| {
-                                        ui.allocate_ui(vec2(20., 20.), |ui| {
-                                            display_emoji(ctx, &item.emoji_name, ui);
+                                for (idx, item) in reactions.message_reactions.iter().enumerate() {
+                                    ui.push_id(idx, |ui| {
+                                        let group = ui.group(|ui| {
+                                            ui.allocate_ui(vec2(20., 20.), |ui| {
+                                                display_emoji(ctx, &item.emoji_name, ui);
+                                            });
+
+                                            ui.label(
+                                                RichText::from(item.times.to_string())
+                                                    .size(self.font_size / 1.3),
+                                            );
                                         });
+
+                                        dbg!(group.response.clicked());
+
+
+                                        let emoji_group_rect = ui
+                                            .interact(group.response.rect, ui.next_auto_id(), Sense::click());
+
+                                        if emoji_group_rect    
+                                            .clicked()
+                                        {
+                                            self.change_send_emoji(
+                                                iter_index,
+                                                item.emoji_name.clone(),
+                                            );
+                                        };
                                     });
-                                    ui.label(
-                                        RichText::from(item.times.to_string())
-                                            .size(self.font_size / 1.3),
-                                    );
                                 }
                             },
                             None => {
@@ -396,27 +416,7 @@ impl Application
 
             ui.menu_button("React", |ui| {
                 if let Some(selected_emoji_name) = self.draw_emoji_selector(ui, ctx) {
-                    //Check if we have already sent this emoji once
-                    //If No send it
-                    if !self.client_ui.incoming_messages.reaction_list[iter_index]
-                        .message_reactions
-                        .iter()
-                        .any(|emoji| &emoji.emoji_name == &selected_emoji_name)
-                    {
-                        self.send_msg(ClientMessage::construct_reaction_msg(
-                            selected_emoji_name,
-                            iter_index,
-                            &self.opened_user_information.uuid,
-                        ));
-                    }
-                    //If yes we send deletion message
-                    else {
-                        self.send_msg(ClientMessage::construct_reaction_remove_msg(
-                            selected_emoji_name,
-                            iter_index,
-                            &self.opened_user_information.uuid,
-                        ));
-                    }
+                    self.change_send_emoji(iter_index, selected_emoji_name);
                 }
             });
 
@@ -433,6 +433,35 @@ impl Application
                 };
             }
         });
+    }
+
+    /// ```iter_index```: Which message does this emoji change belong to
+    /// ```selected_emoji_name```: Which message the user has selected
+    /// This function tries to send / delete the emoji based on the passed arg
+    /// NOTE: This function will send an emoji deletion message if you have already sent this specific emojio
+    fn change_send_emoji(&mut self, iter_index: usize, selected_emoji_name: String)
+    {
+        //Check if we have already sent this emoji once
+        //If No send it
+        if !self.client_ui.incoming_messages.reaction_list[iter_index]
+            .message_reactions
+            .iter()
+            .any(|emoji| &emoji.emoji_name == &selected_emoji_name)
+        {
+            self.send_msg(ClientMessage::construct_reaction_msg(
+                selected_emoji_name,
+                iter_index,
+                &self.opened_user_information.uuid,
+            ));
+        }
+        //If yes we send deletion message
+        else {
+            self.send_msg(ClientMessage::construct_reaction_remove_msg(
+                selected_emoji_name,
+                iter_index,
+                &self.opened_user_information.uuid,
+            ));
+        }
     }
 
     pub fn request_client(&mut self, uuid: String)
