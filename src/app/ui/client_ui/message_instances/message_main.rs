@@ -61,249 +61,7 @@ impl Application
                             let mut message_instances: Vec<Response> = Vec::new();
 
                             for (iter_index, item) in self.client_ui.incoming_messages.clone().message_list.iter().enumerate() {
-                                //Emoji tray pops up when right clicking on a message
-                                let message_group = ui.group(|ui| {
-                                        if let Some(replied_to) = item.replying_to {
-                                            ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui|{
-
-                                                ui.horizontal(|ui| {
-                                                    self.display_icon_from_server(ctx, self.client_ui.incoming_messages.message_list[replied_to].uuid.clone(), ui);
-
-
-                                                if ui.add(egui::widgets::Button::new(
-                                                    RichText::from(
-                                                        format!("{}: {}",
-                                                            self.client_ui.incoming_messages.message_list[replied_to].author,
-                                                            match &self.client_ui.incoming_messages.message_list[replied_to].message_type {
-                                                                ServerMessageType::Deleted => "Deleted message".to_string(),
-                                                                ServerMessageType::Audio(audio) => format!("Sound {}", audio.file_name),
-                                                                ServerMessageType::Image(_img) => "Image".to_string(),
-                                                                ServerMessageType::Upload(upload) => format!("Upload {}", upload.file_name),
-                                                                ServerMessageType::Normal(msg) => {
-                                                                    let mut message_clone = msg.message.clone();
-                                                                    if message_clone.clone().len() > 20 {
-                                                                        message_clone.truncate(20);
-                                                                        message_clone.push_str(" ...");
-                                                                    }
-                                                                    message_clone.to_string()
-                                                                },
-                                                                ServerMessageType::Server(server) => match server {
-                                                                    crate::app::backend::ServerMessage::Connect(profile) => {
-                                                                        format!("{} has connected", profile.username)
-                                                                    },
-                                                                    crate::app::backend::ServerMessage::Disconnect(profile) => {
-                                                                        format!("{} has disconnected", profile.username)
-                                                                    },
-                                                                    crate::app::backend::ServerMessage::Ban(profile) => {
-                                                                        format!("{} has benned banned", profile.username)
-                                                                    }
-                                                                },
-                                                                ServerMessageType::Edit(_) => unreachable!(),
-                                                                ServerMessageType::Reaction(_) => unreachable!(),
-                                                                ServerMessageType::Sync(_) => unreachable!(),
-                                                                ServerMessageType::VoipConnection(_) => unreachable!(),
-                                                                ServerMessageType::VoipState(_) => unreachable!(),
-                                                            }
-                                                        )
-                                                    )
-                                                    .size(self.font_size / 1.5))
-                                                        .frame(false))
-                                                            .clicked() {
-                                                                //implement scrolling to message
-                                                                self.client_ui.scroll_to_message_index = Some(replied_to);
-                                                            }
-                                                });
-
-                                            });
-                                        }
-                                        //Display author
-                                        ui.horizontal(|ui| {
-                                            //Profile picture
-                                            self.display_icon_from_server(ctx, item.uuid.clone(), ui);
-                                            //Client name
-                                            ui.label(RichText::from(item.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
-                                        });
-
-                                        //IMPORTANT: Each of these functions have logic inside them for displaying
-                                        self.message_display(item, ui, ctx, iter_index);
-
-                                        //Display Message date
-                                        ui.label(RichText::from(item.message_date.to_string()).size(self.font_size / 1.5).color(Color32::DARK_GRAY));
-
-                                        if let ServerMessageType::Normal(inner_msg) = &item.message_type {
-                                            if inner_msg.has_been_edited {
-                                                ui.label(RichText::from("(Edited)").strong());
-                                            }
-                                        }
-
-                                        egui::ScrollArea::horizontal().id_source(/* Autoassign id's to interated scroll widgets */ ui.next_auto_id()).max_height(self.font_size).show(ui, |ui|{
-                                            ui.horizontal(|ui| {
-                                                //Check if there is a reaction list vector already allocated non the index of the specific message
-                                                match &self.client_ui.incoming_messages.reaction_list.get(iter_index) {
-                                                    Some(reactions) => {
-                                                        for item in &reactions.message_reactions {
-                                                            ui.group(|ui| {
-                                                                ui.allocate_ui(vec2(20., 20.), |ui| {
-                                                                    display_emoji(ctx, &item.emoji_name, ui);
-                                                                });
-                                                            });
-                                                            ui.label(RichText::from(item.times.to_string()).size(self.font_size / 1.3));
-                                                        }
-                                                    },
-                                                    None => {
-                                                        // eprintln!("message_main.rs: No reaction list allocated for message {}", iter_index);
-                                                    },
-                                                }
-
-                                            });
-                                        });
-
-                                        if ui.is_rect_visible(ui.min_rect()) && *self.client_ui.last_seen_msg_index.lock().unwrap() < iter_index {
-                                            *self.client_ui.last_seen_msg_index.lock().unwrap() = iter_index;
-                                        }
-                                    }
-                                );
-
-                                //Display where the users seen their last message
-                                ui.horizontal(|ui| {
-                                    for client in self.client_ui.incoming_messages.user_seen_list.clone() {
-                                        if iter_index == client.index {
-                                            //Make it more visible
-                                            ui.group(|ui| {
-                                                //Profile picture
-                                                ui.allocate_ui(vec2(18., 18.), |ui| {
-                                                    self.display_icon_from_server(ctx, client.uuid.clone(), ui);
-                                                });
-
-                                                //Client name
-                                                if let Some(profile) = self.client_ui.incoming_messages.connected_clients_profile.get(&client.uuid) {
-                                                    let username = profile.username.clone();
-
-                                                    ui.label(RichText::from(&username).size(self.font_size / 1.3));
-                                                }
-                                                //If the profile was not found then we can ask for it 
-                                                else {
-                                                    ui.spinner();
-
-                                                    self.request_client(client.uuid.clone());
-                                                };
-                                            });
-                                        }
-                                    }
-                                });
-                                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
-                                message_instances.push(message_group.response.clone());
-
-                                message_group.response.context_menu(|ui|{
-                                    let profile_menu_button = ui.menu_button("Profile", |ui| {
-                                        //Check if the message was sent by the server, create a custom profile for it
-                                        if item.uuid == SERVER_UUID {
-                                            //Add verification or somthing like that
-                                            ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
-                                                ui.horizontal_centered(|ui| {
-                                                    ui.label("This message was sent by the host server");
-                                                    ui.allocate_ui(vec2(25., 25.), |ui| {
-                                                        ui.add(Image::new(egui::include_image!("../../../../../icons/tick.png")));
-                                                    })
-                                                });
-                                            });
-                                        }
-                                        //If the message was sent by a normal user
-                                        else {
-                                            //We can safely unwrap here
-                                            let user_profile = self.client_ui.incoming_messages.connected_clients_profile.get(&item.uuid).unwrap();
-                                            //Include full profile picture so it can be displayed
-                                            ctx.include_bytes(
-                                                "bytes://profile_picture",
-                                                user_profile.normal_profile_picture.clone(),
-                                            );
-
-                                            //Display 256px profile picture
-                                            ui.image("bytes://profile_picture");
-
-                                            ui.label(RichText::from(user_profile.username.clone()).size(25.).strong());
-
-                                            ui.separator();
-
-                                            ui.label(format!("Uuid: {}", item.uuid));
-
-                                            if !user_profile.full_name.is_empty() {
-                                                ui.separator();
-
-                                                ui.label(format!("Full name: {}", user_profile.full_name));
-                                            };
-
-                                            ui.separator();
-
-                                            ui.label(format!("Birtdate: {}", user_profile.birth_date));
-
-                                            ui.separator();
-
-                                            if let Some(gender) = &user_profile.gender {
-                                                ui.label(format!("Gender: {}", match gender { 
-                                                    true => "Female",
-                                                    false => "Male",
-                                                }));
-                                            }
-                                        }
-                                    });
-
-                                    //If profile_menu_button.inner.is_none() it is closed, so we can deallocate / forget the before loaded image
-                                    if profile_menu_button.inner.is_none() {
-                                        ctx.forget_image("bytes://profile_picture");
-                                    }
-
-                                    ui.separator();
-
-                                    if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/reply.png"), "Reply")).clicked() {
-                                        self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
-                                        ui.close_menu();
-                                    }
-                                    ui.separator();
-
-                                    //Client-side uuid check, there is a check in the server file
-                                    if item.uuid == self.opened_user_information.uuid && item.message_type != ServerMessageType::Deleted {
-                                        //We should only display the `edit` button if its anormal message thus its editable
-                                        if let ServerMessageType::Normal(inner) = &item.message_type {
-                                            if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/edit.png"), "Edit")).clicked() {
-                                                self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
-                                                self.client_ui.message_buffer = inner.message.to_string();
-                                                ui.close_menu();
-                                            }
-                                        }
-
-                                        if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/delete.png"), "Delete")).clicked() {
-                                            self.send_msg(
-                                                ClientMessage::construct_client_message_edit(iter_index, None, &self.opened_user_information.uuid)
-                                            );
-                                            ui.close_menu();
-                                        }
-
-                                        ui.separator();
-                                    }
-
-                                    ui.menu_button("React", |ui| {
-                                        if let Some(selected_emoji_name) = self.draw_emoji_selector(ui, ctx) {
-                                            //Check if we have already sent this emoji once
-                                            //If No send it
-                                            if !self.client_ui.incoming_messages.reaction_list[iter_index].message_reactions.iter().any(|emoji| &emoji.emoji_name == &selected_emoji_name) {
-                                                self.send_msg(ClientMessage::construct_reaction_msg(selected_emoji_name, iter_index, &self.opened_user_information.uuid));
-                                            }
-                                            //If yes we send deletion message
-                                            else {
-                                                self.send_msg(ClientMessage::construct_reaction_remove_msg(selected_emoji_name, iter_index, &self.opened_user_information.uuid));
-                                            }
-                                        }
-                                    });
-
-                                    if let ServerMessageType::Normal(inner) = &item.message_type {
-                                        if ui.add(Button::image_and_text(egui::include_image!("../../../../../icons/copy.png"), "Copy message")).clicked() {
-                                            ctx.copy_text(inner.message.clone());
-                                            ui.close_menu();
-                                        };
-                                    }
-
-                                });
+                                self.draw_message(ui, item, ctx, iter_index, &mut message_instances);
                             };
 
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
@@ -315,6 +73,366 @@ impl Application
                         }
                     });
         })
+    }
+
+    /// This function draws the message at the ui passted in as an argument.
+    /// The message instance created by this function has a context_menu called upon it.
+    /// This function handles all the message types because this function is to display the whole message.
+    fn draw_message(
+        &mut self,
+        ui: &mut egui::Ui,
+        item: &crate::app::backend::ServerOutput,
+        ctx: &egui::Context,
+        iter_index: usize,
+        message_instances: &mut Vec<Response>,
+    )
+    {
+        //Emoji tray pops up when right clicking on a message
+        let message_group = ui.group(|ui| {
+            if let Some(replied_to) = item.replying_to {
+                ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui| {
+                    ui.horizontal(|ui| {
+                        self.display_icon_from_server(
+                            ctx,
+                            self.client_ui.incoming_messages.message_list[replied_to]
+                                .uuid
+                                .clone(),
+                            ui,
+                        );
+
+                        if ui
+                            .add(
+                                egui::widgets::Button::new(
+                                    RichText::from(format!(
+                                        "{}: {}",
+                                        self.client_ui.incoming_messages.message_list[replied_to]
+                                            .author,
+                                        match &self.client_ui.incoming_messages.message_list
+                                            [replied_to]
+                                            .message_type
+                                        {
+                                            ServerMessageType::Deleted =>
+                                                "Deleted message".to_string(),
+                                            ServerMessageType::Audio(audio) =>
+                                                format!("Sound {}", audio.file_name),
+                                            ServerMessageType::Image(_img) => "Image".to_string(),
+                                            ServerMessageType::Upload(upload) =>
+                                                format!("Upload {}", upload.file_name),
+                                            ServerMessageType::Normal(msg) => {
+                                                let mut message_clone = msg.message.clone();
+                                                if message_clone.clone().len() > 20 {
+                                                    message_clone.truncate(20);
+                                                    message_clone.push_str(" ...");
+                                                }
+                                                message_clone.to_string()
+                                            },
+                                            ServerMessageType::Server(server) => match server {
+                                                crate::app::backend::ServerMessage::Connect(
+                                                    profile,
+                                                ) => {
+                                                    format!("{} has connected", profile.username)
+                                                },
+                                                crate::app::backend::ServerMessage::Disconnect(
+                                                    profile,
+                                                ) => {
+                                                    format!("{} has disconnected", profile.username)
+                                                },
+                                                crate::app::backend::ServerMessage::Ban(
+                                                    profile,
+                                                ) => {
+                                                    format!(
+                                                        "{} has benned banned",
+                                                        profile.username
+                                                    )
+                                                },
+                                            },
+                                            ServerMessageType::Edit(_) => unreachable!(),
+                                            ServerMessageType::Reaction(_) => unreachable!(),
+                                            ServerMessageType::Sync(_) => unreachable!(),
+                                            ServerMessageType::VoipConnection(_) => unreachable!(),
+                                            ServerMessageType::VoipState(_) => unreachable!(),
+                                        }
+                                    ))
+                                    .size(self.font_size / 1.5),
+                                )
+                                .frame(false),
+                            )
+                            .clicked()
+                        {
+                            //implement scrolling to message
+                            self.client_ui.scroll_to_message_index = Some(replied_to);
+                        }
+                    });
+                });
+            }
+            //Display author
+            ui.horizontal(|ui| {
+                //Profile picture
+                self.display_icon_from_server(ctx, item.uuid.clone(), ui);
+                //Client name
+                ui.label(
+                    RichText::from(item.author.to_string())
+                        .size(self.font_size / 1.3)
+                        .color(Color32::WHITE),
+                );
+            });
+
+            //IMPORTANT: Each of these functions have logic inside them for displaying
+            self.message_display(item, ui, ctx, iter_index);
+
+            //Display Message date
+            ui.label(
+                RichText::from(item.message_date.to_string())
+                    .size(self.font_size / 1.5)
+                    .color(Color32::DARK_GRAY),
+            );
+
+            if let ServerMessageType::Normal(inner_msg) = &item.message_type {
+                if inner_msg.has_been_edited {
+                    ui.label(RichText::from("(Edited)").strong());
+                }
+            }
+
+            egui::ScrollArea::horizontal()
+                .id_source(
+                    /* Autoassign id's to interated scroll widgets */ ui.next_auto_id(),
+                )
+                .max_height(self.font_size)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        //Check if there is a reaction list vector already allocated non the index of the specific message
+                        match &self
+                            .client_ui
+                            .incoming_messages
+                            .reaction_list
+                            .get(iter_index)
+                        {
+                            Some(reactions) => {
+                                for item in &reactions.message_reactions {
+                                    ui.group(|ui| {
+                                        ui.allocate_ui(vec2(20., 20.), |ui| {
+                                            display_emoji(ctx, &item.emoji_name, ui);
+                                        });
+                                    });
+                                    ui.label(
+                                        RichText::from(item.times.to_string())
+                                            .size(self.font_size / 1.3),
+                                    );
+                                }
+                            },
+                            None => {
+                                // eprintln!("message_main.rs: No reaction list allocated for message {}", iter_index);
+                            },
+                        }
+                    });
+                });
+
+            if ui.is_rect_visible(ui.min_rect())
+                && *self.client_ui.last_seen_msg_index.lock().unwrap() < iter_index
+            {
+                *self.client_ui.last_seen_msg_index.lock().unwrap() = iter_index;
+            }
+        });
+
+        //Display where the users seen their last message
+        ui.horizontal(|ui| {
+            for client in self.client_ui.incoming_messages.user_seen_list.clone() {
+                if iter_index == client.index {
+                    //Make it more visible
+                    ui.group(|ui| {
+                        //Profile picture
+                        ui.allocate_ui(vec2(18., 18.), |ui| {
+                            self.display_icon_from_server(ctx, client.uuid.clone(), ui);
+                        });
+
+                        //Client name
+                        if let Some(profile) = self
+                            .client_ui
+                            .incoming_messages
+                            .connected_clients_profile
+                            .get(&client.uuid)
+                        {
+                            let username = profile.username.clone();
+
+                            ui.label(RichText::from(&username).size(self.font_size / 1.3));
+                        }
+                        //If the profile was not found then we can ask for it
+                        else {
+                            ui.spinner();
+
+                            self.request_client(client.uuid.clone());
+                        };
+                    });
+                }
+            }
+        });
+
+        //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+        message_instances.push(message_group.response.clone());
+
+        message_group.response.context_menu(|ui| {
+            let profile_menu_button = ui.menu_button("Profile", |ui| {
+                //Check if the message was sent by the server, create a custom profile for it
+                if item.uuid == SERVER_UUID {
+                    //Add verification or somthing like that
+                    ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
+                        ui.horizontal_centered(|ui| {
+                            ui.label("This message was sent by the host server");
+                            ui.allocate_ui(vec2(25., 25.), |ui| {
+                                ui.add(Image::new(egui::include_image!(
+                                    "../../../../../icons/tick.png"
+                                )));
+                            })
+                        });
+                    });
+                }
+                //If the message was sent by a normal user
+                else {
+                    //We can safely unwrap here
+                    let user_profile = self
+                        .client_ui
+                        .incoming_messages
+                        .connected_clients_profile
+                        .get(&item.uuid)
+                        .unwrap();
+                    //Include full profile picture so it can be displayed
+                    ctx.include_bytes(
+                        "bytes://profile_picture",
+                        user_profile.normal_profile_picture.clone(),
+                    );
+
+                    //Display 256px profile picture
+                    ui.image("bytes://profile_picture");
+
+                    ui.label(
+                        RichText::from(user_profile.username.clone())
+                            .size(25.)
+                            .strong(),
+                    );
+
+                    ui.separator();
+
+                    ui.label(format!("Uuid: {}", item.uuid));
+
+                    if !user_profile.full_name.is_empty() {
+                        ui.separator();
+
+                        ui.label(format!("Full name: {}", user_profile.full_name));
+                    };
+
+                    ui.separator();
+
+                    ui.label(format!("Birtdate: {}", user_profile.birth_date));
+
+                    ui.separator();
+
+                    if let Some(gender) = &user_profile.gender {
+                        ui.label(format!(
+                            "Gender: {}",
+                            match gender {
+                                true => "Female",
+                                false => "Male",
+                            }
+                        ));
+                    }
+                }
+            });
+
+            //If profile_menu_button.inner.is_none() it is closed, so we can deallocate / forget the before loaded image
+            if profile_menu_button.inner.is_none() {
+                ctx.forget_image("bytes://profile_picture");
+            }
+
+            ui.separator();
+
+            if ui
+                .add(Button::image_and_text(
+                    egui::include_image!("../../../../../icons/reply.png"),
+                    "Reply",
+                ))
+                .clicked()
+            {
+                self.client_ui.messaging_mode = MessagingMode::Reply(iter_index);
+                ui.close_menu();
+            }
+            ui.separator();
+
+            //Client-side uuid check, there is a check in the server file
+            if item.uuid == self.opened_user_information.uuid
+                && item.message_type != ServerMessageType::Deleted
+            {
+                //We should only display the `edit` button if its anormal message thus its editable
+                if let ServerMessageType::Normal(inner) = &item.message_type {
+                    if ui
+                        .add(Button::image_and_text(
+                            egui::include_image!("../../../../../icons/edit.png"),
+                            "Edit",
+                        ))
+                        .clicked()
+                    {
+                        self.client_ui.messaging_mode = MessagingMode::Edit(iter_index);
+                        self.client_ui.message_buffer = inner.message.to_string();
+                        ui.close_menu();
+                    }
+                }
+
+                if ui
+                    .add(Button::image_and_text(
+                        egui::include_image!("../../../../../icons/delete.png"),
+                        "Delete",
+                    ))
+                    .clicked()
+                {
+                    self.send_msg(ClientMessage::construct_client_message_edit(
+                        iter_index,
+                        None,
+                        &self.opened_user_information.uuid,
+                    ));
+                    ui.close_menu();
+                }
+
+                ui.separator();
+            }
+
+            ui.menu_button("React", |ui| {
+                if let Some(selected_emoji_name) = self.draw_emoji_selector(ui, ctx) {
+                    //Check if we have already sent this emoji once
+                    //If No send it
+                    if !self.client_ui.incoming_messages.reaction_list[iter_index]
+                        .message_reactions
+                        .iter()
+                        .any(|emoji| &emoji.emoji_name == &selected_emoji_name)
+                    {
+                        self.send_msg(ClientMessage::construct_reaction_msg(
+                            selected_emoji_name,
+                            iter_index,
+                            &self.opened_user_information.uuid,
+                        ));
+                    }
+                    //If yes we send deletion message
+                    else {
+                        self.send_msg(ClientMessage::construct_reaction_remove_msg(
+                            selected_emoji_name,
+                            iter_index,
+                            &self.opened_user_information.uuid,
+                        ));
+                    }
+                }
+            });
+
+            if let ServerMessageType::Normal(inner) = &item.message_type {
+                if ui
+                    .add(Button::image_and_text(
+                        egui::include_image!("../../../../../icons/copy.png"),
+                        "Copy message",
+                    ))
+                    .clicked()
+                {
+                    ctx.copy_text(inner.message.clone());
+                    ui.close_menu();
+                };
+            }
+        });
     }
 
     pub fn request_client(&mut self, uuid: String)

@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use egui::{vec2, Align, Align2, Area, Color32, Context, Layout, RichText, Sense, Ui};
+use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
     parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
@@ -435,36 +435,49 @@ impl Application
         picture: &ServerImageUpload,
     )
     {
-        //Image overlay
-        ui.painter().rect_filled(
-            egui::Rect::EVERYTHING,
-            0.,
-            Color32::from_rgba_premultiplied(0, 0, 0, 180),
-        );
+        Area::new("image_bg".into())
+            .movable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
+            .default_size(ctx.used_size())
+            .show(ctx, |ui| {
+                //Pain background
+                ui.painter()
+                    .clone()
+                    .with_layer_id(LayerId::background())
+                    .rect_filled(
+                        egui::Rect::EVERYTHING,
+                        0.,
+                        Color32::from_rgba_premultiplied(0, 0, 0, 170),
+                    );
+
+                if ui
+                    .allocate_response(ui.available_size(), Sense::click())
+                    .clicked()
+                {
+                    self.client_ui.image_overlay = false;
+                }
+            });
 
         Area::new("image_overlay".into())
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .show(ctx, |ui| {
-                ui.allocate_ui(
-                    vec2(ui.available_width() / 1.3, ui.available_height() / 1.3),
-                    |ui| {
-                        ui.add(egui::widgets::Image::from_bytes(
-                            format!("bytes://{}", picture.signature),
-                            image_bytes.clone(),
-                        )) /*Add the same context menu as before*/
-                        .context_menu(|ui| {
-                            if ui.button("Save").clicked() {
-                                //always name the file ".png"
-                                let image_save = ServerFileReply {
-                                    bytes: image_bytes.clone(),
-                                    file_name: PathBuf::from(".png"),
-                                };
-                                let _ = write_file(image_save);
-                            }
-                        });
-                    },
-                );
+                ui.allocate_ui(ui.available_size(), |ui| {
+                    ui.add(egui::widgets::Image::from_bytes(
+                        format!("bytes://{}", picture.signature),
+                        image_bytes.clone(),
+                    )) /*Add the same context menu as before*/
+                    .context_menu(|ui| {
+                        if ui.button("Save").clicked() {
+                            //always name the file ".png"
+                            let image_save = ServerFileReply {
+                                bytes: image_bytes.clone(),
+                                file_name: PathBuf::from(".png"),
+                            };
+                            let _ = write_file(image_save);
+                        }
+                    });
+                });
             });
 
         Area::new("image_overlay_exit".into())

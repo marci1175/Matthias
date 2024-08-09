@@ -106,17 +106,10 @@ impl Application
                     if port.is_empty() {
                         //Avoid panicking when trying to display a Notification
                         //This is very rare but can still happen
-                        match self.toasts.lock() {
-                            Ok(mut toasts) => {
-                                display_error_message(
-                                    "Invalid address to send the message on.",
-                                    self.toasts.clone(),
-                                );
-                            },
-                            Err(err) => {
-                                tracing::error!("{}", err);
-                            },
-                        }
+                        display_error_message(
+                            "Invalid address to send the message on.",
+                            self.toasts.clone(),
+                        );
 
                         return;
                     }
