@@ -1,2 +1,8 @@
-To compile Matthias you will need luajit(You'll need to compile that from source: https://luajit.org/download.html), pkg-config all added to the PATH env variable.
+To compile Matthias you will need:
+    pkg-config, 
+    Opencv,
+all added to the PATH env variable.
+
+The install deps.cmd file will install the deps but it wont add them to the PATH.
+
 Have fun!

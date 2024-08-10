@@ -61,6 +61,7 @@ egui-notify = "0.15.0"
 tokio-console = "0.1.10"
 console-subscriber = "0.2.0"
 socket2 = "0.5.7"
+wincam = "0.1.2"
 
 [dependencies.uuid]
 version = "1.6.1"

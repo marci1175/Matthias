@@ -93,6 +93,7 @@ impl eframe::App for backend::Application
             TODO: Create disconnection connection sound effects
 
             TODO: Add AI (Neural network) powered hand drawing recognition
+            TODO: Add video chat
         */
 
         //Check for startup args
