@@ -822,7 +822,8 @@ impl Application
                                                                 .reaction_list
                                                                 [reaction.message_index]
                                                                 .message_reactions[index]
-                                                                .times += 1;
+                                                                .authors
+                                                                .push(reaction.uuid.clone());
                                                         }
                                                         else {
                                                             //If no, add a new reaction counter
@@ -835,7 +836,9 @@ impl Application
                                                                     emoji_name: reaction
                                                                         .emoji_name
                                                                         .clone(),
-                                                                    times: 1,
+                                                                    authors: vec![reaction
+                                                                        .uuid
+                                                                        .clone()],
                                                                 })
                                                         }
                                                     },
@@ -855,20 +858,28 @@ impl Application
                                                                     == reaction.emoji_name
                                                             })
                                                         {
-                                                            //Borrow counter as mutable
-                                                            let emoji_reaction_times = &mut self
+                                                            //Borrow authors list as mutable
+                                                            let emoji_authors = &mut self
                                                                 .client_ui
                                                                 .incoming_messages
                                                                 .reaction_list
                                                                 [reaction.message_index]
                                                                 .message_reactions[index]
-                                                                .times;
+                                                                .authors;
 
-                                                            //Subtract 1 from the emoji counter
-                                                            *emoji_reaction_times -= 1;
-
+                                                            //Remove the user who has sent this message from the authors list
+                                                            match emoji_authors.iter().position(
+                                                                |uuid| *uuid == reaction.uuid,
+                                                            ) {
+                                                                Some(idx) => {
+                                                                    emoji_authors.remove(idx);
+                                                                },
+                                                                None => {
+                                                                    tracing::error!("Tried to remove a non-author from the authors list.");
+                                                                },
+                                                            }
                                                             //If the emoji is reacted with 0 times, it means it has been fully deleted from the list
-                                                            if *emoji_reaction_times == 0 {
+                                                            if emoji_authors.len() == 0 {
                                                                 self.client_ui
                                                                     .incoming_messages
                                                                     .reaction_list

@@ -218,20 +218,18 @@ impl Application
                                             });
 
                                             ui.label(
-                                                RichText::from(item.times.to_string())
+                                                RichText::from(item.authors.len().to_string())
                                                     .size(self.font_size / 1.3),
                                             );
                                         });
 
-                                        dbg!(group.response.clicked());
+                                        let emoji_group_rect = ui.interact(
+                                            group.response.rect,
+                                            ui.next_auto_id(),
+                                            Sense::click(),
+                                        );
 
-
-                                        let emoji_group_rect = ui
-                                            .interact(group.response.rect, ui.next_auto_id(), Sense::click());
-
-                                        if emoji_group_rect    
-                                            .clicked()
-                                        {
+                                        if emoji_group_rect.clicked() {
                                             self.change_send_emoji(
                                                 iter_index,
                                                 item.emoji_name.clone(),
@@ -441,22 +439,36 @@ impl Application
     /// NOTE: This function will send an emoji deletion message if you have already sent this specific emojio
     fn change_send_emoji(&mut self, iter_index: usize, selected_emoji_name: String)
     {
-        //Check if we have already sent this emoji once
-        //If No send it
-        if !self.client_ui.incoming_messages.reaction_list[iter_index]
+        //Check if there is an emoji already added
+        if let Some(reaction) = self.client_ui.incoming_messages.reaction_list[iter_index]
             .message_reactions
             .iter()
-            .any(|emoji| &emoji.emoji_name == &selected_emoji_name)
+            .find(|reaction| reaction.emoji_name == selected_emoji_name)
         {
-            self.send_msg(ClientMessage::construct_reaction_msg(
-                selected_emoji_name,
-                iter_index,
-                &self.opened_user_information.uuid,
-            ));
+            //Check if we have already sent this message, if yes we delete it
+            if reaction
+                .authors
+                .iter()
+                .any(|uuid| *uuid == self.opened_user_information.uuid)
+            {
+                self.send_msg(ClientMessage::construct_reaction_remove_msg(
+                    selected_emoji_name,
+                    iter_index,
+                    &self.opened_user_information.uuid,
+                ));
+            }
+            //If no, we can send it
+            else {
+                self.send_msg(ClientMessage::construct_reaction_msg(
+                    selected_emoji_name,
+                    iter_index,
+                    &self.opened_user_information.uuid,
+                ));
+            }
         }
-        //If yes we send deletion message
+        //If no that means we can add the emoji
         else {
-            self.send_msg(ClientMessage::construct_reaction_remove_msg(
+            self.send_msg(ClientMessage::construct_reaction_msg(
                 selected_emoji_name,
                 iter_index,
                 &self.opened_user_information.uuid,

@@ -1,5 +1,8 @@
 use chrono::{Duration, Utc};
-use std::{fs::{self, read}, path::PathBuf};
+use std::{
+    fs::{self, read},
+    path::PathBuf,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -29,12 +32,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Ok(_) => (),
         Err(_err) => {
             //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!("opencv/{dll_name}.dll"))).expect("OpenCV library dll was not found in binary folder.");
+            let dll_bytes = fs::read(PathBuf::from(format!("opencv/{dll_name}.dll")))
+                .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path
             let mut release_ancestor = release_path.ancestors();
             let release_folder_path = release_ancestor.next().unwrap().display();
-            
+
             //Get ancestor path
             let mut debug_ancestor = debug_path.ancestors();
             let debug_folder_path = dbg!(debug_ancestor.next().unwrap().display());

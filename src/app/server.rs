@@ -853,7 +853,7 @@ impl MessageService
                 },
 
                 ClientReaction(reaction) => {
-                    self.handle_reaction(reaction).await;
+                    self.handle_reaction(reaction, &req).await;
                 },
 
                 MessageEdit(edit) => {
@@ -1444,7 +1444,7 @@ impl MessageService
     }
 
     /// handle reaction requests
-    pub async fn handle_reaction(&self, reaction: &ReactionType)
+    pub async fn handle_reaction(&self, reaction: &ReactionType, req: &ClientMessage)
     {
         match reaction {
             ReactionType::Add(reaction) => {
@@ -1457,7 +1457,7 @@ impl MessageService
                         {
                             //Check if it has already been reacted before, if yes add one to the counter
                             if item.emoji_name == reaction.emoji_name {
-                                item.times += 1;
+                                item.authors.push(req.uuid.clone());
 
                                 //Quit the function immediately, so we can add the new reaction
                                 return;
@@ -1469,8 +1469,7 @@ impl MessageService
                             .message_reactions
                             .push(Reaction {
                                 emoji_name: reaction.emoji_name.clone(),
-                                //Set default amount, start from 1
-                                times: 1,
+                                authors: vec![req.uuid.clone()],
                             });
                     },
                     Err(err) => println!("{err}"),
@@ -1488,11 +1487,20 @@ impl MessageService
                         {
                             //Check if it has already been reacted before, if yes add one to the counter
                             if item.emoji_name == reaction.emoji_name {
-                                item.times -= 1;
+                                match item.authors.iter().position(|uuid| **uuid == req.uuid) {
+                                    Some(idx) => {
+                                        item.authors.remove(idx);
+                                    },
+                                    None => {
+                                        tracing::error!(
+                                            "Tried to remove a non-author from the authors list."
+                                        );
+                                    },
+                                }
 
                                 //Check if the item.times is 0 that means we removed the last reaction
                                 //If yes, set flag
-                                if item.times == 0 {
+                                if item.authors.len() == 0 {
                                     was_last_rection = true;
                                 }
                             }

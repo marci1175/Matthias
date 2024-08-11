@@ -51,6 +51,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+use wincam::Webcam;
 
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
@@ -1084,6 +1085,7 @@ pub struct ClientReaction
 {
     pub emoji_name: String,
     pub message_index: usize,
+    pub uuid: String,
 }
 
 ///Lets the client edit their *OWN* message, a client check is implemented TODO: please write a server check for this
@@ -1235,6 +1237,7 @@ impl ClientMessage
             message_type: ClientMessageType::Reaction(ReactionType::Add(ClientReaction {
                 emoji_name,
                 message_index: index,
+                uuid: uuid.to_string(),
             })),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1252,6 +1255,7 @@ impl ClientMessage
             message_type: ClientMessageType::Reaction(ReactionType::Remove(ClientReaction {
                 emoji_name,
                 message_index: index,
+                uuid: uuid.to_string(),
             })),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1940,12 +1944,12 @@ impl ServerOutput
                             match message {
                                 //The client will increment its emoji counter
                                 ReactionType::Add(message) => {
-                                    ServerMessageReaction { reaction_type: ReactionType::Add(ClientReaction { emoji_name: message.emoji_name, message_index: message.message_index }) }
+                                    ServerMessageReaction { reaction_type: ReactionType::Add(ClientReaction { emoji_name: message.emoji_name, uuid: message.uuid, message_index: message.message_index }) }
                                 },
                                 //The client will decrement its emoji counter
                                 //If the index is 0 the client will automaticly remove that emoji entry
                                 ReactionType::Remove(message) => {
-                                    ServerMessageReaction { reaction_type: ReactionType::Remove(ClientReaction { emoji_name: message.emoji_name, message_index: message.message_index }) }
+                                    ServerMessageReaction { reaction_type: ReactionType::Remove(ClientReaction { emoji_name: message.emoji_name, uuid: message.uuid, message_index: message.message_index }) }
                                 },
                             }
                         )
@@ -2178,16 +2182,22 @@ pub enum UdpMessage
     Message(Vec<u8>),
 }
 
-#[derive(Debug, Clone)]
+/// This struct contains all the information for having a voice and or video call.
+#[derive(Clone)]
 pub struct Voip
 {
-    /// The clients socket, which theyre listening on
+    /// The clients socket, which theyre listening on for packets (audio, image)
     pub socket: Arc<UdpSocket>,
+
+    /// This handle is used to take pictures with the host's camera
+    /// If we are in a voice call this is ```None```
+    pub camera_handle: Option<Arc<Mutex<Webcam>>>,
 }
 
 impl Voip
 {
-    /// This function creates a new ```Voip``` intance containing a ```UdpSocket``` and an authentication from the server
+    /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
+    /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
     pub async fn new() -> anyhow::Result<Self>
     {
         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
@@ -2196,6 +2206,34 @@ impl Voip
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
         Ok(Self {
             socket: Arc::new(socket_handle),
+            camera_handle: None,
+        })
+    }
+
+    /// This function sets the ```camera_handle``` in this ```Voip``` instance.
+    /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
+    pub fn add_video_handle(&mut self) -> anyhow::Result<()>
+    {
+        self.camera_handle = Some(Arc::new(Mutex::new(Webcam::new_def_auto_detect()?)));
+
+        Ok(())
+    }
+
+    /// This function removes the ```camera_handle``` in this ```Voip``` instance.
+    pub fn remove_video_handle(&mut self)
+    {
+        self.camera_handle = None;
+    }
+
+    pub async fn new_video_call() -> anyhow::Result<Self>
+    {
+        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+        let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
+        socket_2.set_reuse_address(true)?;
+        let socket_handle = UdpSocket::from_std(socket_2.into())?;
+        Ok(Self {
+            socket: Arc::new(socket_handle),
+            camera_handle: Some(Arc::new(Mutex::new(Webcam::new_def_auto_detect()?))),
         })
     }
 
@@ -3153,11 +3191,14 @@ pub struct MessageReaction
     pub message_reactions: Vec<Reaction>,
 }
 
+/// This struct contains the what the people have reacted with.
+/// This struct contains the one emoji's name and the users' uuid who have sent this.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Reaction
 {
-    /// The reaction's corresponding emoji name
+    /// The emoji send by the ```authors```
     pub emoji_name: String,
-    /// The coutner of how many times this emoji has been sent
-    pub times: i64,
+
+    /// Author's uuid list
+    pub authors: Vec<String>,
 }
