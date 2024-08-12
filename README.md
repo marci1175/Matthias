@@ -13,9 +13,6 @@ A decentralized chat application built completely in rust.
 - Intuitive user interface
 - Experimental MD (Markdown) support
 
-# Legacy
-- The predecessor of Matthias was [ChatApp](https://github.com/marci1175/ChatApp)
-
 # Children repositories (Crates/Repos created for the purpose of showcasing/improving Matthias)
 - [Wincam](https://github.com/marci1175/wincam) (Used to capture images from the host's camera)
 - [Protocol Showcase](https://github.com/marci1175/matthias-tokio-protocol/tree/master) (Used to showcase Matthias's TCP protocol)
@@ -36,3 +33,6 @@ Feel free to chat in the official [Matthias discord server](https://discord.gg/6
 ![Messages](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/messages.png)
 ### Register page
 ![Register page](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/register.png)
+
+# Legacy
+- The predecessor of Matthias was [ChatApp](https://github.com/marci1175/ChatApp)
