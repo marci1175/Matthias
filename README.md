@@ -13,6 +13,14 @@ A decentralized chat application built completely in rust.
 - Intuitive user interface
 - Experimental MD (Markdown) support
 
+# Legacy
+- The predecessor of Matthias was [ChatApp](https://github.com/marci1175/ChatApp)
+
+# Children repositories (Crates/Repos created for the purpose of showcasing/improving Matthias)
+- [Wincam](https://github.com/marci1175/wincam) (Used to capture images from the host's camera)
+- [Protocol Showcase](https://github.com/marci1175/matthias-tokio-protocol/tree/master) (Used to showcase Matthias's TCP protocol)
+- [mLua proc macro](https://github.com/marci1175/mlua_proc_macro) (Used in creating the lua API)
+
 __All this__ with great preformance, due to the project being mulit-threaded, using async calls with egui and many more!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
 ## Community
