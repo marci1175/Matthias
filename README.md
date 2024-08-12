@@ -21,10 +21,14 @@ A decentralized chat application built completely in rust.
 - [Protocol Showcase](https://github.com/marci1175/matthias-tokio-protocol/tree/master) (Used to showcase Matthias's TCP protocol)
 - [mLua proc macro](https://github.com/marci1175/mlua_proc_macro) (Used in creating the lua API)
 
+_________________________________________________________
 __All this__ with great preformance, due to the project being mulit-threaded, using async calls with egui and many more!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
+_________________________________________________________
+
 ## Community
 Feel free to chat in the official [Matthias discord server](https://discord.gg/66KFkByMGa)!
+
 ## Preview
 ### Lua api
 ![lua api](https://github.com/marci1175/Matthias/blob/813d91dec618beca08e85f9c09e7acb1d977c03d/.github/assets/luaapi.png)
