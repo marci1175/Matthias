@@ -12,7 +12,8 @@ A decentralized chat application built completely in rust.
 - Windows installer (Using a Visual Studio project)
 - Intuitive user interface
 - Experimental MD (Markdown) support
-__All this__ with great preformance, due to the project using multiple threads, async calls, egui and many more optmizatations!
+
+__All this__ with great preformance, due to the project being mulit-threaded, using async calls with egui and many more!
 I have also tried to make my codebase futureproof, with implementing custom automatizations (Example: code generating for emojies) and custom proc macros.
 ## Community
 Feel free to chat in the official [Matthias discord server](https://discord.gg/66KFkByMGa)!
