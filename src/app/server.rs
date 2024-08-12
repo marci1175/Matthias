@@ -30,7 +30,7 @@ use crate::app::backend::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
     },
-    ServerFileReply, ServerImageReply, ServerMaster,
+    ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
 };
 use tokio::{
     io::AsyncWrite,
@@ -376,41 +376,52 @@ pub fn create_client_voip_manager(
                 //recive_message lenght by reading its first 4 bytes
                 recived_bytes = reciver.recv() => {
                     let recived_bytes = recived_bytes.unwrap();
+                        
                     //Decrypt message
-                        //This is what we relay to all the other clients
-                        let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
+                    //This is what we relay to all the other clients
+                    let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
 
-                        //Spawn relay thread
-                        tokio::spawn(async move {
-                        //Relay message to all of the clients
-                            for connected_socket_addr in voip_connected_clients.iter().filter(|entry| {
-                                #[allow(unused_variables)]
-                                let socket_addr = entry.value();
+                    match UdpMessageType::from_number(u32::from_be_bytes(decrypted_bytes[decrypted_bytes.len() - 4..].try_into().unwrap())) {
+                        UdpMessageType::Voice => {
+                            //Spawn relay thread
+                            tokio::spawn(async move {
+                                //Relay message to all of the clients
+                                for connected_socket_addr in voip_connected_clients.iter().filter(|entry| {
+                                    #[allow(unused_variables)]
+                                    let socket_addr = entry.value();
 
-                                //We dont send the user's voice to them in release builds
-                                #[cfg(not(debug_assertions))]
-                                {
-                                    *socket_addr != listening_to
+                                    //We dont send the user's voice to them in release builds
+                                    #[cfg(not(debug_assertions))]
+                                    {
+                                        *socket_addr != listening_to
+                                    }
+
+                                    //We allow voice loopback in debug builds
+                                    #[cfg(debug_assertions)]
+                                    {
+                                        true
+                                    }
+                                }).map(|entry| *entry.value()) {
+                                    //Encrypt it with the client's session ID
+                                    let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
+
+                                    let mut message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
+
+                                    //Append message to header
+                                    message_lenght_header.append(&mut encrypted_packet);
+
+                                    //Send the header indicating message lenght and send the whole message appended to it
+                                    socket.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
                                 }
+                            });
+                        }
+                        UdpMessageType::Image => {
 
-                                //We allow voice loopback in debug builds
-                                #[cfg(debug_assertions)]
-                                {
-                                    true
-                                }
-                            }).map(|entry| *entry.value()) {
-                                //Encrypt it with the client's session ID
-                                let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
+                        }
+                        UdpMessageType::ImageHeader => {
 
-                                let mut message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
-
-                                //Append message to header
-                                message_lenght_header.append(&mut encrypted_packet);
-
-                                //Send the header indicating message lenght and send the whole message appended to it
-                                socket.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
-                            }
-                        });
+                        }
+                    }
                 },
             }
         }
@@ -686,7 +697,7 @@ impl MessageService
                                                             let _ = client.0.send(body_buf[4..].to_vec()).await;
                                                         },
                                                         None => {
-                                                            println!("Client hasnt been added to the client connected list");
+                                                            tracing::error!("Client hasnt been added to the client connected list");
                                                         },
                                                     };
                                                 }
@@ -969,6 +980,7 @@ impl MessageService
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
             connected_client_thread_channels: Arc::new(DashMap::new()),
+            message_buffer: Arc::new(DashMap::new()),
         })
     }
 

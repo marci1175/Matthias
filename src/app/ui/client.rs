@@ -4,6 +4,7 @@ use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
     RichText, Sense, Stroke,
 };
+use image::ImageOutputFormat;
 use rodio::{Decoder, Sink};
 use std::{
     collections::VecDeque,
@@ -1128,6 +1129,9 @@ impl Application
 
                     //Start audio recorder
                     let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
+
+                    let camera_handle = voip.camera_handle.clone();
+                    
                     //We can just send it becasue we have already set the default destination address
                     loop {
                         select! {
@@ -1138,29 +1142,53 @@ impl Application
                                 let playbackable_audio: Vec<u8> = {
                                     //Lock handle
                                     let mut recording_handle = recording_handle.lock().unwrap();
-
+                        
                                     //Create wav bytes
                                     let playbackable_audio: Vec<u8> = create_wav_file(
                                         recording_handle.clone().into()
                                     );
-
+                        
                                     //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
                                     recording_handle.clear();
-
+                        
                                     //Return wav bytes
                                     playbackable_audio
                                 };
+                        
+                                //Get image bytes from the cameras
+                                match camera_handle.clone() {
+                                    Some(handle) => {
+                                        //Lock handle
+                                        let mut camera_handle = handle.lock().await;
 
+                                        //Create buffer for image
+                                        let mut buffer = std::io::Cursor::new(Vec::new());
+
+                                        //Get camera frame
+                                        let (camera_bytes, size) = camera_handle.get_frame().unwrap_or_default();
+                                        
+                                        //Convert raw image bytes to jpeg
+                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(40)).unwrap();
+                                        
+                                        //Send image
+                                        voip.send_image(uuid.clone(), &buffer.into_inner(), &decryption_key).await.unwrap();
+                                    },
+                                    None => {
+                                        // . . .
+                                    },
+                                }
+                        
                                 voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await.unwrap();
                             },
-
+                        
                             _ = cancel_token.cancelled() => {
                                 //Exit thread
                                 break;
                             },
-                        }
+                        };
                     }
                 });
+
                 //Create sink
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
                 let decryption_key = self.client_connection.client_secret.clone();
@@ -1179,8 +1207,7 @@ impl Application
                                 match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
-                                                        tracing::error!("{}", err);
-
+                                        tracing::error!("{}", err);
                                     },
                                 }
                             } => {}

@@ -2148,6 +2148,8 @@ pub struct ServerVoip
 
     /// This entry makes sure the 2 threads are only spawned once
     pub threads: Option<()>,
+
+    pub message_buffer: Arc<DashMap<String, HashMap<String, Vec<u8>>>>,
 }
 
 impl ServerVoip
@@ -2172,14 +2174,27 @@ impl ServerVoip
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum UdpMessage
-{
-    /// This enums inner value is the lenght of the message this is indicating
-    MessageLenght(u32),
+/// This enum holds the variants of a UdpMessage
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum UdpMessageType {
+    /// Voice message
+    Voice = 1,
+    /// Image message
+    Image = 2,
+    /// Image header message
+    ImageHeader = 3,
+}
 
-    /// The inner value of this message is the raw bytes of the Voice bytes and the UUID
-    Message(Vec<u8>),
+impl UdpMessageType {
+    pub fn from_number(num: u32) -> Self {
+        match num {
+            1 => Self::Voice,
+            2 => Self::Image,
+            3 => Self::ImageHeader,
+
+            _ => unimplemented!("Branch not covered"),
+        }
+    }
 }
 
 /// This struct contains all the information for having a voice and or video call.
@@ -2191,7 +2206,7 @@ pub struct Voip
 
     /// This handle is used to take pictures with the host's camera
     /// If we are in a voice call this is ```None```
-    pub camera_handle: Option<Arc<Mutex<Webcam>>>,
+    pub camera_handle: Option<Arc<tokio::sync::Mutex<Webcam>>>,
 }
 
 impl Voip
@@ -2214,7 +2229,7 @@ impl Voip
     /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
     pub fn add_video_handle(&mut self) -> anyhow::Result<()>
     {
-        self.camera_handle = Some(Arc::new(Mutex::new(Webcam::new_def_auto_detect()?)));
+        self.camera_handle = Some(Arc::new(tokio::sync::Mutex::new(Webcam::new_def_auto_detect()?)));
 
         Ok(())
     }
@@ -2233,7 +2248,7 @@ impl Voip
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
         Ok(Self {
             socket: Arc::new(socket_handle),
-            camera_handle: Some(Arc::new(Mutex::new(Webcam::new_def_auto_detect()?))),
+            camera_handle: Some(Arc::new(tokio::sync::Mutex::new(Webcam::new_def_auto_detect()?))),
         })
     }
 
@@ -2258,19 +2273,86 @@ impl Voip
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
+        self.send_bytes(bytes, encryption_key, UdpMessageType::Voice).await?;
+
+        Ok(())
+    }
+
+    /// This function sends bytes on the UdpSocket the instance contains
+    /// The bytes passed to this function are automaticly encrypted by the provided encrytion key
+    /// Message type appends a set isize to the message so that the server can identify each message
+    async fn send_bytes(&self, bytes: Vec<u8>, encryption_key: &[u8], message_type: UdpMessageType) -> Result<(), Error>
+    {
         //Encrypt message
         let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
+        //Get message lenght
         let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
+        //Append message to message lenght
         message_lenght_in_bytes.append(&mut encrypted_message);
 
-        //Send the message with the header in one
+        //Append message bytes
+        message_lenght_in_bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
+
+        //Send bytes
         self.socket.send(&message_lenght_in_bytes).await?;
 
         Ok(())
     }
+
+    pub async fn send_image(
+        &self,
+        uuid: String,
+        bytes: &[u8],
+        encryption_key: &[u8],
+    ) -> anyhow::Result<()>
+    {
+        //Create image parts by splitting it every 60000 bytes
+        let image_parts_tuple: Vec<(String, &[u8])> = bytes
+            .chunks(60000)
+            .map(|image_part| (sha256::digest(image_part), image_part))
+            .collect();
+
+        //Create header message
+        let header_message = ImageHeader::new(
+            uuid.clone(),
+            Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone())),
+        );
+
+        //Send header
+        self.send_bytes(
+            serde_json::to_string(&header_message)?.as_bytes().to_vec(),
+            encryption_key,
+            UdpMessageType::ImageHeader
+        )
+        .await?;
+
+        //Send image parts
+        for (hash, bytes) in image_parts_tuple {
+            //Hash as Vector
+            let mut hash = hash.as_bytes().to_vec();
+
+            //Append the hash to the bytes
+            let mut bytes = bytes.to_vec();
+
+            bytes.append(&mut hash);
+
+            //Append uuid to the message
+            bytes.append(&mut uuid.as_bytes().to_vec());
+
+            //Send bytes
+            self.send_bytes(bytes, encryption_key, UdpMessageType::Image).await?;
+        }
+
+        Ok(())
+    }
 }
+
+// HashMap::from_iter(image_parts.iter().map(|part| {
+//     //Sha256 the bytes of the message part, insert a None into the hashmap so that the server will know where to insert the
+//     (sha256::digest(*part), None)
+// }))
 
 /*
  Client backend
@@ -3201,4 +3283,28 @@ pub struct Reaction
 
     /// Author's uuid list
     pub authors: Vec<String>,
+}
+
+/// This header struct contains the uuid of the author who has sent this header and the image parts the server would receive
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ImageHeader
+{
+    /// The author of this header aka who constructed it
+    pub uuid: String,
+
+    /// This entry contains the image parts in a list.
+    /// The keys are the bytes hashsed with ```Sha256```.
+    pub image_parts_hash: Vec<String>,
+}
+
+impl ImageHeader
+{
+    /// Construct a new ```ImageHeader``` instance
+    pub fn new(uuid: String, image_parts_hash: Vec<String>) -> Self
+    {
+        Self {
+            uuid,
+            image_parts_hash,
+        }
+    }
 }
