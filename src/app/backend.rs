@@ -19,6 +19,7 @@ use egui::{
 };
 use egui_notify::{Toast, Toasts};
 use image::DynamicImage;
+use indexmap::IndexMap;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
 use rand::rngs::ThreadRng;
@@ -2141,6 +2142,8 @@ pub struct ServerVoipClose
     pub reason: String,
 }
 
+pub type MessageBuffer = Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>;
+
 #[derive(Debug, Clone)]
 pub struct ServerVoip
 {
@@ -2165,7 +2168,12 @@ pub struct ServerVoip
     /// This entry makes sure the 2 threads are only spawned once
     pub threads: Option<()>,
 
-    pub message_buffer: Arc<DashMap<String, HashMap<String, Vec<u8>>>>,
+    /// This field contains the Video(Image) buffer of the clients.
+    /// If header file's hashes are paired we send / relay the image to all the other clients.
+    /// The ```DashMap``` contains the HeaderMessages (value) paired with the uuid's of the clients (key)
+    /// The ```IndexMap``` contains the MessageParts (value)  paired with the HeaderMessage's uuid (key)
+    /// The ```HashMap``` contains the image bytes (value) paired with the byte hash (key)
+    pub message_buffer: MessageBuffer,
 }
 
 impl ServerVoip
@@ -2196,10 +2204,10 @@ pub enum UdpMessageType
 {
     /// Voice message
     Voice = 1,
-    /// Image message
-    Image = 2,
     /// Image header message
     ImageHeader = 3,
+    /// Image message
+    Image = 2,
 }
 
 impl UdpMessageType
@@ -2307,11 +2315,14 @@ impl Voip
     /// Message type appends a set isize to the message so that the server can identify each message
     async fn send_bytes(
         &self,
-        bytes: Vec<u8>,
+        mut bytes: Vec<u8>,
         encryption_key: &[u8],
         message_type: UdpMessageType,
     ) -> Result<(), Error>
     {
+        //Append message flag bytes
+        bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
+
         //Encrypt message
         let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
@@ -2320,9 +2331,6 @@ impl Voip
 
         //Append message to message lenght
         message_lenght_in_bytes.append(&mut encrypted_message);
-
-        //Append message bytes
-        message_lenght_in_bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
 
         //Send bytes
         self.socket.send(&message_lenght_in_bytes).await?;
@@ -2343,13 +2351,16 @@ impl Voip
             .map(|image_part| (sha256::digest(image_part), image_part))
             .collect();
 
+        let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
+
         //Create header message
         let header_message = ImageHeader::new(
             uuid.clone(),
-            Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone())),
+            image_parts.clone(),
+            sha256::digest(image_parts.iter().map(|hash| hash.as_bytes().to_vec()).flatten().collect::<Vec<u8>>())
         );
 
-        //Send header
+        //Send image header
         self.send_bytes(
             serde_json::to_string(&header_message)?.as_bytes().to_vec(),
             encryption_key,
@@ -2358,9 +2369,12 @@ impl Voip
         .await?;
 
         //Send image parts
+        //We have already sent the image header
         for (hash, bytes) in image_parts_tuple {
             //Hash as Vector
             let mut hash = hash.as_bytes().to_vec();
+
+            dbg!(hash.len());
 
             //Append the hash to the bytes
             let mut bytes = bytes.to_vec();
@@ -3325,16 +3339,20 @@ pub struct ImageHeader
     /// This entry contains the image parts in a list.
     /// The keys are the bytes hashsed with ```Sha256```.
     pub image_parts_hash: Vec<String>,
+
+    /// Custom identifier of the ```ImageHeader``` the server uses this to know where the image part goes
+    pub identificator: String,
 }
 
 impl ImageHeader
 {
     /// Construct a new ```ImageHeader``` instance
-    pub fn new(uuid: String, image_parts_hash: Vec<String>) -> Self
+    pub fn new(uuid: String, image_parts_hash: Vec<String>, identificator: String) -> Self
     {
         Self {
             uuid,
             image_parts_hash,
+            identificator,
         }
     }
 }

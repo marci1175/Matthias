@@ -10,6 +10,7 @@ use anyhow::{Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
+use indexmap::IndexMap;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
@@ -24,13 +25,10 @@ use super::backend::{
 };
 
 use crate::app::backend::{
-    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct,
-    ClientFileUpload as ClientFileUploadStruct, ClientMessage,
-    ClientMessageType::{
+    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessage, ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    },
-    ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
+    }, ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType
 };
 use tokio::{
     io::AsyncWrite,
@@ -359,14 +357,20 @@ pub fn create_client_voip_manager(
     key: [u8; 32],
     mut reciver: Receiver<Vec<u8>>,
     #[allow(unused_variables)] listening_to: SocketAddr,
+    uuid: String,
 )
 {
+    let message_buffer = voip.message_buffer.clone();
+
     //Spawn client management thread
     tokio::spawn(async move {
         loop {
             let socket = voip.socket.clone();
             //Clone so we can move the value
             let voip_connected_clients = voip.connected_clients.clone();
+
+            let message_buffer = message_buffer.clone();
+            
             select! {
                 _ = shutdown_token.cancelled() => {
                     //Shutdown thread by exiting the loop
@@ -379,9 +383,12 @@ pub fn create_client_voip_manager(
 
                     //Decrypt message
                     //This is what we relay to all the other clients
-                    let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
+                    let mut decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
 
-                    match UdpMessageType::from_number(u32::from_be_bytes(decrypted_bytes[decrypted_bytes.len() - 4..].try_into().unwrap())) {
+                    let message_flag_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
+
+                    //Get message type by reading last 4 bytes
+                    match UdpMessageType::from_number(u32::from_be_bytes(message_flag_bytes.try_into().unwrap())) {
                         UdpMessageType::Voice => {
                             //Spawn relay thread
                             tokio::spawn(async move {
@@ -415,10 +422,29 @@ pub fn create_client_voip_manager(
                                 }
                             });
                         }
-                        UdpMessageType::Image => {
-
-                        }
                         UdpMessageType::ImageHeader => {
+                            //Get actual message, we ignore the message type
+                            let message = decrypted_bytes.to_vec();
+                            
+                            //Get string from bytes
+                            let message_as_string = String::from_utf8(message).unwrap();
+
+                            //```Deserialize``` string into ```ImageHeader``` struct
+                            let image_header = serde_json::from_str::<ImageHeader>(&message_as_string).unwrap();
+
+                            //Create image part map which will later be used for storing parts of the Image
+                            let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(image_header.image_parts_hash.iter().map(|hash| (hash.clone(), None)));
+
+                            //Create ```IndexMap```
+                            let mut header_index_map = IndexMap::new();
+
+                            //Insert entry into the ```IndexMap```
+                            header_index_map.insert(image_header.identificator, image_part_map);
+
+                            //Insert IndexMap into the ```message_buffer```
+                            message_buffer.insert(uuid.clone(), header_index_map);
+                        }
+                        UdpMessageType::Image => {
 
                         }
                     }
@@ -685,7 +711,7 @@ impl MessageService
                                                     //Get message lenght
                                                     let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
-                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
+                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the header thus we didnt remove the bytes from the buffer
                                                     let mut body_buf = vec![0; header_lenght as usize + 4];
 
                                                     let (_, socket_addr) = socket.recv_from(&mut body_buf).await.unwrap();
@@ -730,6 +756,7 @@ impl MessageService
                                         self.decryption_key,
                                         reciver,
                                         socket_addr,
+                                        req.uuid.clone(),
                                     );
 
                                     voip.connected_client_thread_channels.insert(
