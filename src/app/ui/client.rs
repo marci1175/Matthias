@@ -197,6 +197,41 @@ impl Application
         {
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "voip_connected_users")
                 .show(ctx, |ui| {
+                    //We should only display the settings menu if we are connected to a Voip call
+                    if let Some(voip) = &mut self.client_ui.voip {
+                        //Settings for the client connected to an ongoing call
+                        ui.allocate_ui(vec2(ui.available_width(), 30.), |ui| {
+                            ui.horizontal_centered(|ui| {
+                                ui.add(ImageButton::new(egui::include_image!("../../../icons/record.png")));
+
+                                //If there isnt a camera added
+                                if !voip.camera_handle_is_open {
+                                    //Display camera on button
+                                    if ui.add(ImageButton::new(egui::include_image!("../../../icons/camera.png"))).clicked() {
+                                        //Add camera handle to the voip
+                                        match voip.add_camera_handle() {
+                                            Ok(_) => (),
+                                            Err(err) => {
+                                                tracing::error!("{err}");
+
+                                                display_error_message(err, self.toasts.clone());
+                                            },
+                                        };
+                                    }
+                                }
+                                else {
+                                    //Display camera off button
+                                    if ui.add(ImageButton::new(egui::include_image!("../../../icons/camera_off.png"))).clicked() {
+                                        //Drop camera handle
+                                        voip.remove_camera_handle();
+                                    }
+                                }
+                            });
+                        });
+    
+                        ui.separator();
+                    }
+
                     //Display the name of this part of the ui
                     ui.label(
                         RichText::from("Users connected to the voice chat:")
@@ -1119,6 +1154,47 @@ impl Application
 
                 self.record_audio_interrupter = tx;
 
+                let uuid_clone = uuid.clone();
+                let decryption_key_clone = decryption_key.clone();
+                let voip_clone = voip.clone();
+                let camera_handle = voip_clone.camera_handle.clone();
+                let cancel_token_clone = cancel_token.clone();
+
+                //Create image sender thread
+                tokio::spawn(async move {
+                    loop {
+                        select! {
+                            //Lock camera handle
+                            mut camera_handle = camera_handle.lock() => {
+                                //Get image bytes from the cameras
+                                match camera_handle.as_mut() {
+                                    Some(handle) => {
+                                        //Create buffer for image
+                                        let mut buffer = std::io::Cursor::new(Vec::new());
+    
+                                        //Get camera frame
+                                        let (camera_bytes, size) = handle.get_frame().unwrap_or_default();
+                                        
+                                        //Convert raw image bytes to jpeg
+                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(40)).unwrap();
+                                        
+                                        //Send image
+                                        voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner(), &decryption_key_clone).await.unwrap();
+                                    },
+                                    None => {
+                                        // . . .
+                                    },
+                                }
+                            }
+    
+                            _ = cancel_token_clone.cancelled() => {
+                                //Exit thread
+                                break;
+                            },
+                        }
+                    }
+                });
+
                 //Sender thread
                 tokio::spawn(async move {
                     //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
@@ -1154,29 +1230,6 @@ impl Application
                                     //Return wav bytes
                                     playbackable_audio
                                 };
-                        
-                                //Get image bytes from the cameras
-                                match camera_handle.clone() {
-                                    Some(handle) => {
-                                        //Lock handle
-                                        let mut camera_handle = handle.lock().await;
-
-                                        //Create buffer for image
-                                        let mut buffer = std::io::Cursor::new(Vec::new());
-
-                                        //Get camera frame
-                                        let (camera_bytes, size) = camera_handle.get_frame().unwrap_or_default();
-                                        
-                                        //Convert raw image bytes to jpeg
-                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(40)).unwrap();
-                                        
-                                        //Send image
-                                        voip.send_image(uuid.clone(), &buffer.into_inner(), &decryption_key).await.unwrap();
-                                    },
-                                    None => {
-                                        // . . .
-                                    },
-                                }
                         
                                 voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await.unwrap();
                             },

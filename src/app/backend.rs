@@ -2232,8 +2232,11 @@ pub struct Voip
     pub socket: Arc<UdpSocket>,
 
     /// This handle is used to take pictures with the host's camera
-    /// If we are in a voice call this is ```None```
-    pub camera_handle: Option<Arc<tokio::sync::Mutex<Webcam>>>,
+    /// If we are in a voice call this is ```None``` by default
+    pub camera_handle: Arc<tokio::sync::Mutex<Option<Webcam>>>,
+
+    /// Signals whether there is a camera handle open
+    pub camera_handle_is_open: bool,
 }
 
 impl Voip
@@ -2248,38 +2251,68 @@ impl Voip
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
         Ok(Self {
             socket: Arc::new(socket_handle),
-            camera_handle: None,
+            camera_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            camera_handle_is_open: false,
         })
     }
 
     /// This function sets the ```camera_handle``` in this ```Voip``` instance.
     /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
-    pub fn add_video_handle(&mut self) -> anyhow::Result<()>
+    /// This function uses an async thread to set the value.
+    pub fn add_camera_handle(&mut self) -> anyhow::Result<()>
     {
-        self.camera_handle = Some(Arc::new(tokio::sync::Mutex::new(
-            Webcam::new_def_auto_detect()?,
-        )));
+        let camera_handle = self.camera_handle.clone();
+        
+        //Create camera handle thread
+        //This thread modifies the camera_handle directly
+        tokio::spawn(async move {
+            let mut camera_handle = camera_handle.lock().await;
+            
+            *camera_handle = Some(
+                Webcam::new_def_auto_detect().unwrap(),
+            );
+        });
+
+        self.camera_handle_is_open = true;
 
         Ok(())
     }
 
     /// This function removes the ```camera_handle``` in this ```Voip``` instance.
-    pub fn remove_video_handle(&mut self)
+    /// This function uses an async thread to set the value.
+    pub fn remove_camera_handle(&mut self)
     {
-        self.camera_handle = None;
+        let camera_handle = self.camera_handle.clone();
+        
+        //Create camera handle thread
+        //This thread modifies the camera_handle directly
+        tokio::spawn(async move {
+            let mut camera_handle = camera_handle.lock().await;
+            
+            *camera_handle = None;
+        });
+
+        self.camera_handle_is_open = false;
     }
 
+    /// Starts a video call when this function is called.
+    /// It sets the ```Voip``` instance and creates a call 
     pub async fn new_video_call() -> anyhow::Result<Self>
     {
         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+
         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
+
         socket_2.set_reuse_address(true)?;
+
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
+
         Ok(Self {
             socket: Arc::new(socket_handle),
-            camera_handle: Some(Arc::new(tokio::sync::Mutex::new(
+            camera_handle: Arc::new(tokio::sync::Mutex::new(Some(
                 Webcam::new_def_auto_detect()?,
             ))),
+            camera_handle_is_open: true,
         })
     }
 

@@ -445,7 +445,7 @@ pub fn create_client_voip_manager(
                             message_buffer.insert(uuid.clone(), header_index_map);
                         }
                         UdpMessageType::Image => {
-
+                            
                         }
                     }
                 },
@@ -714,18 +714,24 @@ impl MessageService
                                                     //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the header thus we didnt remove the bytes from the buffer
                                                     let mut body_buf = vec![0; header_lenght as usize + 4];
 
-                                                    let (_, socket_addr) = socket.recv_from(&mut body_buf).await.unwrap();
+                                                    match socket.recv_from(&mut body_buf).await {
+                                                        Ok((_, socket_addr)) => {
+                                                            match connected_clients.get(&socket_addr) {
+                                                                Some(client) => {
+                                                                    //We send everythin from the 4th byte since that is the part of the header
+                                                                    //We dont care about the result since it will panic when the thread is shut down
+                                                                    let _ = client.0.send(body_buf[4..].to_vec()).await;
+                                                                },
+                                                                None => {
+                                                                    tracing::error!("Client hasnt been added to the client connected list");
+                                                                },
+                                                            };
+                                                        },
 
-                                                    match connected_clients.get(&socket_addr) {
-                                                        Some(client) => {
-                                                            //We send everythin from the 4th byte since that is the part of the header
-                                                            //We dont care about the result since it will panic when the thread is shut down
-                                                            let _ = client.0.send(body_buf[4..].to_vec()).await;
+                                                        Err(err) => {
+                                                            tracing::error!("{err}");
                                                         },
-                                                        None => {
-                                                            tracing::error!("Client hasnt been added to the client connected list");
-                                                        },
-                                                    };
+                                                    }
                                                 }
                                                 //Wait until the token gets cancelled
                                                 _ = cancellation_token.cancelled() => {
