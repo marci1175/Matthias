@@ -1,7 +1,7 @@
 @echo off
 echo %PATH% | find /C /I "C:\ProgramData\chocolatey\bin" >nul
 set is_choco=%ERRORLEVEL%
-if %is_choco%==0 (
+if %is_choco%==1 (
     echo "Chocolatey installation found, downloading dependencies."
 
     echo "Installing cmake:"
