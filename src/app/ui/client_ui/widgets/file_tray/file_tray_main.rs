@@ -111,6 +111,7 @@ impl Application
                                 self.client_ui.messaging_mode = MessagingMode::Normal;
                                 //Clear messaging buffer
                                 self.client_ui.message_buffer.clear();
+                                self.client_ui.text_edit_cursor_index = 0;
                             }
                         });
                     }

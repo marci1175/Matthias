@@ -1,6 +1,6 @@
 use egui::{
     load::{BytesPoll, LoadError},
-    vec2, Image, ImageButton,
+    vec2, Image, ImageButton, RichText,
 };
 use std::collections::BTreeMap;
 
@@ -157,6 +157,22 @@ fn special_char_name(chr: char) -> Option<&'static str>
     }
 }
 
+impl ToString for EmojiTypes
+{
+    fn to_string(&self) -> String
+    {
+        match self {
+            EmojiTypes::AnimatedBlobs(_) => String::from("Animated blobs"),
+            EmojiTypes::Blobs(_) => String::from("Blobs"),
+            EmojiTypes::Foods(_) => String::from("Foods"),
+            EmojiTypes::Icons(_) => String::from("Icons"),
+            EmojiTypes::Letters(_) => String::from("Letters"),
+            EmojiTypes::Numbers(_) => String::from("Numbers"),
+            EmojiTypes::Turtles(_) => String::from("Turtles"),
+        }
+    }
+}
+
 impl backend::Application
 {
     /// Iterates over all the characters
@@ -178,267 +194,147 @@ impl backend::Application
     pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context)
         -> Option<String>
     {
-        ui.horizontal_top(|ui| {
-            for emoji_type in EMOJIS.emoji_types.iter() {
-                match emoji_type {
-                    EmojiTypes::AnimatedBlobs(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::AnimatedBlobs,
-                            "Animated Blobs",
-                        )
-                    },
-                    EmojiTypes::Blobs(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Blobs,
-                            "Blobs",
-                        )
-                    },
-                    EmojiTypes::Icons(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Icons,
-                            "Icons",
-                        )
-                    },
-                    EmojiTypes::Letters(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Letters,
-                            "Letters",
-                        )
-                    },
-                    EmojiTypes::Numbers(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Numbers,
-                            "Numbers",
-                        )
-                    },
-                    EmojiTypes::Turtles(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Turtles,
-                            "Turtles",
-                        )
-                    },
-                    EmojiTypes::Foods(_) => {
-                        ui.selectable_value(
-                            &mut self.client_ui.emoji_tab_state,
-                            backend::EmojiTypesDiscriminants::Foods,
-                            "Foods",
-                        )
-                    },
-                };
-            }
-        });
-
-        ui.separator();
-
-        //This value will become a Some if the user selects (clicks) an emoji
-        let mut selected_emoji: Option<String> = None;
-
-        match self.client_ui.emoji_tab_state {
-            backend::EmojiTypesDiscriminants::AnimatedBlobs => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
+        ui.allocate_ui(vec2(400., 350.), |ui| {
+            let scroll_area = egui::ScrollArea::vertical().show(ui, |ui| {
                 for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::AnimatedBlobs(animated_blobs) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for animated_blob in animated_blobs {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, animated_blob.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                    match emoji_type {
+                        EmojiTypes::AnimatedBlobs(animated_blobs) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in animated_blobs {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        return display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Blobs => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Blobs(blobs) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for blob in blobs {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, blob.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Blobs(blobs) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in blobs {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Icons => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Icons(icons) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for icon in icons {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, icon.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Icons(icons) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in icons {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Letters => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Letters(letters) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for letter in letters {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, letter.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Letters(letters) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in letters {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Numbers => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Numbers(numbers) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for number in numbers {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, number.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Numbers(numbers) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in numbers {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Turtles => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Turtles(turtles) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for turtle in turtles {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, turtle.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Turtles(turtles) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in turtles {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
-                }
-            },
-            backend::EmojiTypesDiscriminants::Foods => {
-                //If we have selected an emoji we just return it, god forgive me for this piece of code
-                if selected_emoji.is_some() {
-                    return selected_emoji;
-                }
-
-                for emoji_type in EMOJIS.emoji_types.iter() {
-                    //If its some we break the loop
-                    if selected_emoji.is_some() {
-                        break;
-                    }
-
-                    if let EmojiTypes::Foods(foods) = emoji_type {
-                        ui.horizontal_wrapped(|ui| {
-                            for food in foods {
-                                ui.allocate_ui(vec2(30., 30.), |ui| {
-                                    selected_emoji = display_emoji(ctx, food.name, ui);
-                                });
-
-                                //If its some we break the loop
-                                if selected_emoji.is_some() {
-                                    break;
+                        },
+                        EmojiTypes::Foods(foods) => {
+                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
+    
+                            //Display emojis
+                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
+                                for emoji in foods {
+                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
+                                        display_emoji(ctx, &emoji.name, ui)
+                                    }).inner {
+                                        return Some(emoji_name);
+                                    }
                                 }
+    
+                                return None;
+                            }).inner {
+                                return Some(emoji_name);
                             }
-                        });
-                    }
+                        },
+                    };
+    
+                    ui.separator();
                 }
-            },
-        };
+    
+                None
+            });
 
-        selected_emoji
+            scroll_area.inner
+        }).inner
+
     }
 }
 

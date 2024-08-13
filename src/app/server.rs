@@ -376,7 +376,7 @@ pub fn create_client_voip_manager(
                 //recive_message lenght by reading its first 4 bytes
                 recived_bytes = reciver.recv() => {
                     let recived_bytes = recived_bytes.unwrap();
-                        
+
                     //Decrypt message
                     //This is what we relay to all the other clients
                     let decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();

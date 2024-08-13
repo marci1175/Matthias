@@ -645,6 +645,22 @@ impl Default for EmojiTypesDiscriminants
     }
 }
 
+impl ToString for EmojiTypes
+{
+    fn to_string(&self) -> String
+    {
+        match self {
+            EmojiTypes::AnimatedBlobs(_) => String::from("Animated blobs"),
+            EmojiTypes::Blobs(_) => String::from("Blobs"),
+            EmojiTypes::Foods(_) => String::from("Foods"),
+            EmojiTypes::Icons(_) => String::from("Icons"),
+            EmojiTypes::Letters(_) => String::from("Letters"),
+            EmojiTypes::Numbers(_) => String::from("Numbers"),
+            EmojiTypes::Turtles(_) => String::from("Turtles"),
+        }
+    }
+}
+
 /// Client side variables
 #[derive(serde::Deserialize, serde::Serialize, Clone, ToTable)]
 pub struct Client
@@ -2176,7 +2192,8 @@ impl ServerVoip
 
 /// This enum holds the variants of a UdpMessage
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum UdpMessageType {
+pub enum UdpMessageType
+{
     /// Voice message
     Voice = 1,
     /// Image message
@@ -2185,8 +2202,10 @@ pub enum UdpMessageType {
     ImageHeader = 3,
 }
 
-impl UdpMessageType {
-    pub fn from_number(num: u32) -> Self {
+impl UdpMessageType
+{
+    pub fn from_number(num: u32) -> Self
+    {
         match num {
             1 => Self::Voice,
             2 => Self::Image,
@@ -2229,7 +2248,9 @@ impl Voip
     /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
     pub fn add_video_handle(&mut self) -> anyhow::Result<()>
     {
-        self.camera_handle = Some(Arc::new(tokio::sync::Mutex::new(Webcam::new_def_auto_detect()?)));
+        self.camera_handle = Some(Arc::new(tokio::sync::Mutex::new(
+            Webcam::new_def_auto_detect()?,
+        )));
 
         Ok(())
     }
@@ -2248,7 +2269,9 @@ impl Voip
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
         Ok(Self {
             socket: Arc::new(socket_handle),
-            camera_handle: Some(Arc::new(tokio::sync::Mutex::new(Webcam::new_def_auto_detect()?))),
+            camera_handle: Some(Arc::new(tokio::sync::Mutex::new(
+                Webcam::new_def_auto_detect()?,
+            ))),
         })
     }
 
@@ -2273,7 +2296,8 @@ impl Voip
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
-        self.send_bytes(bytes, encryption_key, UdpMessageType::Voice).await?;
+        self.send_bytes(bytes, encryption_key, UdpMessageType::Voice)
+            .await?;
 
         Ok(())
     }
@@ -2281,7 +2305,12 @@ impl Voip
     /// This function sends bytes on the UdpSocket the instance contains
     /// The bytes passed to this function are automaticly encrypted by the provided encrytion key
     /// Message type appends a set isize to the message so that the server can identify each message
-    async fn send_bytes(&self, bytes: Vec<u8>, encryption_key: &[u8], message_type: UdpMessageType) -> Result<(), Error>
+    async fn send_bytes(
+        &self,
+        bytes: Vec<u8>,
+        encryption_key: &[u8],
+        message_type: UdpMessageType,
+    ) -> Result<(), Error>
     {
         //Encrypt message
         let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
@@ -2324,7 +2353,7 @@ impl Voip
         self.send_bytes(
             serde_json::to_string(&header_message)?.as_bytes().to_vec(),
             encryption_key,
-            UdpMessageType::ImageHeader
+            UdpMessageType::ImageHeader,
         )
         .await?;
 
@@ -2342,7 +2371,8 @@ impl Voip
             bytes.append(&mut uuid.as_bytes().to_vec());
 
             //Send bytes
-            self.send_bytes(bytes, encryption_key, UdpMessageType::Image).await?;
+            self.send_bytes(bytes, encryption_key, UdpMessageType::Image)
+                .await?;
         }
 
         Ok(())

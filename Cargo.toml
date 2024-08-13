@@ -7,8 +7,8 @@ rust-version = "1.71"
 
 [dependencies]
 egui = "0.28.1"
-egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect"] }
-image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] } # Add the types you want support for
+egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect", "image"] }
+image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp", "gif"] } # Add the types you want support for
 
 prost = "0.10"
 tokio = { version = "1.37.0", features = ["full"] }

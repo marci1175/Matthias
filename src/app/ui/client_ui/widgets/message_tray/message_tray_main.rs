@@ -341,6 +341,8 @@ impl Application
                         self.client_ui.files_to_send.clear();
                         self.client_ui.messaging_mode = MessagingMode::Normal;
                         self.client_ui.message_buffer.clear();
+
+                        self.client_ui.text_edit_cursor_index = 0;
                     }
 
                     //add file button
@@ -370,6 +372,10 @@ impl Application
                             if let Some(emoji_name) = self.draw_emoji_selector(ui, ctx) {
                                 let is_inserting_front = self.client_ui.text_edit_cursor_index
                                     == self.client_ui.message_buffer.len();
+
+                                if self.client_ui.text_edit_cursor_index > self.client_ui.message_buffer.len() {
+                                    self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
+                                }
 
                                 self.client_ui.message_buffer.insert_str(
                                     self.client_ui.text_edit_cursor_index,
