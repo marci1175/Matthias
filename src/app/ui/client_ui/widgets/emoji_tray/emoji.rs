@@ -199,142 +199,212 @@ impl backend::Application
                 for emoji_type in EMOJIS.emoji_types.iter() {
                     match emoji_type {
                         EmojiTypes::AnimatedBlobs(animated_blobs) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in animated_blobs {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        return display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in animated_blobs {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Blobs(blobs) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in blobs {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in blobs {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Icons(icons) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in icons {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in icons {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Letters(letters) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in letters {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in letters {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Numbers(numbers) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in numbers {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in numbers {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Turtles(turtles) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in turtles {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in turtles {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                         EmojiTypes::Foods(foods) => {
-                            ui.label(RichText::from(emoji_type.to_string()).strong().size(self.font_size));
-    
+                            ui.label(
+                                RichText::from(emoji_type.to_string())
+                                    .strong()
+                                    .size(self.font_size),
+                            );
+
                             //Display emojis
-                            if let Some(emoji_name) = ui.horizontal_wrapped(|ui| {
-                                for emoji in foods {
-                                    if let Some(emoji_name) = ui.allocate_ui(vec2(25., 25.), |ui| {
-                                        display_emoji(ctx, &emoji.name, ui)
-                                    }).inner {
-                                        return Some(emoji_name);
+                            if let Some(emoji_name) = ui
+                                .horizontal_wrapped(|ui| {
+                                    for emoji in foods {
+                                        if let Some(emoji_name) = ui
+                                            .allocate_ui(vec2(25., 25.), |ui| {
+                                                display_emoji(ctx, emoji.name, ui)
+                                            })
+                                            .inner
+                                        {
+                                            return Some(emoji_name);
+                                        }
                                     }
-                                }
-    
-                                return None;
-                            }).inner {
+
+                                    None
+                                })
+                                .inner
+                            {
                                 return Some(emoji_name);
                             }
                         },
                     };
-    
+
                     ui.separator();
                 }
-    
+
                 None
             });
 
             scroll_area.inner
-        }).inner
-
+        })
+        .inner
     }
 }
 

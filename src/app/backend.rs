@@ -2262,15 +2262,13 @@ impl Voip
     pub fn add_camera_handle(&mut self) -> anyhow::Result<()>
     {
         let camera_handle = self.camera_handle.clone();
-        
+
         //Create camera handle thread
         //This thread modifies the camera_handle directly
         tokio::spawn(async move {
             let mut camera_handle = camera_handle.lock().await;
-            
-            *camera_handle = Some(
-                Webcam::new_def_auto_detect().unwrap(),
-            );
+
+            *camera_handle = Some(Webcam::new_def_auto_detect().unwrap());
         });
 
         self.camera_handle_is_open = true;
@@ -2283,12 +2281,12 @@ impl Voip
     pub fn remove_camera_handle(&mut self)
     {
         let camera_handle = self.camera_handle.clone();
-        
+
         //Create camera handle thread
         //This thread modifies the camera_handle directly
         tokio::spawn(async move {
             let mut camera_handle = camera_handle.lock().await;
-            
+
             *camera_handle = None;
         });
 
@@ -2296,7 +2294,7 @@ impl Voip
     }
 
     /// Starts a video call when this function is called.
-    /// It sets the ```Voip``` instance and creates a call 
+    /// It sets the ```Voip``` instance and creates a call
     pub async fn new_video_call() -> anyhow::Result<Self>
     {
         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
@@ -2309,9 +2307,9 @@ impl Voip
 
         Ok(Self {
             socket: Arc::new(socket_handle),
-            camera_handle: Arc::new(tokio::sync::Mutex::new(Some(
-                Webcam::new_def_auto_detect()?,
-            ))),
+            camera_handle: Arc::new(tokio::sync::Mutex::new(
+                Some(Webcam::new_def_auto_detect()?),
+            )),
             camera_handle_is_open: true,
         })
     }
@@ -2325,18 +2323,9 @@ impl Voip
         encryption_key: &[u8],
     ) -> anyhow::Result<()>
     {
-        let bytes_lenght = bytes.len();
-
-        //Check for packet lenght overflow
-        if bytes_lenght > 65531 {
-            bail!(format!(
-                "Udp packet lenght overflow, with lenght of {bytes_lenght}"
-            ))
-        }
-
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
-
+        
         self.send_bytes(bytes, encryption_key, UdpMessageType::Voice)
             .await?;
 
@@ -2351,7 +2340,7 @@ impl Voip
         mut bytes: Vec<u8>,
         encryption_key: &[u8],
         message_type: UdpMessageType,
-    ) -> Result<(), Error>
+    ) -> anyhow::Result<(), Error>
     {
         //Append message flag bytes
         bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
@@ -2364,6 +2353,15 @@ impl Voip
 
         //Append message to message lenght
         message_lenght_in_bytes.append(&mut encrypted_message);
+
+        //Check for packet lenght overflow
+        let bytes_lenght = message_lenght_in_bytes.len();
+
+        if bytes_lenght > 65535 {
+            bail!(format!(
+                "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+            ))
+        }
 
         //Send bytes
         self.socket.send(&message_lenght_in_bytes).await?;
@@ -2386,12 +2384,16 @@ impl Voip
 
         let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
 
-        //Create header message
-        let header_message = ImageHeader::new(
-            uuid.clone(),
-            image_parts.clone(),
-            sha256::digest(image_parts.iter().map(|hash| hash.as_bytes().to_vec()).flatten().collect::<Vec<u8>>())
+        let identificator = sha256::digest(
+            image_parts
+                .iter()
+                .flat_map(|hash| hash.as_bytes().to_vec())
+                .collect::<Vec<u8>>(),
         );
+
+        //Create header message
+        let header_message =
+            ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
 
         //Send image header
         self.send_bytes(
@@ -2403,19 +2405,42 @@ impl Voip
 
         //Send image parts
         //We have already sent the image header
-        for (hash, bytes) in image_parts_tuple {
-            //Hash as Vector
-            let mut hash = hash.as_bytes().to_vec();
+        self.send_image_parts(image_parts_tuple, uuid, encryption_key, identificator)
+            .await?;
 
-            dbg!(hash.len());
+        Ok(())
+    }
+
+    /// Send the images specified in the ```image_parts_tuple``` argument
+    /// __Image message contents:__
+    /// - ```[len - 64..]``` = Contains the hash (sha256 hash) of the image part we are sending
+    /// - ```[..len - 64]``` = Contains the image part we are sending (JPEG image)
+    /// - **The hash lenght is 64 bytes.**
+    /// - **The identificator is 64 bytes.**
+    /// - **The uuid is 36 bytes.**
+    async fn send_image_parts(
+        &self,
+        image_parts_tuple: Vec<(String, &[u8])>,
+        uuid: String,
+        encryption_key: &[u8],
+        identificator: String,
+    ) -> Result<(), Error>
+    {
+        for (hash, bytes) in image_parts_tuple {
+            //Hash as bytes
+            let mut hash = hash.as_bytes().to_vec();
 
             //Append the hash to the bytes
             let mut bytes = bytes.to_vec();
 
+            //Append hash
             bytes.append(&mut hash);
 
             //Append uuid to the message
             bytes.append(&mut uuid.as_bytes().to_vec());
+
+            //Append identificator
+            bytes.append(&mut identificator.as_bytes().to_vec());
 
             //Send bytes
             self.send_bytes(bytes, encryption_key, UdpMessageType::Image)
@@ -2425,11 +2450,6 @@ impl Voip
         Ok(())
     }
 }
-
-// HashMap::from_iter(image_parts.iter().map(|part| {
-//     //Sha256 the bytes of the message part, insert a None into the hashmap so that the server will know where to insert the
-//     (sha256::digest(*part), None)
-// }))
 
 /*
  Client backend

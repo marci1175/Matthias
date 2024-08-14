@@ -2,11 +2,11 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
-    time::Duration,
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, ops::Deref, path::PathBuf,
+    sync::Arc, time::Duration,
 };
 
-use anyhow::{Error, Result};
+use anyhow::{bail, Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
 use egui::Context;
@@ -25,10 +25,13 @@ use super::backend::{
 };
 
 use crate::app::backend::{
-    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessage, ClientMessageType::{
+    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct,
+    ClientFileUpload as ClientFileUploadStruct, ClientMessage,
+    ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    }, ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType
+    },
+    ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
 };
 use tokio::{
     io::AsyncWrite,
@@ -369,8 +372,10 @@ pub fn create_client_voip_manager(
             //Clone so we can move the value
             let voip_connected_clients = voip.connected_clients.clone();
 
-            let message_buffer = message_buffer.clone();
-            
+            let message_buffer: Arc<
+                DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>,
+            > = message_buffer.clone();
+
             select! {
                 _ = shutdown_token.cancelled() => {
                     //Shutdown thread by exiting the loop
@@ -382,13 +387,16 @@ pub fn create_client_voip_manager(
                     let recived_bytes = recived_bytes.unwrap();
 
                     //Decrypt message
-                    //This is what we relay to all the other clients
+                    // [. . . . . .4][4 . . . . len - 4][len - 4..]
+                    //  PACKET LENGHT       MESSAGE      MSG TYPE
                     let mut decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
 
-                    let message_flag_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
+                    let message_type_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
 
                     //Get message type by reading last 4 bytes
-                    match UdpMessageType::from_number(u32::from_be_bytes(message_flag_bytes.try_into().unwrap())) {
+                    let message_type = UdpMessageType::from_number(u32::from_be_bytes(message_type_bytes.try_into().unwrap()));
+
+                    match message_type {
                         UdpMessageType::Voice => {
                             //Spawn relay thread
                             tokio::spawn(async move {
@@ -409,14 +417,20 @@ pub fn create_client_voip_manager(
                                         true
                                     }
                                 }).map(|entry| *entry.value()) {
-                                    //Encrypt it with the client's session ID
+                                    let mut decrypted_bytes = decrypted_bytes.clone();
+
+                                    //Append message type, this will be encrypted
+                                    decrypted_bytes.append(&mut (message_type.clone() as u32).to_be_bytes().to_vec());
+
+                                    //Encrypt packet
                                     let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
 
+                                    //Get encrypted packet size
                                     let mut message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
 
                                     //Append message to header
                                     message_lenght_header.append(&mut encrypted_packet);
-
+                                    
                                     //Send the header indicating message lenght and send the whole message appended to it
                                     socket.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
                                 }
@@ -424,10 +438,10 @@ pub fn create_client_voip_manager(
                         }
                         UdpMessageType::ImageHeader => {
                             //Get actual message, we ignore the message type
-                            let message = decrypted_bytes.to_vec();
-                            
+                            let message_bytes = decrypted_bytes.to_vec();
+
                             //Get string from bytes
-                            let message_as_string = String::from_utf8(message).unwrap();
+                            let message_as_string = String::from_utf8(message_bytes).unwrap();
 
                             //```Deserialize``` string into ```ImageHeader``` struct
                             let image_header = serde_json::from_str::<ImageHeader>(&message_as_string).unwrap();
@@ -445,13 +459,186 @@ pub fn create_client_voip_manager(
                             message_buffer.insert(uuid.clone(), header_index_map);
                         }
                         UdpMessageType::Image => {
-                            
+                            // [. . . . . . . . . . . len - 164][len - 164 . . . . . len - 100][len - 100. . . . . len - 64][len - 64 . . . .]
+                            //      IMAGE                           HASH                            UUID                      IDENTIFICATOR
+                            let message_bytes = decrypted_bytes.to_vec();
+
+                            //Get the identificator of the image part in bytes
+                            let indetificator_bytes = message_bytes[message_bytes.len() - 64..].to_vec();
+
+                            let identificator = String::from_utf8(indetificator_bytes).unwrap();
+
+                            //Get the identificator of the image part in bytes
+                            let hash_bytes = message_bytes[message_bytes.len() - 64 - 64 - 36..message_bytes.len() - 64 - 36].to_vec();
+
+                            let hash = String::from_utf8(hash_bytes).unwrap();
+
+                            //Get the image part bytes
+                            //We subtract 164 bytes to only get the image part
+                            let image = message_bytes[..message_bytes.len() - 64 - 64 - 36].to_vec();
+
+                            //THIS IS UNUSED AND SHOULD BE REMOVED
+                            let uuid_bytes = message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec();
+
+                            if let Some(mut image_header) = message_buffer.get_mut(&uuid) {
+                                if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
+                                    let contents_clone = contents.clone();
+
+                                    if let Some(byte_pair) = contents.get_mut(&hash) {
+                                        *byte_pair = Some(image);
+                                    }
+                                    else {
+                                        tracing::error!("Image part hash not found in the image header: {hash}");
+                                    }
+
+                                    //If all the parts of the image header had arrived send the image to all the clients
+                                    if contents.iter().all(|(_, value)| value.is_some()) {
+                                        tokio::spawn(async move {
+                                            for connected_client in voip_connected_clients.iter() {
+                                                let uuid = connected_client.key();
+
+                                                let socket_addr = connected_client.value();
+
+                                                //Combine the image part bytes
+                                                let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
+                                                    <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value).unwrap()
+                                                }).collect();
+
+                                                //Create image parts by splitting it every 60000 bytes
+                                                let image_parts_tuple: Vec<(String, &[u8])> = image_bytes
+                                                    .chunks(60000)
+                                                    .map(|image_part| (sha256::digest(image_part), image_part))
+                                                    .collect();
+
+                                                let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
+
+                                                let identificator = sha256::digest(
+                                                    image_parts
+                                                        .iter()
+                                                        .flat_map(|hash| hash.as_bytes().to_vec())
+                                                        .collect::<Vec<u8>>(),
+                                                );
+
+                                                //Create header message
+                                                let header_message =
+                                                    ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
+
+                                                // Send image header
+                                                send_bytes(
+                                                    serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
+                                                    &key,
+                                                    UdpMessageType::ImageHeader,
+                                                    socket.clone(),
+                                                    socket_addr.clone(),
+                                                )
+                                                .await.unwrap();
+
+                                                //Send image parts
+                                                //We have already sent the image header
+                                                send_image_parts(image_parts_tuple, uuid.clone(), &key, identificator, socket.clone(), socket_addr.clone())
+                                                    .await.unwrap();
+                                            }
+                                        });
+
+                                        //Drain earlier ImageHeaders (and the current one), because a new one has arrived
+                                        image_header.drain(..=index);
+                                    }
+                                }
+                                else {
+                                    tracing::error!("Image header not found: {identificator}");
+                                }
+                            }
+                            else {
+                                tracing::error!("User not found in the image header list: {uuid}");
+                            }
                         }
                     }
                 },
             }
         }
     });
+}
+
+async fn send_bytes(
+    mut bytes: Vec<u8>,
+    encryption_key: &[u8],
+    message_type: UdpMessageType,
+    socket: Arc<UdpSocket>,
+    send_to: SocketAddr,
+) -> anyhow::Result<()>
+{
+    //Append message flag bytes
+    bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
+
+    //Encrypt message
+    let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
+
+    //Get message lenght
+    let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
+
+    //Append message to message lenght
+    message_lenght_in_bytes.append(&mut encrypted_message);
+
+    //Check for packet lenght overflow
+    let bytes_lenght = message_lenght_in_bytes.len();
+
+    if bytes_lenght > 65536 {
+        bail!(format!(
+            "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+        ))
+    }
+
+    //Send bytes
+    socket.send_to(&message_lenght_in_bytes, send_to).await?;
+
+    Ok(())
+}
+/// Send the images specified in the ```image_parts_tuple``` argument
+/// __Image message contents:__
+/// - ```[len - 64 - 64 - 36..len - 64 - 36]``` = Contains the hash (sha256 hash) of the image part we are sending
+/// - ```[len - 64 - 36.. len - 64]``` = Contains the UUID of the author who has sent the message
+/// - ```[..len - 64 - 64 - 36]``` = Contains the image part we are sending (JPEG image)
+/// - ```[len - 64..]``` = Contains the identificator of the part we are sending
+/// - **The hash lenght is 64 bytes.**
+/// - **The identificator is 64 bytes.**
+/// - **The uuid is 36 bytes.**
+async fn send_image_parts(
+    image_parts_tuple: Vec<(String, &[u8])>,
+    uuid: String,
+    encryption_key: &[u8],
+    identificator: String,
+    socket: Arc<UdpSocket>,
+    send_to: SocketAddr,
+) -> Result<(), Error>
+{
+    for (hash, bytes) in image_parts_tuple {
+        //Hash as bytes
+        let mut hash = hash.as_bytes().to_vec();
+
+        //Append the hash to the bytes
+        let mut bytes = bytes.to_vec();
+
+        //Append hash
+        bytes.append(&mut hash);
+
+        //Append uuid to the message
+        bytes.append(&mut uuid.as_bytes().to_vec());
+
+        //Append identificator
+        bytes.append(&mut identificator.as_bytes().to_vec());
+
+        //Send bytes
+        send_bytes(
+            bytes,
+            encryption_key,
+            UdpMessageType::Image,
+            socket.clone(),
+            send_to,
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 impl MessageService
@@ -1545,7 +1732,7 @@ impl MessageService
 
                                 //Check if the item.times is 0 that means we removed the last reaction
                                 //If yes, set flag
-                                if item.authors.len() == 0 {
+                                if item.authors.is_empty() {
                                     was_last_rection = true;
                                 }
                             }

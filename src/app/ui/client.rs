@@ -1,13 +1,15 @@
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
+use dashmap::DashMap;
 use egui::{
     vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
     RichText, Sense, Stroke,
 };
-use image::ImageOutputFormat;
+use image::{ImageBuffer, ImageOutputFormat};
+use indexmap::IndexMap;
 use rodio::{Decoder, Sink};
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs,
     io::{BufReader, Cursor},
     path::PathBuf,
@@ -20,8 +22,8 @@ use uuid::Uuid;
 
 use crate::app::backend::{
     decrypt_aes256, decrypt_aes256_bytes, display_error_message, write_audio, write_file,
-    ClientMessage, ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction,
-    ServerReplyType, ServerSync, ServerVoipReply, Voip,
+    ClientMessage, ClientMessageType, ConnectionState, ImageHeader, MessageBuffer, MessageReaction,
+    PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipReply, UdpMessageType, Voip,
 };
 
 use crate::app::{
@@ -202,12 +204,19 @@ impl Application
                         //Settings for the client connected to an ongoing call
                         ui.allocate_ui(vec2(ui.available_width(), 30.), |ui| {
                             ui.horizontal_centered(|ui| {
-                                ui.add(ImageButton::new(egui::include_image!("../../../icons/record.png")));
+                                ui.add(ImageButton::new(egui::include_image!(
+                                    "../../../icons/record.png"
+                                )));
 
                                 //If there isnt a camera added
                                 if !voip.camera_handle_is_open {
                                     //Display camera on button
-                                    if ui.add(ImageButton::new(egui::include_image!("../../../icons/camera.png"))).clicked() {
+                                    if ui
+                                        .add(ImageButton::new(egui::include_image!(
+                                            "../../../icons/camera.png"
+                                        )))
+                                        .clicked()
+                                    {
                                         //Add camera handle to the voip
                                         match voip.add_camera_handle() {
                                             Ok(_) => (),
@@ -221,14 +230,19 @@ impl Application
                                 }
                                 else {
                                     //Display camera off button
-                                    if ui.add(ImageButton::new(egui::include_image!("../../../icons/camera_off.png"))).clicked() {
+                                    if ui
+                                        .add(ImageButton::new(egui::include_image!(
+                                            "../../../icons/camera_off.png"
+                                        )))
+                                        .clicked()
+                                    {
                                         //Drop camera handle
                                         voip.remove_camera_handle();
                                     }
                                 }
                             });
                         });
-    
+
                         ui.separator();
                     }
 
@@ -242,8 +256,8 @@ impl Application
                     //Put all of the connected users nxt to eachother
                     ui.horizontal(|ui| {
                         for connected_client_uuid in connected_clients.iter() {
-                            //Display each "node"
-                            ui.vertical(|ui| {
+                            //Display each user
+                            ui.vertical_centered(|ui| {
                                 self.display_icon_from_server(
                                     ctx,
                                     connected_client_uuid.clone(),
@@ -915,7 +929,7 @@ impl Application
                                                                 },
                                                             }
                                                             //If the emoji is reacted with 0 times, it means it has been fully deleted from the list
-                                                            if emoji_authors.len() == 0 {
+                                                            if emoji_authors.is_empty() {
                                                                 self.client_ui
                                                                     .incoming_messages
                                                                     .reaction_list
@@ -1206,8 +1220,6 @@ impl Application
                     //Start audio recorder
                     let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
 
-                    let camera_handle = voip.camera_handle.clone();
-                    
                     //We can just send it becasue we have already set the default destination address
                     loop {
                         select! {
@@ -1247,6 +1259,9 @@ impl Application
                 let decryption_key = self.client_connection.client_secret.clone();
                 //Reciver thread
                 tokio::spawn(async move {
+                    //Create image buffer
+                    let image_buffer: MessageBuffer = Arc::new(DashMap::new());
+
                     //Listen on socket, play audio
                     loop {
                         select! {
@@ -1257,7 +1272,7 @@ impl Application
 
                             //Recive bytes
                             _recived_bytes_count = async {
-                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone()).await {
+                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone()).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         tracing::error!("{}", err);
@@ -1272,8 +1287,8 @@ impl Application
     }
 }
 
-/// Recives audio packets on the given UdpSocket, messages are decrypted with the decrpytion key
-/// Automaticly appends the decrypted audio bytes to the ```Sink```
+/// Recives packets on the given UdpSocket, messages are decrypted with the decrpytion key
+/// Automaticly appends the decrypted audio bytes to the ```Sink``` if its an uadio packet
 /// I might rework this function so that we can see whos talking based on uuid
 async fn recive_server_relay(
     //Socket this function is Listening on
@@ -1282,6 +1297,8 @@ async fn recive_server_relay(
     decryption_key: &[u8],
     //The sink its appending the bytes to
     sink: Arc<Sink>,
+
+    image_buffer: MessageBuffer,
 ) -> anyhow::Result<()>
 {
     //Create buffer for header, this is the size of the maximum udp packet so no error will appear
@@ -1297,7 +1314,7 @@ async fn recive_server_relay(
     let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
     //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
-    let mut body_buf = vec![0; header_lenght as usize + 4];
+    let mut body_buf = vec![0; (header_lenght + 4) as usize];
 
     //Recive the whole message
     reciver_socket_part.recv(&mut body_buf).await.unwrap();
@@ -1309,24 +1326,118 @@ async fn recive_server_relay(
         decryption_key,
     )?;
 
-    //Get the byte lenght of a Uuid
-    let uuid_ddefault_byte_lenght = Uuid::max().as_bytes().len() * 2 + 4;
+    let message_flag_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
+    
+    // dbg!(&decrypted_bytes[decrypted_bytes.len() - 8 ..]);
+    
+    match UdpMessageType::from_number(u32::from_be_bytes(message_flag_bytes.try_into().unwrap())) {
+        UdpMessageType::Voice => {
+            //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
+            let uuid = String::from_utf8(
+                decrypted_bytes
+                    .drain(decrypted_bytes.len() - 36..)
+                    .collect(),
+            )?;
 
-    //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
-    let uuid = String::from_utf8(
-        decrypted_bytes
-            .drain(decrypted_bytes.len() - uuid_ddefault_byte_lenght..)
-            .collect(),
-    )?;
+            dbg!(&uuid);
 
-    //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
-    uuid::Uuid::parse_str(&uuid)
-        .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
+            //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
+            uuid::Uuid::parse_str(&uuid)
+                .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
 
-    //Play recived bytes
-    sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(
-        decrypted_bytes,
-    )))?);
+            //Play recived bytes
+            sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(
+                decrypted_bytes,
+            )))?);
+        },
+        UdpMessageType::ImageHeader => {
+            //Get actual message, we ignore the message type
+            let message_bytes = decrypted_bytes.to_vec();
+
+            //Get string from bytes
+            let message_as_string = String::from_utf8(message_bytes).unwrap();
+
+            //```Deserialize``` string into ```ImageHeader``` struct
+            let image_header = serde_json::from_str::<ImageHeader>(&message_as_string).unwrap();
+
+            //Create image part map which will later be used for storing parts of the Image
+            let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(
+                image_header
+                    .image_parts_hash
+                    .iter()
+                    .map(|hash| (hash.clone(), None)),
+            );
+
+            //Create ```IndexMap```
+            let mut header_index_map = IndexMap::new();
+
+            //Insert entry into the ```IndexMap```
+            header_index_map.insert(image_header.identificator, image_part_map);
+
+            //Insert IndexMap into the ```image_buffer```
+            image_buffer.insert(image_header.uuid.clone(), header_index_map);
+        },
+        UdpMessageType::Image => {
+            // [. . . . . . . . . . . len - 164][len - 164 . . . . . len - 100][len - 100. . . . . len - 64][len - 64 . . . .]
+            //      IMAGE                           HASH                            UUID                      IDENTIFICATOR
+            let message_bytes = decrypted_bytes.to_vec();
+
+            //Get the identificator of the image part in bytes
+            let indetificator_bytes = message_bytes[message_bytes.len() - 64..].to_vec();
+
+            let identificator = String::from_utf8(indetificator_bytes).unwrap();
+
+            //Get the identificator of the image part in bytes
+            let hash_bytes = message_bytes
+                [message_bytes.len() - 64 - 64 - 36..message_bytes.len() - 64 - 36]
+                .to_vec();
+
+            let hash = String::from_utf8(hash_bytes).unwrap();
+
+            //Get the image part bytes
+            //We subtract 164 bytes to only get the image part
+            let image = message_bytes[..message_bytes.len() - 64 - 64 - 36].to_vec();
+
+            let uuid =
+                String::from_utf8(message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec()).unwrap();
+
+            //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
+            uuid::Uuid::parse_str(&uuid.trim())
+                .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
+
+            if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
+                if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
+                    let contents_clone = contents.clone();
+
+                    if let Some(byte_pair) = contents.get_mut(&hash) {
+                        *byte_pair = Some(image);
+                    }
+                    else {
+                        tracing::error!("Image part hash not found in the image header: {hash}");
+                    }
+
+                    //If all the parts of the image header had arrived send the image to all the clients
+                    if contents.iter().all(|(_, value)| value.is_some()) {
+                        //Combine the image part bytes
+                        let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
+                            <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value).unwrap()
+                        }).collect();
+
+
+                        
+                        //Drain earlier ImageHeaders (and the current one), because a new one has arrived
+                        image_header.drain(..=index);
+                    }
+                }
+                else {
+                    tracing::error!("Image header not found: {identificator}");
+                }
+            }
+            else {
+                tracing::error!("User not found in the image header list: {uuid}");
+            }
+        },
+    }
 
     Ok(())
 }

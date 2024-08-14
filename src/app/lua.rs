@@ -30,7 +30,7 @@ pub fn load_code(lua: &Lua, code: String) -> anyhow::Result<()>
 /// This function calls the function specified in the fn_name arg, an optional arg can be provided to the called function
 pub fn call_function(lua: &Lua, arg: Option<String>, fn_name: String) -> anyhow::Result<()>
 {
-    let function = lua.globals().get::<_, mlua::Function>(fn_name)?;
+    let function = lua.globals().get::<_, mlua::Function<'_>>(fn_name)?;
 
     //Match args
     match arg {

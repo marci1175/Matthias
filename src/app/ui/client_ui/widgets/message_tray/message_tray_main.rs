@@ -373,8 +373,11 @@ impl Application
                                 let is_inserting_front = self.client_ui.text_edit_cursor_index
                                     == self.client_ui.message_buffer.len();
 
-                                if self.client_ui.text_edit_cursor_index > self.client_ui.message_buffer.len() {
-                                    self.client_ui.text_edit_cursor_index = self.client_ui.message_buffer.len();
+                                if self.client_ui.text_edit_cursor_index
+                                    > self.client_ui.message_buffer.len()
+                                {
+                                    self.client_ui.text_edit_cursor_index =
+                                        self.client_ui.message_buffer.len();
                                 }
 
                                 self.client_ui.message_buffer.insert_str(

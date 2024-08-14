@@ -1,8 +1,5 @@
 use chrono::{Duration, Utc};
-use std::{
-    fs,
-    path::PathBuf
-};
+use std::{fs, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
