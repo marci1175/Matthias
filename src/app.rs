@@ -90,10 +90,11 @@ impl eframe::App for backend::Application
         /* TODOS:
             TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
-            TODO: Create disconnection connection sound effects
+            TODO: Create sound effects
 
             TODO: Add AI (Neural network) powered hand drawing recognition
-            TODO: Add video chat
+            TODO: Improve video chat
+            TODO: Fix disconnecting from a call
         */
 
         //Check for startup args

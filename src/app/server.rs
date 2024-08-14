@@ -541,7 +541,7 @@ pub fn create_client_voip_manager(
                                         });
 
                                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
-                                        image_header.drain(..=index);
+                                        image_header.drain(index..=index);
                                     }
                                 }
                                 else {

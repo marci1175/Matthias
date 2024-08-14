@@ -291,13 +291,12 @@ impl Application
                                                 egui::load::BytesPoll::Pending { .. } => {
                                                     ui.spinner();
                                                 },
-                                                egui::load::BytesPoll::Ready { size, bytes, .. } => {
+                                                egui::load::BytesPoll::Ready { .. } => {
                                                     ui.allocate_ui(vec2(360., 360.), |ui| {
                                                         ui.add(
                                                             Image::from_uri(format!("bytes://video_steam:{connected_client_uuid}"))
                                                         );
                                                     });
-                                                    ctx.request_repaint();
                                                 },
                                             }
                                         },
@@ -1470,7 +1469,7 @@ async fn recive_server_relay(
                         ctx.include_bytes(uri, image_bytes);
 
                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
-                        image_header.drain(..=index);
+                        image_header.drain(index..=index);
                     }
                 }
                 else {
