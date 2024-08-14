@@ -2325,7 +2325,7 @@ impl Voip
     {
         //Append the uuid to the audio bytes
         bytes.append(uuid.as_bytes().to_vec().as_mut());
-        
+
         self.send_bytes(bytes, encryption_key, UdpMessageType::Voice)
             .await?;
 

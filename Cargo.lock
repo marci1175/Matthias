@@ -3324,6 +3324,7 @@ dependencies = [
  "mlua-sys",
  "mlua_proc_macro",
  "num-traits",
+ "opencv",
  "opus",
  "phf",
  "phf_codegen",
@@ -6751,9 +6752,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "wincam"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a3dbc5edaf7399ca2f7f662d0dbca05fd9207a7a5099277ae5a5037534e1968"
+checksum = "ef4c0755a547d3d826cdfcffa4fef34320448c4571f82b3dbe954c0c513c7567"
 dependencies = [
  "anyhow",
  "image 0.25.2",

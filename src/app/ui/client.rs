@@ -2,14 +2,21 @@ pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
 use dashmap::DashMap;
 use egui::{
-    vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, ImageButton, Layout, Pos2,
-    RichText, Sense, Stroke,
+    load::LoadError, vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image,
+    ImageButton, Layout, Pos2, RichText, Sense, Stroke,
 };
 use image::{ImageBuffer, ImageOutputFormat};
 use indexmap::IndexMap;
+use opencv::{core::{Mat, MatTraitConstManual}, imgproc::{cvt_color_def, COLOR_BGR2RGB, COLOR_RGB2BGR}};
 use rodio::{Decoder, Sink};
 use std::{
-    collections::{HashMap, VecDeque}, fs, io::{BufReader, Cursor}, path::PathBuf, sync::{mpsc, Arc, Mutex}, task::Context, time::Duration
+    collections::{HashMap, VecDeque},
+    fs,
+    io::{BufReader, BufWriter, Cursor},
+    path::PathBuf,
+    sync::{mpsc, Arc, Mutex},
+    task::Context,
+    time::Duration,
 };
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -251,36 +258,60 @@ impl Application
                     //Put all of the connected users nxt to eachother
                     ui.horizontal(|ui| {
                         for connected_client_uuid in connected_clients.iter() {
-                            //Display each user
-                            ui.allocate_ui(vec2(70., ui.available_height()), |ui| {
-                                ui.vertical_centered(|ui| {
-                                    self.display_icon_from_server(
-                                        ctx,
-                                        connected_client_uuid.clone(),
-                                        ui,
-                                    );
-    
+                            ui.horizontal(|ui| {
+                                self.display_icon_from_server(
+                                    ctx,
+                                    connected_client_uuid.clone(),
+                                    ui,
+                                );
+                                ui.vertical(|ui| {
+                                    //Display username
                                     match self
-                                        .client_ui
-                                        .incoming_messages
-                                        .connected_clients_profile
-                                        .get(connected_client_uuid)
+                                    .client_ui
+                                    .incoming_messages
+                                    .connected_clients_profile
+                                    .get(connected_client_uuid)
                                     {
                                         Some(profile) => {
                                             ui.label(RichText::from(&profile.username).weak());
                                         },
                                         None => {
                                             self.request_client(connected_client_uuid.to_string());
-    
+
                                             ui.label(RichText::from(format!(
                                                 "Profile not found for: {connected_client_uuid}"
                                             )));
                                         },
                                     }
-
-                                    ui.add(Image::from_uri(format!("bytes://video_steam:{connected_client_uuid}")));
-
-                                    ctx.request_repaint();
+                                    
+                                    //Display image
+                                    match ctx.try_load_bytes(&format!("bytes://video_steam:{connected_client_uuid}")) {
+                                        Ok(bytes_poll) => {
+                                            match bytes_poll {
+                                                egui::load::BytesPoll::Pending { .. } => {
+                                                    ui.spinner();
+                                                },
+                                                egui::load::BytesPoll::Ready { size, bytes, .. } => {
+                                                    ui.allocate_ui(vec2(360., 360.), |ui| {
+                                                        ui.add(
+                                                            Image::from_uri(format!("bytes://video_steam:{connected_client_uuid}"))
+                                                        );
+                                                    });
+                                                    ctx.request_repaint();
+                                                },
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let LoadError::Loading(inner) = err {
+                                                if inner != "Bytes not found. Did you forget to call Context::include_bytes?" {
+                                                    tracing::error!("{}", inner);
+                                                }
+                                            }
+                                            else {
+                                                tracing::error!("{}", err);
+                                            }
+                                        }
+                                    }
                                 });
                             });
                         }
@@ -785,7 +816,7 @@ impl Application
                                 match connection_pair.send_message(message.clone()).await {
                                     Ok(_) => {},
                                     Err(err) => {
-                                                        tracing::error!("{}", err);
+                                        tracing::error!("{}", err);
 
                                         //Error appeared, after this the tread quits, so there arent an inf amount of threads running
                                         sender.send(None).expect("Failed to signal thread error");
@@ -1174,7 +1205,7 @@ impl Application
                 let voip_clone = voip.clone();
                 let camera_handle = voip_clone.camera_handle.clone();
                 let cancel_token_clone = cancel_token.clone();
-
+                
                 //Create image sender thread
                 tokio::spawn(async move {
                     loop {
@@ -1185,16 +1216,16 @@ impl Application
                                 match camera_handle.as_mut() {
                                     Some(handle) => {
                                         //Create buffer for image
-                                        let mut buffer = std::io::Cursor::new(Vec::new());
+                                        let mut buffer = BufWriter::new(Cursor::new(Vec::new()));
     
                                         //Get camera frame
                                         let (camera_bytes, size) = handle.get_frame().unwrap_or_default();
-                                        
+
                                         //Convert raw image bytes to jpeg
-                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(40)).unwrap();
-                                        
+                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(70)).unwrap();
+
                                         //Send image
-                                        voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner(), &decryption_key_clone).await.unwrap();
+                                        voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner().unwrap().into_inner(), &decryption_key_clone).await.unwrap();
                                     },
                                     None => {
                                         // . . .
@@ -1335,7 +1366,7 @@ async fn recive_server_relay(
     )?;
 
     let message_flag_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
-    
+
     match UdpMessageType::from_number(u32::from_be_bytes(message_flag_bytes.try_into().unwrap())) {
         UdpMessageType::Voice => {
             //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
@@ -1402,8 +1433,10 @@ async fn recive_server_relay(
             //We subtract 164 bytes to only get the image part
             let image = message_bytes[..message_bytes.len() - 64 - 64 - 36].to_vec();
 
-            let uuid =
-                String::from_utf8(message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec()).unwrap();
+            let uuid = String::from_utf8(
+                message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec(),
+            )
+            .unwrap();
 
             //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
             uuid::Uuid::parse_str(&uuid.trim())
@@ -1411,7 +1444,6 @@ async fn recive_server_relay(
 
             if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
-
                     if let Some(byte_pair) = contents.get_mut(&hash) {
                         *byte_pair = Some(image);
                     }
@@ -1424,12 +1456,19 @@ async fn recive_server_relay(
                         let contents_clone = contents.clone();
 
                         //Combine the image part bytes
-                        let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
-                            <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value).unwrap()
-                        }).collect();
-
-                        ctx.include_bytes(format!("bytes://video_steam:{uuid}"), image_bytes);
+                        let image_bytes: Vec<u8> = contents_clone
+                            .iter()
+                            .flat_map(|(_, value)| {
+                                <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value)
+                                    .unwrap()
+                            })
+                            .collect();
                         
+                        let uri = format!("bytes://video_steam:{uuid}");
+
+                        ctx.forget_image(&uri);
+                        ctx.include_bytes(uri, image_bytes);
+
                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
                         image_header.drain(..=index);
                     }

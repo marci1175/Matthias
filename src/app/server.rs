@@ -2,7 +2,7 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::HashMap, env, fs, io::Write, net::SocketAddr, ops::Deref, path::PathBuf,
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf,
     sync::Arc, time::Duration,
 };
 
@@ -430,7 +430,7 @@ pub fn create_client_voip_manager(
 
                                     //Append message to header
                                     message_lenght_header.append(&mut encrypted_packet);
-                                    
+
                                     //Send the header indicating message lenght and send the whole message appended to it
                                     socket.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
                                 }
