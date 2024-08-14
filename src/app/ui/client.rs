@@ -9,12 +9,7 @@ use image::{ImageBuffer, ImageOutputFormat};
 use indexmap::IndexMap;
 use rodio::{Decoder, Sink};
 use std::{
-    collections::{HashMap, VecDeque},
-    fs,
-    io::{BufReader, Cursor},
-    path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
-    time::Duration,
+    collections::{HashMap, VecDeque}, fs, io::{BufReader, Cursor}, path::PathBuf, sync::{mpsc, Arc, Mutex}, task::Context, time::Duration
 };
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -257,30 +252,36 @@ impl Application
                     ui.horizontal(|ui| {
                         for connected_client_uuid in connected_clients.iter() {
                             //Display each user
-                            ui.vertical_centered(|ui| {
-                                self.display_icon_from_server(
-                                    ctx,
-                                    connected_client_uuid.clone(),
-                                    ui,
-                                );
+                            ui.allocate_ui(vec2(70., ui.available_height()), |ui| {
+                                ui.vertical_centered(|ui| {
+                                    self.display_icon_from_server(
+                                        ctx,
+                                        connected_client_uuid.clone(),
+                                        ui,
+                                    );
+    
+                                    match self
+                                        .client_ui
+                                        .incoming_messages
+                                        .connected_clients_profile
+                                        .get(connected_client_uuid)
+                                    {
+                                        Some(profile) => {
+                                            ui.label(RichText::from(&profile.username).weak());
+                                        },
+                                        None => {
+                                            self.request_client(connected_client_uuid.to_string());
+    
+                                            ui.label(RichText::from(format!(
+                                                "Profile not found for: {connected_client_uuid}"
+                                            )));
+                                        },
+                                    }
 
-                                match self
-                                    .client_ui
-                                    .incoming_messages
-                                    .connected_clients_profile
-                                    .get(connected_client_uuid)
-                                {
-                                    Some(profile) => {
-                                        ui.label(RichText::from(&profile.username).weak());
-                                    },
-                                    None => {
-                                        self.request_client(connected_client_uuid.to_string());
+                                    ui.add(Image::from_uri(format!("bytes://video_steam:{connected_client_uuid}")));
 
-                                        ui.label(RichText::from(format!(
-                                            "Profile not found for: {connected_client_uuid}"
-                                        )));
-                                    },
-                                }
+                                    ctx.request_repaint();
+                                });
                             });
                         }
                     });
@@ -615,7 +616,7 @@ impl Application
         self.client_recv(ctx);
 
         //Client voip thread managemant
-        self.client_voip_thread();
+        self.client_voip_thread(ctx);
 
         match self.audio_bytes_rx.try_recv() {
             Ok(bytes) => {
@@ -1151,7 +1152,7 @@ impl Application
     }
 
     ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 35ms of your voice then sends it to the linked voip destination
-    fn client_voip_thread(&mut self)
+    fn client_voip_thread(&mut self, ctx: &egui::Context)
     {
         if let Some(voip) = self.client_ui.voip.clone() {
             self.voip_thread.get_or_insert_with(|| {
@@ -1254,11 +1255,16 @@ impl Application
                     }
                 });
 
+                //Clone ctx
+                let ctx = ctx.clone();
+
                 //Create sink
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
                 let decryption_key = self.client_connection.client_secret.clone();
                 //Reciver thread
                 tokio::spawn(async move {
+                    let ctx_clone = ctx.clone();
+
                     //Create image buffer
                     let image_buffer: MessageBuffer = Arc::new(DashMap::new());
 
@@ -1272,7 +1278,7 @@ impl Application
 
                             //Recive bytes
                             _recived_bytes_count = async {
-                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone()).await {
+                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone(), &ctx_clone).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         tracing::error!("{}", err);
@@ -1297,8 +1303,10 @@ async fn recive_server_relay(
     decryption_key: &[u8],
     //The sink its appending the bytes to
     sink: Arc<Sink>,
-
+    //This serves as the image buffer from the server
     image_buffer: MessageBuffer,
+
+    ctx: &egui::Context,
 ) -> anyhow::Result<()>
 {
     //Create buffer for header, this is the size of the maximum udp packet so no error will appear
@@ -1328,8 +1336,6 @@ async fn recive_server_relay(
 
     let message_flag_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
     
-    // dbg!(&decrypted_bytes[decrypted_bytes.len() - 8 ..]);
-    
     match UdpMessageType::from_number(u32::from_be_bytes(message_flag_bytes.try_into().unwrap())) {
         UdpMessageType::Voice => {
             //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
@@ -1338,8 +1344,6 @@ async fn recive_server_relay(
                     .drain(decrypted_bytes.len() - 36..)
                     .collect(),
             )?;
-
-            dbg!(&uuid);
 
             //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
             uuid::Uuid::parse_str(&uuid)
@@ -1407,7 +1411,6 @@ async fn recive_server_relay(
 
             if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
-                    let contents_clone = contents.clone();
 
                     if let Some(byte_pair) = contents.get_mut(&hash) {
                         *byte_pair = Some(image);
@@ -1418,12 +1421,14 @@ async fn recive_server_relay(
 
                     //If all the parts of the image header had arrived send the image to all the clients
                     if contents.iter().all(|(_, value)| value.is_some()) {
+                        let contents_clone = contents.clone();
+
                         //Combine the image part bytes
                         let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
                             <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value).unwrap()
                         }).collect();
 
-
+                        ctx.include_bytes(format!("bytes://video_steam:{uuid}"), image_bytes);
                         
                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
                         image_header.drain(..=index);

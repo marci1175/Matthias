@@ -478,11 +478,10 @@ pub fn create_client_voip_manager(
                             let image = message_bytes[..message_bytes.len() - 64 - 64 - 36].to_vec();
 
                             //THIS IS UNUSED AND SHOULD BE REMOVED
-                            let uuid_bytes = message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec();
+                            let _uuid_bytes = message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec();
 
                             if let Some(mut image_header) = message_buffer.get_mut(&uuid) {
                                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
-                                    let contents_clone = contents.clone();
 
                                     if let Some(byte_pair) = contents.get_mut(&hash) {
                                         *byte_pair = Some(image);
@@ -493,6 +492,7 @@ pub fn create_client_voip_manager(
 
                                     //If all the parts of the image header had arrived send the image to all the clients
                                     if contents.iter().all(|(_, value)| value.is_some()) {
+                                        let contents_clone = contents.clone();
                                         tokio::spawn(async move {
                                             for connected_client in voip_connected_clients.iter() {
                                                 let uuid = connected_client.key();
