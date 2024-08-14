@@ -1273,8 +1273,14 @@ impl Application
                                     //Return wav bytes
                                     playbackable_audio
                                 };
-                        
-                                voip.send_audio(uuid.clone(), playbackable_audio, &decryption_key).await.unwrap();
+                                
+                                //Create audio chunks
+                                let audio_chunks = playbackable_audio.chunks(30000);
+
+                                //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
+                                for chunk in audio_chunks {
+                                    voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
+                                }
                             },
                         
                             _ = cancel_token.cancelled() => {
@@ -1462,11 +1468,18 @@ async fn recive_server_relay(
                                     .unwrap()
                             })
                             .collect();
-                        
+                            
+                        //Define uri
                         let uri = format!("bytes://video_steam:{uuid}");
-
+                        
+                        //Forget image on that URI
                         ctx.forget_image(&uri);
+
+                        //Pair URI with bytes
                         ctx.include_bytes(uri, image_bytes);
+                        
+                        //Request repaint
+                        ctx.request_repaint();
 
                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
                         image_header.drain(index..=index);
