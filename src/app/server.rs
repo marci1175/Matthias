@@ -2,8 +2,8 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf,
-    sync::Arc, time::Duration,
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{bail, Error, Result};

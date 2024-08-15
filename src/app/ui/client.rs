@@ -7,14 +7,17 @@ use egui::{
 };
 use image::{ImageBuffer, ImageOutputFormat};
 use indexmap::IndexMap;
-use opencv::{core::{Mat, MatTraitConstManual}, imgproc::{cvt_color_def, COLOR_BGR2RGB, COLOR_RGB2BGR}};
+use opencv::{
+    core::{Mat, MatTraitConstManual},
+    imgproc::{cvt_color_def, COLOR_BGR2RGB, COLOR_RGB2BGR},
+};
 use rodio::{Decoder, Sink};
 use std::{
     collections::{HashMap, VecDeque},
     fs,
     io::{BufReader, BufWriter, Cursor},
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{atomic::Ordering::Relaxed, mpsc, Arc, Mutex},
     task::Context,
     time::Duration,
 };
@@ -206,9 +209,20 @@ impl Application
                         //Settings for the client connected to an ongoing call
                         ui.allocate_ui(vec2(ui.available_width(), 30.), |ui| {
                             ui.horizontal_centered(|ui| {
-                                ui.add(ImageButton::new(egui::include_image!(
-                                    "../../../icons/record.png"
-                                )));
+                                if voip.enable_microphone.load(Relaxed) {
+                                    if ui.add(ImageButton::new(egui::include_image!(
+                                        "../../../icons/record_off.png"
+                                    ))).clicked() {
+                                        voip.enable_microphone.store(false, Relaxed);
+                                    }
+                                }
+                                else {
+                                    if ui.add(ImageButton::new(egui::include_image!(
+                                        "../../../icons/record.png"
+                                    ))).clicked() {
+                                        voip.enable_microphone.store(true, Relaxed);
+                                    }
+                                }
 
                                 //If there isnt a camera added
                                 if !voip.camera_handle_is_open {
@@ -1240,6 +1254,8 @@ impl Application
                     }
                 });
 
+                let enable_microphone = voip.enable_microphone.clone();
+
                 //Sender thread
                 tokio::spawn(async move {
                     //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
@@ -1249,7 +1265,7 @@ impl Application
                     voip.socket.connect(destination).await.unwrap();
 
                     //Start audio recorder
-                    let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone()).unwrap();
+                    let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
 
                     //We can just send it becasue we have already set the default destination address
                     loop {
@@ -1257,30 +1273,33 @@ impl Application
                             //Wait until we should send the buffer
                             //Record 35ms of audio, send it to the server
                             _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS as u64)) => {
-                                //We create this scope to tell the compiler the recording handle wont be sent across any awaits
-                                let playbackable_audio: Vec<u8> = {
-                                    //Lock handle
-                                    let mut recording_handle = recording_handle.lock().unwrap();
-                        
-                                    //Create wav bytes
-                                    let playbackable_audio: Vec<u8> = create_wav_file(
-                                        recording_handle.clone().into()
-                                    );
-                        
-                                    //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
-                                    recording_handle.clear();
-                        
-                                    //Return wav bytes
-                                    playbackable_audio
-                                };
-                                
-                                //Create audio chunks
-                                let audio_chunks = playbackable_audio.chunks(30000);
-
-                                //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
-                                for chunk in audio_chunks {
-                                    voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
-                                }
+                                    //We create this scope to tell the compiler the recording handle wont be sent across any awaits
+                                    let playbackable_audio: Vec<u8> = {
+                                        //Lock handle
+                                        let mut recording_handle = recording_handle.lock().unwrap();
+                            
+                                        //Create wav bytes
+                                        let playbackable_audio: Vec<u8> = create_wav_file(
+                                            recording_handle.clone().into()
+                                        );
+                            
+                                        //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
+                                        recording_handle.clear();
+                            
+                                        //Return wav bytes
+                                        playbackable_audio
+                                    };
+                                    
+                                    //Create audio chunks
+                                    let audio_chunks = playbackable_audio.chunks(30000);
+                                    
+                                    //Check if the voice recorder has returned some, if yes that means we are allowed to record
+                                    if enable_microphone.load(Relaxed) {
+                                        //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
+                                        for chunk in audio_chunks {
+                                            voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
+                                        }
+                                    }
                             },
                         
                             _ = cancel_token.cancelled() => {
@@ -1468,16 +1487,16 @@ async fn recive_server_relay(
                                     .unwrap()
                             })
                             .collect();
-                            
+
                         //Define uri
                         let uri = format!("bytes://video_steam:{uuid}");
-                        
+
                         //Forget image on that URI
                         ctx.forget_image(&uri);
 
                         //Pair URI with bytes
                         ctx.include_bytes(uri, image_bytes);
-                        
+
                         //Request repaint
                         ctx.request_repaint();
 

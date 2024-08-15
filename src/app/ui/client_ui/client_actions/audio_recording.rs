@@ -10,6 +10,7 @@ use std::{
     f32,
     io::{BufWriter, Cursor},
     sync::{
+        atomic::AtomicBool,
         mpsc::{self, Receiver},
         Arc, Mutex,
     },
@@ -106,6 +107,7 @@ pub fn record_audio_with_interrupt(
     interrupt: Receiver<()>,
     amplification_precentage: f32,
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
+    should_record: Arc<AtomicBool>,
 ) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>>
 {
     let wav_buffer_clone = buffer_handle.clone();

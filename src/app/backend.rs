@@ -30,13 +30,13 @@ use std::{
     collections::HashMap,
     env,
     fmt::{Debug, Display},
-    fs, io,
-    io::{Read, Seek, SeekFrom, Write},
+    fs,
+    io::{self, Read, Seek, SeekFrom, Write},
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
+        atomic::AtomicBool,
+        mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
     time::Duration,
@@ -2237,6 +2237,9 @@ pub struct Voip
 
     /// Signals whether there is a camera handle open
     pub camera_handle_is_open: bool,
+
+    /// Whether the microphone should record audio
+    pub enable_microphone: Arc<AtomicBool>,
 }
 
 impl Voip
@@ -2253,6 +2256,7 @@ impl Voip
             socket: Arc::new(socket_handle),
             camera_handle: Arc::new(tokio::sync::Mutex::new(None)),
             camera_handle_is_open: false,
+            enable_microphone: Arc::new(AtomicBool::new(true)),
         })
     }
 
@@ -2311,6 +2315,7 @@ impl Voip
                 Some(Webcam::new_def_auto_detect()?),
             )),
             camera_handle_is_open: true,
+            enable_microphone: Arc::new(AtomicBool::new(true)),
         })
     }
 
