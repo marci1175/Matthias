@@ -110,7 +110,6 @@ impl Application
                 let voip_clone = voip.clone();
                 let camera_handle = voip_clone.camera_handle.clone();
                 let cancel_token_clone = self.webcam_recording_shutdown.clone();
-                
                 //Create image sender thread
                 tokio::spawn(async move {
                     loop {
@@ -122,7 +121,6 @@ impl Application
                                     Some(handle) => {
                                         //Create buffer for image
                                         let mut buffer = BufWriter::new(Cursor::new(Vec::new()));
-    
                                         //Get camera frame
                                         let (camera_bytes, size) = handle.get_frame().unwrap_or_default();
 
@@ -137,7 +135,6 @@ impl Application
                                     },
                                 }
                             }
-    
                             _ = cancel_token_clone.cancelled() => {
                                 //Exit thread
                                 break;
@@ -169,28 +166,22 @@ impl Application
                                     let playbackable_audio: Vec<u8> = {
                                         //Lock handle
                                         let mut recording_handle = recording_handle.lock().unwrap();
-                            
                                         //Create wav bytes
                                         let playbackable_audio: Vec<u8> = create_wav_file(
                                             recording_handle.clone().into()
                                         );
-                            
                                         //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
                                         recording_handle.clear();
-                            
                                         //Return wav bytes
                                         playbackable_audio
                                     };
-                                    
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
-                                    
                                     //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
                                     for chunk in audio_chunks {
                                         voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
                                     }
                             },
-                        
                             _ = cancel_token.cancelled() => {
                                 //Exit thread
                                 break;
@@ -382,7 +373,8 @@ async fn recive_server_relay(
                 else {
                     tracing::error!("Image header not found: {identificator}");
                 }
-            }else {
+            }
+            else {
                 tracing::error!("User not found in the image header list: {uuid}");
             }
         },

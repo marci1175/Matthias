@@ -285,7 +285,6 @@ impl Application
                                             )));
                                         },
                                     }
-                                    
                                     //Display image
                                     match ctx.try_load_bytes(&format!("bytes://video_steam:{connected_client_uuid}")) {
                                         Ok(bytes_poll) => {

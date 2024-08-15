@@ -25,10 +25,14 @@ use super::backend::{
 };
 
 use crate::app::backend::{
-    decrypt_aes256_bytes, encrypt_aes256_bytes, get_image_header, ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessage, ClientMessageType::{
+    decrypt_aes256_bytes, encrypt_aes256_bytes, get_image_header,
+    ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
+    ClientMessage,
+    ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    }, ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType
+    },
+    ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
 };
 use tokio::{
     io::AsyncWrite,

@@ -3428,7 +3428,11 @@ impl ImageHeader
 
 /// This function fetches the image header from the decrypted bytes.
 /// It inserts the image header into the ```ImageBuffer``` provided in the arguments.
-pub fn get_image_header(decrypted_bytes: &Vec<u8>, image_buffer: &Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>) -> anyhow::Result<()> {
+pub fn get_image_header(
+    decrypted_bytes: &Vec<u8>,
+    image_buffer: &Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>,
+) -> anyhow::Result<()>
+{
     //Get actual message, we ignore the message type
     let message_bytes = decrypted_bytes.to_vec();
 
@@ -3437,14 +3441,22 @@ pub fn get_image_header(decrypted_bytes: &Vec<u8>, image_buffer: &Arc<DashMap<St
 
     //```Deserialize``` string into ```ImageHeader``` struct
     let image_header = serde_json::from_str::<ImageHeader>(&message_as_string)?;
-           
+
     //Try getting the uuid's ImageHeaders
     //Insert IndexMap into the ```image_buffer```
     if let Some(mut image_headers) = dbg!(image_buffer.get_mut(&image_header.uuid)) {
-        image_headers.insert(image_header.identificator.clone(), HashMap::from_iter(image_header.image_parts_hash.iter().map(|hash| (hash.clone(), None))));
+        image_headers.insert(
+            image_header.identificator.clone(),
+            HashMap::from_iter(
+                image_header
+                    .image_parts_hash
+                    .iter()
+                    .map(|hash| (hash.clone(), None)),
+            ),
+        );
     }
     else {
-         //Create image part map which will later be used for storing parts of the Image
+        //Create image part map which will later be used for storing parts of the Image
         let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(
             image_header
                 .image_parts_hash
@@ -3457,7 +3469,7 @@ pub fn get_image_header(decrypted_bytes: &Vec<u8>, image_buffer: &Arc<DashMap<St
 
         //Insert entry into the ```IndexMap```
         header_index_map.insert(image_header.identificator, image_part_map);
-    
+
         //If the ImageHeader list is not found, insert the ```IndexMap```(Image header list) into the ```image_buffer```
         image_buffer.insert(image_header.uuid.clone(), header_index_map);
     }
