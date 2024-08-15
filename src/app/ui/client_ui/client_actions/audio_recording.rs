@@ -123,11 +123,18 @@ pub fn record_audio_with_interrupt(
         let stream = device.build_input_stream(
             &config.into(),
             move |data, _: &_| {
-                write_input_data_to_buffer_with_set_len::<f32>(
-                    data,
-                    buffer_handle.clone(),
-                    amplification_precentage / 100.,
-                )
+                {
+                    //If the function returned false
+                    if !write_input_data_to_buffer_with_set_len::<f32>(
+                        data,
+                        buffer_handle.clone(),
+                        amplification_precentage / 100.,
+                        should_record.clone(),
+                    ) {
+                        //Quit the thread, stop recording
+                        return;
+                    }
+                }
             },
             err_fn,
             None,
@@ -288,14 +295,23 @@ fn write_input_data_to_buffer_with_set_len<T>(
     input: &[T],
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
     amplification_multiplier: f32,
-) where
+    should_record: Arc<AtomicBool>,
+) -> bool
+where
     T: num_traits::cast::ToPrimitive + Sample + std::fmt::Debug,
 {
     let mut buffer_handle = buffer_handle.lock().unwrap();
+
+    //If we arent supposed to be recording return false
+    if !should_record.load(std::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
 
     for sample in input.iter() {
         let sample_as_f32 = sample.to_f32().unwrap() * amplification_multiplier;
 
         buffer_handle.push_back(sample_as_f32);
     }
+
+    true
 }

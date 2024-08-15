@@ -25,13 +25,10 @@ use super::backend::{
 };
 
 use crate::app::backend::{
-    decrypt_aes256_bytes, encrypt_aes256_bytes, ClientFileRequestType as ClientRequestTypeStruct,
-    ClientFileUpload as ClientFileUploadStruct, ClientMessage,
-    ClientMessageType::{
+    decrypt_aes256_bytes, encrypt_aes256_bytes, get_image_header, ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct, ClientMessage, ClientMessageType::{
         FileRequestType, FileUpload, MessageEdit, NormalMessage, Reaction as ClientReaction,
         SyncMessage, VoipConnection,
-    },
-    ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
+    }, ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType
 };
 use tokio::{
     io::AsyncWrite,
@@ -372,7 +369,7 @@ pub fn create_client_voip_manager(
             //Clone so we can move the value
             let voip_connected_clients = voip.connected_clients.clone();
 
-            let message_buffer: Arc<
+            let image_buffer: Arc<
                 DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>,
             > = message_buffer.clone();
 
@@ -437,26 +434,7 @@ pub fn create_client_voip_manager(
                             });
                         }
                         UdpMessageType::ImageHeader => {
-                            //Get actual message, we ignore the message type
-                            let message_bytes = decrypted_bytes.to_vec();
-
-                            //Get string from bytes
-                            let message_as_string = String::from_utf8(message_bytes).unwrap();
-
-                            //```Deserialize``` string into ```ImageHeader``` struct
-                            let image_header = serde_json::from_str::<ImageHeader>(&message_as_string).unwrap();
-
-                            //Create image part map which will later be used for storing parts of the Image
-                            let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(image_header.image_parts_hash.iter().map(|hash| (hash.clone(), None)));
-
-                            //Create ```IndexMap```
-                            let mut header_index_map = IndexMap::new();
-
-                            //Insert entry into the ```IndexMap```
-                            header_index_map.insert(image_header.identificator, image_part_map);
-
-                            //Insert IndexMap into the ```message_buffer```
-                            message_buffer.insert(uuid.clone(), header_index_map);
+                            get_image_header(&decrypted_bytes, &image_buffer).unwrap();
                         }
                         UdpMessageType::Image => {
                             // [. . . . . . . . . . . len - 164][len - 164 . . . . . len - 100][len - 100. . . . . len - 64][len - 64 . . . .]
@@ -480,7 +458,7 @@ pub fn create_client_voip_manager(
                             //THIS IS UNUSED AND SHOULD BE REMOVED
                             let _uuid_bytes = message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec();
 
-                            if let Some(mut image_header) = message_buffer.get_mut(&uuid) {
+                            if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
                                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
 
                                     if let Some(byte_pair) = contents.get_mut(&hash) {

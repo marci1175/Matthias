@@ -16,9 +16,9 @@ use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_audio, write_file,
-    ClientMessage, ClientMessageType, ConnectionState, MessageReaction,
-    PlaybackCursor, Reaction, ServerReplyType, ServerSync, ServerVoipReply, Voip,
+    decrypt_aes256, display_error_message, write_audio, write_file, ClientMessage,
+    ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
+    ServerSync, ServerVoipReply, Voip,
 };
 
 use crate::app::{
@@ -238,7 +238,10 @@ impl Application
                                         .clicked()
                                     {
                                         //Drop camera handle
-                                        voip.remove_camera_handle();
+                                        voip.remove_camera_handle(&self.client_connection.client_secret, self.opened_user_information.uuid.clone());
+
+                                        //Cancel webcam recording
+                                        self.webcam_recording_shutdown.cancel();
                                     }
                                 }
                             });

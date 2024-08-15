@@ -118,6 +118,10 @@ pub struct Application
     #[serde(skip)]
     pub voip_shutdown_token: CancellationToken,
 
+    ///Webcam recorder shutdown token
+    #[serde(skip)]
+    pub webcam_recording_shutdown: CancellationToken,
+
     ///What is the server's password set to
     pub server_password: String,
 
@@ -235,6 +239,7 @@ impl Default for Application
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
+            webcam_recording_shutdown: CancellationToken::new(),
             startup_args: None,
             record_audio_interrupter: mpsc::channel::<()>().0,
             toasts: Arc::new(Mutex::new(Toasts::new())),
@@ -2275,14 +2280,26 @@ impl Voip
     }
 
     /// This function removes the ```camera_handle``` in this ```Voip``` instance.
+    /// Before removing the camera handle this function will send an empty image, indicating camera image shutdown.
     /// This function uses an async thread to set the value.
-    pub fn remove_camera_handle(&mut self)
+    pub fn remove_camera_handle(&mut self, encryption_key: &[u8], uuid: String)
     {
         let camera_handle = self.camera_handle.clone();
+
+        let voip = self.clone();
+        let encryption_key = encryption_key.to_vec();
 
         //Create camera handle thread
         //This thread modifies the camera_handle directly
         tokio::spawn(async move {
+            //Send an empty image indicating video shutdown
+            match Voip::send_image(&voip, uuid, &vec![0], &encryption_key).await {
+                Ok(_) => (),
+                Err(err) => {
+                    tracing::error!("{err}");
+                },
+            }
+
             let mut camera_handle = camera_handle.lock().await;
 
             *camera_handle = None;
@@ -2459,7 +2476,7 @@ impl Voip
 pub struct AudioPlayback
 {
     ///Output stream
-    pub stream: Arc<OutputStream>,
+    pub _stream: Arc<OutputStream>,
     ///Output stream handle
     pub stream_handle: OutputStreamHandle,
     ///Audio sinks, these are the audios played
@@ -2474,7 +2491,7 @@ impl Default for AudioPlayback
     {
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         Self {
-            stream: Arc::new(stream),
+            _stream: Arc::new(stream),
             stream_handle,
             sink_list: Vec::new(),
             settings_list: Vec::new(),
@@ -3407,4 +3424,43 @@ impl ImageHeader
             identificator,
         }
     }
+}
+
+/// This function fetches the image header from the decrypted bytes.
+/// It inserts the image header into the ```ImageBuffer``` provided in the arguments.
+pub fn get_image_header(decrypted_bytes: &Vec<u8>, image_buffer: &Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>) -> anyhow::Result<()> {
+    //Get actual message, we ignore the message type
+    let message_bytes = decrypted_bytes.to_vec();
+
+    //Get string from bytes
+    let message_as_string = String::from_utf8(message_bytes)?;
+
+    //```Deserialize``` string into ```ImageHeader``` struct
+    let image_header = serde_json::from_str::<ImageHeader>(&message_as_string)?;
+           
+    //Try getting the uuid's ImageHeaders
+    //Insert IndexMap into the ```image_buffer```
+    if let Some(mut image_headers) = dbg!(image_buffer.get_mut(&image_header.uuid)) {
+        image_headers.insert(image_header.identificator.clone(), HashMap::from_iter(image_header.image_parts_hash.iter().map(|hash| (hash.clone(), None))));
+    }
+    else {
+         //Create image part map which will later be used for storing parts of the Image
+        let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(
+            image_header
+                .image_parts_hash
+                .iter()
+                .map(|hash| (hash.clone(), None)),
+        );
+
+        //Create ```IndexMap```
+        let mut header_index_map = IndexMap::new();
+
+        //Insert entry into the ```IndexMap```
+        header_index_map.insert(image_header.identificator, image_part_map);
+    
+        //If the ImageHeader list is not found, insert the ```IndexMap```(Image header list) into the ```image_buffer```
+        image_buffer.insert(image_header.uuid.clone(), header_index_map);
+    }
+
+    Ok(())
 }

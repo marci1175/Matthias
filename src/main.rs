@@ -83,7 +83,7 @@ async fn main() -> eframe::Result<()>
                 visuals: Visuals::dark(),
                 ..Default::default()
             });
-            
+
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 

@@ -4,7 +4,7 @@ use tokio::{
     sync::Mutex,
 };
 
-use super::backend::{fetch_incoming_message_lenght, Application, ClientMessage};
+use super::backend::{fetch_incoming_message_lenght, get_image_header, Application, ClientMessage};
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
 use dashmap::DashMap;
@@ -14,18 +14,16 @@ use rodio::Sink;
 use std::{
     collections::{HashMap, VecDeque},
     io::{BufReader, BufWriter, Cursor},
-    sync::{atomic::Ordering::Relaxed, mpsc, Arc},
+    sync::{mpsc, Arc},
     time::Duration,
 };
 use tokio::select;
 
-use crate::app::backend::{
-    decrypt_aes256_bytes, ImageHeader, MessageBuffer, UdpMessageType,
-};
+use crate::app::backend::{decrypt_aes256_bytes, ImageHeader, MessageBuffer, UdpMessageType};
 
 use crate::app::ui::client_ui::client_actions::audio_recording::{
-        create_wav_file, record_audio_with_interrupt,
-    };
+    create_wav_file, record_audio_with_interrupt,
+};
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
@@ -111,7 +109,7 @@ impl Application
                 let decryption_key_clone = decryption_key.clone();
                 let voip_clone = voip.clone();
                 let camera_handle = voip_clone.camera_handle.clone();
-                let cancel_token_clone = cancel_token.clone();
+                let cancel_token_clone = self.webcam_recording_shutdown.clone();
                 
                 //Create image sender thread
                 tokio::spawn(async move {
@@ -187,12 +185,9 @@ impl Application
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
                                     
-                                    //Check if the voice recorder has returned some, if yes that means we are allowed to record
-                                    if enable_microphone.load(Relaxed) {
-                                        //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
-                                        for chunk in audio_chunks {
-                                            voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
-                                        }
+                                    //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
+                                    for chunk in audio_chunks {
+                                        voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
                                     }
                             },
                         
@@ -304,31 +299,7 @@ async fn recive_server_relay(
             )))?);
         },
         UdpMessageType::ImageHeader => {
-            //Get actual message, we ignore the message type
-            let message_bytes = decrypted_bytes.to_vec();
-
-            //Get string from bytes
-            let message_as_string = String::from_utf8(message_bytes).unwrap();
-
-            //```Deserialize``` string into ```ImageHeader``` struct
-            let image_header = serde_json::from_str::<ImageHeader>(&message_as_string).unwrap();
-
-            //Create image part map which will later be used for storing parts of the Image
-            let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(
-                image_header
-                    .image_parts_hash
-                    .iter()
-                    .map(|hash| (hash.clone(), None)),
-            );
-
-            //Create ```IndexMap```
-            let mut header_index_map = IndexMap::new();
-
-            //Insert entry into the ```IndexMap```
-            header_index_map.insert(image_header.identificator, image_part_map);
-
-            //Insert IndexMap into the ```image_buffer```
-            image_buffer.insert(image_header.uuid.clone(), header_index_map);
+            get_image_header(&decrypted_bytes, &image_buffer).unwrap();
         },
         UdpMessageType::Image => {
             // [. . . . . . . . . . . len - 164][len - 164 . . . . . len - 100][len - 100. . . . . len - 64][len - 64 . . . .]
@@ -385,11 +356,21 @@ async fn recive_server_relay(
                         //Define uri
                         let uri = format!("bytes://video_steam:{uuid}");
 
-                        //Forget image on that URI
-                        ctx.forget_image(&uri);
+                        //If the image bytes are empty that means the video stream has shut down
+                        if image_bytes == vec![0] {
+                            //Forget image on that URI
+                            ctx.forget_image(&uri);
 
-                        //Pair URI with bytes
-                        ctx.include_bytes(uri, image_bytes);
+                            image_buffer.remove(&uuid);
+                        }
+                        //Else save the image
+                        else {
+                            //Forget image on that URI
+                            ctx.forget_image(&uri);
+
+                            //Pair URI with bytes
+                            ctx.include_bytes(uri, image_bytes);
+                        }
 
                         //Request repaint
                         ctx.request_repaint();
@@ -401,8 +382,7 @@ async fn recive_server_relay(
                 else {
                     tracing::error!("Image header not found: {identificator}");
                 }
-            }
-            else {
+            }else {
                 tracing::error!("User not found in the image header list: {uuid}");
             }
         },
