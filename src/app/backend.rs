@@ -671,11 +671,6 @@ pub struct Client
     pub extension: Extension,
 
     #[serde(skip)]
-    /// Shows which tabs is selected in the emoji tab
-    /// This is enum is included with the generated emoji image header
-    pub emoji_tab_state: EmojiTypesDiscriminants,
-
-    #[serde(skip)]
     ///Fields shared with the client
     pub shared_fields: Arc<Mutex<SharedFields>>,
 
@@ -837,7 +832,6 @@ impl Default for Client
         Self {
             extension: Extension::default(),
             emojis_display_rect: None,
-            emoji_tab_state: EmojiTypesDiscriminants::Blobs,
             shared_fields: Default::default(),
             text_edit_cursor_desired_index: None,
             text_edit_cursor_index: 0,
@@ -2156,7 +2150,7 @@ pub struct ServerVoip
         Arc<DashMap<SocketAddr, (Arc<tokio::sync::mpsc::Sender<Vec<u8>>>, CancellationToken)>>,
 
     /// This field contains the amount of time the call has been established for
-    pub established_since: chrono::DateTime<Utc>,
+    pub _established_since: chrono::DateTime<Utc>,
 
     /// The socket the server is listening on for incoming messages
     /// The only reason this is an option so we can implement ```serde::Deserialize```
@@ -2299,7 +2293,7 @@ impl Voip
 
     /// Starts a video call when this function is called.
     /// It sets the ```Voip``` instance and creates a call
-    pub async fn new_video_call() -> anyhow::Result<Self>
+    pub async fn _new_video_call() -> anyhow::Result<Self>
     {
         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
 
@@ -3020,7 +3014,7 @@ impl Message
                                     ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
                                     eprintln!("The called emoji was not found in the emoji header: {}", original_emoji_name);
                                 }
-                                ui.add(Image::from_uri(&format!("bytes://{}", original_emoji_name)));
+                                ui.add(Image::from_uri(format!("bytes://{}", original_emoji_name)));
                             }
                         },
                         Err(err) => {

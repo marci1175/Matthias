@@ -661,7 +661,7 @@ impl Application
                                                                 ui.label(RichText::from("The called emoji was not found in the emoji header").color(Color32::RED));
                                                                 eprintln!("The called emoji was not found in the emoji header: {}", emoji_name);
                                                             }
-                                                            ui.add(Image::from_uri(&format!("bytes://{}", emoji_name)));
+                                                            ui.add(Image::from_uri(format!("bytes://{}", emoji_name)));
                                                         }
                                                     },
                                                     Err(err) => {

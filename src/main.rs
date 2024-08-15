@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 #![warn(clippy::all, rust_2018_idioms)]
 #![feature(path_file_prefix)]
-#![feature(cursor_remaining)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod app;
 
@@ -84,7 +83,7 @@ async fn main() -> eframe::Result<()>
                 visuals: Visuals::dark(),
                 ..Default::default()
             });
-
+            
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 

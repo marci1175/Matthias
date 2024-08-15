@@ -501,7 +501,7 @@ pub fn create_client_voip_manager(
 
                                                 //Combine the image part bytes
                                                 let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
-                                                    <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&value).unwrap()
+                                                    <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(value).unwrap()
                                                 }).collect();
 
                                                 //Create image parts by splitting it every 60000 bytes
@@ -529,13 +529,13 @@ pub fn create_client_voip_manager(
                                                     &key,
                                                     UdpMessageType::ImageHeader,
                                                     socket.clone(),
-                                                    socket_addr.clone(),
+                                                    *socket_addr,
                                                 )
                                                 .await.unwrap();
 
                                                 //Send image parts
                                                 //We have already sent the image header
-                                                send_image_parts(image_parts_tuple, uuid.clone(), &key, identificator, socket.clone(), socket_addr.clone())
+                                                send_image_parts(image_parts_tuple, uuid.clone(), &key, identificator, socket.clone(), *socket_addr)
                                                     .await.unwrap();
                                             }
                                         });
@@ -1195,7 +1195,7 @@ impl MessageService
         //Return ServerVoip
         Ok(ServerVoip {
             connected_clients: Arc::new(DashMap::new()),
-            established_since: Utc::now(),
+            _established_since: Utc::now(),
             socket: Arc::new(socket),
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
