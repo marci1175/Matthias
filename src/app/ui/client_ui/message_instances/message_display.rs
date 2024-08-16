@@ -362,19 +362,19 @@ impl Application
                     }
                 }));
             },
-            crate::app::backend::ServerMessageType::VoipConnection(connection_type) => {
-                match connection_type {
-                    crate::app::backend::ServerVoipEvent::Connected(client_uuid) => {
+            crate::app::backend::ServerMessageType::VoipEvent(server_voip_event) => {
+                match server_voip_event.event {
+                    crate::app::backend::VoipEvent::Connected => {
                         let profile = match self
                             .client_ui
                             .incoming_messages
                             .connected_clients_profile
-                            .get(client_uuid.as_str())
+                            .get(server_voip_event.uuid.as_str())
                         {
                             Some(profile) => profile,
                             //If we dont have the profile we ask for it then return to avoid panicing
                             None => {
-                                self.request_client(client_uuid.to_string());
+                                self.request_client(server_voip_event.uuid.to_string());
 
                                 return;
                             },
@@ -390,17 +390,17 @@ impl Application
                             );
                         });
                     },
-                    crate::app::backend::ServerVoipEvent::Disconnected(client_uuid) => {
+                    crate::app::backend::VoipEvent::Disconnected => {
                         let profile = match self
                             .client_ui
                             .incoming_messages
                             .connected_clients_profile
-                            .get(client_uuid.as_str())
+                            .get(server_voip_event.uuid.as_str())
                         {
                             Some(profile) => profile,
                             //If we dont have the profile we ask for it then return to avoid panicing
                             None => {
-                                self.request_client(client_uuid.to_string());
+                                self.request_client(server_voip_event.uuid.to_string());
 
                                 return;
                             },
@@ -416,6 +416,9 @@ impl Application
                             );
                         });
                     },
+                    
+                    crate::app::backend::VoipEvent::ImageConnected => unreachable!(),
+                    crate::app::backend::VoipEvent::ImageDisconnected => unreachable!(),
                 };
             },
             crate::app::backend::ServerMessageType::Edit(_)

@@ -175,8 +175,10 @@ impl Application
         {
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "voip_connected_users")
                 .show(ctx, |ui| {
+                    let uuid = self.opened_user_information.uuid.clone();
+
                     //We should only display the settings menu if we are connected to a Voip call
-                    if let Some(voip) = &mut self.client_ui.voip {
+                    if let Some(voip) = self.client_ui.voip.clone() {
                         //Settings for the client connected to an ongoing call
                         ui.allocate_ui(vec2(ui.available_width(), 30.), |ui| {
                             ui.horizontal_centered(|ui| {
@@ -194,7 +196,7 @@ impl Application
                                 }
 
                                 //If there isnt a camera added
-                                if !voip.camera_handle_is_open {
+                                if !voip.camera_handle_is_open.load(Relaxed) {
                                     //Display camera on button
                                     if ui
                                         .add(ImageButton::new(egui::include_image!(
@@ -217,6 +219,11 @@ impl Application
                                                 display_error_message(err, self.toasts.clone());
                                             },
                                         };
+
+                                        voip.camera_handle_is_open.store(true, Relaxed);
+
+                                        //Send image connection message
+                                        self.send_msg(ClientMessage::construct_voip_event(uuid.clone(), crate::app::backend::ClientVoipRequest::ImageConnected));
                                     }
                                 }
                                 else {
@@ -230,8 +237,13 @@ impl Application
                                         //Drop camera handle
                                         voip.remove_camera_handle(&self.client_connection.client_secret, self.opened_user_information.uuid.clone());
 
+                                        voip.camera_handle_is_open.store(false, Relaxed);
+
                                         //Cancel webcam recording
                                         self.voip_video_shutdown_token.cancel();
+                                        
+                                        //Send image disconnection message
+                                        self.send_msg(ClientMessage::construct_voip_event(uuid.clone(), crate::app::backend::ClientVoipRequest::ImageDisconnected));
                                     }
                                 }
                             });
@@ -275,8 +287,9 @@ impl Application
                                             )));
                                         },
                                     }
+
                                     //Display image
-                                    match ctx.try_load_bytes(&format!("bytes://video_steam:{connected_client_uuid}")) {
+                                    match ctx.try_load_bytes(&format!("bytes://video_stream:{connected_client_uuid}")) {
                                         Ok(bytes_poll) => {
                                             match bytes_poll {
                                                 egui::load::BytesPoll::Pending { .. } => {
@@ -285,7 +298,7 @@ impl Application
                                                 egui::load::BytesPoll::Ready { .. } => {
                                                     ui.allocate_ui(vec2(360., 360.), |ui| {
                                                         ui.add(
-                                                            Image::from_uri(format!("bytes://video_steam:{connected_client_uuid}"))
+                                                            Image::from_uri(format!("bytes://video_stream:{connected_client_uuid}"))
                                                         );
                                                     });
                                                 },

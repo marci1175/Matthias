@@ -149,7 +149,7 @@ impl Application
                                             ServerMessageType::Edit(_) => unreachable!(),
                                             ServerMessageType::Reaction(_) => unreachable!(),
                                             ServerMessageType::Sync(_) => unreachable!(),
-                                            ServerMessageType::VoipConnection(_) => unreachable!(),
+                                            ServerMessageType::VoipEvent(_) => unreachable!(),
                                             ServerMessageType::VoipState(_) => unreachable!(),
                                         }
                                     ))
