@@ -1,3 +1,4 @@
 [toolchain]
 version = "nightly"
 components = [ "rustfmt", "clippy", "rustc", "rust-docs", "rust-analyzer" ]
+targets = [ "x86_64-linux-android" ]
