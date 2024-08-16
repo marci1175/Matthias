@@ -120,7 +120,7 @@ pub struct Application
 
     ///Webcam recorder shutdown token
     #[serde(skip)]
-    pub webcam_recording_shutdown: CancellationToken,
+    pub voip_video_shutdown_token: CancellationToken,
 
     ///What is the server's password set to
     pub server_password: String,
@@ -202,6 +202,10 @@ pub struct Application
     #[serde(skip)]
     pub voip_thread: Option<()>,
 
+    ///Voip image sender thread
+    #[serde(skip)]
+    pub voip_video_thread: Option<()>,
+
     #[serde(skip)]
     /// This is what the main thread uses to recive messages from the sync thread
     pub server_output_reciver: Arc<Receiver<Option<String>>>,
@@ -239,7 +243,8 @@ impl Default for Application
         let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
-            webcam_recording_shutdown: CancellationToken::new(),
+            voip_video_thread: None,
+            voip_video_shutdown_token: CancellationToken::new(),
             startup_args: None,
             record_audio_interrupter: mpsc::channel::<()>().0,
             toasts: Arc::new(Mutex::new(Toasts::new())),
@@ -2293,7 +2298,7 @@ impl Voip
         //This thread modifies the camera_handle directly
         tokio::spawn(async move {
             //Send an empty image indicating video shutdown
-            match Voip::send_image(&voip, uuid, &vec![0], &encryption_key).await {
+            match Voip::send_image(&voip, uuid, &[0], &encryption_key).await {
                 Ok(_) => (),
                 Err(err) => {
                     tracing::error!("{err}");
@@ -3444,7 +3449,7 @@ pub fn get_image_header(
 
     //Try getting the uuid's ImageHeaders
     //Insert IndexMap into the ```image_buffer```
-    if let Some(mut image_headers) = dbg!(image_buffer.get_mut(&image_header.uuid)) {
+    if let Some(mut image_headers) = image_buffer.get_mut(&image_header.uuid) {
         image_headers.insert(
             image_header.identificator.clone(),
             HashMap::from_iter(

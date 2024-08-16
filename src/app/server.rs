@@ -6,6 +6,8 @@ use std::{
     time::Duration,
 };
 
+use crate::app::client::{HASH_BYTE_OFFSET, IDENTIFICATOR_BYTE_OFFSET, UUID_BYTE_OFFSET};
+
 use anyhow::{bail, Error, Result};
 use chrono::Utc;
 use dashmap::DashMap;
@@ -24,7 +26,7 @@ use super::backend::{
     ServerReplyType, ServerSync, ServerVoip, ServerVoipReply, ServerVoipState,
 };
 
-use crate::app::backend::{
+use super::backend::{
     decrypt_aes256_bytes, encrypt_aes256_bytes, get_image_header,
     ClientFileRequestType as ClientRequestTypeStruct, ClientFileUpload as ClientFileUploadStruct,
     ClientMessage,
@@ -34,6 +36,7 @@ use crate::app::backend::{
     },
     ImageHeader, ServerFileReply, ServerImageReply, ServerMaster, UdpMessageType,
 };
+
 use tokio::{
     io::AsyncWrite,
     net::{tcp::OwnedReadHalf, UdpSocket},
@@ -446,21 +449,21 @@ pub fn create_client_voip_manager(
                             let message_bytes = decrypted_bytes.to_vec();
 
                             //Get the identificator of the image part in bytes
-                            let indetificator_bytes = message_bytes[message_bytes.len() - 64..].to_vec();
+                            let indetificator_bytes = message_bytes[message_bytes.len() - IDENTIFICATOR_BYTE_OFFSET..].to_vec();
 
                             let identificator = String::from_utf8(indetificator_bytes).unwrap();
 
                             //Get the identificator of the image part in bytes
-                            let hash_bytes = message_bytes[message_bytes.len() - 64 - 64 - 36..message_bytes.len() - 64 - 36].to_vec();
+                            let hash_bytes = message_bytes[message_bytes.len() - HASH_BYTE_OFFSET..message_bytes.len() - UUID_BYTE_OFFSET].to_vec();
 
                             let hash = String::from_utf8(hash_bytes).unwrap();
 
                             //Get the image part bytes
                             //We subtract 164 bytes to only get the image part
-                            let image = message_bytes[..message_bytes.len() - 64 - 64 - 36].to_vec();
+                            let image = message_bytes[..message_bytes.len() - HASH_BYTE_OFFSET].to_vec();
 
                             //THIS IS UNUSED AND SHOULD BE REMOVED
-                            let _uuid_bytes = message_bytes[message_bytes.len() - 64 - 36..message_bytes.len() - 64].to_vec();
+                            let _uuid_bytes = message_bytes[message_bytes.len() - UUID_BYTE_OFFSET..message_bytes.len() - IDENTIFICATOR_BYTE_OFFSET].to_vec();
 
                             if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
                                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
@@ -475,6 +478,8 @@ pub fn create_client_voip_manager(
                                     //If all the parts of the image header had arrived send the image to all the clients
                                     if contents.iter().all(|(_, value)| value.is_some()) {
                                         let contents_clone = contents.clone();
+                                        let image_buffer = image_buffer.clone();
+
                                         tokio::spawn(async move {
                                             for connected_client in voip_connected_clients.iter() {
                                                 let uuid = connected_client.key();
@@ -505,6 +510,11 @@ pub fn create_client_voip_manager(
                                                 let header_message =
                                                     ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
 
+                                                if image_bytes == vec![0] {
+                                                    println!("asd");
+                                                    image_buffer.remove(&uuid.clone());
+                                                }
+
                                                 // Send image header
                                                 send_bytes(
                                                     serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
@@ -524,7 +534,7 @@ pub fn create_client_voip_manager(
 
                                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
                                         image_header.drain(index..=index);
-                                    }
+                                    };
                                 }
                                 else {
                                     tracing::error!("Image header not found: {identificator}");
@@ -532,7 +542,7 @@ pub fn create_client_voip_manager(
                             }
                             else {
                                 tracing::error!("User not found in the image header list: {uuid}");
-                            }
+                            };
                         }
                     }
                 },

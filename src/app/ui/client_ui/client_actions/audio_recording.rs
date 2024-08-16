@@ -18,7 +18,7 @@ use std::{
     time::Duration,
 };
 
-use crate::app::ui::client::VOIP_PACKET_BUFFER_LENGHT_MS;
+pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
 pub const SAMPLE_RATE: usize = 48000;
 pub const STEREO_PACKET_BUFFER_LENGHT: usize =
@@ -132,7 +132,6 @@ pub fn record_audio_with_interrupt(
                         should_record.clone(),
                     ) {
                         //Quit the thread, stop recording
-                        return;
                     }
                 }
             },

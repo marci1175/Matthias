@@ -80,6 +80,7 @@ impl eframe::App for backend::Application
         self.server_shutdown_token.cancel();
         self.autosync_shutdown_token.cancel();
         self.voip_shutdown_token.cancel();
+        self.voip_video_shutdown_token.cancel();
 
         //Signal the voice recorder function to stop
         let _ = self.record_audio_interrupter.send(());
