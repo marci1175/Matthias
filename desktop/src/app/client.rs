@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedReadHalf, TcpStream},
@@ -31,7 +32,7 @@ pub const IDENTIFICATOR_BYTE_OFFSET: usize = 64;
 /// This is the byte lenght of the uuid's text representation (utf8)
 pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 
-use super::backend::{fetch_incoming_message_lenght, get_image_header};
+use super::backend::{fetch_incoming_message_lenght, get_image_header, ServerVoipEvent};
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
 use dashmap::DashMap;
@@ -42,7 +43,7 @@ use std::{
     sync::mpsc,
 };
 
-use crate::app::backend::{decrypt_aes256_bytes, MessageBuffer, UdpMessageType};
+use crate::app::backend::{decrypt_aes256_bytes, ImageBuffer, UdpMessageType};
 
 use crate::app::ui::client_ui::client_actions::audio_recording::{
     create_wav_file, record_audio_with_interrupt,
@@ -121,11 +122,12 @@ impl Application
             let cancel_token_child = cancel_token.child_token();
             let uuid_clone = uuid.clone();
             let decryption_key_clone = decryption_key.clone();
-            let voip_clone = voip.clone();
-            let camera_handle = voip_clone.camera_handle.clone();
-            let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
 
-            
+            //This instance of Voip is used when sending images
+            let voip_image = voip.clone();
+
+            let camera_handle = voip_image.camera_handle.clone();
+            let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
 
             self.voip_thread.get_or_insert_with(|| {
                 let reciver_socket_part = voip.socket.clone();
@@ -167,8 +169,10 @@ impl Application
                                         //Return wav bytes
                                         playbackable_audio
                                     };
+                                    
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
+                                    
                                     //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
                                     for chunk in audio_chunks {
                                         voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
@@ -189,13 +193,11 @@ impl Application
                 let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
                 let decryption_key = self.client_connection.client_secret.clone();
 
+                let image_buffer = voip_image.image_buffer.clone();
+
                 //Reciver thread
                 tokio::spawn(async move {
                     let ctx_clone = ctx.clone();
-
-                    //Create image buffer
-                    let image_buffer: MessageBuffer = Arc::new(DashMap::new());
-
                     //Listen on socket, play audio
                     loop {
                         select! {
@@ -243,7 +245,7 @@ impl Application
                                         image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(70)).unwrap();
 
                                         //Send image
-                                        voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner().unwrap().into_inner(), &decryption_key_clone).await.unwrap();
+                                        voip_image.send_image(uuid_clone.clone(), &buffer.into_inner().unwrap().into_inner(), &decryption_key_clone).await.unwrap();
                                     },
                                     None => {
                                         //... camera handle has been removed
@@ -252,7 +254,6 @@ impl Application
                                 }
                             }
                             _ = voice_recording_shutdown.cancelled() => {
-                                println!("exit thread");
                                 //Exit thread
                                 break;
                             },
@@ -559,25 +560,41 @@ impl Application
                                                     );
                                                 }
                                             },
+                                            ServerMessageType::VoipEvent(voip_event) => {
+                                                match voip_event.event {
+                                                    //These messages can be added to the message stack
+                                                    super::backend::VoipEvent::Connected | super::backend::VoipEvent::Disconnected => {
+                                                        self.add_message(msg.message.clone());
+                                                    },
+
+                                                    //These message types have a side effect on the client's ```image_buffer```
+                                                    //Add the uuid if connected
+                                                    super::backend::VoipEvent::ImageConnected => {
+                                                        if let Some(voip) = &self.client_ui.voip {
+                                                            voip.image_buffer.insert(voip_event.uuid.clone(), IndexMap::new());
+                                                        }
+                                                        else {
+                                                            tracing::error!("Voip event called, but there is no voip instance");
+                                                        }
+                                                    },
+                                                    //Remove the uuid if disconnected
+                                                    super::backend::VoipEvent::ImageDisconnected => {
+                                                        if let Some(voip) = &self.client_ui.voip {
+                                                            voip.image_buffer.remove(&voip_event.uuid);
+                                                            
+                                                            //Forget image
+                                                            ctx.forget_image(&format!("bytes://video_stream:{}", voip_event.uuid.clone()));
+                                                        }
+                                                        else {
+                                                            tracing::error!("Voip event called, but there is no voip instance");
+                                                        }
+                                                    },
+                                                }
+                                            }
                                             _ => {
-                                                //Allocate Message vec for the new message
-                                                self.client_ui
-                                                    .incoming_messages
-                                                    .reaction_list
-                                                    .push(MessageReaction::default());
+                                                let message = msg.message.clone();
 
-                                                //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
-                                                self.client_ui
-                                                    .incoming_messages
-                                                    .message_list
-                                                    .push(msg.message.clone());
-
-                                                //Callback
-                                                self.client_ui.extension.event_call_extensions(
-                                                    crate::app::lua::EventCall::OnChatRecive,
-                                                    &self.lua,
-                                                    Some(msg.message._struct_into_string()),
-                                                );
+                                                self.add_message(message);
                                             },
                                         }
                                     },
@@ -704,8 +721,8 @@ impl Application
                                                         }
                                                     },
                                                     Err(_err) => {
-                                                        tracing::error!("{}", _err);
-                                                    },
+                                                        tracing::error!("{_err}");
+                                                    }
                                                 }
                                             },
                                         }
@@ -736,6 +753,27 @@ impl Application
             }
         }
     }
+
+fn add_message(&mut self, message: super::backend::ServerOutput) {
+        //Allocate Message vec for the new message
+        self.client_ui
+            .incoming_messages
+            .reaction_list
+            .push(MessageReaction::default());
+    
+        //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
+        self.client_ui
+            .incoming_messages
+            .message_list
+            .push(message.clone());
+    
+        //Callback
+        self.client_ui.extension.event_call_extensions(
+            crate::app::lua::EventCall::OnChatRecive,
+            &self.lua,
+            Some(message._struct_into_string()),
+        );
+    }
 }
 
 /// Recives packets on the given UdpSocket, messages are decrypted with the decrpytion key
@@ -749,7 +787,7 @@ async fn recive_server_relay(
     //The sink its appending the bytes to
     sink: Arc<Sink>,
     //This serves as the image buffer from the server
-    image_buffer: MessageBuffer,
+    image_buffer: ImageBuffer,
 
     ctx: &egui::Context,
 ) -> anyhow::Result<()>
@@ -857,29 +895,22 @@ async fn recive_server_relay(
                             .collect();
 
                         //Define uri
-                        let uri = format!("bytes://video_steam:{uuid}");
+                        let uri = format!("bytes://video_stream:{uuid}");
+                        
+                        //Drain earlier ImageHeaders (and the current one), because a new one has arrived
+                        image_header.drain(index..=index);
+                        
+                        //Its important to drop image header, so that we dont deadlock, due to me accessing the image_buffer later
+                        drop(image_header);
 
-                        //If the image bytes are empty that means the video stream has shut down
-                        if image_bytes == vec![0] {
-                            //Forget image on that URI
-                            ctx.forget_image(&uri);
+                        //Forget image on that URI
+                        ctx.forget_image(&uri);
 
-                            image_buffer.remove(&uuid);
-                        }
-                        //Else save the image
-                        else {
-                            //Forget image on that URI
-                            ctx.forget_image(&uri);
-
-                            //Pair URI with bytes
-                            ctx.include_bytes(uri, image_bytes);
-                        }
+                        //Pair URI with bytes
+                        ctx.include_bytes(uri, image_bytes);
 
                         //Request repaint
                         ctx.request_repaint();
-
-                        //Drain earlier ImageHeaders (and the current one), because a new one has arrived
-                        image_header.drain(index..=index);
                     }
                 }
                 else {

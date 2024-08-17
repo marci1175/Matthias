@@ -146,7 +146,7 @@ impl Application
                                                     format!("{} has been banned", profile.username)
                                                 },
                                             },
-                                            ServerMessageType::VoipConnection(_) => unreachable!(),
+                                            ServerMessageType::VoipEvent(_) => unreachable!(),
                                             ServerMessageType::Edit(_) => unreachable!(),
                                             ServerMessageType::Reaction(_) => unreachable!(),
                                             ServerMessageType::Sync(_) => unreachable!(),

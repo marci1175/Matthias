@@ -21,7 +21,7 @@ use super::backend::{
     ReactionType, ServerClientReply, ServerMessageType,
     ServerMessageTypeDiscriminants::{
         Audio, Edit, Image, Normal, Reaction as ServerMessageTypeDiscriminantReaction, Sync,
-        Upload, VoipConnection as Voip,
+        Upload, VoipEvent as Voip,
     },
     ServerReplyType, ServerSync, ServerVoip, ServerVoipReply, ServerVoipState,
 };
@@ -367,7 +367,7 @@ pub fn create_client_voip_manager(
     uuid: String,
 )
 {
-    let message_buffer = voip.message_buffer.clone();
+    let message_buffer = voip.image_buffer.clone();
 
     //Spawn client management thread
     tokio::spawn(async move {
@@ -478,8 +478,6 @@ pub fn create_client_voip_manager(
                                     //If all the parts of the image header had arrived send the image to all the clients
                                     if contents.iter().all(|(_, value)| value.is_some()) {
                                         let contents_clone = contents.clone();
-                                        let image_buffer = image_buffer.clone();
-
                                         tokio::spawn(async move {
                                             for connected_client in voip_connected_clients.iter() {
                                                 let uuid = connected_client.key();
@@ -509,11 +507,6 @@ pub fn create_client_voip_manager(
                                                 //Create header message
                                                 let header_message =
                                                     ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
-
-                                                if image_bytes == vec![0] {
-                                                    println!("asd");
-                                                    image_buffer.remove(&uuid.clone());
-                                                }
 
                                                 // Send image header
                                                 send_bytes(
@@ -1044,7 +1037,23 @@ impl MessageService
                                 .await?;
                             }
                             else {
-                                println!("Voip disconnected from an offline server")
+                                tracing::error!("Voip disconnected from an offline server")
+                            }
+                        },
+                        super::backend::ClientVoipRequest::ImageConnected => {
+                            if let Some(voip) = &mut self.voip {
+                                voip.image_buffer.insert(req.uuid.clone(), IndexMap::new());
+                            }
+                            else {
+                                tracing::error!("Voip image connected to an offline server");
+                            }
+                        },
+                        super::backend::ClientVoipRequest::ImageDisconnected => {
+                            if let Some(voip) = &mut  self.voip {
+                                voip.image_buffer.remove(&req.uuid);
+                            }
+                            else {
+                                tracing::error!("Voip image connected to an offline server");
                             }
                         },
                     }
@@ -1192,7 +1201,7 @@ impl MessageService
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
             connected_client_thread_channels: Arc::new(DashMap::new()),
-            message_buffer: Arc::new(DashMap::new()),
+            image_buffer: Arc::new(DashMap::new()),
         })
     }
 

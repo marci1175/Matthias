@@ -1444,6 +1444,16 @@ impl ClientMessage
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
         }
     }
+
+    pub fn construct_voip_event(uuid: String, event: ClientVoipRequest) -> ClientMessage
+    {
+        ClientMessage {
+            replying_to: None,
+            message_type: ClientMessageType::VoipConnection(event),
+            uuid: uuid.to_string(),
+            message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
+        }
+    }
 }
 
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
@@ -1833,10 +1843,11 @@ pub enum ServerMessageType
 
     /// This message shows if a user has connected to the voip call
     #[strum_discriminants(strum(message = "Voip connection"))]
-    VoipConnection(ServerVoipEvent),
+    VoipEvent(ServerVoipEvent),
 
+    /// This message holds the State of the Voip service
     #[strum_discriminants(strum(message = "Voip state"))]
-    VoipState(ServerVoipState),
+    VoipState(ServerVoipState), 
 }
 
 /// The types of message the server can "send"
@@ -1926,7 +1937,7 @@ impl ServerOutput
                                 )
                             },
                             ServerMessageTypeDiscriminants::VoipState => unreachable!(),
-                            ServerMessageTypeDiscriminants::VoipConnection => unreachable!(),
+                            ServerMessageTypeDiscriminants::VoipEvent => unreachable!(),
                             ServerMessageTypeDiscriminants::Deleted => unreachable!(),
                             ServerMessageTypeDiscriminants::Sync => unreachable!(),
                             ServerMessageTypeDiscriminants::Normal => unreachable!(),
@@ -1947,14 +1958,32 @@ impl ServerOutput
                     ClientMessageType::VoipConnection(voip_message_type) => {
                         let server_message = match voip_message_type {
                             ClientVoipRequest::Connect(_) => {
-                                ServerVoipEvent::Connected(uuid.clone())
+                                ServerVoipEvent {
+                                    event: VoipEvent::Connected,
+                                    uuid: uuid.clone(),
+                                }
                             },
                             ClientVoipRequest::Disconnect => {
-                                ServerVoipEvent::Disconnected(uuid.clone())
+                                ServerVoipEvent {
+                                    event: VoipEvent::Disconnected,
+                                    uuid: uuid.clone(),
+                                }
+                            },
+                            ClientVoipRequest::ImageConnected => {
+                                ServerVoipEvent {
+                                    event: VoipEvent::ImageConnected,
+                                    uuid: uuid.clone(),
+                                }
+                            },
+                            ClientVoipRequest::ImageDisconnected => {
+                                ServerVoipEvent {
+                                    event: VoipEvent::ImageDisconnected,
+                                    uuid: uuid.clone(),
+                                }
                             },
                         };
 
-                        ServerMessageType::VoipConnection(server_message)
+                        ServerMessageType::VoipEvent(server_message)
                     },
                     ClientMessageType::SyncMessage(_) => {
                         ServerMessageType::Sync(ServerMessageSync {  })
@@ -2092,16 +2121,38 @@ pub enum ClientVoipRequest
 
     /// The voip call will automaticly stop once there are no connected clients
     Disconnect,
+
+    /// The client has enabled video
+    ImageConnected,
+
+    /// The client has disabled video
+    ImageDisconnected,
 }
 
-/// This enum is used to display if a client has joined or left the Voip call, this is a ServerMessageType
+/// This enum is used to display if a client has joined or left the Voip call, this is a ```ServerMessageType```
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum ServerVoipEvent
+pub enum VoipEvent
 {
-    /// Client connected, the inner value is their uuid
-    Connected(String),
-    /// Client disconnected, the inner value is their uuid
-    Disconnected(String),
+    /// Client connected
+    Connected,
+    /// Client disconnected
+    Disconnected,
+
+    /// The client has enabled video
+    ImageConnected,
+
+    /// The client has disabled video
+    ImageDisconnected,
+}
+
+
+/// This struct holds all important information, when informing clients / servers about a ```VoipEvent```
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ServerVoipEvent {
+    /// The uuid of the user who has initiated this event
+    pub uuid: String,
+    /// The event the user has initiated
+    pub event: VoipEvent,
 }
 
 ///The struct contains all the useful information for displaying an ongoing voip connection.
@@ -2148,7 +2199,7 @@ pub struct ServerVoipClose
     pub reason: String,
 }
 
-pub type MessageBuffer = Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>;
+pub type ImageBuffer = Arc<DashMap<String, IndexMap<String, HashMap<String, Option<Vec<u8>>>>>>;
 
 #[derive(Debug, Clone)]
 pub struct ServerVoip
@@ -2179,7 +2230,7 @@ pub struct ServerVoip
     /// The ```DashMap``` contains the HeaderMessages (value) paired with the uuid's of the clients (key)
     /// The ```IndexMap``` contains the MessageParts (value)  paired with the HeaderMessage's uuid (key)
     /// The ```HashMap``` contains the image bytes (value) paired with the byte hash (key)
-    pub message_buffer: MessageBuffer,
+    pub image_buffer: ImageBuffer,
 }
 
 impl ServerVoip
@@ -2242,10 +2293,13 @@ pub struct Voip
     pub camera_handle: Arc<tokio::sync::Mutex<Option<Webcam>>>,
 
     /// Signals whether there is a camera handle open
-    pub camera_handle_is_open: bool,
+    pub camera_handle_is_open: Arc<AtomicBool>,
 
     /// Whether the microphone should record audio
     pub enable_microphone: Arc<AtomicBool>,
+
+    /// This field serves as a UDP protocol of some sorts, it is used as an ```ImageBuffer```
+    pub image_buffer: ImageBuffer,
 }
 
 impl Voip
@@ -2261,15 +2315,16 @@ impl Voip
         Ok(Self {
             socket: Arc::new(socket_handle),
             camera_handle: Arc::new(tokio::sync::Mutex::new(None)),
-            camera_handle_is_open: false,
+            camera_handle_is_open: Arc::new(AtomicBool::new(false)),
             enable_microphone: Arc::new(AtomicBool::new(true)),
+            image_buffer: Arc::new(DashMap::new()),
         })
     }
 
     /// This function sets the ```camera_handle``` in this ```Voip``` instance.
     /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
     /// This function uses an async thread to set the value.
-    pub fn add_camera_handle(&mut self) -> anyhow::Result<()>
+    pub fn add_camera_handle(&self) -> anyhow::Result<()>
     {
         let camera_handle = self.camera_handle.clone();
 
@@ -2281,7 +2336,6 @@ impl Voip
             *camera_handle = Some(Webcam::new_def_auto_detect().unwrap());
         });
 
-        self.camera_handle_is_open = true;
 
         Ok(())
     }
@@ -2289,7 +2343,7 @@ impl Voip
     /// This function removes the ```camera_handle``` in this ```Voip``` instance.
     /// Before removing the camera handle this function will send an empty image, indicating camera image shutdown.
     /// This function uses an async thread to set the value.
-    pub fn remove_camera_handle(&mut self, encryption_key: &[u8], uuid: String)
+    pub fn remove_camera_handle(&self, encryption_key: &[u8], uuid: String)
     {
         let camera_handle = self.camera_handle.clone();
 
@@ -2312,7 +2366,6 @@ impl Voip
             *camera_handle = None;
         });
 
-        self.camera_handle_is_open = false;
     }
 
     /// Starts a video call when this function is called.
@@ -2332,8 +2385,9 @@ impl Voip
             camera_handle: Arc::new(tokio::sync::Mutex::new(
                 Some(Webcam::new_def_auto_detect()?),
             )),
-            camera_handle_is_open: true,
+            camera_handle_is_open: Arc::new(AtomicBool::new(false)),
             enable_microphone: Arc::new(AtomicBool::new(true)),
+            image_buffer: Arc::new(DashMap::new()),
         })
     }
 
@@ -3452,7 +3506,7 @@ pub fn get_image_header(
     //Try getting the uuid's ImageHeaders
     //Insert IndexMap into the ```image_buffer```
     if let Some(mut image_headers) = image_buffer.get_mut(&image_header.uuid) {
-        image_headers.insert(
+        image_headers.value_mut().insert(
             image_header.identificator.clone(),
             HashMap::from_iter(
                 image_header
@@ -3461,24 +3515,6 @@ pub fn get_image_header(
                     .map(|hash| (hash.clone(), None)),
             ),
         );
-    }
-    else {
-        //Create image part map which will later be used for storing parts of the Image
-        let image_part_map: HashMap<String, Option<Vec<u8>>> = HashMap::from_iter(
-            image_header
-                .image_parts_hash
-                .iter()
-                .map(|hash| (hash.clone(), None)),
-        );
-
-        //Create ```IndexMap```
-        let mut header_index_map = IndexMap::new();
-
-        //Insert entry into the ```IndexMap```
-        header_index_map.insert(image_header.identificator, image_part_map);
-
-        //If the ImageHeader list is not found, insert the ```IndexMap```(Image header list) into the ```image_buffer```
-        image_buffer.insert(image_header.uuid.clone(), header_index_map);
     }
 
     Ok(())
