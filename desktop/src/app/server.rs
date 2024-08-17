@@ -479,50 +479,52 @@ pub fn create_client_voip_manager(
                                     if contents.iter().all(|(_, value)| value.is_some()) {
                                         let contents_clone = contents.clone();
                                         tokio::spawn(async move {
-                                            for connected_client in voip_connected_clients.iter() {
-                                                let uuid = connected_client.key();
+                                            
 
-                                                let socket_addr = connected_client.value();
+                                        //Combine the image part bytes
+                                        let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
+                                            <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(value).unwrap()
+                                        }).collect();
 
-                                                //Combine the image part bytes
-                                                let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
-                                                    <std::option::Option<std::vec::Vec<u8>> as Clone>::clone(value).unwrap()
-                                                }).collect();
+                                        //Create image parts by splitting it every 60000 bytes
+                                        let image_parts_tuple: Vec<(String, &[u8])> = image_bytes
+                                            .chunks(60000)
+                                            .map(|image_part| (sha256::digest(image_part), image_part))
+                                            .collect();
 
-                                                //Create image parts by splitting it every 60000 bytes
-                                                let image_parts_tuple: Vec<(String, &[u8])> = image_bytes
-                                                    .chunks(60000)
-                                                    .map(|image_part| (sha256::digest(image_part), image_part))
-                                                    .collect();
+                                        let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
 
-                                                let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
+                                        let identificator = sha256::digest(
+                                            image_parts
+                                                .iter()
+                                                .flat_map(|hash| hash.as_bytes().to_vec())
+                                                .collect::<Vec<u8>>(),
+                                        );
 
-                                                let identificator = sha256::digest(
-                                                    image_parts
-                                                        .iter()
-                                                        .flat_map(|hash| hash.as_bytes().to_vec())
-                                                        .collect::<Vec<u8>>(),
-                                                );
+                                                
+                                        for connected_client in voip_connected_clients.iter() {
+                                            let uuid = connected_client.key();
+                                            let socket_addr = connected_client.value();
 
-                                                //Create header message
-                                                let header_message =
-                                                    ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
+                                            //Create header message
+                                            let header_message =
+                                                ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
 
-                                                // Send image header
-                                                send_bytes(
-                                                    serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
-                                                    &key,
-                                                    UdpMessageType::ImageHeader,
-                                                    socket.clone(),
-                                                    *socket_addr,
-                                                )
+                                            // Send image header
+                                            send_bytes(
+                                                serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
+                                                &key,
+                                                UdpMessageType::ImageHeader,
+                                                socket.clone(),
+                                                *socket_addr,
+                                            )
+                                            .await.unwrap();
+
+                                            //Send image parts
+                                            //We have already sent the image header
+                                            send_image_parts(image_parts_tuple.clone(), uuid.clone(), &key, identificator.clone(), socket.clone(), *socket_addr)
                                                 .await.unwrap();
-
-                                                //Send image parts
-                                                //We have already sent the image header
-                                                send_image_parts(image_parts_tuple, uuid.clone(), &key, identificator, socket.clone(), *socket_addr)
-                                                    .await.unwrap();
-                                            }
+                                        }
                                         });
 
                                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
@@ -578,6 +580,7 @@ async fn send_bytes(
 
     Ok(())
 }
+
 /// Send the images specified in the ```image_parts_tuple``` argument
 /// __Image message contents:__
 /// - ```[len - 64 - 64 - 36..len - 64 - 36]``` = Contains the hash (sha256 hash) of the image part we are sending

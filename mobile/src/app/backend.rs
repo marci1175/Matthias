@@ -35,7 +35,6 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        atomic::AtomicBool,
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
@@ -188,10 +187,10 @@ pub struct Application
 
     /// Voip (UdpSocket) maker
     /// When a successful ```Voip``` instance is created it is sent over from the async thread
-    #[serde(skip)]
-    pub voip_connection_reciver: Arc<mpsc::Receiver<Voip>>,
-    #[serde(skip)]
-    pub voip_connection_sender: mpsc::Sender<Voip>,
+    // #[serde(skip)]
+    // pub voip_connection_reciver: Arc<mpsc::Receiver<Voip>>,
+    // #[serde(skip)]
+    // pub voip_connection_sender: mpsc::Sender<Voip>,
 
     ///Server - client syncing thread
     #[serde(skip)]
@@ -239,7 +238,7 @@ impl Default for Application
 
         let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
 
-        let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
+        // let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
 
         Self {
             voip_video_thread: None,
@@ -320,8 +319,8 @@ impl Default for Application
             server_output_reciver: Arc::new(server_output_reciver),
             server_output_sender,
 
-            voip_connection_reciver: Arc::new(voip_connection_reciver),
-            voip_connection_sender,
+            // voip_connection_reciver: Arc::new(voip_connection_reciver),
+            // voip_connection_sender,
 
             autosync_shutdown_token: CancellationToken::new(),
             server_connected_clients_profile: Arc::new(DashMap::new()),
@@ -827,8 +826,8 @@ pub struct Client
     #[table(save)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 
-    #[serde(skip)]
-    pub voip: Option<Voip>,
+    // #[serde(skip)]
+    // pub voip: Option<Voip>,
 
     /// This entry contains the volume precentage of the microphone, this is modified in the settings
     pub microphone_volume: Arc<Mutex<f32>>,
@@ -887,7 +886,7 @@ impl Default for Client
             voice_recording_start: None,
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
-            voip: None,
+            // voip: None,
             microphone_volume: Arc::new(Mutex::new(100.)),
         }
     }
@@ -1241,8 +1240,7 @@ impl ClientMessage
                         .to_str()
                         .unwrap()
                         .to_string()
-                        .split(".")
-                        .into_iter().next().unwrap().to_string(),
+                        .split(".").next().unwrap().to_string(),
                 ),
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
@@ -2230,248 +2228,248 @@ impl UdpMessageType
 }
 
 /// This struct contains all the information for having a voice and or video call.
-#[derive(Clone)]
-pub struct Voip
-{
-    /// The clients socket, which theyre listening on for packets (audio, image)
-    pub socket: Arc<UdpSocket>,
+// #[derive(Clone)]
+// pub struct Voip
+// {
+//     /// The clients socket, which theyre listening on for packets (audio, image)
+//     pub socket: Arc<UdpSocket>,
 
-    /// This handle is used to take pictures with the host's camera
-    /// If we are in a voice call this is ```None``` by default
-    pub camera_handle: Arc<tokio::sync::Mutex<Option<Webcam>>>,
+//     /// This handle is used to take pictures with the host's camera
+//     /// If we are in a voice call this is ```None``` by default
+//     pub camera_handle: Arc<tokio::sync::Mutex<Option<Webcam>>>,
 
-    /// Signals whether there is a camera handle open
-    pub camera_handle_is_open: bool,
+//     /// Signals whether there is a camera handle open
+//     pub camera_handle_is_open: bool,
 
-    /// Whether the microphone should record audio
-    pub enable_microphone: Arc<AtomicBool>,
-}
+//     /// Whether the microphone should record audio
+//     pub enable_microphone: Arc<AtomicBool>,
+// }
 
-impl Voip
-{
-    /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
-    /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
-    pub async fn new() -> anyhow::Result<Self>
-    {
-        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
-        let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
-        socket_2.set_reuse_address(true)?;
-        let socket_handle = UdpSocket::from_std(socket_2.into())?;
-        Ok(Self {
-            socket: Arc::new(socket_handle),
-            camera_handle: Arc::new(tokio::sync::Mutex::new(None)),
-            camera_handle_is_open: false,
-            enable_microphone: Arc::new(AtomicBool::new(true)),
-        })
-    }
+// impl Voip
+// {
+//     /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
+//     /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
+//     pub async fn new() -> anyhow::Result<Self>
+//     {
+//         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+//         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
+//         socket_2.set_reuse_address(true)?;
+//         let socket_handle = UdpSocket::from_std(socket_2.into())?;
+//         Ok(Self {
+//             socket: Arc::new(socket_handle),
+//             camera_handle: Arc::new(tokio::sync::Mutex::new(None)),
+//             camera_handle_is_open: false,
+//             enable_microphone: Arc::new(AtomicBool::new(true)),
+//         })
+//     }
 
-    /// This function sets the ```camera_handle``` in this ```Voip``` instance.
-    /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
-    /// This function uses an async thread to set the value.
-    pub fn add_camera_handle(&mut self) -> anyhow::Result<()>
-    {
-        let camera_handle = self.camera_handle.clone();
+//     /// This function sets the ```camera_handle``` in this ```Voip``` instance.
+//     /// __NOTE: This doesnt inherently mean that a video call will start, it will just set the ```Voip``` instance.__
+//     /// This function uses an async thread to set the value.
+//     pub fn add_camera_handle(&mut self) -> anyhow::Result<()>
+//     {
+//         let camera_handle = self.camera_handle.clone();
 
-        //Create camera handle thread
-        //This thread modifies the camera_handle directly
-        tokio::spawn(async move {
-            let mut camera_handle = camera_handle.lock().await;
+//         //Create camera handle thread
+//         //This thread modifies the camera_handle directly
+//         tokio::spawn(async move {
+//             let mut camera_handle = camera_handle.lock().await;
 
-            *camera_handle = Some(Webcam::new_def_auto_detect().unwrap());
-        });
+//             *camera_handle = Some(Webcam::new_def_auto_detect().unwrap());
+//         });
 
-        self.camera_handle_is_open = true;
+//         self.camera_handle_is_open = true;
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    /// This function removes the ```camera_handle``` in this ```Voip``` instance.
-    /// Before removing the camera handle this function will send an empty image, indicating camera image shutdown.
-    /// This function uses an async thread to set the value.
-    pub fn remove_camera_handle(&mut self, encryption_key: &[u8], uuid: String)
-    {
-        let camera_handle = self.camera_handle.clone();
+//     /// This function removes the ```camera_handle``` in this ```Voip``` instance.
+//     /// Before removing the camera handle this function will send an empty image, indicating camera image shutdown.
+//     /// This function uses an async thread to set the value.
+//     pub fn remove_camera_handle(&mut self, encryption_key: &[u8], uuid: String)
+//     {
+//         let camera_handle = self.camera_handle.clone();
 
-        let voip = self.clone();
-        let encryption_key = encryption_key.to_vec();
+//         let voip = self.clone();
+//         let encryption_key = encryption_key.to_vec();
 
-        //Create camera handle thread
-        //This thread modifies the camera_handle directly
-        tokio::spawn(async move {
-            //Send an empty image indicating video shutdown
-            match Voip::send_image(&voip, uuid, &[0], &encryption_key).await {
-                Ok(_) => (),
-                Err(err) => {
-                    tracing::error!("{err}");
-                },
-            }
+//         //Create camera handle thread
+//         //This thread modifies the camera_handle directly
+//         tokio::spawn(async move {
+//             //Send an empty image indicating video shutdown
+//             match Voip::send_image(&voip, uuid, &[0], &encryption_key).await {
+//                 Ok(_) => (),
+//                 Err(err) => {
+//                     tracing::error!("{err}");
+//                 },
+//             }
 
-            let mut camera_handle = camera_handle.lock().await;
+//             let mut camera_handle = camera_handle.lock().await;
 
-            *camera_handle = None;
-        });
+//             *camera_handle = None;
+//         });
 
-        self.camera_handle_is_open = false;
-    }
+//         self.camera_handle_is_open = false;
+//     }
 
-    /// Starts a video call when this function is called.
-    /// It sets the ```Voip``` instance and creates a call
-    pub async fn _new_video_call() -> anyhow::Result<Self>
-    {
-        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+//     /// Starts a video call when this function is called.
+//     /// It sets the ```Voip``` instance and creates a call
+//     pub async fn _new_video_call() -> anyhow::Result<Self>
+//     {
+//         let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
 
-        let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
+//         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
 
-        socket_2.set_reuse_address(true)?;
+//         socket_2.set_reuse_address(true)?;
 
-        let socket_handle = UdpSocket::from_std(socket_2.into())?;
+//         let socket_handle = UdpSocket::from_std(socket_2.into())?;
 
-        Ok(Self {
-            socket: Arc::new(socket_handle),
-            camera_handle: Arc::new(tokio::sync::Mutex::new(
-                Some(Webcam::new_def_auto_detect()?),
-            )),
-            camera_handle_is_open: true,
-            enable_microphone: Arc::new(AtomicBool::new(true)),
-        })
-    }
+//         Ok(Self {
+//             socket: Arc::new(socket_handle),
+//             camera_handle: Arc::new(tokio::sync::Mutex::new(
+//                 Some(Webcam::new_def_auto_detect()?),
+//             )),
+//             camera_handle_is_open: true,
+//             enable_microphone: Arc::new(AtomicBool::new(true)),
+//         })
+//     }
 
-    /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
-    /// Any lenght of audio can be sent because the header is included with the packet
-    pub async fn send_audio(
-        &self,
-        uuid: String,
-        mut bytes: Vec<u8>,
-        encryption_key: &[u8],
-    ) -> anyhow::Result<()>
-    {
-        //Append the uuid to the audio bytes
-        bytes.append(uuid.as_bytes().to_vec().as_mut());
+//     /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
+//     /// Any lenght of audio can be sent because the header is included with the packet
+//     pub async fn send_audio(
+//         &self,
+//         uuid: String,
+//         mut bytes: Vec<u8>,
+//         encryption_key: &[u8],
+//     ) -> anyhow::Result<()>
+//     {
+//         //Append the uuid to the audio bytes
+//         bytes.append(uuid.as_bytes().to_vec().as_mut());
 
-        self.send_bytes(bytes, encryption_key, UdpMessageType::Voice)
-            .await?;
+//         self.send_bytes(bytes, encryption_key, UdpMessageType::Voice)
+//             .await?;
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    /// This function sends bytes on the UdpSocket the instance contains
-    /// The bytes passed to this function are automaticly encrypted by the provided encrytion key
-    /// Message type appends a set isize to the message so that the server can identify each message
-    async fn send_bytes(
-        &self,
-        mut bytes: Vec<u8>,
-        encryption_key: &[u8],
-        message_type: UdpMessageType,
-    ) -> anyhow::Result<(), Error>
-    {
-        //Append message flag bytes
-        bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
+//     /// This function sends bytes on the UdpSocket the instance contains
+//     /// The bytes passed to this function are automaticly encrypted by the provided encrytion key
+//     /// Message type appends a set isize to the message so that the server can identify each message
+//     async fn send_bytes(
+//         &self,
+//         mut bytes: Vec<u8>,
+//         encryption_key: &[u8],
+//         message_type: UdpMessageType,
+//     ) -> anyhow::Result<(), Error>
+//     {
+//         //Append message flag bytes
+//         bytes.append(&mut (message_type as u32).to_be_bytes().to_vec());
 
-        //Encrypt message
-        let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
+//         //Encrypt message
+//         let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
-        //Get message lenght
-        let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
+//         //Get message lenght
+//         let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
-        //Append message to message lenght
-        message_lenght_in_bytes.append(&mut encrypted_message);
+//         //Append message to message lenght
+//         message_lenght_in_bytes.append(&mut encrypted_message);
 
-        //Check for packet lenght overflow
-        let bytes_lenght = message_lenght_in_bytes.len();
+//         //Check for packet lenght overflow
+//         let bytes_lenght = message_lenght_in_bytes.len();
 
-        if bytes_lenght > 65535 {
-            bail!(format!(
-                "Udp packet lenght overflow, with lenght of {bytes_lenght}"
-            ))
-        }
+//         if bytes_lenght > 65535 {
+//             bail!(format!(
+//                 "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+//             ))
+//         }
 
-        //Send bytes
-        self.socket.send(&message_lenght_in_bytes).await?;
+//         //Send bytes
+//         self.socket.send(&message_lenght_in_bytes).await?;
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    pub async fn send_image(
-        &self,
-        uuid: String,
-        bytes: &[u8],
-        encryption_key: &[u8],
-    ) -> anyhow::Result<()>
-    {
-        //Create image parts by splitting it every 60000 bytes
-        let image_parts_tuple: Vec<(String, &[u8])> = bytes
-            .chunks(60000)
-            .map(|image_part| (sha256::digest(image_part), image_part))
-            .collect();
+//     pub async fn send_image(
+//         &self,
+//         uuid: String,
+//         bytes: &[u8],
+//         encryption_key: &[u8],
+//     ) -> anyhow::Result<()>
+//     {
+//         //Create image parts by splitting it every 60000 bytes
+//         let image_parts_tuple: Vec<(String, &[u8])> = bytes
+//             .chunks(60000)
+//             .map(|image_part| (sha256::digest(image_part), image_part))
+//             .collect();
 
-        let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
+//         let image_parts = Vec::from_iter(image_parts_tuple.iter().map(|part| part.0.clone()));
 
-        let identificator = sha256::digest(
-            image_parts
-                .iter()
-                .flat_map(|hash| hash.as_bytes().to_vec())
-                .collect::<Vec<u8>>(),
-        );
+//         let identificator = sha256::digest(
+//             image_parts
+//                 .iter()
+//                 .flat_map(|hash| hash.as_bytes().to_vec())
+//                 .collect::<Vec<u8>>(),
+//         );
 
-        //Create header message
-        let header_message =
-            ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
+//         //Create header message
+//         let header_message =
+//             ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
 
-        //Send image header
-        self.send_bytes(
-            serde_json::to_string(&header_message)?.as_bytes().to_vec(),
-            encryption_key,
-            UdpMessageType::ImageHeader,
-        )
-        .await?;
+//         //Send image header
+//         self.send_bytes(
+//             serde_json::to_string(&header_message)?.as_bytes().to_vec(),
+//             encryption_key,
+//             UdpMessageType::ImageHeader,
+//         )
+//         .await?;
 
-        //Send image parts
-        //We have already sent the image header
-        self.send_image_parts(image_parts_tuple, uuid, encryption_key, identificator)
-            .await?;
+//         //Send image parts
+//         //We have already sent the image header
+//         self.send_image_parts(image_parts_tuple, uuid, encryption_key, identificator)
+//             .await?;
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    /// Send the images specified in the ```image_parts_tuple``` argument
-    /// __Image message contents:__
-    /// - ```[len - 64..]``` = Contains the hash (sha256 hash) of the image part we are sending
-    /// - ```[..len - 64]``` = Contains the image part we are sending (JPEG image)
-    /// - **The hash lenght is 64 bytes.**
-    /// - **The identificator is 64 bytes.**
-    /// - **The uuid is 36 bytes.**
-    async fn send_image_parts(
-        &self,
-        image_parts_tuple: Vec<(String, &[u8])>,
-        uuid: String,
-        encryption_key: &[u8],
-        identificator: String,
-    ) -> Result<(), Error>
-    {
-        for (hash, bytes) in image_parts_tuple {
-            //Hash as bytes
-            let mut hash = hash.as_bytes().to_vec();
+//     /// Send the images specified in the ```image_parts_tuple``` argument
+//     /// __Image message contents:__
+//     /// - ```[len - 64..]``` = Contains the hash (sha256 hash) of the image part we are sending
+//     /// - ```[..len - 64]``` = Contains the image part we are sending (JPEG image)
+//     /// - **The hash lenght is 64 bytes.**
+//     /// - **The identificator is 64 bytes.**
+//     /// - **The uuid is 36 bytes.**
+//     async fn send_image_parts(
+//         &self,
+//         image_parts_tuple: Vec<(String, &[u8])>,
+//         uuid: String,
+//         encryption_key: &[u8],
+//         identificator: String,
+//     ) -> Result<(), Error>
+//     {
+//         for (hash, bytes) in image_parts_tuple {
+//             //Hash as bytes
+//             let mut hash = hash.as_bytes().to_vec();
 
-            //Append the hash to the bytes
-            let mut bytes = bytes.to_vec();
+//             //Append the hash to the bytes
+//             let mut bytes = bytes.to_vec();
 
-            //Append hash
-            bytes.append(&mut hash);
+//             //Append hash
+//             bytes.append(&mut hash);
 
-            //Append uuid to the message
-            bytes.append(&mut uuid.as_bytes().to_vec());
+//             //Append uuid to the message
+//             bytes.append(&mut uuid.as_bytes().to_vec());
 
-            //Append identificator
-            bytes.append(&mut identificator.as_bytes().to_vec());
+//             //Append identificator
+//             bytes.append(&mut identificator.as_bytes().to_vec());
 
-            //Send bytes
-            self.send_bytes(bytes, encryption_key, UdpMessageType::Image)
-                .await?;
-        }
+//             //Send bytes
+//             self.send_bytes(bytes, encryption_key, UdpMessageType::Image)
+//                 .await?;
+//         }
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 /*
  Client backend

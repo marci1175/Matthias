@@ -14,8 +14,6 @@ use windows_sys::{
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
-    panic!();
-    
     //Get args
     let args: Vec<String> = args().collect();
 
@@ -80,7 +78,7 @@ async fn main() -> eframe::Result<()>
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            let mut application = matthias::app::backend::Application::new(cc);
+            let mut application = matthias_mobile::app::backend::Application::new(cc);
 
             //Check if there are any custom startup args
             if args.len() > 1 {
@@ -110,6 +108,7 @@ where
         )
     };
 }
+
 /*  Gulyásleves recept
 
     Heat the oil or lard in a large pot (preferably a Dutch oven). Add the onions along with a few spoonfuls of water (so they don’t brown) and a pinch of the salt. Cook slowly over very low heat for about 15 to 20 minutes, or until the onions are clear and glassy.

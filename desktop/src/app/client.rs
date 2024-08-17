@@ -32,10 +32,9 @@ pub const IDENTIFICATOR_BYTE_OFFSET: usize = 64;
 /// This is the byte lenght of the uuid's text representation (utf8)
 pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 
-use super::backend::{fetch_incoming_message_lenght, get_image_header, ServerVoipEvent};
+use super::backend::{fetch_incoming_message_lenght, get_image_header};
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
-use dashmap::DashMap;
 use image::ImageOutputFormat;
 use std::{
     collections::VecDeque,
@@ -148,7 +147,7 @@ impl Application
                     voip.socket.connect(destination).await.unwrap();
 
                     //Start audio recorder
-                    let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
+                    let recording_handle = record_audio_with_interrupt(rx, microphone_precentage, voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
 
                     //We can just send it becasue we have already set the default destination address
                     loop {

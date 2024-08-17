@@ -1,12 +1,11 @@
 use egui::{
-    load::LoadError, vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image,
-    ImageButton, Layout, Pos2, RichText, Sense, Stroke,
+    load::LoadError, vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, Layout, Pos2, RichText, Sense, Stroke,
 };
 use rodio::Decoder;
-use std::sync::atomic::Ordering::Relaxed;
-use tokio_util::sync::CancellationToken;
 
-use crate::app::backend::{display_error_message, ClientMessage, ConnectionState, Voip};
+use crate::app::backend::{display_error_message, ClientMessage, ConnectionState,
+    // Voip
+};
 
 use crate::app::backend::{Application, SearchType, ServerMessageType};
 
@@ -89,76 +88,8 @@ impl Application
                             "Invalid address to send the message on.",
                             self.toasts.clone(),
                         );
-
-                        return;
                     }
 
-                    ui.allocate_ui(vec2(40., 40.), |ui| {
-                        if self.client_ui.voip.as_mut().is_some() {
-                            let disconnect_button = ui.add(ImageButton::new(Image::new(
-                                egui::include_image!("..\\..\\..\\icons\\call_red.png"),
-                            )));
-
-                            if disconnect_button.clicked() {
-                                //Shut down listener server, and disconnect from server
-                                self.send_msg(ClientMessage::construct_voip_disconnect(
-                                    &self.opened_user_information.uuid,
-                                ));
-
-                                //Shutdown listener and recorder thread
-                                self.voip_shutdown_token.cancel();
-
-                                //Signal the voice recorder function to stop
-                                let _ = self.record_audio_interrupter.send(());
-
-                                //Reset state
-                                self.client_ui.voip = None;
-                                self.voip_thread = None;
-                            }
-                        }
-                        else {
-                            ui.add_enabled_ui(self.atx.is_none(), |ui| {
-                                let call_button = ui.add(ImageButton::new(Image::new(
-                                    egui::include_image!("..\\..\\..\\icons\\call.png"),
-                                )));
-
-                                if call_button.clicked() {
-                                    //Move sender into thread
-                                    let sender = self.voip_connection_sender.clone();
-
-                                    //Reset shutdown token State, if we had cancelled this token we must create a new one in order to reset its state
-                                    //else its going to be cancelled and new threads will shut dwon immediately
-                                    self.voip_shutdown_token = CancellationToken::new();
-
-                                    let toasts = self.toasts.clone();
-
-                                    //Spawn thread which will create the ```Voip``` instance
-                                    tokio::spawn(async move {
-                                        match Voip::new().await {
-                                            Ok(voip) => {
-                                                // It is okay to unwrap since it doesnt matter if we panic
-                                                sender.send(voip).unwrap();
-                                            },
-                                            Err(err) => {
-                                                //Avoid panicking when trying to display a Notification
-                                                //This is very rare but can still happen
-                                                display_error_message(err, toasts);
-                                            },
-                                        }
-                                    });
-                                }
-
-                                call_button.on_hover_text("Start a group call");
-
-                                //Callback
-                                self.client_ui.extension.event_call_extensions(
-                                    crate::app::lua::EventCall::OnCallSend,
-                                    &self.lua,
-                                    None,
-                                );
-                            });
-                        }
-                    });
                 }
             });
 
@@ -175,78 +106,6 @@ impl Application
         {
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "voip_connected_users")
                 .show(ctx, |ui| {
-                    //We should only display the settings menu if we are connected to a Voip call
-                    if let Some(voip) = &mut self.client_ui.voip {
-                        //Settings for the client connected to an ongoing call
-                        ui.allocate_ui(vec2(ui.available_width(), 30.), |ui| {
-                            ui.horizontal_centered(|ui| {
-                                if voip.enable_microphone.load(Relaxed) {
-                                    if ui.add(ImageButton::new(egui::include_image!(
-                                        "../../../icons/record_off.png"
-                                    ))).clicked() {
-                                        voip.enable_microphone.store(false, Relaxed);
-                                    }
-                                }
-                                else if ui.add(ImageButton::new(egui::include_image!(
-                                    "../../../icons/record.png"
-                                ))).clicked() {
-                                    voip.enable_microphone.store(true, Relaxed);
-                                }
-
-                                //If there isnt a camera added
-                                if !voip.camera_handle_is_open {
-                                    //Display camera on button
-                                    if ui
-                                        .add(ImageButton::new(egui::include_image!(
-                                            "../../../icons/camera.png"
-                                        )))
-                                        .clicked()
-                                    {
-                                        //Reset cancellation token
-                                        self.voip_video_shutdown_token = CancellationToken::new();
-
-                                        //Reset thread
-                                        self.voip_video_thread = None;
-
-                                        //Add camera handle to the voip
-                                        match voip.add_camera_handle() {
-                                            Ok(_) => (),
-                                            Err(err) => {
-                                                tracing::error!("{err}");
-
-                                                display_error_message(err, self.toasts.clone());
-                                            },
-                                        };
-                                    }
-                                }
-                                else {
-                                    //Display camera off button
-                                    if ui
-                                        .add(ImageButton::new(egui::include_image!(
-                                            "../../../icons/camera_off.png"
-                                        )))
-                                        .clicked()
-                                    {
-                                        //Drop camera handle
-                                        voip.remove_camera_handle(&self.client_connection.client_secret, self.opened_user_information.uuid.clone());
-
-                                        //Cancel webcam recording
-                                        self.voip_video_shutdown_token.cancel();
-                                    }
-                                }
-                            });
-                        });
-
-                        ui.separator();
-                    }
-
-                    //Display the name of this part of the ui
-                    ui.label(
-                        RichText::from("Users connected to the voice chat:")
-                            .weak()
-                            .size(self.font_size / 2.),
-                    );
-
                     //Put all of the connected users nxt to eachother
                     ui.horizontal(|ui| {
                         for connected_client_uuid in connected_clients.iter() {
@@ -637,7 +496,7 @@ impl Application
         self.client_recv(ctx);
 
         //Client voip thread managemant
-        self.client_voip_thread(ctx);
+        // self.client_voip_thread(ctx);
 
         match self.audio_bytes_rx.try_recv() {
             Ok(bytes) => {

@@ -1,9 +1,6 @@
-use crate::app::{
-    backend::{
+use crate::app::backend::{
         Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
-    },
-    ui::client_ui::client_actions::audio_recording::{audio_recording_with_recv, create_wav_file},
-};
+    };
 use chrono::Utc;
 use egui::{
     load::{BytesPoll, LoadError},
@@ -13,7 +10,6 @@ use egui::{
 };
 use rand::Rng;
 use rfd::FileDialog;
-use std::sync::mpsc;
 
 impl Application
 {
@@ -414,89 +410,6 @@ impl Application
                     else {
                         //check if button has been unhovered, reset variable
                         self.client_ui.random_generated = false;
-                    }
-
-                    //Record button
-                    if let Some(atx) = self.atx.clone() {
-                        ui.horizontal_centered(|ui| {
-                            let stop_recording_button = ui
-                                .allocate_ui(
-                                    vec2(ui.available_width(), self.font_size * 1.5),
-                                    |ui| {
-                                        ui.add(
-                                            egui::ImageButton::new(egui::include_image!(
-                                                "../../../../../../icons/record.png"
-                                            ))
-                                            .tint(Color32::RED),
-                                        )
-                                    },
-                                )
-                                .inner;
-
-                            //Signal the recording thread to stop
-                            if stop_recording_button.clicked() {
-                                //Just send something, it doesnt really matter
-                                atx.send(false).unwrap();
-
-                                //Destroy state
-                                self.atx = None;
-                            }
-
-                            //Display stats
-                            ui.label(
-                                RichText::from("Recording")
-                                    .size(self.font_size)
-                                    .color(Color32::RED),
-                            );
-                            //Display lenght
-                            ui.label(
-                                RichText::from(format!(
-                                    "{}s",
-                                    Utc::now()
-                                        .signed_duration_since(
-                                            self.client_ui.voice_recording_start.unwrap()
-                                        )
-                                        .num_seconds()
-                                ))
-                                .size(self.font_size),
-                            );
-                            ctx.request_repaint();
-                        });
-                    }
-                    else {
-                        ui.add_enabled_ui(self.client_ui.voip.is_none(), |ui| {
-                            if ui
-                                .add(egui::ImageButton::new(egui::include_image!(
-                                    "../../../../../../icons/record.png"
-                                )))
-                                .clicked()
-                            {
-                                let (tx, rx) = mpsc::channel::<bool>();
-
-                                self.atx = Some(tx);
-
-                                //Set audio recording start
-                                self.client_ui.voice_recording_start = Some(Utc::now());
-
-                                //Move into thread
-                                let audio_bytes_sender = self.audio_bytes_tx.clone();
-                                let microphone_precentage =
-                                    self.client_ui.microphone_volume.clone();
-
-                                tokio::spawn(async move {
-                                    let bytes = audio_recording_with_recv(
-                                        rx,
-                                        *microphone_precentage.lock().unwrap(),
-                                    )
-                                    .unwrap();
-
-                                    //These bytes can be played back with rodio (Wav format)
-                                    let playback_bytes = create_wav_file(bytes);
-
-                                    audio_bytes_sender.send(playback_bytes).unwrap();
-                                });
-                            }
-                        });
                     }
                 });
             });

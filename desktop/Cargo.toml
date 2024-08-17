@@ -10,7 +10,6 @@ egui = "0.28.1"
 egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect", "image"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "bmp", "tiff", "webp", "gif"] } # Add the types you want support for
 
-prost = "0.10"
 tokio = { version = "1.37.0", features = ["full"] }
 eframe = { version = "0.28.1", default-features = true, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
@@ -49,12 +48,8 @@ dashmap = {version = "6.0.0", features = ["serde"]}
 sha256 = "1.5.0"
 phf = {version = "0.11.2", features = ["macros"]}
 mlua = {version = "0.9.9", features = ["luajit", "async", "vendored"]}
-quote = "1.0.36"
-syn = {version = "2.0.70", features = ["full"]}
 mlua_proc_macro = "0.1.12"
 mlua-sys = {version = "0.6.1", features = ["luajit", "vendored"]}
-speed_test = "0.1.8"
-pipe = "0.4.0"
 num-traits = "0.2.19"
 opus = "0.3.0"
 egui-notify = "0.15.0"
@@ -80,7 +75,6 @@ features = [
 [build-dependencies]
 chrono = "0.4.31"
 winres = "0.1.12"
-phf_codegen = "0.11.2"
 phf_macros = "0.11.2"
 
 # native:

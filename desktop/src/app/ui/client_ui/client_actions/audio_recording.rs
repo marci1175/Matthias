@@ -10,13 +10,14 @@ use std::{
     f32,
     io::{BufWriter, Cursor},
     sync::{
-        atomic::AtomicBool,
+        atomic::{AtomicBool, AtomicI64},
         mpsc::{self, Receiver},
         Arc, Mutex,
     },
     thread::JoinHandle,
     time::Duration,
 };
+use std::sync::atomic::Ordering::Relaxed;
 
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
@@ -105,7 +106,7 @@ pub fn record_audio_for_set_duration(
 /// This  `queue` or `buffer` gets updated from left to right, the new element always pushes back all the elements behind it, if the value's index reaches ```idx > queue_lenght```, it gets dropped.
 pub fn record_audio_with_interrupt(
     interrupt: Receiver<()>,
-    amplification_precentage: f32,
+    amplification_precentage: Arc<AtomicI64>,
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
     should_record: Arc<AtomicBool>,
 ) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>>
@@ -128,7 +129,7 @@ pub fn record_audio_with_interrupt(
                     if !write_input_data_to_buffer_with_set_len::<f32>(
                         data,
                         buffer_handle.clone(),
-                        amplification_precentage / 100.,
+                        amplification_precentage.load(Relaxed) as f32 / 100.,
                         should_record.clone(),
                     ) {
                         //Quit the thread, stop recording

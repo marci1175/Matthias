@@ -67,7 +67,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     //Emoji type directories
     let mut emoji_type_dir: Vec<PathBuf> = Vec::new();
 
-    let read_dir = fs::read_dir(PathBuf::from(format!("icons/emojis")))?;
+    let read_dir = fs::read_dir(PathBuf::from("icons/emojis".to_string()))?;
 
     for entry in read_dir {
         let dir_entry = entry?;

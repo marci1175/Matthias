@@ -35,7 +35,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        atomic::AtomicBool,
+        atomic::{AtomicBool, AtomicI64},
         mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
@@ -832,7 +832,7 @@ pub struct Client
     pub voip: Option<Voip>,
 
     /// This entry contains the volume precentage of the microphone, this is modified in the settings
-    pub microphone_volume: Arc<Mutex<f32>>,
+    pub microphone_volume: Arc<AtomicI64>,
 }
 
 impl Default for Client
@@ -889,7 +889,7 @@ impl Default for Client
             last_seen_msg_index: Arc::new(Mutex::new(0)),
             emoji_selector_index: 0,
             voip: None,
-            microphone_volume: Arc::new(Mutex::new(100.)),
+            microphone_volume: Arc::new(AtomicI64::new(100)),
         }
     }
 }
@@ -1242,8 +1242,7 @@ impl ClientMessage
                         .to_str()
                         .unwrap()
                         .to_string()
-                        .split(".")
-                        .into_iter().next().unwrap().to_string(),
+                        .split(".").next().unwrap().to_string(),
                 ),
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),

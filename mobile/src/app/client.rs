@@ -34,19 +34,10 @@ pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 use super::backend::{fetch_incoming_message_lenght, get_image_header};
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 
-use dashmap::DashMap;
-use image::ImageOutputFormat;
-use std::{
-    collections::VecDeque,
-    io::{BufReader, BufWriter, Cursor},
-    sync::mpsc,
-};
+use std::io::{BufReader, Cursor};
 
 use crate::app::backend::{decrypt_aes256_bytes, MessageBuffer, UdpMessageType};
 
-use crate::app::ui::client_ui::client_actions::audio_recording::{
-    create_wav_file, record_audio_with_interrupt,
-};
 
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
@@ -111,157 +102,157 @@ impl ServerReply
 impl Application
 {
     ///This function is used to send voice recording in a voip connection, this function spawns a thread which record 35ms of your voice then sends it to the linked voip destination
-    pub fn client_voip_thread(&mut self, ctx: &egui::Context)
-    {
-        if let Some(voip) = self.client_ui.voip.clone() {
-            let uuid = self.opened_user_information.uuid.clone();
-            let destination = self.client_ui.send_on_ip.clone();
-            let decryption_key = self.client_connection.client_secret.clone();
-            let cancel_token = self.voip_shutdown_token.clone();
-            let cancel_token_child = cancel_token.child_token();
-            let uuid_clone = uuid.clone();
-            let decryption_key_clone = decryption_key.clone();
-            let voip_clone = voip.clone();
-            let camera_handle = voip_clone.camera_handle.clone();
-            let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
+    // pub fn client_voip_thread(&mut self, ctx: &egui::Context)
+    // {
+    //     if let Some(voip) = self.client_ui.voip.clone() {
+    //         let uuid = self.opened_user_information.uuid.clone();
+    //         let destination = self.client_ui.send_on_ip.clone();
+    //         let decryption_key = self.client_connection.client_secret.clone();
+    //         let cancel_token = self.voip_shutdown_token.clone();
+    //         let cancel_token_child = cancel_token.child_token();
+    //         let uuid_clone = uuid.clone();
+    //         let decryption_key_clone = decryption_key.clone();
+    //         let voip_clone = voip.clone();
+    //         let camera_handle = voip_clone.camera_handle.clone();
+    //         let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
 
             
 
-            self.voip_thread.get_or_insert_with(|| {
-                let reciver_socket_part = voip.socket.clone();
-                let microphone_precentage = self.client_ui.microphone_volume.clone();
+    //         self.voip_thread.get_or_insert_with(|| {
+    //             let reciver_socket_part = voip.socket.clone();
+    //             let microphone_precentage = self.client_ui.microphone_volume.clone();
 
-                let (tx, rx) = mpsc::channel::<()>();
+    //             let (tx, rx) = mpsc::channel::<()>();
 
-                self.record_audio_interrupter = tx;
+    //             self.record_audio_interrupter = tx;
 
-                let enable_microphone = voip.enable_microphone.clone();
+    //             let enable_microphone = voip.enable_microphone.clone();
 
-                //Sender thread
-                tokio::spawn(async move {
-                    //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
-                    let voip_audio_buffer: Arc<std::sync::Mutex<VecDeque<f32>>> = Arc::new(std::sync::Mutex::new(VecDeque::new()));
+    //             //Sender thread
+    //             tokio::spawn(async move {
+    //                 //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
+    //                 let voip_audio_buffer: Arc<std::sync::Mutex<VecDeque<f32>>> = Arc::new(std::sync::Mutex::new(VecDeque::new()));
 
-                    //Conect socket to destination
-                    voip.socket.connect(destination).await.unwrap();
+    //                 //Conect socket to destination
+    //                 voip.socket.connect(destination).await.unwrap();
 
-                    //Start audio recorder
-                    let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
+    //                 //Start audio recorder
+    //                 let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
 
-                    //We can just send it becasue we have already set the default destination address
-                    loop {
-                        select! {
-                            //Wait until we should send the buffer
-                            //Record 35ms of audio, send it to the server
-                            _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS as u64)) => {
-                                    //We create this scope to tell the compiler the recording handle wont be sent across any awaits
-                                    let playbackable_audio: Vec<u8> = {
-                                        //Lock handle
-                                        let mut recording_handle = recording_handle.lock().unwrap();
-                                        //Create wav bytes
-                                        let playbackable_audio: Vec<u8> = create_wav_file(
-                                            recording_handle.clone().into()
-                                        );
-                                        //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
-                                        recording_handle.clear();
-                                        //Return wav bytes
-                                        playbackable_audio
-                                    };
-                                    //Create audio chunks
-                                    let audio_chunks = playbackable_audio.chunks(30000);
-                                    //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
-                                    for chunk in audio_chunks {
-                                        voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
-                                    }
-                            },
-                            _ = cancel_token.cancelled() => {
-                                //Exit thread
-                                break;
-                            },
-                        };
-                    }
-                });
+    //                 //We can just send it becasue we have already set the default destination address
+    //                 loop {
+    //                     select! {
+    //                         //Wait until we should send the buffer
+    //                         //Record 35ms of audio, send it to the server
+    //                         _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS as u64)) => {
+    //                                 //We create this scope to tell the compiler the recording handle wont be sent across any awaits
+    //                                 let playbackable_audio: Vec<u8> = {
+    //                                     //Lock handle
+    //                                     let mut recording_handle = recording_handle.lock().unwrap();
+    //                                     //Create wav bytes
+    //                                     let playbackable_audio: Vec<u8> = create_wav_file(
+    //                                         recording_handle.clone().into()
+    //                                     );
+    //                                     //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
+    //                                     recording_handle.clear();
+    //                                     //Return wav bytes
+    //                                     playbackable_audio
+    //                                 };
+    //                                 //Create audio chunks
+    //                                 let audio_chunks = playbackable_audio.chunks(30000);
+    //                                 //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
+    //                                 for chunk in audio_chunks {
+    //                                     voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
+    //                                 }
+    //                         },
+    //                         _ = cancel_token.cancelled() => {
+    //                             //Exit thread
+    //                             break;
+    //                         },
+    //                     };
+    //                 }
+    //             });
 
-                //Clone ctx
-                let ctx = ctx.clone();
+    //             //Clone ctx
+    //             let ctx = ctx.clone();
 
-                //Create sink
-                let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
-                let decryption_key = self.client_connection.client_secret.clone();
+    //             //Create sink
+    //             let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
+    //             let decryption_key = self.client_connection.client_secret.clone();
 
-                //Reciver thread
-                tokio::spawn(async move {
-                    let ctx_clone = ctx.clone();
+    //             //Reciver thread
+    //             tokio::spawn(async move {
+    //                 let ctx_clone = ctx.clone();
 
-                    //Create image buffer
-                    let image_buffer: MessageBuffer = Arc::new(DashMap::new());
+    //                 //Create image buffer
+    //                 let image_buffer: MessageBuffer = Arc::new(DashMap::new());
 
-                    //Listen on socket, play audio
-                    loop {
-                        select! {
-                            _ = cancel_token_child.cancelled() => {
-                                //Break out of the listener loop
-                                break;
-                            },
+    //                 //Listen on socket, play audio
+    //                 loop {
+    //                     select! {
+    //                         _ = cancel_token_child.cancelled() => {
+    //                             //Break out of the listener loop
+    //                             break;
+    //                         },
 
-                            //Recive bytes
-                            _recived_bytes_count = async {
-                                match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone(), &ctx_clone).await {
-                                    Ok(_) => (),
-                                    Err(err) => {
-                                        tracing::error!("{}", err);
-                                    },
-                                }
-                            } => {}
-                        }
-                    }
-                });
-            });
+    //                         //Recive bytes
+    //                         _recived_bytes_count = async {
+    //                             match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone(), &ctx_clone).await {
+    //                                 Ok(_) => (),
+    //                                 Err(err) => {
+    //                                     tracing::error!("{}", err);
+    //                                 },
+    //                             }
+    //                         } => {}
+    //                     }
+    //                 }
+    //             });
+    //         });
 
-            if let Ok(handle) = camera_handle.try_lock() {
-                if handle.is_none() {
-                    return;
-                }
-            }
+    //         if let Ok(handle) = camera_handle.try_lock() {
+    //             if handle.is_none() {
+    //                 return;
+    //             }
+    //         }
 
-            self.voip_video_thread.get_or_insert_with(|| {
-                //Create image sender thread
-                tokio::spawn(async move {
-                    loop {
-                        select! {
-                            //Lock camera handle
-                            mut camera_handle = camera_handle.lock() => {
-                                //Get image bytes from the cameras
-                                match camera_handle.as_mut() {
-                                    Some(handle) => {
-                                        //Create buffer for image
-                                        let mut buffer = BufWriter::new(Cursor::new(Vec::new()));
-                                        //Get camera frame
-                                        let (camera_bytes, size) = handle.get_frame().unwrap_or_default();
+    //         self.voip_video_thread.get_or_insert_with(|| {
+    //             //Create image sender thread
+    //             tokio::spawn(async move {
+    //                 loop {
+    //                     select! {
+    //                         //Lock camera handle
+    //                         mut camera_handle = camera_handle.lock() => {
+    //                             //Get image bytes from the cameras
+    //                             match camera_handle.as_mut() {
+    //                                 Some(handle) => {
+    //                                     //Create buffer for image
+    //                                     let mut buffer = BufWriter::new(Cursor::new(Vec::new()));
+    //                                     //Get camera frame
+    //                                     let (camera_bytes, size) = handle.get_frame().unwrap_or_default();
 
-                                        //Convert raw image bytes to jpeg
-                                        image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(70)).unwrap();
+    //                                     //Convert raw image bytes to jpeg
+    //                                     image::write_buffer_with_format(&mut buffer, &camera_bytes, size.width as u32, size.height as u32, image::ColorType::Rgb8, ImageOutputFormat::Jpeg(70)).unwrap();
 
-                                        //Send image
-                                        voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner().unwrap().into_inner(), &decryption_key_clone).await.unwrap();
-                                    },
-                                    None => {
-                                        //... camera handle has been removed
-                                        break;
-                                    },
-                                }
-                            }
-                            _ = voice_recording_shutdown.cancelled() => {
-                                println!("exit thread");
-                                //Exit thread
-                                break;
-                            },
-                        }
-                    }
-                });
-            });
-        }
-    }
+    //                                     //Send image
+    //                                     voip_clone.send_image(uuid_clone.clone(), &buffer.into_inner().unwrap().into_inner(), &decryption_key_clone).await.unwrap();
+    //                                 },
+    //                                 None => {
+    //                                     //... camera handle has been removed
+    //                                     break;
+    //                                 },
+    //                             }
+    //                         }
+    //                         _ = voice_recording_shutdown.cancelled() => {
+    //                             println!("exit thread");
+    //                             //Exit thread
+    //                             break;
+    //                         },
+    //                     }
+    //                 }
+    //             });
+    //         });
+    //     }
+    // }
 
     ///This functions is used for clients to recive messages from the server (this doesnt not check validity of the order of the messages, altough this may not be needed as tcp takes care of this)
     pub fn client_recv(&mut self, ctx: &egui::Context)
