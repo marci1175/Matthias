@@ -10,14 +10,13 @@ use std::{
     f32,
     io::{BufWriter, Cursor},
     sync::{
-        atomic::{AtomicBool, AtomicI64},
+        atomic::{AtomicBool, AtomicI64, Ordering::Relaxed},
         mpsc::{self, Receiver},
         Arc, Mutex,
     },
     thread::JoinHandle,
     time::Duration,
 };
-use std::sync::atomic::Ordering::Relaxed;
 
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
 

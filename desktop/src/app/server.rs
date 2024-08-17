@@ -465,6 +465,8 @@ pub fn create_client_voip_manager(
                             //THIS IS UNUSED AND SHOULD BE REMOVED
                             let _uuid_bytes = message_bytes[message_bytes.len() - UUID_BYTE_OFFSET..message_bytes.len() - IDENTIFICATOR_BYTE_OFFSET].to_vec();
 
+                            let author_uuid = String::from_utf8(_uuid_bytes).unwrap();
+
                             if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
                                 if let Some((index, _, contents)) = image_header.get_full_mut(&identificator) {
 
@@ -479,7 +481,7 @@ pub fn create_client_voip_manager(
                                     if contents.iter().all(|(_, value)| value.is_some()) {
                                         let contents_clone = contents.clone();
                                         tokio::spawn(async move {
-                                            
+
 
                                         //Combine the image part bytes
                                         let image_bytes: Vec<u8> = contents_clone.iter().flat_map(|(_, value)| {
@@ -501,14 +503,12 @@ pub fn create_client_voip_manager(
                                                 .collect::<Vec<u8>>(),
                                         );
 
-                                                
                                         for connected_client in voip_connected_clients.iter() {
-                                            let uuid = connected_client.key();
                                             let socket_addr = connected_client.value();
 
                                             //Create header message
                                             let header_message =
-                                                ImageHeader::new(uuid.clone(), image_parts.clone(), identificator.clone());
+                                                ImageHeader::new(author_uuid.clone(), image_parts.clone(), identificator.clone());
 
                                             // Send image header
                                             send_bytes(
@@ -522,7 +522,7 @@ pub fn create_client_voip_manager(
 
                                             //Send image parts
                                             //We have already sent the image header
-                                            send_image_parts(image_parts_tuple.clone(), uuid.clone(), &key, identificator.clone(), socket.clone(), *socket_addr)
+                                            send_image_parts(image_parts_tuple.clone(), author_uuid.clone(), &key, identificator.clone(), socket.clone(), *socket_addr)
                                                 .await.unwrap();
                                         }
                                         });
@@ -1052,7 +1052,7 @@ impl MessageService
                             }
                         },
                         super::backend::ClientVoipRequest::ImageDisconnected => {
-                            if let Some(voip) = &mut  self.voip {
+                            if let Some(voip) = &mut self.voip {
                                 voip.image_buffer.remove(&req.uuid);
                             }
                             else {

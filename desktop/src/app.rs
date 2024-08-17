@@ -479,15 +479,18 @@ impl backend::Application
 
             ui.horizontal(|ui| {
                 ui.label("Microphone volume precentage");
-                self.client_ui.microphone_volume.fetch_update(std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst, |mut value| {
-                    ui.add(Slider::new(
-                        &mut value,
-                        50..=500,
-                    ));
+                self.client_ui
+                    .microphone_volume
+                    .fetch_update(
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                        |mut value| {
+                            ui.add(Slider::new(&mut value, 50..=500));
 
-                    Some(value)
-                });
-                
+                            Some(value)
+                        },
+                    )
+                    .unwrap_or_default();
             });
         });
     }

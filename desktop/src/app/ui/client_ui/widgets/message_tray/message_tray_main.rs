@@ -486,7 +486,9 @@ impl Application
                                 tokio::spawn(async move {
                                     let bytes = audio_recording_with_recv(
                                         rx,
-                                        microphone_precentage.load(std::sync::atomic::Ordering::Relaxed) as f32,
+                                        microphone_precentage
+                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                            as f32,
                                     )
                                     .unwrap();
 

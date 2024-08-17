@@ -416,7 +416,7 @@ impl Application
                             );
                         });
                     },
-                    
+
                     crate::app::backend::VoipEvent::ImageConnected => unreachable!(),
                     crate::app::backend::VoipEvent::ImageDisconnected => unreachable!(),
                 };

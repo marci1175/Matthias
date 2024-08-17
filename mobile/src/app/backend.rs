@@ -321,7 +321,6 @@ impl Default for Application
 
             // voip_connection_reciver: Arc::new(voip_connection_reciver),
             // voip_connection_sender,
-
             autosync_shutdown_token: CancellationToken::new(),
             server_connected_clients_profile: Arc::new(DashMap::new()),
             opened_user_information: UserInformation::default(),
@@ -828,7 +827,6 @@ pub struct Client
 
     // #[serde(skip)]
     // pub voip: Option<Voip>,
-
     /// This entry contains the volume precentage of the microphone, this is modified in the settings
     pub microphone_volume: Arc<Mutex<f32>>,
 }
@@ -1240,7 +1238,10 @@ impl ClientMessage
                         .to_str()
                         .unwrap()
                         .to_string()
-                        .split(".").next().unwrap().to_string(),
+                        .split(".")
+                        .next()
+                        .unwrap()
+                        .to_string(),
                 ),
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),

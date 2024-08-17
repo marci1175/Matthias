@@ -1,6 +1,6 @@
 use crate::app::backend::{
-        Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
-    };
+    Application, ClientMessage, ConnectionState, MessagingMode, ServerMessageType, EMOJI_TUPLES,
+};
 use chrono::Utc;
 use egui::{
     load::{BytesPoll, LoadError},

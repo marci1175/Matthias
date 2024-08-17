@@ -53,7 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
 fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path_to_output = PathBuf::from(format!("{}\\emoji_header.rs", dbg!(std::env::var("OUT_DIR")?)));
+    let path_to_output = PathBuf::from(format!(
+        "{}\\emoji_header.rs",
+        dbg!(std::env::var("OUT_DIR")?)
+    ));
 
     //This will get written to the output file
     let mut content = String::new();

@@ -38,7 +38,6 @@ use std::io::{BufReader, Cursor};
 
 use crate::app::backend::{decrypt_aes256_bytes, MessageBuffer, UdpMessageType};
 
-
 /// Sends connection request to the specified server handle, returns the server's response, this function does not create a new thread, and may block
 pub async fn connect_to_server(
     mut connection: TcpStream,
@@ -115,8 +114,6 @@ impl Application
     //         let voip_clone = voip.clone();
     //         let camera_handle = voip_clone.camera_handle.clone();
     //         let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
-
-            
 
     //         self.voip_thread.get_or_insert_with(|| {
     //             let reciver_socket_part = voip.socket.clone();

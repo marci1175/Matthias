@@ -174,6 +174,7 @@ impl Application
             .connected_clients
         {
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "voip_connected_users")
+                .resizable(true)
                 .show(ctx, |ui| {
                     let uuid = self.opened_user_information.uuid.clone();
 
@@ -184,13 +185,13 @@ impl Application
                             ui.horizontal_centered(|ui| {
                                 if voip.enable_microphone.load(Relaxed) {
                                     if ui.add(ImageButton::new(egui::include_image!(
-                                        "../../../icons/record_off.png"
+                                        "../../../icons/record.png"
                                     ))).clicked() {
                                         voip.enable_microphone.store(false, Relaxed);
                                     }
                                 }
                                 else if ui.add(ImageButton::new(egui::include_image!(
-                                    "../../../icons/record.png"
+                                    "../../../icons/record_off.png"
                                 ))).clicked() {
                                     voip.enable_microphone.store(true, Relaxed);
                                 }

@@ -1242,7 +1242,10 @@ impl ClientMessage
                         .to_str()
                         .unwrap()
                         .to_string()
-                        .split(".").next().unwrap().to_string(),
+                        .split(".")
+                        .next()
+                        .unwrap()
+                        .to_string(),
                 ),
                 bytes: std::fs::read(file_path).unwrap_or_default(),
             }),
@@ -1846,7 +1849,7 @@ pub enum ServerMessageType
 
     /// This message holds the State of the Voip service
     #[strum_discriminants(strum(message = "Voip state"))]
-    VoipState(ServerVoipState), 
+    VoipState(ServerVoipState),
 }
 
 /// The types of message the server can "send"
@@ -2144,10 +2147,10 @@ pub enum VoipEvent
     ImageDisconnected,
 }
 
-
 /// This struct holds all important information, when informing clients / servers about a ```VoipEvent```
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ServerVoipEvent {
+pub struct ServerVoipEvent
+{
     /// The uuid of the user who has initiated this event
     pub uuid: String,
     /// The event the user has initiated
@@ -2335,7 +2338,6 @@ impl Voip
             *camera_handle = Some(Webcam::new_def_auto_detect().unwrap());
         });
 
-
         Ok(())
     }
 
@@ -2364,7 +2366,6 @@ impl Voip
 
             *camera_handle = None;
         });
-
     }
 
     /// Starts a video call when this function is called.

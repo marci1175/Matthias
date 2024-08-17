@@ -1,9 +1,13 @@
 use egui::{
-    load::LoadError, vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, Layout, Pos2, RichText, Sense, Stroke,
+    load::LoadError, vec2, Align, Align2, Area, Color32, FontFamily, FontId, Id, Image, Layout,
+    Pos2, RichText, Sense, Stroke,
 };
 use rodio::Decoder;
 
-use crate::app::backend::{display_error_message, ClientMessage, ConnectionState,
+use crate::app::backend::{
+    display_error_message,
+    ClientMessage,
+    ConnectionState,
     // Voip
 };
 
@@ -89,7 +93,6 @@ impl Application
                             self.toasts.clone(),
                         );
                     }
-
                 }
             });
 

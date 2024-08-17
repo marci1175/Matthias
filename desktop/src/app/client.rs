@@ -171,7 +171,9 @@ impl Application
                                     
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
-                                    
+
+                                    tracing::info!("Sending uuid: {uuid}");
+
                                     //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
                                     for chunk in audio_chunks {
                                         voip.send_audio(uuid.clone(), chunk.to_vec(), &decryption_key).await.unwrap();
@@ -589,7 +591,7 @@ impl Application
                                                         }
                                                     },
                                                 }
-                                            }
+                                            },
                                             _ => {
                                                 let message = msg.message.clone();
 
@@ -721,7 +723,7 @@ impl Application
                                                     },
                                                     Err(_err) => {
                                                         tracing::error!("{_err}");
-                                                    }
+                                                    },
                                                 }
                                             },
                                         }
@@ -753,19 +755,20 @@ impl Application
         }
     }
 
-fn add_message(&mut self, message: super::backend::ServerOutput) {
+    fn add_message(&mut self, message: super::backend::ServerOutput)
+    {
         //Allocate Message vec for the new message
         self.client_ui
             .incoming_messages
             .reaction_list
             .push(MessageReaction::default());
-    
+
         //We can append the missing messages sent from the server, to the self.client_ui.incoming_msg.struct_list vector
         self.client_ui
             .incoming_messages
             .message_list
             .push(message.clone());
-    
+
         //Callback
         self.client_ui.extension.event_call_extensions(
             crate::app::lua::EventCall::OnChatRecive,
@@ -867,8 +870,10 @@ async fn recive_server_relay(
             )
             .unwrap();
 
+            dbg!(&uuid);
+
             //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
-            uuid::Uuid::parse_str(uuid.trim())
+            uuid::Uuid::parse_str(&uuid)
                 .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
 
             if let Some(mut image_header) = image_buffer.get_mut(&uuid) {
@@ -895,10 +900,10 @@ async fn recive_server_relay(
 
                         //Define uri
                         let uri = format!("bytes://video_stream:{uuid}");
-                        
+
                         //Drain earlier ImageHeaders (and the current one), because a new one has arrived
                         image_header.drain(index..=index);
-                        
+
                         //Its important to drop image header, so that we dont deadlock, due to me accessing the image_buffer later
                         drop(image_header);
 
