@@ -1,6 +1,28 @@
+# Create workspace
 [workspace]
 
+# Use 2021 rust resolver
+resolver = "2"
+
+# Define members
 members = [
+    # Desktop client
     "desktop",
+    # Android client
     "mobile",
 ]
+
+#
+# Build profiles
+#
+# Optimize release builds for size
+[profile.release]
+opt-level = "s"
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
+
+# Dont optimize in debug builds for faster compilation:
+[profile.dev]
+opt-level = 0

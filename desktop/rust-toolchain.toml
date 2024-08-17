@@ -1,3 +1,4 @@
 [toolchain]
+channel = "nightly"
 components = [ "rustfmt", "clippy", "rustc", "rust-docs", "rust-analyzer" ]
-targets = [ "x86_64-linux-android" ]
+targets = [ "x86_64-pc-windows-msvc" ]

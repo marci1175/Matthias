@@ -14,6 +14,8 @@ use windows_sys::{
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
+    panic!();
+    
     //Get args
     let args: Vec<String> = args().collect();
 
@@ -58,14 +60,6 @@ async fn main() -> eframe::Result<()>
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
-            icon: Some(std::sync::Arc::new(egui::IconData {
-                rgba: image::load_from_memory(include_bytes!("../icons/main.png"))
-                    .unwrap()
-                    .to_rgba8()
-                    .to_vec(),
-                width: 1024,
-                height: 1024,
-            })),
             ..Default::default()
         },
         ..Default::default()

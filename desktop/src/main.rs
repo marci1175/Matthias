@@ -11,6 +11,7 @@ use windows_sys::{
     w,
     Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
 };
+
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
@@ -21,10 +22,11 @@ async fn main() -> eframe::Result<()>
     env_logger::init();
 
     #[cfg(debug_assertions)]
-    console_subscriber::init();
-
-    #[cfg(debug_assertions)]
-    std::env::set_var("RUST_BACKTRACE", "1");
+    {
+        console_subscriber::init();
+        
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
 
     //set custom panic hook
     #[cfg(not(debug_assertions))]

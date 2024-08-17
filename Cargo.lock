@@ -3385,7 +3385,6 @@ dependencies = [
  "mlua-sys",
  "mlua_proc_macro",
  "num-traits",
- "opencv",
  "opus",
  "phf",
  "phf_codegen",
@@ -3415,7 +3414,6 @@ dependencies = [
  "uuid",
  "wasm-bindgen-futures",
  "winapi",
- "wincam",
  "windows-sys 0.52.0",
  "winres",
 ]

@@ -20,8 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let dll_name = std::env!("OPENCV_LINK_LIBS", "");
 
-    let release_path = PathBuf::from(format!("target/release/{dll_name}.dll"));
-    let debug_path = PathBuf::from(format!("target/debug/{dll_name}.dll"));
+    let release_path = PathBuf::from(format!("../target/release/{dll_name}.dll"));
+    let debug_path = PathBuf::from(format!("../target/debug/{dll_name}.dll"));
 
     //Move opencv dll to build folder
     match fs::read(&release_path) {
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
 fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path_to_output = PathBuf::from(format!("{}/emoji_header.rs", std::env::var("OUT_DIR")?));
+    let path_to_output = PathBuf::from(format!("{}\\emoji_header.rs", dbg!(std::env::var("OUT_DIR")?)));
 
     //This will get written to the output file
     let mut content = String::new();
@@ -67,7 +67,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     //Emoji type directories
     let mut emoji_type_dir: Vec<PathBuf> = Vec::new();
 
-    let read_dir = fs::read_dir(PathBuf::from("icons/emojis"))?;
+    let read_dir = fs::read_dir(PathBuf::from(format!("icons/emojis")))?;
 
     for entry in read_dir {
         let dir_entry = entry?;
@@ -179,6 +179,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 }};",
         map_body.join("\n")
     ));
+
     //Write the contents to the file
     fs::write(path_to_output, content)?;
 

@@ -52,7 +52,6 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-use wincam::Webcam;
 
 #[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
 #[serde(default)]
