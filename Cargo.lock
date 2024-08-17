@@ -3360,6 +3360,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "matthias-mobile"
+version = "5.0.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "claxon",
+ "console-subscriber",
+ "cpal",
+ "dashmap",
+ "eframe",
+ "egui",
+ "egui-notify",
+ "egui_extras",
+ "env_logger",
+ "hex",
+ "hound",
+ "image 0.24.9",
+ "indexmap 2.3.0",
+ "log",
+ "mlua",
+ "mlua-sys",
+ "mlua_proc_macro",
+ "num-traits",
+ "opencv",
+ "opus",
+ "phf",
+ "phf_codegen",
+ "phf_macros",
+ "pipe",
+ "prost 0.10.4",
+ "quote",
+ "rand",
+ "regex",
+ "reqwest",
+ "rfd",
+ "rodio",
+ "rust-argon2",
+ "serde",
+ "serde_json",
+ "sha256",
+ "socket2 0.5.7",
+ "speed_test",
+ "strum 0.25.0",
+ "strum_macros 0.25.3",
+ "syn 2.0.72",
+ "tap",
+ "tokio",
+ "tokio-console",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "wasm-bindgen-futures",
+ "winapi",
+ "wincam",
+ "windows-sys 0.52.0",
+ "winres",
+]
+
+[[package]]
 name = "maybe-rayon"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
