@@ -1,0 +1,6 @@
+brace_style = "AlwaysNextLine"
+combine_control_expr = false
+control_brace_style = "ClosingNextLine"
+force_multiline_blocks = true
+match_block_trailing_comma = true
+imports_granularity = "Crate"
