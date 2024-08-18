@@ -178,8 +178,12 @@ impl Application
                 );
             });
 
+            let rect = ui.available_rect_before_wrap();
+
+            let mut child_ui = ui.child_ui(rect, Layout::top_down(Align::Min), None);
+
             //IMPORTANT: Each of these functions have logic inside them for displaying
-            self.message_display(item, ui, ctx, iter_index);
+            let message_resp = self.message_display(item, &mut child_ui, ctx, iter_index);
 
             //Display Message date
             ui.label(

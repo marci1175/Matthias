@@ -26,6 +26,7 @@ impl Application
             crate::app::backend::ServerMessageType::Upload(inner) => {
                 let button =
                     ui.button(RichText::from(inner.file_name.to_string()).size(self.font_size));
+                    
                 button.paint_debug_info();
                 //If we want to download the file included in the message
                 if button.clicked() {

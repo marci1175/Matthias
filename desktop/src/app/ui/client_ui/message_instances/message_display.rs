@@ -1,10 +1,9 @@
 use std::{fs, path::PathBuf};
 
-use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, RichText, Sense, Ui};
+use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, Response, RichText, Sense, Ui};
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
-    ServerFileReply, ServerImageUpload, ServerMessageType,
+    parse_incoming_message, write_file, Application, ClientMessage, ClientProfile, MessageDisplay, ServerFileReply, ServerImageUpload, ServerMessageType
 };
 use rodio::{Decoder, Source};
 
@@ -19,7 +18,7 @@ impl Application
         ui: &mut Ui,
         ctx: &egui::Context,
         current_index_in_message_list: usize,
-    )
+    ) -> Response
     {
         match &message.message_type {
             //File upload
@@ -40,6 +39,8 @@ impl Application
                         connection.send_message(message).await.unwrap();
                     });
                 }
+
+                button
             },
             crate::app::backend::ServerMessageType::Normal(message) => {
                 let messages = parse_incoming_message(message.message.clone());
@@ -48,7 +49,7 @@ impl Application
                 'mainloop: loop {
                     let mut cont = false;
 
-                    ui.horizontal_wrapped(|ui| {
+                    let resp = ui.horizontal_wrapped(|ui| {
                         for message in messages_iter.by_ref() {
                             //If there is a newline in the messages vector we need to break out of the horizontal wrapped "loop", so well keep drawing in the next line
                             if message.inner_message == MessageDisplay::NewLine {
@@ -58,14 +59,14 @@ impl Application
 
                             message.display(ui, ctx);
                         }
-                    });
+                    }).response;
 
                     if cont {
                         continue 'mainloop;
                     }
 
                     //Break when we have finished iterating over the messages
-                    break;
+                    return resp;
                 }
             },
             crate::app::backend::ServerMessageType::Image(picture) => {
@@ -126,7 +127,7 @@ impl Application
                             }
                         }
                     };
-                });
+                }).response
             },
             crate::app::backend::ServerMessageType::Audio(audio) => {
                 //Create folder for audios for later problem avoidance
@@ -319,14 +320,14 @@ impl Application
                         .text("Speed")
                         .step_by(0.01),
                     );
-                });
+                }).response
             },
             crate::app::backend::ServerMessageType::Deleted => {
                 ui.label(
                     RichText::from("Deleted message")
                         .strong()
                         .size(self.font_size),
-                );
+                )
             },
             crate::app::backend::ServerMessageType::Server(server_msg) => {
                 let message = match server_msg {
@@ -360,7 +361,7 @@ impl Application
                     else {
                         Color32::GRAY
                     }
-                }));
+                }))
             },
             crate::app::backend::ServerMessageType::VoipEvent(server_voip_event) => {
                 match server_voip_event.event {
@@ -376,7 +377,7 @@ impl Application
                             None => {
                                 self.request_client(server_voip_event.uuid.to_string());
 
-                                return;
+                                &ClientProfile::default()
                             },
                         };
 
@@ -388,7 +389,7 @@ impl Application
                                 ))
                                 .size(self.font_size),
                             );
-                        });
+                        }).response
                     },
                     crate::app::backend::VoipEvent::Disconnected => {
                         let profile = match self
@@ -402,7 +403,7 @@ impl Application
                             None => {
                                 self.request_client(server_voip_event.uuid.to_string());
 
-                                return;
+                                &ClientProfile::default()
                             },
                         };
 
@@ -414,12 +415,12 @@ impl Application
                                 ))
                                 .size(self.font_size),
                             );
-                        });
+                        }).response
                     },
 
                     crate::app::backend::VoipEvent::ImageConnected => unreachable!(),
                     crate::app::backend::VoipEvent::ImageDisconnected => unreachable!(),
-                };
+                }
             },
             crate::app::backend::ServerMessageType::Edit(_)
             | ServerMessageType::VoipState(_)
