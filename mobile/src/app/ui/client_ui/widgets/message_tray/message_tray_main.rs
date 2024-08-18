@@ -281,7 +281,7 @@ impl Application
                 ui.add_enabled_ui(enabled, |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../../../../icons/send_msg.png"
+                            "../../../../../../../assets/icons/send_msg.png"
                         )))
                         .clicked()
                         || ctx.input(|reader| reader.key_pressed(Key::Enter))
@@ -344,7 +344,7 @@ impl Application
                     //add file button
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../../../../icons/add_file.png"
+                            "../../../../../../../assets/icons/add_file.png"
                         )))
                         .on_hover_text("Send files")
                         .clicked()

@@ -22,7 +22,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/logout.png"
+                            "../../../../assets/icons/logout.png"
                         )))
                         .clicked()
                     {
@@ -45,7 +45,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/settings.png"
+                            "../../../../assets/icons/settings.png"
                         )))
                         .clicked()
                     {
@@ -55,7 +55,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/search.png"
+                            "../../../../assets/icons/search.png"
                         )))
                         .clicked()
                     {
@@ -486,7 +486,7 @@ impl Application
                 ui.allocate_ui(vec2(25., 25.), |ui| {
                     if ui
                         .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../icons/cross.png"
+                            "../../../../assets/icons/cross.png"
                         )))
                         .clicked()
                     {

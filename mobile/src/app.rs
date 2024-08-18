@@ -442,7 +442,7 @@ impl backend::Application
                     ui.allocate_ui(vec2(25., 25.), |ui| {
                         if ui
                             .add(egui::widgets::ImageButton::new(egui::include_image!(
-                                "../icons/bookmark.png"
+                                "../../assets/icons/bookmark.png"
                             )))
                             .clicked()
                         {

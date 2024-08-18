@@ -487,7 +487,7 @@ impl Application
                 ui.allocate_ui(vec2(25., 25.), |ui| {
                     if ui
                         .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../../../icons/cross.png"
+                            "../../../../../../assets/icons/cross.png"
                         )))
                         .clicked()
                     {

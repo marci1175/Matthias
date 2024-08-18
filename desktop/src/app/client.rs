@@ -870,8 +870,6 @@ async fn recive_server_relay(
             )
             .unwrap();
 
-            dbg!(&uuid);
-
             //Make sure to verify that the UUID we are parsing is really a uuid, because if its not we know we have parsed the bytes in an incorrect order
             uuid::Uuid::parse_str(&uuid)
                 .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;

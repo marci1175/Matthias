@@ -298,7 +298,7 @@ impl Application
                             ui.label("This message was sent by the host server");
                             ui.allocate_ui(vec2(25., 25.), |ui| {
                                 ui.add(Image::new(egui::include_image!(
-                                    "../../../../../icons/tick.png"
+                                    "../../../../../../assets/icons/tick.png"
                                 )));
                             })
                         });
@@ -365,7 +365,7 @@ impl Application
 
             if ui
                 .add(Button::image_and_text(
-                    egui::include_image!("../../../../../icons/reply.png"),
+                    egui::include_image!("../../../../../../assets/icons/reply.png"),
                     "Reply",
                 ))
                 .clicked()
@@ -383,7 +383,7 @@ impl Application
                 if let ServerMessageType::Normal(inner) = &item.message_type {
                     if ui
                         .add(Button::image_and_text(
-                            egui::include_image!("../../../../../icons/edit.png"),
+                            egui::include_image!("../../../../../../assets/icons/edit.png"),
                             "Edit",
                         ))
                         .clicked()
@@ -396,7 +396,7 @@ impl Application
 
                 if ui
                     .add(Button::image_and_text(
-                        egui::include_image!("../../../../../icons/delete.png"),
+                        egui::include_image!("../../../../../../assets/icons/delete.png"),
                         "Delete",
                     ))
                     .clicked()
@@ -421,7 +421,7 @@ impl Application
             if let ServerMessageType::Normal(inner) = &item.message_type {
                 if ui
                     .add(Button::image_and_text(
-                        egui::include_image!("../../../../../icons/copy.png"),
+                        egui::include_image!("../../../../../../assets/icons/copy.png"),
                         "Copy message",
                     ))
                     .clicked()
@@ -492,7 +492,7 @@ impl Application
         //If uuid is the server's we just include the image of the server
         if uuid == SERVER_UUID {
             ui.add(Image::new(egui::include_image!(
-                "../../../../../icons/server_white64.png"
+                "../../../../../../assets/icons/server_white64.png"
             )));
 
             return;

@@ -62,7 +62,7 @@ async fn main() -> eframe::Result<()>
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
             icon: Some(std::sync::Arc::new(egui::IconData {
-                rgba: image::load_from_memory(include_bytes!("../icons/main.png"))
+                rgba: image::load_from_memory(include_bytes!("../../assets/icons/main.png"))
                     .unwrap()
                     .to_rgba8()
                     .to_vec(),

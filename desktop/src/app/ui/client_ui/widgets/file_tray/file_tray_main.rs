@@ -24,26 +24,26 @@ impl Application
                                                         match item.extension().unwrap().to_string_lossy().to_ascii_lowercase().as_str() {
                                                             //file extenisons
                                                             "exe" | "msi" | "cmd" | "com" | "inf" | "bat" | "ipa" | "osx" | "pif" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/exe_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/exe_icon.png")));
                                                             }
                                                             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "z" | "tgz" | "tbz2" | "txz" | "sit" | "tar.gz" | "tar.bz2" | "tar.xz" | "zipp" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/zip_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/zip_icon.png")));
                                                             }
                                                             "jpeg" | "jpg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "svg" | "ico" | "raw" | "heif" | "pdf" | "eps" | "ai" | "psd" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/picture_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/picture_icon.png")));
                                                             }
                                                             "wav" | "mp3" | "ogg" | "flac" | "aac" | "midi" | "wma" | "aiff" | "ape" | "alac" | "amr" | "caf" | "au" | "ra" | "m4a" | "ac3" | "dts" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/sound_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/sound_icon.png")));
                                                             }
                                                             "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "mpeg" | "mpg" | "rm" | "swf" | "vob" | "ts" | "m2ts" | "mts" | "divx" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/video_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/video_icon.png")));
                                                             }
                                                             // :)
                                                             "rs" => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/rust_lang_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/rust_lang_icon.png")));
                                                             }
                                                             _ => {
-                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../icons/file_types/general_icon.png")));
+                                                                ui.add(egui::widgets::Image::new(egui::include_image!("../../../../../../../assets/icons/file_types/general_icon.png")));
                                                             }
                                                         }
                                                     });
@@ -62,7 +62,7 @@ impl Application
                                                 ui.allocate_ui(vec2(30., 30.), |ui|{
                                                     if ui.add(
                                                         ImageButton::new(
-                                                            egui::include_image!("../../../../../../icons/delete.png")
+                                                            egui::include_image!("../../../../../../../assets/icons/delete.png")
                                                         )
                                                     ).clicked() {
                                                         self.client_ui.files_to_send.remove(index);
@@ -106,7 +106,7 @@ impl Application
                                     });
                                 });
                             });
-                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
+                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../../assets/icons/cross.png"))).clicked() {
                                 //Reset messaging mode
                                 self.client_ui.messaging_mode = MessagingMode::Normal;
                                 //Clear messaging buffer
@@ -155,7 +155,7 @@ impl Application
                                     });
                                 });
                             });
-                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../icons/cross.png"))).clicked() {
+                            if ui.add(egui::ImageButton::new(egui::include_image!("../../../../../../../assets/icons/cross.png"))).clicked() {
                                 self.client_ui.messaging_mode = MessagingMode::Normal;
                             }
                         });

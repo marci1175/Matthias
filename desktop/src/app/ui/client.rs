@@ -19,7 +19,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/logout.png"
+                            "../../../../assets/icons/logout.png"
                         )))
                         .clicked()
                     {
@@ -42,7 +42,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/settings.png"
+                            "../../../../assets/icons/settings.png"
                         )))
                         .clicked()
                     {
@@ -52,7 +52,7 @@ impl Application
                 ui.allocate_ui(vec2(300., 40.), |ui| {
                     if ui
                         .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../icons/search.png"
+                            "../../../../assets/icons/search.png"
                         )))
                         .clicked()
                     {
@@ -96,7 +96,7 @@ impl Application
                     ui.allocate_ui(vec2(40., 40.), |ui| {
                         if self.client_ui.voip.as_mut().is_some() {
                             let disconnect_button = ui.add(ImageButton::new(Image::new(
-                                egui::include_image!("..\\..\\..\\icons\\call_red.png"),
+                                egui::include_image!("../../../../assets/icons/call_red.png"),
                             )));
 
                             if disconnect_button.clicked() {
@@ -119,7 +119,7 @@ impl Application
                         else {
                             ui.add_enabled_ui(self.atx.is_none(), |ui| {
                                 let call_button = ui.add(ImageButton::new(Image::new(
-                                    egui::include_image!("..\\..\\..\\icons\\call.png"),
+                                    egui::include_image!("../../../../assets/icons/call.png"),
                                 )));
 
                                 if call_button.clicked() {
@@ -185,13 +185,13 @@ impl Application
                             ui.horizontal_centered(|ui| {
                                 if voip.enable_microphone.load(Relaxed) {
                                     if ui.add(ImageButton::new(egui::include_image!(
-                                        "../../../icons/record.png"
+                                        "../../../../assets/icons/record.png"
                                     ))).clicked() {
                                         voip.enable_microphone.store(false, Relaxed);
                                     }
                                 }
                                 else if ui.add(ImageButton::new(egui::include_image!(
-                                    "../../../icons/record_off.png"
+                                    "../../../../assets/icons/record_off.png"
                                 ))).clicked() {
                                     voip.enable_microphone.store(true, Relaxed);
                                 }
@@ -201,7 +201,7 @@ impl Application
                                     //Display camera on button
                                     if ui
                                         .add(ImageButton::new(egui::include_image!(
-                                            "../../../icons/camera.png"
+                                            "../../../../assets/icons/camera.png"
                                         )))
                                         .clicked()
                                     {
@@ -231,7 +231,7 @@ impl Application
                                     //Display camera off button
                                     if ui
                                         .add(ImageButton::new(egui::include_image!(
-                                            "../../../icons/camera_off.png"
+                                            "../../../../assets/icons/camera_off.png"
                                         )))
                                         .clicked()
                                     {
@@ -638,7 +638,7 @@ impl Application
                 ui.allocate_ui(vec2(25., 25.), |ui| {
                     if ui
                         .add(egui::ImageButton::new(egui::include_image!(
-                            "../../../icons/cross.png"
+                            "../../../../assets/icons/cross.png"
                         )))
                         .clicked()
                     {

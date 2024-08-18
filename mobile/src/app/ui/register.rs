@@ -19,7 +19,7 @@ impl Application
                     ui.allocate_ui(vec2(40., 50.), |ui| {
                         if ui
                             .add(ImageButton::new(egui::include_image!(
-                                "../../../icons/logout.png"
+                                "../../../../assets/icons/logout.png"
                             )))
                             .clicked()
                         {

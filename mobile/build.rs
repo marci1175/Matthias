@@ -19,7 +19,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
 fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path_to_output = PathBuf::from(format!("{}/emoji_header.rs", std::env::var("OUT_DIR")?));
+    let path_to_output = PathBuf::from(format!(
+        "{}\\emoji_header.rs",
+        std::env::var("OUT_DIR")?
+    ));
 
     //This will get written to the output file
     let mut content = String::new();
@@ -33,7 +36,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     //Emoji type directories
     let mut emoji_type_dir: Vec<PathBuf> = Vec::new();
 
-    let read_dir = fs::read_dir(PathBuf::from("icons/emojis"))?;
+    let read_dir = fs::read_dir(PathBuf::from("../assets/icons/emojis".to_string())).unwrap();
 
     for entry in read_dir {
         let dir_entry = entry?;
@@ -134,7 +137,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     let map_body: Vec<String> = emoji_tuple
         .iter()
         .map(|(name, path)| {
-            format!(r#"    "{name}" => include_bytes!(r"..\\..\\..\..\\..\\{path}"),"#)
+            format!(r#"    "{name}" => include_bytes!(r"..\\..\\..\..\\{path}"),"#)
         })
         .collect();
 
@@ -145,6 +148,7 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 }};",
         map_body.join("\n")
     ));
+
     //Write the contents to the file
     fs::write(path_to_output, content)?;
 
