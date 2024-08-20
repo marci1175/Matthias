@@ -95,6 +95,7 @@ impl eframe::App for backend::Application
 
             TODO: Add AI (Neural network) powered hand drawing recognition
             TODO: Recode audio file playbacking
+            TODO: Rework file uploads on server
         */
 
         //Check for startup args

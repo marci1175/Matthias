@@ -1156,7 +1156,7 @@ impl MessageService
                         FileUpload(inner) => {
                             //We should match the upload type more specificly
                             match inner.extension.clone().unwrap_or_default().as_str() {
-                                "png" | "jpeg" | "bmp" | "tiff" | "webp" => Image,
+                                "png" | "jpeg" | "bmp" | "tiff" | "webp" | "gif" | "jpg" => Image,
                                 "wav" | "mp3" | "m4a" => Audio,
                                 _ => Upload,
                             }
@@ -1673,7 +1673,7 @@ impl MessageService
 
         //Pattern match on upload tpye so we know how to handle the specific request
         match upload_type.extension.clone().unwrap_or_default().as_str() {
-            "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,
+            "png" | "jpeg" | "bmp" | "tiff" | "webp" | "gif" | "jpg" => self.recive_image(req, upload_type).await,
             "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY
             _ => self.recive_file(req, upload_type).await,

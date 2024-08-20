@@ -254,7 +254,7 @@ impl Application
                         }
                         else if ui.button("Upload picture").clicked() {
                             let app_data_path = rfd::FileDialog::new()
-                                .add_filter("Supported formats", &["png"])
+                                .add_filter("Supported formats (.png, .jpg)", &["png", "jpg"])
                                 .pick_file();
 
                             if let Some(app_data_path) = app_data_path {

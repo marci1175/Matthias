@@ -21,7 +21,7 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_D6C27F0C96B8402C9C5D9B86D44C56BF"
+        "MsmKey" = "8:_C6C1D853DC844121B46D77FC8E936FAC"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -169,6 +169,14 @@
             "PrerequisitesLocation" = "2:1"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.7.2"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4.7.2 (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.7.2"
+                    }
+                }
             }
         }
     }
@@ -211,9 +219,9 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_D6C27F0C96B8402C9C5D9B86D44C56BF"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C6C1D853DC844121B46D77FC8E936FAC"
             {
-            "SourcePath" = "8:..\\..\\target\\release\\matthias.exe"
+            "SourcePath" = "8:..\\..\\..\\target\\release\\matthias.exe"
             "TargetName" = "8:matthias.exe"
             "Tag" = "8:"
             "Folder" = "8:_A83CD10A04134DA4BBA2C9AD1F266D25"
@@ -488,7 +496,7 @@
             "ShowCmd" = "3:1"
             "IconIndex" = "3:0"
             "Transitive" = "11:FALSE"
-            "Target" = "8:_D6C27F0C96B8402C9C5D9B86D44C56BF"
+            "Target" = "8:_C6C1D853DC844121B46D77FC8E936FAC"
             "Folder" = "8:_39418F417EB549CC90C4A25FB94B13F0"
             "WorkingFolder" = "8:_A83CD10A04134DA4BBA2C9AD1F266D25"
             "Icon" = "8:"

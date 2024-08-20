@@ -8,7 +8,7 @@ use crate::app::backend::{
     parse_incoming_message, write_file, Application, ClientMessage, ClientProfile, MessageDisplay,
     ServerFileReply, ServerImageUpload, ServerMessageType,
 };
-use rodio::{Decoder, Source};
+use rodio::Decoder;
 
 //use crate::app::account_manager::write_file;
 use crate::app::backend::PlaybackCursor;
@@ -88,9 +88,13 @@ impl Application
                                 let image_widget = ui.add(egui::widgets::Image::from_uri(
                                     format!("bytes://{}", picture.signature),
                                 ));
+                                
                                 if image_widget.interact(Sense::click()).clicked() {
                                     self.client_ui.image_overlay = true;
+
+                                    ctx.include_bytes(format!("bytes://large_image_display"), bytes.clone());
                                 }
+
                                 image_widget.context_menu(|ui| {
                                     if ui.button("Save").clicked() {
                                         //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
@@ -101,8 +105,9 @@ impl Application
                                         let _ = crate::app::backend::write_file(image_save);
                                     }
                                 });
+
                                 if self.client_ui.image_overlay {
-                                    self.image_overlay_draw(ui, ctx, bytes.to_vec(), picture);
+                                    self.image_overlay_draw(ctx, bytes.to_vec());
                                 }
                             }
                         }
@@ -273,29 +278,6 @@ impl Application
                         );
                     }
 
-                    /*
-                    let pos = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor_offset;
-                    if let Some(cursor) = self.client_ui.audio_playback.settings_list[current_index_in_message_list].cursor.as_mut() {
-                        cursor.set_position(pos);
-                        let range = self.client_ui.audio_playback.settings_list
-                        [current_index_in_message_list]
-                        .cursor.clone().unwrap().position() + self.client_ui.audio_playback.settings_list
-                        [current_index_in_message_list]
-                        .cursor.clone().unwrap().remaining_slice().len() as u64;
-                        //Cursor
-                        ui.add(
-                            egui::Slider::new(
-                                &mut self.client_ui.audio_playback.settings_list
-                                    [current_index_in_message_list]
-                                    .cursor_offset,
-                                0..=range,
-                            )
-                            .text("Volume")
-                            .step_by(1.)
-                        );
-                    }
-                    */
-
                     ui.label(&audio.file_name);
                     //Audio volume
                     ui.add(
@@ -435,43 +417,17 @@ impl Application
 
     pub fn image_overlay_draw(
         &mut self,
-        ui: &mut egui::Ui,
         ctx: &Context,
         image_bytes: Vec<u8>,
-        picture: &ServerImageUpload,
     )
     {
-        Area::new("image_bg".into())
-            .movable(false)
-            .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
-            .default_size(ctx.used_size())
-            .show(ctx, |ui| {
-                //Pain background
-                ui.painter()
-                    .clone()
-                    .with_layer_id(LayerId::background())
-                    .rect_filled(
-                        egui::Rect::EVERYTHING,
-                        0.,
-                        Color32::from_rgba_premultiplied(0, 0, 0, 170),
-                    );
-
-                if ui
-                    .allocate_response(ui.available_size(), Sense::click())
-                    .clicked()
-                {
-                    self.client_ui.image_overlay = false;
-                }
-            });
-
-        Area::new("image_overlay".into())
+        Area::new("large_image_display".into())
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .show(ctx, |ui| {
-                ui.allocate_ui(ui.available_size(), |ui| {
-                    ui.add(egui::widgets::Image::from_bytes(
-                        format!("bytes://{}", picture.signature),
-                        image_bytes.clone(),
+                ui.allocate_ui(ctx.used_size() / 2., |ui| {
+                    ui.add(egui::widgets::Image::from_uri(
+                        "bytes://large_image_display",
                     )) /*Add the same context menu as before*/
                     .context_menu(|ui| {
                         if ui.button("Save").clicked() {
@@ -498,8 +454,36 @@ impl Application
                         .clicked()
                     {
                         self.client_ui.image_overlay = false;
+
+                        //Forget imagge
+                        ctx.forget_image("bytes://large_image_display");
                     }
                 })
+            });
+
+            Area::new("image_bg".into())
+            .movable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
+            .default_size(ctx.used_size())
+            .show(ctx, |ui| {
+                //Pain background
+                ui.painter()
+                    .clone()
+                    .with_layer_id(LayerId::background())
+                    .rect_filled(
+                        egui::Rect::EVERYTHING,
+                        0.,
+                        Color32::from_rgba_premultiplied(0, 0, 0, 170),
+                    );
+
+                if ui
+                    .allocate_response(ui.available_size(), Sense::click())
+                    .clicked()
+                {
+                    self.client_ui.image_overlay = false;
+                    //Forget imagge
+                    ctx.forget_image("bytes://large_image_display");
+                }
             });
     }
 }
