@@ -162,6 +162,9 @@ impl Application
                                             },
                                         }
                                     });
+
+                                    //Lua callback
+                                    self.client_ui.extension.event_call_extensions(crate::app::lua::EventCall::OnCallSend, &self.lua, None);
                                 }
 
                                 call_button.on_hover_text("Start a group call");

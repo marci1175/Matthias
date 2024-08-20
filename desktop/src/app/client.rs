@@ -168,10 +168,9 @@ impl Application
                                         //Return wav bytes
                                         playbackable_audio
                                     };
+                                    
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
-
-                                    tracing::info!("Sending uuid: {uuid}");
 
                                     //Avoid sending too much data (If there is more recorded we just iterate over the chunks and not send them at once)
                                     for chunk in audio_chunks {
