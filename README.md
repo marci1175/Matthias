@@ -1,17 +1,21 @@
 # Matthias
-A decentralized chat application built completely in rust.
+A (soon to be) multiplatform decentralized chat application built completely in rust.
 ## Features
-- Encrypted messages ensuring security
-- Decentralized backend which doesnt rely on any central provider
-- Customizable profiles
-- Text, audio, image, file messages furthermore images are also displayed
-- Voice call
-- Exrtensive lua (using luajit) API with documentation at [Gitbook](https://matthias.gitbook.io/) with external libs available
-- Custom connection urls (If the app is installed through the installer) this allows the user to connect to a server with just a link 
-- Custom emojies
+| Features | Desktop | Mobile |
+| -------- | ------- | ------- |
+| Encrypted messages ensuring security  | ✅ | ✅ |
+| Decentralized backend which doesnt rely on any central provider | ✅ | ✅ |
+| Customizable profiles    | ✅ | ✅ |
+| Text, audio, image, file messages and images | ✅ | ✅ |
+| Custom emojies | ✅ | ✅ |
+| Intuitive user interface | ✅ | ✅ |
+| Experimental MD (Markdown) support | ✅ | ✅ |
+| Voice calls | ✅ | ❌ |
+| Extensive lua (using luajit) API with documentation at [Gitbook](https://matthias.gitbook.io/) with external libs available | ✅ | ❌ |
+| Custom connection urls (If the app is installed through the installer) this allows the user to connect to a server with just a link | ✅ | ❌ |
+
+### Adittional Features (For desktop only):
 - Windows installer (Using a Visual Studio project)
-- Intuitive user interface
-- Experimental MD (Markdown) support
 
 # Children repositories (Crates/Repos created for the purpose of showcasing/improving Matthias)
 - [Wincam](https://github.com/marci1175/wincam) (Used to capture images from the host's camera)

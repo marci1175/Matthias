@@ -154,16 +154,6 @@ impl Application
 
                 ui.allocate_ui(vec2(300., 150.), |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        //Get the audio settings vector
-                        let audio_settings = self.client_ui.audio_playback.settings_list.clone();
-
-                        //We will need the cursor so that we will be able to display where we are in the track
-                        let mut cursor = audio_settings[current_index_in_message_list]
-                            .cursor
-                            .cursor
-                            .lock()
-                            .unwrap();
-
                         match self.client_ui.audio_playback.sink_list[current_index_in_message_list]
                             .as_mut()
                         {

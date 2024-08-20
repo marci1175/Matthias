@@ -775,9 +775,6 @@ pub struct Client
     ///self.send_on_ip encoded into base64, this is supposedly for ease of use, I dont know why its even here
     pub send_on_ip_base64_encoded: String,
 
-    ///Does client have the password required checkbox ticked
-    pub req_passw: bool,
-
     ///The password the user has entered for server auth
     pub client_password: String,
 
@@ -869,7 +866,6 @@ impl Default for Client
             usr_msg_expanded: false,
             send_on_ip: String::new(),
             send_on_ip_base64_encoded: String::new(),
-            req_passw: false,
             client_password: String::new(),
             emoji: vec![
                 "😐", "😍", "😉", "😈", "😇", "😆", "😅", "😄", "😃", "😂", "😁", "😀",
@@ -2647,13 +2643,21 @@ pub struct ScrollToMessage
     #[serde(skip)]
     pub messages: Vec<egui::Response>,
     pub index: usize,
+
+    /// This a quick fix for the reponses being invalidated, this bool is set to true when the scroll area it is the 2nd iteration of the painting
+    /// this means that the scroll area already has stick to bottom turned off
+    pub can_scroll: bool,
 }
 
 impl ScrollToMessage
 {
     pub fn new(messages: Vec<egui::Response>, index: usize) -> ScrollToMessage
     {
-        ScrollToMessage { messages, index }
+        ScrollToMessage {
+            messages,
+            index,
+            can_scroll: false,
+        }
     }
 }
 
@@ -2909,7 +2913,7 @@ pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow:
 /// Argon is used to encrypt this
 pub fn encrypt(string_to_be_encrypted: String) -> String
 {
-    let password = string_to_be_encrypted.as_bytes();
+    let password = string_to_be_encrypted.trim().as_bytes();
     let salt = b"c1eaa94ec38ab7aa16e9c41d029256d3e423f01defb0a2760b27117ad513ccd2";
     let config = Config::owasp1();
 

@@ -673,7 +673,7 @@ impl MessageService
         }
 
         if let ClientMessageType::SyncMessage(sync_msg) = &req.message_type {
-            if sync_msg.password == self.passw.trim() {
+            if &sync_msg.password == self.passw.trim() {
                 //Handle incoming connections and disconnections, if sync_attr is a None then its just a message for syncing
                 if let Some(sync_attr) = &sync_msg.sync_attribute {
                     match sync_attr {

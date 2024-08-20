@@ -111,7 +111,8 @@ impl eframe::App for backend::Application
                     Some(sep_idx) => {
                         let (address, password) = link.split_at(sep_idx);
 
-                        let password = &password[1..];
+                        //Leave out parts of the password which are artifically added to the argmuent
+                        let password = &password[1..password.len() - 1];
 
                         //Connect to server
                         self.connect_to_server(
@@ -414,10 +415,7 @@ impl backend::Application
                                 self.connect_to_server(
                                     ctx,
                                     self.client_ui.send_on_ip.clone(),
-                                    self.client_ui
-                                        .req_passw
-                                        .then_some(&self.client_ui.client_password)
-                                        .cloned(),
+                                    Some(self.client_ui.client_password.clone()),
                                 );
                             }
                         },

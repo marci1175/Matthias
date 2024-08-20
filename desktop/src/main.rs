@@ -25,7 +25,8 @@ async fn main() -> eframe::Result<()>
         let filter = filter::Targets::new()
             .with_default(Level::INFO)
             .with_default(Level::ERROR)
-            .with_default(Level::DEBUG);
+            //  .with_default(Level::DEBUG)
+            ;
 
         tracing_subscriber::registry()
             .with(tracing_subscriber::fmt::layer())

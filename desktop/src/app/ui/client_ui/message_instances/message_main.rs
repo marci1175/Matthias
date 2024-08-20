@@ -25,17 +25,7 @@ impl Application
                     .stick_to_bottom(self.client_ui.scroll_to_message.is_none())
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
-
-                        //Scroll to reply logic
-                        if let Some(scroll_to_instance) = &self.client_ui.scroll_to_message {
-                            scroll_to_instance.messages[scroll_to_instance.index].scroll_to_me(Some(Align::Center));
-                            //Destroy instance
-                            self.client_ui.scroll_to_message = None;
-                            self.client_ui.scroll_to_message_index = None;
-                        }
-
                         ui.allocate_ui(ui.available_size(), |ui| {
-
                             //Display welcome message if self.send_on_ip is empty
                             if self.client_ui.send_on_ip.is_empty() {
                                 ui.with_layout(Layout::centered_and_justified(egui::Direction::TopDown), |ui|{
@@ -67,7 +57,23 @@ impl Application
                             if let Some(scroll_to_reply) = self.client_ui.scroll_to_message_index {
                                 self.client_ui.scroll_to_message = Some(ScrollToMessage::new(message_instances, scroll_to_reply));
                             }
+
+                        //Scroll to reply logic
+                        if let Some(scroll_to_instance) = self.client_ui.scroll_to_message.as_mut() {
+                            ui.scroll_with_delta(egui::Vec2::new(0.0, -10.0));
+                            
+                            let message_rect = scroll_to_instance.messages[scroll_to_instance.index].clone();
+
+                            message_rect.scroll_to_me(Some(Align::Center));
+
+                            //Only destroy instance if the message is visible, thanks egui!!
+                            if ui.is_rect_visible(message_rect.rect) {
+                                self.client_ui.scroll_to_message = None;
+                                self.client_ui.scroll_to_message_index = None;
+                            }
+                        }
                         });
+
                         if self.client_ui.usr_msg_expanded {
                             ui.allocate_space(vec2(ui.available_width(), 25.));
                         }
@@ -90,11 +96,13 @@ impl Application
         //The inner ui's response
         let mut message_reponse: Option<Response> = None;
 
+        let mut reply_area_reponse: Option<Response> = None;
+
         //Emoji tray pops up when right clicking on a message
         let message_group = ui.group(|ui| {
             if let Some(replied_to) = item.replying_to {
                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui| {
-                    ui.horizontal(|ui| {
+                    let reply_button_area = ui.horizontal(|ui| {
                         self.display_icon_from_server(
                             ctx,
                             self.client_ui.incoming_messages.message_list[replied_to]
@@ -103,33 +111,31 @@ impl Application
                             ui,
                         );
 
-                        if ui
-                            .add(
-                                egui::widgets::Button::new(
-                                    RichText::from(format!(
-                                        "{}: {}",
-                                        self.client_ui.incoming_messages.message_list[replied_to]
-                                            .author,
-                                        match &self.client_ui.incoming_messages.message_list
-                                            [replied_to]
-                                            .message_type
-                                        {
-                                            ServerMessageType::Deleted =>
-                                                "Deleted message".to_string(),
-                                            ServerMessageType::Audio(audio) =>
-                                                format!("Sound {}", audio.file_name),
-                                            ServerMessageType::Image(_img) => "Image".to_string(),
-                                            ServerMessageType::Upload(upload) =>
-                                                format!("Upload {}", upload.file_name),
-                                            ServerMessageType::Normal(msg) => {
-                                                let mut message_clone = msg.message.clone();
-                                                if message_clone.clone().len() > 20 {
-                                                    message_clone.truncate(20);
-                                                    message_clone.push_str(" ...");
-                                                }
-                                                message_clone.to_string()
-                                            },
-                                            ServerMessageType::Server(server) => match server {
+                        ui.add(
+                            egui::widgets::Button::new(
+                                RichText::from(format!(
+                                    "{}: {}",
+                                    self.client_ui.incoming_messages.message_list[replied_to]
+                                        .author,
+                                    match &self.client_ui.incoming_messages.message_list[replied_to]
+                                        .message_type
+                                    {
+                                        ServerMessageType::Deleted => "Deleted message".to_string(),
+                                        ServerMessageType::Audio(audio) =>
+                                            format!("Sound {}", audio.file_name),
+                                        ServerMessageType::Image(_img) => "Image".to_string(),
+                                        ServerMessageType::Upload(upload) =>
+                                            format!("Upload {}", upload.file_name),
+                                        ServerMessageType::Normal(msg) => {
+                                            let mut message_clone = msg.message.clone();
+                                            if message_clone.clone().len() > 20 {
+                                                message_clone.truncate(20);
+                                                message_clone.push_str(" ...");
+                                            }
+                                            message_clone.to_string()
+                                        },
+                                        ServerMessageType::Server(server) =>
+                                            match server {
                                                 crate::app::backend::ServerMessage::Connect(
                                                     profile,
                                                 ) => {
@@ -149,23 +155,32 @@ impl Application
                                                     )
                                                 },
                                             },
-                                            ServerMessageType::Edit(_) => unreachable!(),
-                                            ServerMessageType::Reaction(_) => unreachable!(),
-                                            ServerMessageType::Sync(_) => unreachable!(),
-                                            ServerMessageType::VoipEvent(_) => unreachable!(),
-                                            ServerMessageType::VoipState(_) => unreachable!(),
-                                        }
-                                    ))
-                                    .size(self.font_size / 1.5),
-                                )
-                                .frame(false),
+                                        ServerMessageType::Edit(_) => unreachable!(),
+                                        ServerMessageType::Reaction(_) => unreachable!(),
+                                        ServerMessageType::Sync(_) => unreachable!(),
+                                        ServerMessageType::VoipEvent(_) => unreachable!(),
+                                        ServerMessageType::VoipState(_) => unreachable!(),
+                                    }
+                                ))
+                                .size(self.font_size / 1.5),
                             )
-                            .clicked()
-                        {
-                            //implement scrolling to message
-                            self.client_ui.scroll_to_message_index = Some(replied_to);
-                        }
+                            .frame(false),
+                        );
                     });
+
+                    reply_area_reponse = Some(reply_button_area.response.clone());
+
+                    if ui
+                        .interact(
+                            reply_button_area.response.rect,
+                            ui.next_auto_id(),
+                            Sense::click(),
+                        )
+                        .clicked()
+                    {
+                        //implement scrolling to message
+                        self.client_ui.scroll_to_message_index = Some(replied_to);
+                    }
                 });
             }
 
@@ -293,11 +308,19 @@ impl Application
             }
         });
 
-        //Back up reponse of message group, so we can scroll to it later if the user thinks like it
-        message_instances.push(message_group.response.clone());
-
         if let Some(inner_message_reponse) = message_reponse {
-            let response = inner_message_reponse.union(message_group.response);
+            let mut response = inner_message_reponse.union(message_group.response);
+
+            if let Some(reply_response) = reply_area_reponse {
+                response = reply_response.union(response);
+
+                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+                message_instances.push(response.clone());
+            }
+            else {
+                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+                message_instances.push(response.clone());
+            }
 
             response.context_menu(|ui| {
                 let profile_menu_button = ui.menu_button("Profile", |ui| {
