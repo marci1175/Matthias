@@ -737,6 +737,10 @@ impl Application
 
                                 //Assuming the connection is faulty we reset state
                                 self.reset_client_connection();
+
+                                //Try to dsiconnect from the server
+                                self.disconnect_from_server();
+
                                 self.client_connection.reset_state();
                             },
                         }

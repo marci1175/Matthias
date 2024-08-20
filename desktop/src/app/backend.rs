@@ -2250,9 +2250,13 @@ impl ServerVoip
     /// Remove the ```SocketAddr``` to the ```UDP``` server's destiantions
     pub fn disconnect(&self, uuid: String) -> anyhow::Result<()>
     {
-        self.connected_clients
+        let (_, removed_address) = self
+            .connected_clients
             .remove(&uuid)
             .ok_or_else(|| anyhow::Error::msg("Client was not connected"))?;
+
+        self.connected_client_thread_channels
+            .remove(&removed_address);
 
         Ok(())
     }

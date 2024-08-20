@@ -97,12 +97,62 @@ impl Application
 
                                 image_widget.context_menu(|ui| {
                                     if ui.button("Save").clicked() {
-                                        //always name the file ".png", NOTE: USE WRITE FILE BECAUSE WRITE IMAGE IS AUTOMATIC WITHOUT ASKING THE USER
-                                        let image_save = ServerFileReply {
-                                            bytes: bytes.to_vec(),
-                                            file_name: PathBuf::from("image.png"),
-                                        };
-                                        let _ = crate::app::backend::write_file(image_save);
+                                        if let Ok(format) = image::guess_format(&bytes) {
+                                            let type_name = match format {
+                                                image::ImageFormat::Png => {
+                                                    "Png"
+                                                },
+                                                image::ImageFormat::Jpeg => {
+                                                    "Jpeg"
+                                                },
+                                                image::ImageFormat::Gif => {
+                                                    "Gif"
+                                                },
+                                                image::ImageFormat::WebP => {
+                                                    "WebP"
+                                                },
+                                                image::ImageFormat::Pnm => {
+                                                    "Pnm"
+                                                },
+                                                image::ImageFormat::Tiff => {
+                                                    "Tiff"
+                                                },
+                                                image::ImageFormat::Tga => {
+                                                    "Tga"
+                                                },
+                                                image::ImageFormat::Dds => {
+                                                    "Dds"
+                                                },
+                                                image::ImageFormat::Bmp => {
+                                                    "Bmp"
+                                                },
+                                                image::ImageFormat::Ico => {
+                                                    "Ico"
+                                                },
+                                                image::ImageFormat::Hdr => {
+                                                    "Hdr"
+                                                },
+                                                image::ImageFormat::OpenExr => {
+                                                    "OpenExr"
+                                                },
+                                                image::ImageFormat::Farbfeld => {
+                                                    "Farbfeld"
+                                                },
+                                                image::ImageFormat::Avif => {
+                                                    "Avif"
+                                                },
+                                                image::ImageFormat::Qoi => {
+                                                    "Qoi"
+                                                },
+                                                _ => todo!(),
+                                            };
+
+                                            let image_save = ServerFileReply {
+                                                bytes: bytes.to_vec(),
+                                                file_name: PathBuf::from(format!("image.{}",type_name.to_lowercase())),
+                                            };
+                                            let _ = crate::app::backend::write_file(image_save);
+                                        }
                                     }
                                 });
 
@@ -213,10 +263,8 @@ impl Application
                                         fs::read(&path_to_audio).unwrap_or_default();
 
                                     sink.append(
-                                        Decoder::new(PlaybackCursor::new(
-                                            file_stream_to_be_read,
-                                        ))
-                                        .unwrap(),
+                                        Decoder::new(PlaybackCursor::new(file_stream_to_be_read))
+                                            .unwrap(),
                                     )
                                 }
                             },
@@ -415,11 +463,7 @@ impl Application
         }
     }
 
-    pub fn image_overlay_draw(
-        &mut self,
-        ctx: &Context,
-        image_bytes: Vec<u8>,
-    )
+    pub fn image_overlay_draw(&mut self, ctx: &Context, image_bytes: Vec<u8>)
     {
         Area::new("large_image_display".into())
             .movable(false)
@@ -428,17 +472,7 @@ impl Application
                 ui.allocate_ui(ctx.used_size() / 2., |ui| {
                     ui.add(egui::widgets::Image::from_uri(
                         "bytes://large_image_display",
-                    )) /*Add the same context menu as before*/
-                    .context_menu(|ui| {
-                        if ui.button("Save").clicked() {
-                            //always name the file ".png"
-                            let image_save = ServerFileReply {
-                                bytes: image_bytes.clone(),
-                                file_name: PathBuf::from(".png"),
-                            };
-                            let _ = write_file(image_save);
-                        }
-                    });
+                    ));
                 });
             });
 
@@ -461,7 +495,7 @@ impl Application
                 })
             });
 
-            Area::new("image_bg".into())
+        Area::new("image_bg".into())
             .movable(false)
             .anchor(Align2::CENTER_CENTER, vec2(0., 0.))
             .default_size(ctx.used_size())

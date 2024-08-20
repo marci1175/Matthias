@@ -309,6 +309,7 @@ impl eframe::App for backend::Application
                     if !matches!(self.client_connection.state, ConnectionState::Connected(_)) {
                         //If we recived a None it means we have an error
                         self.client_connection.state = ConnectionState::Error;
+                        self.disconnect_from_server();
                     }
                 }
             },
@@ -568,6 +569,9 @@ impl backend::Application
 
         //Shut down threadsa nad reset state
         self.reset_client_connection();
+
+        self.voip_shutdown_token.cancel();
+        self.voip_video_shutdown_token.cancel();
 
         //Disconnect from server
         tokio::task::spawn(async move {

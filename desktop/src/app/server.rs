@@ -209,6 +209,13 @@ pub async fn server_main(
                             }
                         }
                     }
+
+                    let voip = message_service_lock.voip.clone();
+                    if let Some(voip) = voip {
+                        for banned_uuid in message_service_lock.shared_fields.lock().await.banned_uuids.lock().await.iter() {
+                            voip.disconnect(banned_uuid.to_string()).unwrap_or_default();
+                        }
+                    }
                 },
 
                 _ = cancellation_child_clone.cancelled() => {
@@ -388,9 +395,8 @@ pub fn create_client_voip_manager(
 
                 //recive_message lenght by reading its first 4 bytes
                 recived_bytes = reciver.recv() => {
-                    let recived_bytes = recived_bytes.unwrap();
-
-                    //Decrypt message
+                    if let Some(recived_bytes) = recived_bytes {
+                        //Decrypt message
                     // [. . . . . .4][4 . . . . len - 4][len - 4..]
                     //  PACKET LENGHT       MESSAGE      MSG TYPE
                     let mut decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
@@ -539,6 +545,7 @@ pub fn create_client_voip_manager(
                                 tracing::error!("User not found in the image header list: {uuid}");
                             };
                         }
+                    }
                     }
                 },
             }
@@ -1673,7 +1680,9 @@ impl MessageService
 
         //Pattern match on upload tpye so we know how to handle the specific request
         match upload_type.extension.clone().unwrap_or_default().as_str() {
-            "png" | "jpeg" | "bmp" | "tiff" | "webp" | "gif" | "jpg" => self.recive_image(req, upload_type).await,
+            "png" | "jpeg" | "bmp" | "tiff" | "webp" | "gif" | "jpg" => {
+                self.recive_image(req, upload_type).await
+            },
             "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY
             _ => self.recive_file(req, upload_type).await,
