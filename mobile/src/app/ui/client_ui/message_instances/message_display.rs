@@ -247,8 +247,7 @@ impl Application
                                                 .is_loading = true;
                                         }
                                     };
-                                })
-                                .response;
+                                });
                             },
                         }
                     });

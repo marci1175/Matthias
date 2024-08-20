@@ -1,4 +1,4 @@
-use std::{fs, io::Cursor, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use egui::{
     vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, Response, RichText, Sense, Ui,
@@ -202,19 +202,17 @@ impl Application
                                     },
                                 }
 
-                                if !sink.empty() {
-                                    if ui.button("Restart").clicked() {
-                                        sink.stop();
-                                        let file_stream_to_be_read =
-                                            fs::read(&path_to_audio).unwrap_or_default();
+                                if !sink.empty() && ui.button("Restart").clicked() {
+                                    sink.stop();
+                                    let file_stream_to_be_read =
+                                        fs::read(&path_to_audio).unwrap_or_default();
 
-                                        sink.append(
-                                            Decoder::new(PlaybackCursor::new(
-                                                file_stream_to_be_read,
-                                            ))
-                                            .unwrap(),
-                                        )
-                                    }
+                                    sink.append(
+                                        Decoder::new(PlaybackCursor::new(
+                                            file_stream_to_be_read,
+                                        ))
+                                        .unwrap(),
+                                    )
                                 }
                             },
                             None => {
@@ -251,8 +249,7 @@ impl Application
                                                 .is_loading = true;
                                         }
                                     };
-                                })
-                                .response;
+                                });
                             },
                         }
                     });
