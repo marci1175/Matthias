@@ -105,12 +105,17 @@ impl Application
                                     self.disable_camera(voip);
                                 }
 
-                                if let Some(voip_connected_clients) = &self.client_ui.incoming_messages.ongoing_voip_call.connected_clients {
+                                if let Some(voip_connected_clients) = &self
+                                    .client_ui
+                                    .incoming_messages
+                                    .ongoing_voip_call
+                                    .connected_clients
+                                {
                                     voip_connected_clients.iter().for_each(|uuid| {
                                         ctx.forget_image(&format!("bytes://video_stream:{uuid}"));
                                     });
                                 }
-                                
+
                                 //Shut down listener server, and disconnect from server
                                 self.send_msg(ClientMessage::construct_voip_disconnect(
                                     &self.opened_user_information.uuid,

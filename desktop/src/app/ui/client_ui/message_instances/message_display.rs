@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, io::Cursor, path::PathBuf};
 
 use egui::{
     vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, Response, RichText, Sense, Ui,
@@ -168,60 +168,63 @@ impl Application
                             .as_mut()
                         {
                             Some(sink) => {
-                                match sink.is_paused() {
+                                match sink.is_paused() || sink.empty() {
                                     //Audio is stopped
                                     true => {
                                         if ui.button("Play").clicked() {
-                                            sink.play();
+                                            if sink.empty() {
+                                                let file_stream_to_be_read =
+                                                    fs::read(&path_to_audio).unwrap_or_default();
+
+                                                sink.append(
+                                                    Decoder::new(PlaybackCursor::new(
+                                                        file_stream_to_be_read,
+                                                    ))
+                                                    .unwrap(),
+                                                )
+                                            }
+                                            else {
+                                                sink.play();
+                                            }
                                         };
                                     },
                                     //Audio is running
                                     false => {
-                                        //Construct new decoder
-                                        if let Ok(decoder) = Decoder::new(PlaybackCursor::new(
-                                            cursor.clone().into_inner(),
-                                        )) {
-                                            // Always set the cursor_pos to the cursor's position as a temp value
-                                            let mut cursor_pos =
-                                            <std::io::Cursor<std::vec::Vec<u8>> as Clone>::clone(
-                                                &cursor,
-                                            )
-                                            .into_inner()
-                                            .len()
-                                                / decoder.sample_rate() as usize;
+                                        if sink.empty() {
+                                            if ui.button("Restart").clicked() {
+                                                let file_stream_to_be_read =
+                                                    fs::read(&path_to_audio).unwrap_or_default();
 
-                                            //Why the fuck does this always return a None?!
-                                            tracing::debug!("{:?}", decoder.total_duration());
-
-                                            if let Some(total_dur) = decoder.total_duration() {
-                                                // If it has been changed, then change the real cursors position too
-                                                //Display cursor placement
-                                                if ui
-                                                    .add(
-                                                        egui::Slider::new(
-                                                            &mut cursor_pos,
-                                                            0..=total_dur.as_secs() as usize,
-                                                        )
-                                                        .show_value(false)
-                                                        .text("Set player"),
-                                                    )
-                                                    .changed()
-                                                {
-                                                    //Set cursor poition
-                                                    cursor.set_position(
-                                                        (cursor_pos
-                                                            * decoder.sample_rate() as usize)
-                                                            as u64,
-                                                    );
-                                                };
+                                                sink.append(
+                                                    Decoder::new(PlaybackCursor::new(
+                                                        file_stream_to_be_read,
+                                                    ))
+                                                    .unwrap(),
+                                                )
                                             }
-                                        };
-
-                                        //Audio is playing
-                                        if ui.button("Pause").clicked() {
-                                            sink.pause();
+                                        }
+                                        else {
+                                            //Audio is playing
+                                            if ui.button("Pause").clicked() {
+                                                sink.pause();
+                                            }
                                         }
                                     },
+                                }
+
+                                if !sink.empty() {
+                                    if ui.button("Restart").clicked() {
+                                        sink.stop();
+                                        let file_stream_to_be_read =
+                                            fs::read(&path_to_audio).unwrap_or_default();
+
+                                        sink.append(
+                                            Decoder::new(PlaybackCursor::new(
+                                                file_stream_to_be_read,
+                                            ))
+                                            .unwrap(),
+                                        )
+                                    }
                                 }
                             },
                             None => {

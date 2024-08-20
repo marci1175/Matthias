@@ -582,7 +582,7 @@ impl Application
                                                     super::backend::VoipEvent::ImageDisconnected => {
                                                         if let Some(voip) = &self.client_ui.voip {
                                                             voip.image_buffer.remove(&voip_event.uuid);
-                                                            
+
                                                             //Forget image
                                                             ctx.forget_image(&format!("bytes://video_stream:{}", voip_event.uuid.clone()));
                                                         }
@@ -659,6 +659,7 @@ impl Application
                                                             let cursor = PlaybackCursor::new(
                                                                 file_stream_to_be_read,
                                                             );
+
                                                             let sink = Some(Arc::new(
                                                                 Sink::try_new(&stream_handle)
                                                                     .unwrap(),
@@ -744,7 +745,7 @@ impl Application
                     else {
                         //Signal the remaining thread to be shut down
                         self.autosync_shutdown_token.cancel();
-                        
+
                         self.server_sender_thread = None;
 
                         //Then the thread got an error, we should reset the state
