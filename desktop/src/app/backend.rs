@@ -138,9 +138,9 @@ pub struct Application
 
     ///thread communication for audio ! SAVING !
     #[serde(skip)]
-    pub audio_save_rx: Arc<mpsc::Receiver<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>>,
+    pub audio_save_rx: Arc<mpsc::Receiver<(Option<Arc<Sink>>, PlaybackCursor, u64, PathBuf)>>,
     #[serde(skip)]
-    pub audio_save_tx: Arc<mpsc::Sender<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>>,
+    pub audio_save_tx: Arc<mpsc::Sender<(Option<Arc<Sink>>, PlaybackCursor, u64, PathBuf)>>,
 
     ///Channels for sending recorded, and formatted Wav audio bytes
     #[serde(skip)]
@@ -231,7 +231,7 @@ impl Default for Application
     {
         let (dtx, drx) = mpsc::channel::<String>();
         let (audio_save_tx, audio_save_rx) =
-            mpsc::channel::<(Option<Arc<Sink>>, PlaybackCursor, usize, PathBuf)>();
+            mpsc::channel::<(Option<Arc<Sink>>, PlaybackCursor, u64, PathBuf)>();
 
         let (audio_bytes_tx, audio_bytes_rx) = mpsc::channel::<Vec<u8>>();
 
@@ -1098,6 +1098,8 @@ pub struct ClientAudioRequest
 {
     /// This is the signature of the file which has been uploaded, this acts like a handle to the file
     pub signature: String,
+
+    pub index: u64,
 }
 
 ///Reaction packet, defines which message its reacting to and with which char
@@ -1386,12 +1388,12 @@ impl ClientMessage
     }
 
     ///this is used for asking for an image
-    pub fn construct_audio_request_msg(signature: String, uuid: &str) -> ClientMessage
+    pub fn construct_audio_request_msg(signature: String, uuid: &str, index: u64) -> ClientMessage
     {
         ClientMessage {
             replying_to: None,
             message_type: ClientMessageType::FileRequestType(ClientFileRequestType::AudioRequest(
-                ClientAudioRequest { signature },
+                ClientAudioRequest { signature, index },
             )),
             uuid: uuid.to_string(),
             message_date: { Utc::now().format("%Y.%m.%d. %H:%M").to_string() },
@@ -1755,6 +1757,9 @@ pub struct ServerAudioReply
     pub signature: String,
     /// The requested audio file's name
     pub file_name: String,
+
+    /// The index of the audio
+    pub audio_idx: u64,
 }
 
 ///This is what the server sends back (pushes to message vector), when reciving a normal message

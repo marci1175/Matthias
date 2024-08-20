@@ -96,6 +96,7 @@ impl eframe::App for backend::Application
             TODO: Add AI (Neural network) powered hand drawing recognition
             TODO: Improve video chat
             TODO: Fix disconnecting from a call
+            TODO: Recode audio file playbacking
         */
 
         //Check for startup args

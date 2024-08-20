@@ -3311,6 +3311,7 @@ dependencies = [
  "tokio-console",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "uuid",
  "wasm-bindgen-futures",
  "winapi",

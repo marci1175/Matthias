@@ -86,7 +86,7 @@ impl Application
         iter_index: usize,
         message_instances: &mut Vec<Response>,
     )
-    {   
+    {
         //The inner ui's response
         let mut message_reponse: Option<Response> = None;
 
@@ -182,7 +182,12 @@ impl Application
             });
 
             //IMPORTANT: Each of these functions have logic inside them for displaying
-            message_reponse = Some(self.message_display(item, ui, ctx, iter_index));
+            message_reponse = Some(
+                ui.push_id(iter_index, |ui| {
+                    self.message_display(item, ui, ctx, iter_index)
+                })
+                .inner,
+            );
 
             //Display Message date
             ui.label(
@@ -324,32 +329,32 @@ impl Application
                             "bytes://profile_picture",
                             user_profile.normal_profile_picture.clone(),
                         );
-    
+
                         //Display 256px profile picture
                         ui.image("bytes://profile_picture");
-    
+
                         ui.label(
                             RichText::from(user_profile.username.clone())
                                 .size(25.)
                                 .strong(),
                         );
-    
+
                         ui.separator();
-    
+
                         ui.label(format!("Uuid: {}", item.uuid));
-    
+
                         if !user_profile.full_name.is_empty() {
                             ui.separator();
-    
+
                             ui.label(format!("Full name: {}", user_profile.full_name));
                         };
-    
+
                         ui.separator();
-    
+
                         ui.label(format!("Birtdate: {}", user_profile.birth_date));
-    
+
                         ui.separator();
-    
+
                         if let Some(gender) = &user_profile.gender {
                             ui.label(format!(
                                 "Gender: {}",
@@ -361,14 +366,14 @@ impl Application
                         }
                     }
                 });
-    
+
                 //If profile_menu_button.inner.is_none() it is closed, so we can deallocate / forget the before loaded image
                 if profile_menu_button.inner.is_none() {
                     ctx.forget_image("bytes://profile_picture");
                 }
-    
+
                 ui.separator();
-    
+
                 if ui
                     .add(Button::image_and_text(
                         egui::include_image!("../../../../../../assets/icons/reply.png"),
@@ -380,7 +385,7 @@ impl Application
                     ui.close_menu();
                 }
                 ui.separator();
-    
+
                 //Client-side uuid check, there is a check in the server file
                 if item.uuid == self.opened_user_information.uuid
                     && item.message_type != ServerMessageType::Deleted
@@ -399,7 +404,7 @@ impl Application
                             ui.close_menu();
                         }
                     }
-    
+
                     if ui
                         .add(Button::image_and_text(
                             egui::include_image!("../../../../../../assets/icons/delete.png"),
@@ -414,16 +419,16 @@ impl Application
                         ));
                         ui.close_menu();
                     }
-    
+
                     ui.separator();
                 }
-    
+
                 ui.menu_button("React", |ui| {
                     if let Some(selected_emoji_name) = self.draw_emoji_selector(ui, ctx) {
                         self.change_send_emoji(iter_index, selected_emoji_name);
                     }
                 });
-    
+
                 if let ServerMessageType::Normal(inner) = &item.message_type {
                     if ui
                         .add(Button::image_and_text(
@@ -438,7 +443,6 @@ impl Application
                 }
             });
         }
-
     }
 
     /// ```iter_index```: Which message does this emoji change belong to

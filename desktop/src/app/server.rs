@@ -1645,6 +1645,7 @@ impl MessageService
                     bytes: file_bytes,
                     signature: audio_request.signature.clone(),
                     file_name: file_name.unwrap_or_default(),
+                    audio_idx: audio_request.index,
                 }))
                 .unwrap_or_default()
             },

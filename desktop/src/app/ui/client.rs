@@ -94,12 +94,23 @@ impl Application
                     }
 
                     ui.allocate_ui(vec2(40., 40.), |ui| {
-                        if self.client_ui.voip.as_mut().is_some() {
+                        if let Some(voip) = self.client_ui.voip.clone() {
                             let disconnect_button = ui.add(ImageButton::new(Image::new(
                                 egui::include_image!("../../../../assets/icons/call_red.png"),
                             )));
 
                             if disconnect_button.clicked() {
+                                //Disable camera if it exists before everything else
+                                if voip.camera_handle_is_open.load(Relaxed) {
+                                    self.disable_camera(voip);
+                                }
+
+                                if let Some(voip_connected_clients) = &self.client_ui.incoming_messages.ongoing_voip_call.connected_clients {
+                                    voip_connected_clients.iter().for_each(|uuid| {
+                                        ctx.forget_image(&format!("bytes://video_stream:{uuid}"));
+                                    });
+                                }
+                                
                                 //Shut down listener server, and disconnect from server
                                 self.send_msg(ClientMessage::construct_voip_disconnect(
                                     &self.opened_user_information.uuid,
@@ -235,16 +246,7 @@ impl Application
                                         )))
                                         .clicked()
                                     {
-                                        //Drop camera handle
-                                        voip.remove_camera_handle(&self.client_connection.client_secret, self.opened_user_information.uuid.clone());
-
-                                        voip.camera_handle_is_open.store(false, Relaxed);
-
-                                        //Cancel webcam recording
-                                        self.voip_video_shutdown_token.cancel();
-                                        
-                                        //Send image disconnection message
-                                        self.send_msg(ClientMessage::construct_voip_event(uuid.clone(), crate::app::backend::ClientVoipRequest::ImageDisconnected));
+                                        self.disable_camera(voip);
                                     }
                                 }
                             });
@@ -670,6 +672,9 @@ impl Application
 
         match self.audio_save_rx.try_recv() {
             Ok((sink, cursor, index, path_to_audio)) => {
+                //Convert idx to usize
+                let index = index as usize;
+
                 //Check if the request was unsuccesful, so we can reset the states
                 if sink.is_none() {
                     //Reset state
@@ -710,5 +715,23 @@ impl Application
             },
             Err(_err) => {},
         }
+    }
+
+    fn disable_camera(&mut self, voip: Voip)
+    {
+        let uuid = self.opened_user_information.uuid.clone();
+        //Drop camera handle
+        voip.remove_camera_handle(&self.client_connection.client_secret, uuid.clone());
+
+        voip.camera_handle_is_open.store(false, Relaxed);
+
+        //Cancel webcam recording
+        self.voip_video_shutdown_token.cancel();
+
+        //Send image disconnection message
+        self.send_msg(ClientMessage::construct_voip_event(
+            uuid,
+            crate::app::backend::ClientVoipRequest::ImageDisconnected,
+        ));
     }
 }

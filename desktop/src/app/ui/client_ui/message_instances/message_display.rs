@@ -1,9 +1,12 @@
 use std::{fs, path::PathBuf};
 
-use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, Response, RichText, Sense, Ui};
+use egui::{
+    vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, Response, RichText, Sense, Ui,
+};
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, Application, ClientMessage, ClientProfile, MessageDisplay, ServerFileReply, ServerImageUpload, ServerMessageType
+    parse_incoming_message, write_file, Application, ClientMessage, ClientProfile, MessageDisplay,
+    ServerFileReply, ServerImageUpload, ServerMessageType,
 };
 use rodio::{Decoder, Source};
 
@@ -49,17 +52,19 @@ impl Application
                 'mainloop: loop {
                     let mut cont = false;
 
-                    let resp = ui.horizontal_wrapped(|ui| {
-                        for message in messages_iter.by_ref() {
-                            //If there is a newline in the messages vector we need to break out of the horizontal wrapped "loop", so well keep drawing in the next line
-                            if message.inner_message == MessageDisplay::NewLine {
-                                cont = true;
-                                return;
-                            }
+                    let resp = ui
+                        .horizontal_wrapped(|ui| {
+                            for message in messages_iter.by_ref() {
+                                //If there is a newline in the messages vector we need to break out of the horizontal wrapped "loop", so well keep drawing in the next line
+                                if message.inner_message == MessageDisplay::NewLine {
+                                    cont = true;
+                                    return;
+                                }
 
-                            message.display(ui, ctx);
-                        }
-                    }).response;
+                                message.display(ui, ctx);
+                            }
+                        })
+                        .response;
 
                     if cont {
                         continue 'mainloop;
@@ -149,6 +154,16 @@ impl Application
 
                 ui.allocate_ui(vec2(300., 150.), |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                        //Get the audio settings vector
+                        let audio_settings = self.client_ui.audio_playback.settings_list.clone();
+
+                        //We will need the cursor so that we will be able to display where we are in the track
+                        let mut cursor = audio_settings[current_index_in_message_list]
+                            .cursor
+                            .cursor
+                            .lock()
+                            .unwrap();
+
                         match self.client_ui.audio_playback.sink_list[current_index_in_message_list]
                             .as_mut()
                         {
@@ -162,15 +177,6 @@ impl Application
                                     },
                                     //Audio is running
                                     false => {
-                                        //Display cursor placement
-                                        let mut cursor =
-                                            self.client_ui.audio_playback.settings_list
-                                                [current_index_in_message_list]
-                                                .cursor
-                                                .cursor
-                                                .lock()
-                                                .unwrap();
-
                                         //Construct new decoder
                                         if let Ok(decoder) = Decoder::new(PlaybackCursor::new(
                                             cursor.clone().into_inner(),
@@ -189,6 +195,7 @@ impl Application
 
                                             if let Some(total_dur) = decoder.total_duration() {
                                                 // If it has been changed, then change the real cursors position too
+                                                //Display cursor placement
                                                 if ui
                                                     .add(
                                                         egui::Slider::new(
@@ -210,7 +217,8 @@ impl Application
                                             }
                                         };
 
-                                        if ui.button("Stop").clicked() {
+                                        //Audio is playing
+                                        if ui.button("Pause").clicked() {
                                             sink.pause();
                                         }
                                     },
@@ -221,8 +229,9 @@ impl Application
                                     [current_index_in_message_list]
                                     .is_loading;
 
+                                //If its loading display a spinner
                                 if is_loading {
-                                    ui.label("Requesting file from server, please wait!");
+                                    ui.spinner();
                                 }
 
                                 //This should be enabled when the audio isnt loading
@@ -234,6 +243,7 @@ impl Application
                                                 ClientMessage::construct_audio_request_msg(
                                                     audio.signature.clone(),
                                                     &self.opened_user_information.uuid,
+                                                    current_index_in_message_list as u64,
                                                 );
 
                                             let connection = self.client_connection.clone();
@@ -249,8 +259,7 @@ impl Application
                                         }
                                     };
                                 })
-                                .response
-                                .paint_debug_info();
+                                .response;
                             },
                         }
                     });
@@ -320,7 +329,8 @@ impl Application
                         .text("Speed")
                         .step_by(0.01),
                     );
-                }).response
+                })
+                .response
             },
             crate::app::backend::ServerMessageType::Deleted => {
                 ui.label(
@@ -389,7 +399,8 @@ impl Application
                                 ))
                                 .size(self.font_size),
                             );
-                        }).response
+                        })
+                        .response
                     },
                     crate::app::backend::VoipEvent::Disconnected => {
                         let profile = match self
@@ -415,7 +426,8 @@ impl Application
                                 ))
                                 .size(self.font_size),
                             );
-                        }).response
+                        })
+                        .response
                     },
 
                     crate::app::backend::VoipEvent::ImageConnected => unreachable!(),

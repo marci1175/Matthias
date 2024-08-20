@@ -168,7 +168,6 @@ impl Application
                                         //Return wav bytes
                                         playbackable_audio
                                     };
-                                    
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
 
@@ -356,30 +355,31 @@ impl Application
                         //This patter match will always return true, the message were trying to pattern match is constructed above 
                         //We should update the message for syncing, so we will provide the latest info to the server
                         if let ClientMessageType::SyncMessage(inner) = &mut message.message_type {
-                            tokio::time::sleep(Duration::from_secs(2)).await;
+                            select! {
+                                _ = tokio::time::sleep(Duration::from_secs(2)) => {
+                                    let index = *last_seen_message_index.lock().unwrap();
 
-                            //We should only check for the value after sleep
-                            if shutdown_token_clone.is_cancelled() {
-                                break;
-                            }
+                                    if inner.last_seen_message_index < Some(index) {
+                                        inner.last_seen_message_index = Some(index);
 
-                            let index = *last_seen_message_index.lock().unwrap();
+                                        //We only send a sync packet if we need to
+                                        //We only have to send the sync message, since in the other thread we are reciving every message sent to us
+                                        match connection_pair.send_message(message.clone()).await {
+                                            Ok(_) => {},
+                                            Err(err) => {
+                                                tracing::error!("{}", err);
 
-                            if inner.last_seen_message_index < Some(index) {
-                                inner.last_seen_message_index = Some(index);
-
-                                //We only send a sync packet if we need to
-                                //We only have to send the sync message, since in the other thread we are reciving every message sent to us
-                                match connection_pair.send_message(message.clone()).await {
-                                    Ok(_) => {},
-                                    Err(err) => {
-                                        tracing::error!("{}", err);
-
-                                        //Error appeared, after this the tread quits, so there arent an inf amount of threads running
-                                        sender.send(None).expect("Failed to signal thread error");
-                                        break;
+                                                //Error appeared, after this the tread quits, so there arent an inf amount of threads running
+                                                sender.send(None).expect("Failed to signal thread error");
+                                                break;
+                                            }
+                                        };
                                     }
-                                };
+                                }
+
+                                _ = shutdown_token_clone.cancelled() => {
+                                    break;
+                                }
                             }
                         }
                         else
@@ -588,6 +588,7 @@ impl Application
                                                         }
                                                         else {
                                                             tracing::error!("Voip event called, but there is no voip instance");
+                                                            tracing::info!("The user disconnected from the call while having their webcam eanbled, this is defined behavior.");
                                                         }
                                                     },
                                                 }
@@ -634,7 +635,6 @@ impl Application
 
                                                         let sender = self.audio_save_tx.clone();
 
-                                                        //ONLY USE THIS PATH WHEN YOU ARE SURE THAT THE FILE SPECIFIED ON THIS PATH EXISTS
                                                         let path_to_audio = PathBuf::from(format!(
                                                             "{}\\Matthias\\Client\\{}\\Audios\\{}",
                                                             env!("APPDATA"),
@@ -642,36 +642,38 @@ impl Application
                                                                 .send_on_ip_base64_encoded,
                                                             audio.signature
                                                         ));
+                                                        let ip = self.client_ui.send_on_ip.clone();
 
-                                                        let _ = write_audio(
-                                                            audio.clone(),
-                                                            self.client_ui.send_on_ip.clone(),
-                                                        );
+                                                        //Spawn writer thread
+                                                        std::thread::spawn(move || {
+                                                            let _ = write_audio(audio.clone(), ip);
 
-                                                        while !path_to_audio.exists() {
-                                                            //Block until it exists, we can do this because we are in a different thread then main
-                                                        }
+                                                            while !path_to_audio.exists() {
+                                                                //Block until it exists, we can do this because we are in a different thread then main
+                                                            }
 
-                                                        let file_stream_to_be_read =
-                                                            fs::read(&path_to_audio)
-                                                                .unwrap_or_default();
+                                                            let file_stream_to_be_read =
+                                                                fs::read(&path_to_audio)
+                                                                    .unwrap_or_default();
 
-                                                        let cursor = PlaybackCursor::new(
-                                                            file_stream_to_be_read,
-                                                        );
-                                                        let sink = Some(Arc::new(
-                                                            Sink::try_new(&stream_handle).unwrap(),
-                                                        ));
+                                                            let cursor = PlaybackCursor::new(
+                                                                file_stream_to_be_read,
+                                                            );
+                                                            let sink = Some(Arc::new(
+                                                                Sink::try_new(&stream_handle)
+                                                                    .unwrap(),
+                                                            ));
 
-                                                        sender
-                                                            .send((
-                                                                sink,
-                                                                cursor,
-                                                                //Is this needed
-                                                                0,
-                                                                path_to_audio,
-                                                            ))
-                                                            .unwrap();
+                                                            sender
+                                                                .send((
+                                                                    sink,
+                                                                    cursor,
+                                                                    //Is this needed
+                                                                    audio.audio_idx,
+                                                                    path_to_audio,
+                                                                ))
+                                                                .unwrap();
+                                                        });
                                                     },
                                                     ServerReplyType::Client(client_reply) => {
                                                         self.client_ui
@@ -741,8 +743,9 @@ impl Application
                     }
                     else {
                         //Signal the remaining thread to be shut down
-                        // self.autosync_shutdown_token.cancel();
-                        // wtf? investigate
+                        self.autosync_shutdown_token.cancel();
+                        
+                        self.server_sender_thread = None;
 
                         //Then the thread got an error, we should reset the state
                         tracing::error!("Client reciver or sync thread panicked");

@@ -7,6 +7,8 @@ use std::env::args;
 
 use egui::{Style, ViewportBuilder, Visuals};
 use tokio::fs;
+use tracing::Level;
+use tracing_subscriber::{filter, layer::SubscriberExt, util::SubscriberInitExt};
 use windows_sys::{
     w,
     Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
@@ -18,15 +20,19 @@ async fn main() -> eframe::Result<()>
     //Get args
     let args: Vec<String> = args().collect();
 
-    #[cfg(not(debug_assertions))]
-    env_logger::init();
-
     #[cfg(debug_assertions)]
     {
-        console_subscriber::init();
+        let filter = filter::Targets::new()
+            .with_default(Level::INFO)
+            .with_default(Level::ERROR)
+            .with_default(Level::DEBUG);
+
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .with(filter)
+            .init();
 
         std::env::set_var("RUST_BACKTRACE", "1");
-        std::env::set_var("RUST_LOG", "INFO");
     }
 
     //set custom panic hook
