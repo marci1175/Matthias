@@ -4,7 +4,7 @@ A (soon to be) multiplatform self-hosted chat application built completely in ru
 | Features | Desktop | Mobile |
 | -------- | ------- | ------- |
 | Encrypted messages ensuring security  | ✅ | ✅ |
-| Decentralized backend which doesnt rely on any central provider | ✅ | ✅ |
+| Backend which doesnt rely on any central provider | ✅ | ✅ |
 | Customizable profiles    | ✅ | ✅ |
 | Text, audio, image, file messages and images | ✅ | ✅ |
 | Custom emojies | ✅ | ✅ |
