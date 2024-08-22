@@ -1,5 +1,5 @@
 # Matthias
-A (soon to be) multiplatform decentralized chat application built completely in rust.
+A (soon to be) multiplatform self-hosted chat application built completely in rust.
 ## Features
 | Features | Desktop | Mobile |
 | -------- | ------- | ------- |
