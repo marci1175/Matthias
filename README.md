@@ -14,6 +14,8 @@ A (soon to be) multiplatform self-hosted chat application built completely in ru
 | Extensive lua (using luajit) API with documentation at [Gitbook](https://matthias.gitbook.io/) with external libs available | ✅ | ❌ |
 | Custom connection urls (If the app is installed through the installer) this allows the user to connect to a server with just a link | ✅ | ❌ |
 
+**Disclaimer: The application has never been security audited, and has known flaws.**
+
 ### Adittional Features (For desktop only):
 - Windows installer (Using a Visual Studio project)
 
