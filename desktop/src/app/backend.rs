@@ -22,7 +22,7 @@ use image::DynamicImage;
 use indexmap::IndexMap;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
-use rand::rngs::ThreadRng;
+use rand::{rngs::ThreadRng, Rng};
 use regex::Regex;
 use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -2844,16 +2844,16 @@ impl UserInformation
 /// aes256 is decrypted by this function by a fixed key
 pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Result<String>
 {
-    let ciphertext = hex::decode(string_to_be_decrypted)?;
+    let mut ciphertext = hex::decode(string_to_be_decrypted)?;
+
+    let nonce: Vec<u8> = ciphertext.drain(ciphertext.len() - 12..).collect();
 
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
-
-    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
-
+    
     let plaintext = cipher
-        .decrypt(&nonce, ciphertext.as_ref())
+        .decrypt(&GenericArray::clone_from_slice(&nonce), ciphertext.as_ref())
         .map_err(|_| Error::msg("Invalid password!"))?;
 
     Ok(String::from_utf8(plaintext)?)
@@ -2868,12 +2868,17 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
 
     let cipher = Aes256Gcm::new(key);
 
-    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+    let mut nonce = [0; 12];
+
+    rand::thread_rng().fill(&mut nonce);
+
+    let bytes = string_to_be_encrypted.as_bytes().to_vec();
 
     let ciphertext = cipher
-        .encrypt(&nonce, string_to_be_encrypted.as_bytes().as_ref())
+        .encrypt(&nonce.into(), &*bytes)
         .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
-    let ciphertext = hex::encode(ciphertext);
+
+    let ciphertext = hex::encode(vec![ciphertext, nonce.to_vec()].concat());
 
     Ok(ciphertext)
 }
@@ -2887,27 +2892,31 @@ pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
 
     let cipher = Aes256Gcm::new(key);
 
-    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+    let mut nonce = [0; 12];
+
+    rand::thread_rng().fill(&mut nonce);
 
     let encrypted_bytes = cipher
-        .encrypt(&nonce, bytes)
+        .encrypt(&nonce.into(), bytes)
         .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
 
-    Ok(encrypted_bytes)
+    Ok(vec![encrypted_bytes, nonce.to_vec()].concat())
 }
 
 #[inline]
 /// This function decrypts a provided array of ```Bytes```, with the provided key using ```Aes-256```
 pub fn decrypt_aes256_bytes(bytes_to_be_decrypted: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
 {
+    let mut bytes: Vec<u8> = bytes_to_be_decrypted.to_vec();
+
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
 
-    let nonce = GenericArray::from([69u8; 12]); // funny nonce key hehehe
+    let nonce: Vec<u8> = bytes.drain(bytes.len() - 12..).collect();
 
     let decrypted_bytes = cipher
-        .decrypt(&nonce, bytes_to_be_decrypted)
+        .decrypt(&GenericArray::clone_from_slice(&nonce), &*bytes)
         .map_err(|_| Error::msg("Invalid password!"))?;
 
     Ok(decrypted_bytes)

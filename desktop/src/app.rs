@@ -89,7 +89,6 @@ impl eframe::App for backend::Application
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame)
     {
         /* TODOS:
-            TODO: Migrate to latest egui https://github.com/emilk/egui/issues/4306
             TODO: Restructure files
             TODO: Sound effects
 
