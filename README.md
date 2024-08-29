@@ -34,7 +34,7 @@ _________________________________________________________
 - The next step is to download the source code of this project. (whether that be git cloning or downloading it from github's website)
 - Navigate to the source folder and run ```cargo r --release``` (Or without --release for debugging)
 - Please note that some features may not be available when running the application after compilation (For links to work you must "install" the application through the installer provided)
-### How to create an installer (Note: You must have the Visual Studio installer for this):
+### How to create an installer (Note: You must have the Visual Studio installed for this):
 - Navigate to `desktop/Installer` in the project folder, and open up the Matthias.sln file.
 - Click on build on the top menu bar and click Build Solution (Or use the `ctrl+shift+b` key combination)
 - After building go to `desktop/Installer/MatthiasSetup/Release/` and you will find two files:
