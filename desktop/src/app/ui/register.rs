@@ -118,9 +118,6 @@ impl Application
                     columns[1].vertical_centered(|ui| {
                         ui.horizontal(|ui| {
                             ui.label("Upload profile picture");
-                            if !self.register.normal_profile_picture.is_empty() {
-                                ui.label(RichText::from("Success!").color(Color32::GREEN));
-                            }
                         });
 
                         // ui.label(RichText::from("You can only set pngs as profile pictures right now, this will be fixed in a later release").weak());
@@ -236,20 +233,22 @@ impl Application
                                 .order(egui::Order::Background)
                                 .constrain_to(image_bounds)
                                 .show(ctx, |ui| {
-                                    let allocated_img = ui.allocate_ui(
-                                        vec2(image.width() as f32, image.height() as f32),
-                                        |ui| {
-                                            if let Ok(read_bytes) =
-                                                fs::read(self.register.image.image_path.clone())
-                                            {
-                                                ui.add(Image::from_bytes(
-                                                    "bytes://register_image",
-                                                    read_bytes,
-                                                ));
-                                            }
-                                        },
-                                    );
-                                    self.register.image.image_rect = allocated_img.response.rect;
+                                    if let Some(image_path) = self.register.image.image_path.clone() {
+                                        let allocated_img = ui.allocate_ui(
+                                            vec2(image.width() as f32, image.height() as f32),
+                                            |ui| {
+                                                if let Ok(read_bytes) =
+                                                    fs::read(image_path)
+                                                {
+                                                    ui.add(Image::from_bytes(
+                                                        "bytes://register_image",
+                                                        read_bytes,
+                                                    ));
+                                                }
+                                            },
+                                        );
+                                        self.register.image.image_rect = allocated_img.response.rect;
+                                    }
                                 });
                         }
                         else if ui.button("Upload picture").clicked() {
@@ -257,8 +256,8 @@ impl Application
                                 .add_filter("Supported formats (.png, .jpg)", &["png", "jpg"])
                                 .pick_file();
 
-                            if let Some(app_data_path) = app_data_path {
-                                match read_image(&app_data_path) {
+                            if let Some(path) = app_data_path.clone() {
+                                match read_image(&path) {
                                     Ok(image) => {
                                         //This shouldnt panic as we limit the types of file which can be seletected as a pfp
                                         self.register.image.selected_image_bytes = Some(image);
@@ -269,13 +268,15 @@ impl Application
                                         display_error_message(err, self.toasts.clone());
                                     },
                                 }
+                                
                                 self.register.image.image_path = app_data_path;
+                                
                                 ctx.forget_image("bytes://register_image");
                             }
                         }
 
                         if !(self.register.normal_profile_picture.is_empty()
-                            && self.register.small_profile_picture.is_empty())
+                            && self.register.small_profile_picture.is_empty()) // self.register.image.image_path.is_none()
                         {
                             //Display profile picure preview
                             ui.horizontal_centered(|ui| {
@@ -387,6 +388,14 @@ impl Application
 fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage>
 {
     let image_reader = ImageReader::new(Cursor::new(fs::read(app_data_path)?))
+        .with_guessed_format()?
+        .decode()?;
+
+    Ok(image_reader)
+}
+
+pub fn create_dynamic_image_from_bytes(bytes: &[u8]) -> anyhow::Result<DynamicImage> {
+    let image_reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
         .decode()?;
 

@@ -2,7 +2,7 @@ use super::{
     client::{connect_to_server, ServerReply},
     lua::{Extension, LuaOutput},
     read_extensions_dir,
-    server::SharedFields,
+    server::SharedFields, ui::register::create_dynamic_image_from_bytes,
 };
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, KeyInit},
@@ -18,7 +18,7 @@ use egui::{
     vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
 };
 use egui_notify::{Toast, Toasts};
-use image::DynamicImage;
+use image::{DynamicImage, ImageOutputFormat};
 use indexmap::IndexMap;
 use mlua::Lua;
 use mlua_proc_macro::ToTable;
@@ -31,7 +31,7 @@ use std::{
     env,
     fmt::{Debug, Display},
     fs,
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{self, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     net::SocketAddr,
     path::PathBuf,
     sync::{
@@ -911,7 +911,7 @@ pub struct Main
 }
 
 ///All the stuff important to the registration process
-#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct Register
 {
     /// client's username
@@ -937,6 +937,28 @@ pub struct Register
 
     /// This entry hold all the temp stuff for creating a profile
     pub image: ProfileImage,
+
+
+    pub selected_image_path: Option<PathBuf>,
+}
+
+impl Default for Register {
+    fn default() -> Self {
+        let default_image = create_dynamic_image_from_bytes(include_bytes!("../../../assets/icons/stock-user-icon.png")).unwrap();
+
+        let mut large_pfp = BufWriter::new(Cursor::new(Vec::new()));
+        let mut small_pfp = BufWriter::new(Cursor::new(Vec::new()));
+
+        default_image
+            .resize(256, 256, image::imageops::FilterType::CatmullRom)
+            .write_to(&mut large_pfp, ImageOutputFormat::Png).unwrap();
+
+        default_image
+            .resize(64, 64, image::imageops::FilterType::CatmullRom)
+            .write_to(&mut small_pfp, ImageOutputFormat::Png).unwrap();
+
+        Self { username: String::new(), password: String::new(), gender: None, birth_date: NaiveDate::default(), full_name: String::new(), small_profile_picture: small_pfp.into_inner().unwrap().into_inner(), normal_profile_picture: large_pfp.into_inner().unwrap().into_inner(), image: ProfileImage::default(), selected_image_path: None }
+    }
 }
 
 /// Holds additional information for the ui
@@ -944,8 +966,9 @@ pub struct Register
 pub struct ProfileImage
 {
     #[serde(skip)]
-    /// This shows whether the image selector should be displayed (If its Some), and also contains the path the image is accessed on
-    pub image_path: PathBuf,
+/// This entry contains the selected image's path
+    /// If this is None this means the user hasnt selected a profile picture and when registering we should insert the default profile picture
+    pub image_path: Option<PathBuf>,
 
     #[serde(skip)]
     /// The selected image's parsed bytes
@@ -962,7 +985,7 @@ impl Default for ProfileImage
     fn default() -> Self
     {
         Self {
-            image_path: PathBuf::new(),
+            image_path: None,
             selected_image_bytes: None,
             image_size: 100.,
             image_rect: Rect::EVERYTHING,
