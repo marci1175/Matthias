@@ -1,6 +1,6 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{display_error_message, register, Application, ProfileImage, Register};
+use crate::app::backend::{display_error_message, display_info_message, register, Application, ProfileImage, Register};
 use anyhow::bail;
 use egui::{
     vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke,
@@ -206,6 +206,8 @@ impl Application
                                             //Avoid panicking when trying to display a Notification
                                             //This is very rare but can still happen
                                             display_error_message(err, self.toasts.clone());
+                                        } else {
+                                            display_info_message("File selected successfully!", self.toasts.clone());
                                         };
                                     }
                                 });

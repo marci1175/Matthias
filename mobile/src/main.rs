@@ -7,10 +7,6 @@ use std::env::args;
 
 use egui::{Style, ViewportBuilder, Visuals};
 use tokio::fs;
-use windows_sys::{
-    w,
-    Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
-};
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
@@ -29,31 +25,7 @@ async fn main() -> eframe::Result<()>
     //set custom panic hook
     #[cfg(not(debug_assertions))]
     std::panic::set_hook(Box::new(|info| {
-        let appdata_path = std::env!("APPDATA");
-        // Write error message
-        std::fs::write(
-            format!("{appdata_path}/matthias/error.log"),
-            format!(
-                "[DATE]\n{:?}\n[PANIC]\n{:?}\n[STACK_BACKTRACE]\n{}\n",
-                chrono::Local::now(),
-                info.to_string(),
-                std::backtrace::Backtrace::force_capture().to_string()
-            ),
-        )
-        .unwrap();
-
-        //Display error message
-        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: \n{:?}\nLocation: \n{:?}", {
-            match info.payload().downcast_ref::<&str>() {
-                Some(msg) => msg,
-                None => {
-                    match info.payload().downcast_ref::<String>() {
-                        Some(msg) => msg,
-                        None => "Failed to display panic message",
-                    }
-                },
-            }
-        }, info.location()));
+        
     }));
 
     let native_options = eframe::NativeOptions {
@@ -90,23 +62,6 @@ async fn main() -> eframe::Result<()>
             Ok(Box::new(application))
         }),
     )
-}
-
-pub fn display_panic_message<T>(display: T)
-where
-    T: ToString + std::marker::Send + 'static,
-{
-    unsafe {
-        MessageBoxW(
-            0,
-            str::encode_utf16(display.to_string().as_str())
-                .chain(std::iter::once(0))
-                .collect::<Vec<_>>()
-                .as_ptr(),
-            w!("Panic!"),
-            MB_ICONERROR,
-        )
-    };
 }
 
 /*  Gulyásleves recept

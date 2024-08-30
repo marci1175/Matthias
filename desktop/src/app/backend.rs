@@ -3094,6 +3094,26 @@ where
     }
 }
 
+///Display Error message with a messagebox
+pub fn display_info_message<T>(display: T, toasts: Arc<Mutex<Toasts>>)
+where
+    T: ToString + std::marker::Send + 'static,
+{
+    match toasts.lock() {
+        Ok(mut toasts) => {
+            let mut toast = Toast::info(display.to_string());
+
+            toast.set_duration(Some(Duration::from_secs(4)));
+            toast.set_show_progress_bar(true);
+
+            toasts.add(toast);
+        },
+        Err(_err) => {
+            tracing::error!("{}", _err);
+        },
+    }
+}
+
 /// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_lenght<T>(reader: &mut T) -> anyhow::Result<u32>
