@@ -2,7 +2,8 @@ use super::{
     client::{connect_to_server, ServerReply},
     lua::{Extension, LuaOutput},
     read_extensions_dir,
-    server::SharedFields, ui::register::create_dynamic_image_from_bytes,
+    server::SharedFields,
+    ui::register::create_dynamic_image_from_bytes,
 };
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, KeyInit},
@@ -938,26 +939,42 @@ pub struct Register
     /// This entry hold all the temp stuff for creating a profile
     pub image: ProfileImage,
 
-
     pub selected_image_path: Option<PathBuf>,
 }
 
-impl Default for Register {
-    fn default() -> Self {
-        let default_image = create_dynamic_image_from_bytes(include_bytes!("../../../assets/icons/stock-user-icon.png")).unwrap();
+impl Default for Register
+{
+    fn default() -> Self
+    {
+        let default_image = create_dynamic_image_from_bytes(include_bytes!(
+            "../../../assets/icons/stock-user-icon.png"
+        ))
+        .unwrap();
 
         let mut large_pfp = BufWriter::new(Cursor::new(Vec::new()));
         let mut small_pfp = BufWriter::new(Cursor::new(Vec::new()));
 
         default_image
             .resize(256, 256, image::imageops::FilterType::CatmullRom)
-            .write_to(&mut large_pfp, ImageOutputFormat::Png).unwrap();
+            .write_to(&mut large_pfp, ImageOutputFormat::Png)
+            .unwrap();
 
         default_image
             .resize(64, 64, image::imageops::FilterType::CatmullRom)
-            .write_to(&mut small_pfp, ImageOutputFormat::Png).unwrap();
+            .write_to(&mut small_pfp, ImageOutputFormat::Png)
+            .unwrap();
 
-        Self { username: String::new(), password: String::new(), gender: None, birth_date: NaiveDate::default(), full_name: String::new(), small_profile_picture: small_pfp.into_inner().unwrap().into_inner(), normal_profile_picture: large_pfp.into_inner().unwrap().into_inner(), image: ProfileImage::default(), selected_image_path: None }
+        Self {
+            username: String::new(),
+            password: String::new(),
+            gender: None,
+            birth_date: NaiveDate::default(),
+            full_name: String::new(),
+            small_profile_picture: small_pfp.into_inner().unwrap().into_inner(),
+            normal_profile_picture: large_pfp.into_inner().unwrap().into_inner(),
+            image: ProfileImage::default(),
+            selected_image_path: None,
+        }
     }
 }
 
@@ -966,7 +983,7 @@ impl Default for Register {
 pub struct ProfileImage
 {
     #[serde(skip)]
-/// This entry contains the selected image's path
+    /// This entry contains the selected image's path
     /// If this is None this means the user hasnt selected a profile picture and when registering we should insert the default profile picture
     pub image_path: Option<PathBuf>,
 
@@ -2241,9 +2258,11 @@ pub struct ServerVoip
     /// This field contains the amount of time the call has been established for
     pub _established_since: chrono::DateTime<Utc>,
 
-    /// The socket the server is listening on for incoming messages
-    /// The only reason this is an option so we can implement ```serde::Deserialize```
-    pub socket: Arc<UdpSocket>,
+    /// The socket the server is listening on for incoming messages from ipv6 addresses
+    pub socket_v6: Option<Arc<UdpSocket>>,
+
+    /// The socket the server is listening on for incoming messages from ipv4 addresses
+    pub socket_v4: Arc<UdpSocket>,
 
     /// The cancellation token cancels threads, which are for listening and relaying (Distributing info)
     pub thread_cancellation_token: CancellationToken,
@@ -2336,9 +2355,9 @@ impl Voip
 {
     /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
     /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
-    pub async fn new() -> anyhow::Result<Self>
+    pub async fn new(local_addr: String) -> anyhow::Result<Self>
     {
-        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+        let socket_handle = UdpSocket::bind(local_addr).await?;
         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
         socket_2.set_reuse_address(true)?;
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
@@ -2874,7 +2893,7 @@ pub fn decrypt_aes256(string_to_be_decrypted: &str, key: &[u8]) -> anyhow::Resul
     let key = Key::<Aes256Gcm>::from_slice(key);
 
     let cipher = Aes256Gcm::new(key);
-    
+
     let plaintext = cipher
         .decrypt(&GenericArray::clone_from_slice(&nonce), ciphertext.as_ref())
         .map_err(|_| Error::msg("Invalid password!"))?;

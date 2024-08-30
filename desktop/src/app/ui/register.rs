@@ -1,6 +1,8 @@
 use std::{env, fs, io::Cursor, path::PathBuf};
 
-use crate::app::backend::{display_error_message, display_info_message, register, Application, ProfileImage, Register};
+use crate::app::backend::{
+    display_error_message, display_info_message, register, Application, ProfileImage, Register,
+};
 use anyhow::bail;
 use egui::{
     vec2, Area, Color32, Id, Image, ImageButton, LayerId, Pos2, Rect, RichText, Slider, Stroke,
@@ -206,8 +208,12 @@ impl Application
                                             //Avoid panicking when trying to display a Notification
                                             //This is very rare but can still happen
                                             display_error_message(err, self.toasts.clone());
-                                        } else {
-                                            display_info_message("File selected successfully!", self.toasts.clone());
+                                        }
+                                        else {
+                                            display_info_message(
+                                                "File selected successfully!",
+                                                self.toasts.clone(),
+                                            );
                                         };
                                     }
                                 });
@@ -235,13 +241,12 @@ impl Application
                                 .order(egui::Order::Background)
                                 .constrain_to(image_bounds)
                                 .show(ctx, |ui| {
-                                    if let Some(image_path) = self.register.image.image_path.clone() {
+                                    if let Some(image_path) = self.register.image.image_path.clone()
+                                    {
                                         let allocated_img = ui.allocate_ui(
                                             vec2(image.width() as f32, image.height() as f32),
                                             |ui| {
-                                                if let Ok(read_bytes) =
-                                                    fs::read(image_path)
-                                                {
+                                                if let Ok(read_bytes) = fs::read(image_path) {
                                                     ui.add(Image::from_bytes(
                                                         "bytes://register_image",
                                                         read_bytes,
@@ -249,7 +254,8 @@ impl Application
                                                 }
                                             },
                                         );
-                                        self.register.image.image_rect = allocated_img.response.rect;
+                                        self.register.image.image_rect =
+                                            allocated_img.response.rect;
                                     }
                                 });
                         }
@@ -270,15 +276,16 @@ impl Application
                                         display_error_message(err, self.toasts.clone());
                                     },
                                 }
-                                
+
                                 self.register.image.image_path = app_data_path;
-                                
+
                                 ctx.forget_image("bytes://register_image");
                             }
                         }
 
                         if !(self.register.normal_profile_picture.is_empty()
-                            && self.register.small_profile_picture.is_empty()) // self.register.image.image_path.is_none()
+                            && self.register.small_profile_picture.is_empty())
+                        // self.register.image.image_path.is_none()
                         {
                             //Display profile picure preview
                             ui.horizontal_centered(|ui| {
@@ -396,7 +403,8 @@ fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage>
     Ok(image_reader)
 }
 
-pub fn create_dynamic_image_from_bytes(bytes: &[u8]) -> anyhow::Result<DynamicImage> {
+pub fn create_dynamic_image_from_bytes(bytes: &[u8]) -> anyhow::Result<DynamicImage>
+{
     let image_reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
         .decode()?;
