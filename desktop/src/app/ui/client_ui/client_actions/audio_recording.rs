@@ -230,7 +230,7 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec
     }
 }
 
-/// This function creates a wav foramtted audio file, containingg the samples provided to this function
+/// This function creates a wav foramtted audio file, containing the samples provided to this function
 pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8>
 {
     let writer = Arc::new(Mutex::new(Vec::new()));
@@ -254,7 +254,7 @@ pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8>
     buf.into_inner().to_vec()
 }
 
-/// This function creates a wav foramtted audio file, containingg the samples provided to this function
+/// This function creates a wav foramtted audio file, containing the samples provided to this function
 /// This function doesnt work properly
 pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8>
 {

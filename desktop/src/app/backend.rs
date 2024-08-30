@@ -2351,7 +2351,7 @@ pub struct Voip
 
 impl Voip
 {
-    /// This function creates a new ```Voip``` instance containingg a ```UdpSocket``` and an authentication from the server
+    /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
     /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
     pub async fn new() -> anyhow::Result<Self>
     {
@@ -2775,7 +2775,7 @@ pub fn ipv6_get() -> Result<String, std::io::Error>
 
 /// Account management
 /// This might look similar to ```ClientProfile```
-/// struct containingg a new user's info, when serialized / deserialized it gets encrypted or decrypted
+/// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
 pub struct UserInformation
 {

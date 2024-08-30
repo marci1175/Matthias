@@ -1331,7 +1331,7 @@ impl MessageService
         ));
     }
 
-    /// This function returns a message containingg a full sync (all the messages etc)
+    /// This function returns a message containing a full sync (all the messages etc)
     /// It returns a ```ServerMaster``` converted to an encrypted string
     async fn full_sync_client(&self) -> anyhow::Result<String>
     {
