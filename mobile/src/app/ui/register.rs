@@ -158,7 +158,7 @@ impl Application
 
                             //Draw background
                             ui.painter().rect_filled(
-                                Rect::everything_right_of(ui.available_width()),
+                                Rect::everythingg_right_of(ui.available_width()),
                                 0.,
                                 Color32::from_black_alpha(160),
                             );

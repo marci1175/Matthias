@@ -38,8 +38,8 @@ _________________________________________________________
 - Navigate to `desktop/Installer` in the project folder, and open up the Matthias.sln file.
 - Click on build on the top menu bar and click Build Solution (Or use the `ctrl+shift+b` key combination)
 - After building go to `desktop/Installer/MatthiasSetup/Release/` and you will find two files:
-  - One containing the dependencies (Smaller file size)
-  - One containing the application itself (Bigger file size)
+  - One containingg the dependencies (Smaller file size)
+  - One containingg the application itself (Bigger file size)
 
 ## Community
 Feel free to chat in the official [Matthias discord server](https://discord.gg/66KFkByMGa)!

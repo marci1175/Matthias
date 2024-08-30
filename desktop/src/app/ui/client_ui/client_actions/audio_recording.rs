@@ -18,11 +18,11 @@ use std::{
     time::Duration,
 };
 
-pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
+pub const VOIP_PACKET_BUFFER_LENGTH_MS: usize = 35;
 
 pub const SAMPLE_RATE: usize = 48000;
-pub const STEREO_PACKET_BUFFER_LENGHT: usize =
-    SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGHT_MS / 1000;
+pub const STEREO_PACKET_BUFFER_LENGTH: usize =
+    SAMPLE_RATE * 2 * VOIP_PACKET_BUFFER_LENGTH_MS / 1000;
 
 struct Opt
 {
@@ -50,11 +50,11 @@ impl Default for Opt
     }
 }
 
-/// This function records audio for the passed in duration, then it reutrns the recorded bytes wrapped in a result
-/// The amplification precentage is the precent the microphone's volume should be present, this is later turned into a multiplier
+/// This function records audio for the passed in duration, then it returns the recorded bytes wrapped in a result
+/// The amplification percentage is the percent the microphone's volume should be present, this is later turned into a multiplier
 pub fn record_audio_for_set_duration(
     dur: Duration,
-    amplification_precentage: f32,
+    amplification_percentage: f32,
 ) -> anyhow::Result<Vec<f32>>
 {
     let opt = Opt::default();
@@ -86,7 +86,7 @@ pub fn record_audio_for_set_duration(
     let stream = device.build_input_stream(
         &config.into(),
         move |data, _: &_| {
-            write_input_data::<f32>(data, wav_buffer.clone(), amplification_precentage / 100.)
+            write_input_data::<f32>(data, wav_buffer.clone(), amplification_percentage / 100.)
         },
         err_fn,
         None,
@@ -102,10 +102,10 @@ pub fn record_audio_for_set_duration(
 }
 
 /// This function returns a handle to a `queue` of bytes (```Arc<Mutex<VecDeque<u8>>>```), while spawning a thread which constantly writes the incoming audio into the buffer
-/// This  `queue` or `buffer` gets updated from left to right, the new element always pushes back all the elements behind it, if the value's index reaches ```idx > queue_lenght```, it gets dropped.
+/// This  `queue` or `buffer` gets updated from left to right, the new element always pushes back all the elements behind it, if the value's index reaches ```idx > queue_length```, it gets dropped.
 pub fn record_audio_with_interrupt(
     interrupt: Receiver<()>,
-    amplification_precentage: Arc<AtomicI64>,
+    amplification_percentage: Arc<AtomicI64>,
     buffer_handle: Arc<Mutex<VecDeque<f32>>>,
     should_record: Arc<AtomicBool>,
 ) -> anyhow::Result<Arc<Mutex<VecDeque<f32>>>>
@@ -128,7 +128,7 @@ pub fn record_audio_with_interrupt(
                     if !write_input_data_to_buffer_with_set_len::<f32>(
                         data,
                         buffer_handle.clone(),
-                        amplification_precentage.load(Relaxed) as f32 / 100.,
+                        amplification_percentage.load(Relaxed) as f32 / 100.,
                         should_record.clone(),
                     ) {
                         //Quit the thread, stop recording
@@ -170,11 +170,11 @@ fn get_recording_device() -> Result<(Device, SupportedStreamConfig), Error>
     Ok((device, config))
 }
 
-/// This function records audio on a different thread, until the reciver recives something, then the recorded buffer is returned
-/// The amplification precentage is the precent the microphone's volume should be present, this is later turned into a multiplier
+/// This function records audio on a different thread, until the receiver receives something, then the recorded buffer is returned
+/// The amplification percentage is the percent the microphone's volume should be present, this is later turned into a multiplier
 pub fn audio_recording_with_recv(
     receiver: mpsc::Receiver<bool>,
-    amplification_precentage: f32,
+    amplification_percentage: f32,
 ) -> anyhow::Result<Vec<f32>>
 {
     let (device, config) = get_recording_device()?;
@@ -190,7 +190,7 @@ pub fn audio_recording_with_recv(
     let stream = device.build_input_stream(
         &config.into(),
         move |data, _: &_| {
-            write_input_data::<f32>(data, wav_buffer.clone(), amplification_precentage / 100.)
+            write_input_data::<f32>(data, wav_buffer.clone(), amplification_percentage / 100.)
         },
         err_fn,
         None,
@@ -230,7 +230,7 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec
     }
 }
 
-/// This function creates a wav foramtted audio file, containing the samples provided to this function
+/// This function creates a wav foramtted audio file, containingg the samples provided to this function
 pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8>
 {
     let writer = Arc::new(Mutex::new(Vec::new()));
@@ -254,7 +254,7 @@ pub fn create_wav_file(samples: Vec<f32>) -> Vec<u8>
     buf.into_inner().to_vec()
 }
 
-/// This function creates a wav foramtted audio file, containing the samples provided to this function
+/// This function creates a wav foramtted audio file, containingg the samples provided to this function
 /// This function doesnt work properly
 pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8>
 {
@@ -265,7 +265,7 @@ pub fn create_opus_file(mut samples: Vec<f32>) -> Vec<u8>
     )
     .unwrap();
 
-    samples.resize(STEREO_PACKET_BUFFER_LENGHT, 0.);
+    samples.resize(STEREO_PACKET_BUFFER_LENGTH, 0.);
 
     opus_encoder
         .encode_vec_float(&samples, 512)
@@ -288,7 +288,7 @@ where
     writer.lock().unwrap().append(&mut inp_vec);
 }
 
-/// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the lenght of ```len```
+/// This function writes the multiplied (by the ```amplification_multiplier```) samples to the ```buffer_handle```, and keeps the buffer the length of ```len```
 /// It will notify the Condvar if the buffer_handle's len reaches ```len```
 fn write_input_data_to_buffer_with_set_len<T>(
     input: &[T],

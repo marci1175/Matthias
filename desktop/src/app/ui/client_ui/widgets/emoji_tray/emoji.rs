@@ -24,7 +24,7 @@ impl ToString for EmojiTypes
 
 impl backend::Application
 {
-    /// We return the name of the emoji selected, if none was selected in that frame we reutrn None
+    /// We return the name of the emoji selected, if none was selected in that frame we return None
     pub fn draw_emoji_selector(&mut self, ui: &mut egui::Ui, ctx: &egui::Context)
         -> Option<String>
     {
@@ -242,7 +242,7 @@ impl backend::Application
     }
 }
 
-/// This will display the emoji under the given name, if it is not found in the egui image buffer it will automaticly load it
+/// This will display the emoji under the given name, if it is not found in the egui image buffer it will automatically load it
 pub fn display_emoji(ctx: &egui::Context, emoji_name: &str, ui: &mut egui::Ui) -> Option<String>
 {
     match ctx.try_load_bytes(&format!("bytes://{}", emoji_name)) {

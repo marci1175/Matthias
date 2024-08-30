@@ -94,9 +94,9 @@ impl Application
     )
     {
         //The inner ui's response
-        let mut message_reponse: Option<Response> = None;
+        let mut message_response: Option<Response> = None;
 
-        let mut reply_area_reponse: Option<Response> = None;
+        let mut reply_area_response: Option<Response> = None;
 
         //Emoji tray pops up when right clicking on a message
         let message_group = ui.group(|ui| {
@@ -168,7 +168,7 @@ impl Application
                         );
                     });
 
-                    reply_area_reponse = Some(reply_button_area.response.clone());
+                    reply_area_response = Some(reply_button_area.response.clone());
 
                     if ui
                         .interact(
@@ -197,7 +197,7 @@ impl Application
             });
 
             //IMPORTANT: Each of these functions have logic inside them for displaying
-            message_reponse = Some(
+            message_response = Some(
                 ui.push_id(iter_index, |ui| {
                     self.message_display(item, ui, ctx, iter_index)
                 })
@@ -219,7 +219,7 @@ impl Application
 
             egui::ScrollArea::horizontal()
                 .id_source(
-                    /* Autoassign id's to interated scroll widgets */ ui.next_auto_id(),
+                    /* Autoassign id's to integrated scroll widgets */ ui.next_auto_id(),
                 )
                 .max_height(self.font_size)
                 .show(ui, |ui| {
@@ -308,17 +308,17 @@ impl Application
             }
         });
 
-        if let Some(inner_message_reponse) = message_reponse {
-            let mut response = inner_message_reponse.union(message_group.response);
+        if let Some(inner_message_response) = message_response {
+            let mut response = inner_message_response.union(message_group.response);
 
-            if let Some(reply_response) = reply_area_reponse {
+            if let Some(reply_response) = reply_area_response {
                 response = reply_response.union(response);
 
-                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+                //Back up response of message group, so we can scroll to it later if the user thinks like it
                 message_instances.push(response.clone());
             }
             else {
-                //Back up reponse of message group, so we can scroll to it later if the user thinks like it
+                //Back up response of message group, so we can scroll to it later if the user thinks like it
                 message_instances.push(response.clone());
             }
 
@@ -326,7 +326,7 @@ impl Application
                 let profile_menu_button = ui.menu_button("Profile", |ui| {
                     //Check if the message was sent by the server, create a custom profile for it
                     if item.uuid == SERVER_UUID {
-                        //Add verification or somthing like that
+                        //Add verification or something like that
                         ui.allocate_ui(vec2(ui.available_width(), 25.), |ui| {
                             ui.horizontal_centered(|ui| {
                                 ui.label("This message was sent by the host server");
@@ -413,7 +413,7 @@ impl Application
                 if item.uuid == self.opened_user_information.uuid
                     && item.message_type != ServerMessageType::Deleted
                 {
-                    //We should only display the `edit` button if its anormal message thus its editable
+                    //We should only display the `edit` button if its abnormal message thus its editable
                     if let ServerMessageType::Normal(inner) = &item.message_type {
                         if ui
                             .add(Button::image_and_text(

@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use tokio_util::sync::CancellationToken;
 
 use super::backend::{
-    encrypt, encrypt_aes256, fetch_incoming_message_lenght, ClientLastSeenMessage,
+    encrypt, encrypt_aes256, fetch_incoming_message_length, ClientLastSeenMessage,
     ClientMessageType, ClientProfile, ConnectedClient, ConnectionType, MessageReaction, Reaction,
     ReactionType, ServerClientReply, ServerMessageType,
     ServerMessageTypeDiscriminants::{
@@ -115,7 +115,7 @@ pub struct SharedFields
 pub async fn server_main(
     port: String,
     password: String,
-    //This signals all the client recivers to be shut down
+    //This signals all the client receivers to be shut down
     cancellation_token: CancellationToken,
     connected_clients_profile_list: Arc<DashMap<String, ClientProfile>>,
     //We pass in ctx so we can request repaint when someone connects
@@ -156,7 +156,7 @@ pub async fn server_main(
                 }
             };
 
-            //split client stream, so we will be able to store these seperately
+            //split client stream, so we will be able to store these separately
             let (reader, writer) = stream.into_split();
 
             //We need to clone here too, to pass it into the listener thread
@@ -249,7 +249,7 @@ fn spawn_client_reader(
                     break;
                 }
 
-                msg = recive_message(reader.clone()) => {
+                msg = receive_message(reader.clone()) => {
                     msg?
                 }
             };
@@ -274,11 +274,11 @@ fn spawn_client_reader(
 }
 
 #[inline]
-async fn recive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String>
+async fn receive_message(reader: Arc<tokio::sync::Mutex<OwnedReadHalf>>) -> Result<String>
 {
     let mut reader = reader.lock().await;
 
-    let incoming_message_len = fetch_incoming_message_lenght(&mut *reader).await?;
+    let incoming_message_len = fetch_incoming_message_length(&mut *reader).await?;
 
     let mut message_buffer: Vec<u8> = vec![0; incoming_message_len as usize];
 
@@ -319,15 +319,15 @@ async fn sync_message_with_clients(
     //Encrypt string
     let encrypted_string = encrypt_aes256(server_master_string, &key).unwrap();
 
-    //Send message lenght
-    let message_lenght = TryInto::<u32>::try_into(encrypted_string.as_bytes().len())?;
+    //Send message length
+    let message_length = TryInto::<u32>::try_into(encrypted_string.as_bytes().len())?;
 
     for client in connected_clients_locked.iter_mut() {
         if let Some(client_handle) = &mut client.handle {
             let mut client_handle = client_handle.lock().await;
 
             client_handle
-                .write_all(&message_lenght.to_be_bytes())
+                .write_all(&message_length.to_be_bytes())
                 .await?;
 
             //Send actual message
@@ -346,7 +346,7 @@ where
 {
     let message_bytes = message.as_bytes();
 
-    //Send message lenght
+    //Send message length
     writer
         .write_all(&(message_bytes.len() as u32).to_be_bytes())
         .await?;
@@ -362,7 +362,7 @@ pub fn create_client_voip_manager(
     voip: ServerVoip,
     shutdown_token: CancellationToken,
     key: [u8; 32],
-    mut reciver: Receiver<Vec<u8>>,
+    mut receiver: Receiver<Vec<u8>>,
     #[allow(unused_variables)] listening_to: SocketAddr,
     uuid: String,
 )
@@ -386,14 +386,14 @@ pub fn create_client_voip_manager(
                     break;
                 },
 
-                //recive_message lenght by reading its first 4 bytes
-                recived_bytes = reciver.recv() => {
-                    let recived_bytes = recived_bytes.unwrap();
+                //receive_message length by reading its first 4 bytes
+                received_bytes = receiver.recv() => {
+                    let received_bytes = received_bytes.unwrap();
 
                     //Decrypt message
                     // [. . . . . .4][4 . . . . len - 4][len - 4..]
-                    //  PACKET LENGHT       MESSAGE      MSG TYPE
-                    let mut decrypted_bytes = decrypt_aes256_bytes(&recived_bytes, &key).unwrap();
+                    //  PACKET LENGTH       MESSAGE      MSG TYPE
+                    let mut decrypted_bytes = decrypt_aes256_bytes(&received_bytes, &key).unwrap();
 
                     let message_type_bytes: Vec<u8> = decrypted_bytes.drain(decrypted_bytes.len() - 4..).collect();
 
@@ -430,13 +430,13 @@ pub fn create_client_voip_manager(
                                     let mut encrypted_packet = encrypt_aes256_bytes(&decrypted_bytes, &key).unwrap();
 
                                     //Get encrypted packet size
-                                    let mut message_lenght_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
+                                    let mut message_length_header = (encrypted_packet.len() as u32).to_be_bytes().to_vec();
 
                                     //Append message to header
-                                    message_lenght_header.append(&mut encrypted_packet);
+                                    message_length_header.append(&mut encrypted_packet);
 
-                                    //Send the header indicating message lenght and send the whole message appended to it
-                                    socket.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                    //Send the header indicating message length and send the whole message appended to it
+                                    socket.send_to(&message_length_header, connected_socket_addr).await.unwrap();
                                 }
                             });
                         }
@@ -565,23 +565,23 @@ async fn send_bytes(
     //Encrypt message
     let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
-    //Get message lenght
-    let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
+    //Get message length
+    let mut message_length_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
-    //Append message to message lenght
-    message_lenght_in_bytes.append(&mut encrypted_message);
+    //Append message to message length
+    message_length_in_bytes.append(&mut encrypted_message);
 
-    //Check for packet lenght overflow
-    let bytes_lenght = message_lenght_in_bytes.len();
+    //Check for packet length overflow
+    let bytes_length = message_length_in_bytes.len();
 
-    if bytes_lenght > 65536 {
+    if bytes_length > 65536 {
         bail!(format!(
-            "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+            "Udp packet length overflow, with length of {bytes_length}"
         ))
     }
 
     //Send bytes
-    socket.send_to(&message_lenght_in_bytes, send_to).await?;
+    socket.send_to(&message_length_in_bytes, send_to).await?;
 
     Ok(())
 }
@@ -591,7 +591,7 @@ async fn send_bytes(
 /// - ```[len - 64 - 36.. len - 64]``` = Contains the UUID of the author who has sent the message
 /// - ```[..len - 64 - 64 - 36]``` = Contains the image part we are sending (JPEG image)
 /// - ```[len - 64..]``` = Contains the identificator of the part we are sending
-/// - **The hash lenght is 64 bytes.**
+/// - **The hash length is 64 bytes.**
 /// - **The identificator is 64 bytes.**
 /// - **The uuid is 36 bytes.**
 async fn send_image_parts(
@@ -636,7 +636,7 @@ async fn send_image_parts(
 impl MessageService
 {
     /// The result returned by this function may be a real error, or an error constructed on purpose so that the thread call this function gets shut down.
-    /// When experiening errors, make sure to check the error message as it may be on purpose
+    /// When experiencing errors, make sure to check the error message as it may be on purpose
     #[inline]
     async fn message_main(
         &mut self,
@@ -650,7 +650,7 @@ impl MessageService
         let req: ClientMessage = req_result.unwrap();
 
         //If its a Client reaction or a message edit we shouldnt allocate more MessageReactions, since those are not actual messages
-        //HOWEVER, if theyre client connection or disconnection messages a reaction should be allocated because people can react to those
+        //HOWEVER, if they're client connection or disconnection messages a reaction should be allocated because people can react to those
         if !(matches!(&req.message_type, ClientReaction(_))
             || matches!(&req.message_type, MessageEdit(_))
             || {
@@ -884,20 +884,20 @@ impl MessageService
 
                                             //Wait until we get a new message or until the thread token gets cancelled
                                             select! {
-                                                //Wait until we recive a new message
-                                                //Recive header size
+                                                //Wait until we receive a new message
+                                                //Receive header size
                                                 _ = socket.peek_from(&mut header_buf) => {
-                                                    //Get message lenght
-                                                    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
+                                                    //Get message length
+                                                    let header_length = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
-                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the header thus we didnt remove the bytes from the buffer
-                                                    let mut body_buf = vec![0; header_lenght as usize + 4];
+                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte length because we peeked the header thus we didnt remove the bytes from the buffer
+                                                    let mut body_buf = vec![0; header_length as usize + 4];
 
                                                     match socket.recv_from(&mut body_buf).await {
                                                         Ok((_, socket_addr)) => {
                                                             match connected_clients.get(&socket_addr) {
                                                                 Some(client) => {
-                                                                    //We send everythin from the 4th byte since that is the part of the header
+                                                                    //We send everything from the 4th byte since that is the part of the header
                                                                     //We dont care about the result since it will panic when the thread is shut down
                                                                     let _ = client.0.send(body_buf[4..].to_vec()).await;
                                                                 },
@@ -928,7 +928,7 @@ impl MessageService
                                     .get(&socket_addr)
                                     .is_none()
                                 {
-                                    let (sender, reciver) = mpsc::channel::<Vec<u8>>(255);
+                                    let (sender, receiver) = mpsc::channel::<Vec<u8>>(255);
 
                                     //Create cancellation token for client
                                     let client_manager_cancellation_token =
@@ -939,7 +939,7 @@ impl MessageService
                                         voip.clone(),
                                         client_manager_cancellation_token.clone(),
                                         self.decryption_key,
-                                        reciver,
+                                        receiver,
                                         socket_addr,
                                         req.uuid.clone(),
                                     );
@@ -1142,7 +1142,7 @@ impl MessageService
                     match &req.message_type {
                         FileRequestType(_) => unreachable!(),
                         FileUpload(inner) => {
-                            //We should match the upload type more specificly
+                            //We should match the upload type more specifically
                             match inner.extension.clone().unwrap_or_default().as_str() {
                                 "png" | "jpeg" | "bmp" | "tiff" | "webp" => Image,
                                 "wav" | "mp3" | "m4a" => Audio,
@@ -1331,8 +1331,8 @@ impl MessageService
         ));
     }
 
-    /// This function returns a message containing a full sync (all the messages etc)
-    /// It reutrns a ```ServerMaster``` converted to an encrypted string
+    /// This function returns a message containingg a full sync (all the messages etc)
+    /// It returns a ```ServerMaster``` converted to an encrypted string
     async fn full_sync_client(&self) -> anyhow::Result<String>
     {
         //Construct reply
@@ -1401,9 +1401,9 @@ impl MessageService
             }
         };
     }
-    async fn recive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct)
+    async fn receive_file(&self, request: ClientMessage, req: &ClientFileUploadStruct)
     {
-        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        //We should retrieve the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
             .lock()
@@ -1472,9 +1472,9 @@ impl MessageService
     {
         fs::read(&*self.image_list.get(&signature).unwrap()).unwrap_or_default()
     }
-    async fn recive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct)
+    async fn receive_image(&self, req: ClientMessage, img: &ClientFileUploadStruct)
     {
-        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        //We should retrieve the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
             .lock()
@@ -1530,9 +1530,9 @@ impl MessageService
             },
         }
     }
-    async fn recive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct)
+    async fn receive_audio(&self, req: ClientMessage, audio: &ClientFileUploadStruct)
     {
-        //We should retrive the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
+        //We should retrieve the username of the cient who has sent this, we clone it so that the mutex is dropped, thus allowing other threads to lock it
         let file_author = self
             .connected_clients_profile
             .lock()
@@ -1658,12 +1658,12 @@ impl MessageService
         //Create server folder, so we will have a place to put our uploads
         let _ = fs::create_dir(format!("{}\\matthias\\Server", env!("APPDATA")));
 
-        //Pattern match on upload tpye so we know how to handle the specific request
+        //Pattern match on upload type so we know how to handle the specific request
         match upload_type.extension.clone().unwrap_or_default().as_str() {
-            "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.recive_image(req, upload_type).await,
-            "wav" | "mp3" | "m4a" => self.recive_audio(req, upload_type).await,
+            "png" | "jpeg" | "bmp" | "tiff" | "webp" => self.receive_image(req, upload_type).await,
+            "wav" | "mp3" | "m4a" => self.receive_audio(req, upload_type).await,
             //Define file types and how should the server handle them based on extension, NOTICE: ENSURE CLIENT COMPATIBILITY
-            _ => self.recive_file(req, upload_type).await,
+            _ => self.receive_file(req, upload_type).await,
         }
     }
 

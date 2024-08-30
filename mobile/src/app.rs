@@ -273,8 +273,8 @@ impl eframe::App for backend::Application
                 };
             });
 
-        //Connection reciver
-        match self.connection_reciver.try_recv() {
+        //Connection receiver
+        match self.connection_receiver.try_recv() {
             Ok(connection) => {
                 if let Some(connection) = connection {
                     //Modify client_connection
@@ -303,10 +303,10 @@ impl eframe::App for backend::Application
                     }
                 }
                 else {
-                    // A race condition will occur if we connected succesfully after getting a connection error (request timed out)
+                    // A race condition will occur if we connected successfully after getting a connection error (request timed out)
                     // So we check if we have already made the connection before actually modifying the value based on the timed out request
                     if !matches!(self.client_connection.state, ConnectionState::Connected(_)) {
-                        //If we recived a None it means we have an error
+                        //If we received a None it means we have an error
                         self.client_connection.state = ConnectionState::Error;
                     }
                 }
@@ -317,7 +317,7 @@ impl eframe::App for backend::Application
         }
 
         //Voip instance listener
-        // match self.voip_connection_reciver.try_recv() {
+        // match self.voip_connection_receiver.try_recv() {
         //     Ok(voip) => {
         //         self.client_ui.voip = Some(voip.clone());
 
@@ -478,7 +478,7 @@ impl backend::Application
             });
 
             ui.horizontal(|ui| {
-                ui.label("Microphone volume precentage");
+                ui.label("Microphone volume percentage");
                 ui.add(Slider::new(
                     &mut *self.client_ui.microphone_volume.lock().unwrap(),
                     50.0..=500.0,
@@ -506,10 +506,10 @@ impl backend::Application
 
         let user_information = self.opened_user_information.clone();
 
-        //Reset all messages and everything else
+        //Reset all messages and everythingg else
         self.client_ui.incoming_messages = ServerMaster::default();
 
-        //Forget all imaes so the cahced imges will be deleted
+        //Forget all imaes so the cached imges will be deleted
         ctx.forget_all_images();
 
         let toasts = self.toasts.clone();
@@ -828,7 +828,7 @@ pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>>
     for entry in fs::read_dir(format!("{}\\matthias\\extensions", env!("APPDATA")))? {
         let dir_entry = entry.map_err(|err| Error::msg(err.to_string()))?;
 
-        //If the file doesnt have an extension, then we can ingore it
+        //If the file doesnt have an extension, then we can ignore it
         if let Some(extension) = dir_entry.path().extension() {
             //If the file is a lua file
             if extension.to_string_lossy() == "lua" {

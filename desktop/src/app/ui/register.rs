@@ -155,7 +155,7 @@ impl Application
 
                             //Draw background
                             ui.painter().rect_filled(
-                                Rect::everything_right_of(ui.available_width()),
+                                Rect::everythingg_right_of(ui.available_width()),
                                 0.,
                                 Color32::from_black_alpha(160),
                             );
@@ -233,13 +233,12 @@ impl Application
                                 .order(egui::Order::Background)
                                 .constrain_to(image_bounds)
                                 .show(ctx, |ui| {
-                                    if let Some(image_path) = self.register.image.image_path.clone() {
+                                    if let Some(image_path) = self.register.image.image_path.clone()
+                                    {
                                         let allocated_img = ui.allocate_ui(
                                             vec2(image.width() as f32, image.height() as f32),
                                             |ui| {
-                                                if let Ok(read_bytes) =
-                                                    fs::read(image_path)
-                                                {
+                                                if let Ok(read_bytes) = fs::read(image_path) {
                                                     ui.add(Image::from_bytes(
                                                         "bytes://register_image",
                                                         read_bytes,
@@ -247,7 +246,8 @@ impl Application
                                                 }
                                             },
                                         );
-                                        self.register.image.image_rect = allocated_img.response.rect;
+                                        self.register.image.image_rect =
+                                            allocated_img.response.rect;
                                     }
                                 });
                         }
@@ -268,15 +268,16 @@ impl Application
                                         display_error_message(err, self.toasts.clone());
                                     },
                                 }
-                                
+
                                 self.register.image.image_path = app_data_path;
-                                
+
                                 ctx.forget_image("bytes://register_image");
                             }
                         }
 
                         if !(self.register.normal_profile_picture.is_empty()
-                            && self.register.small_profile_picture.is_empty()) // self.register.image.image_path.is_none()
+                            && self.register.small_profile_picture.is_empty())
+                        // self.register.image.image_path.is_none()
                         {
                             //Display profile picure preview
                             ui.horizontal_centered(|ui| {
@@ -394,7 +395,8 @@ fn read_image(app_data_path: &PathBuf) -> anyhow::Result<DynamicImage>
     Ok(image_reader)
 }
 
-pub fn create_dynamic_image_from_bytes(bytes: &[u8]) -> anyhow::Result<DynamicImage> {
+pub fn create_dynamic_image_from_bytes(bytes: &[u8]) -> anyhow::Result<DynamicImage>
+{
     let image_reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
         .decode()?;
