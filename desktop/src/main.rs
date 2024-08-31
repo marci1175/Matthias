@@ -22,18 +22,19 @@ async fn main() -> eframe::Result<()>
 
     #[cfg(debug_assertions)]
     {
-        console_subscriber::init();
+        //Enable for ```tokio-console``` feature
+        // console_subscriber::init();
         
-        // let filter = filter::Targets::new()
-        //     .with_default(Level::INFO)
-        //     .with_default(Level::ERROR)
-        //     //  .with_default(Level::DEBUG)
-        //     ;
+        let filter = filter::Targets::new()
+            .with_default(Level::INFO)
+            .with_default(Level::ERROR)
+            //  .with_default(Level::DEBUG)
+            ;
 
-        // tracing_subscriber::registry()
-        //     .with(tracing_subscriber::fmt::layer())
-        //     .with(filter)
-        //     .init();
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .with(filter)
+            .init();
 
         std::env::set_var("RUST_BACKTRACE", "1");
     }

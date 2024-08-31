@@ -225,7 +225,7 @@ impl Application
                 }
             }
 
-            self.voip_video_thread.get_or_insert_with(|| {
+            self.voip_video_thread.get_or_insert({
                 //Create image sender thread
                 tokio::spawn(async move {
                     loop {

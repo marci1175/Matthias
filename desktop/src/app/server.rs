@@ -101,8 +101,6 @@ pub struct MessageService
     pub voip: Option<ServerVoip>,
 
     opened_on_port: String,
-
-    pub supports_ipv6: bool,
 }
 
 /// This struct has fields which are exposed to the Ui / Main thread, so they can freely modified via the channel system
@@ -124,18 +122,16 @@ pub async fn server_main(
     ctx: Context,
 ) -> anyhow::Result<Arc<tokio::sync::Mutex<SharedFields>>>
 {
-    let mut supports_ipv6 = true;
-
-    //Start listening
-    let tcp_listener_ipv6: Option<Arc<TcpListener>> =
+    //Bind to ipv6 ip address
+    let tcp_listener_ipv6 =
         match net::TcpListener::bind(format!("[::]:{}", port)).await {
-            Ok(tcp_listener) => Some(Arc::new(tcp_listener)),
-            Err(_) => {
-                supports_ipv6 = false;
-                None
+            Ok(tcp_listener) => tcp_listener,
+            Err(err_v6) => {
+                bail!("\nCould not bind to IPv4: {err_v6}")
             },
         };
-
+    
+    //Bind to ipv4 ip address
     let tcp_listener_ipv4 = match net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
         Ok(tcp_listener) => tcp_listener,
         Err(err_v4) => {
@@ -145,7 +141,6 @@ pub async fn server_main(
 
     //Server default information
     let msg_service = Arc::new(tokio::sync::Mutex::new(MessageService {
-        supports_ipv6: supports_ipv6,
         passw: encrypt(password),
         decryption_key: rand::random::<[u8; 32]>(),
         opened_on_port: port,
@@ -171,20 +166,12 @@ pub async fn server_main(
                     break;
                 }
 
-                connection = {
-                    //If ipv6 is supported this code will pass, if not this will never finish since the ```pending()```
-                    async {
-                        if let Some(listener) = tcp_listener_ipv6.clone() {
-                            listener.accept().await
-                        }
-                        else {
-                            std::future::pending::<Result<(tokio::net::TcpStream, SocketAddr), std::io::Error>>().await
-                        }
-                    }
-                } => {
+                //Listen on incoming ipv6 packets
+                connection = tcp_listener_ipv6.accept() => {
                     connection?
                 }
 
+                //Listen on incoming ipv4 packets
                 connection = tcp_listener_ipv4.accept() => {
                     connection?
                 }
