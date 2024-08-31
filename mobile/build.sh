@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 
 echo $OPENCV_INCLUDE_PATHS
 echo $OPENSSL_DIR
@@ -47,3 +48,8 @@ cd -
 $ANDROID_HOME/build-tools/34.0.0/apksigner.bat sign --ks test.keystore --ks-pass pass:test00 --min-sdk-version 34 --out $APK_TARGET_DIR/apk-signed.apk $APK_TARGET_DIR/apk-aligned.apk
 
 read
+=======
+cargo ndk -t arm64-v8a -o app/src/main/jniLibs/  build
+./gradlew build
+./gradlew installDebug
+>>>>>>> Stashed changes
