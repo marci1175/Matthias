@@ -5,8 +5,6 @@ authors = ["Varga Marcell <v.marcell4000@gmail.com>"]
 edition = "2021"
 rust-version = "1.71"
 
-<<<<<<< Updated upstream
-=======
 [lib]
 crate-type = ["cdylib"]
 name = "main"
@@ -20,7 +18,6 @@ required-features = [ "desktop" ]
 default = []
 desktop = []
 
->>>>>>> Stashed changes
 [dependencies]
 egui = "0.28.1"
 egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect", "image"] }
@@ -38,15 +35,6 @@ eframe = { version = "0.28.1", default-features = true, features = [
 
 log = "0.4"
 
-<<<<<<< Updated upstream
-=======
-winit = { version = "0.28", features = [ "android-game-activity" ] }
-
-wgpu = "0.16.0"
-
-pollster = "0.2"
-
->>>>>>> Stashed changes
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 chrono = {version = "0.4.31", features = ["serde"]}

@@ -4,41 +4,42 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 pub mod app;
-
-
 use std::env::args;
 
 use app::backend::Application;
+use eframe::NativeOptions;
 use egui::{Style, ViewportBuilder, Visuals};
-use tokio::fs;
+
+#[cfg(target_os = "android")]
+use winit::platform::android::activity::AndroidApp;
+
 #[tokio::main]
-async fn main() -> eframe::Result<()>
+#[cfg(target_os = "android")]
+#[no_mangle]
+async fn android_main(app: AndroidApp)
 {
-    //Get args
-    let args: Vec<String> = args().collect();
+    use winit::platform::android::EventLoopBuilderExtAndroid;
 
-    #[cfg(not(debug_assertions))]
-    env_logger::init();
-
-    #[cfg(debug_assertions)]
-    console_subscriber::init();
-
-    #[cfg(debug_assertions)]
-    std::env::set_var("RUST_BACKTRACE", "1");
-
-    //set custom panic hook
-    #[cfg(not(debug_assertions))]
-    std::panic::set_hook(Box::new(|info| {}));
+    android_logger::init_once(
+        android_logger::Config::default().with_max_level(log::LevelFilter::Debug),
+    );
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
             ..Default::default()
         },
+        event_loop_builder: Some(Box::new(move |builder| {
+            builder.with_android_app(app);
+        })),
         ..Default::default()
     };
 
-    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA"))).await;
+    application_main(native_options, args).unwrap_or_else(|err| {
+        log::error!("Failure while running EFrame application: {err:?}");
+    });
+}
 
+pub fn application_main(native_options: NativeOptions, args: Vec<String>) -> Result<(), eframe::Error> {
     eframe::run_native(
         "Matthias",
         native_options,
@@ -65,6 +66,30 @@ async fn main() -> eframe::Result<()>
         }),
     )
 }
+
+#[cfg(not(target_os = "android"))]
+fn main() -> Result<(), eframe::Error> {
+    //Get args
+    let args: Vec<String> = args().collect();
+
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn) // Default Log Level
+        .parse_default_env()
+        .init();
+
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_BACKTRACE", "1");
+
+    let native_options = eframe::NativeOptions {
+        viewport: ViewportBuilder {
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    application_main(native_options, args)
+}
+
 
 /*  Gulyásleves recept
 
