@@ -24,9 +24,7 @@ async fn main() -> eframe::Result<()>
 
     //set custom panic hook
     #[cfg(not(debug_assertions))]
-    std::panic::set_hook(Box::new(|info| {
-        
-    }));
+    std::panic::set_hook(Box::new(|info| {}));
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
