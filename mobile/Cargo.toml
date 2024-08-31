@@ -5,6 +5,9 @@ authors = ["Varga Marcell <v.marcell4000@gmail.com>"]
 edition = "2021"
 rust-version = "1.71"
 
+[lib]
+crate_type = ["cdylib"]
+
 [dependencies]
 egui = "0.28.1"
 egui_extras = { version = "0.28.1", features = ["all_loaders", "datepicker", "serde", "syntect", "image"] }
@@ -19,7 +22,8 @@ eframe = { version = "0.28.1", default-features = true, features = [
     "default"
 ] }
 log = "0.4"
-
+android_logger = "0.13"
+android-activity = { version = "0.6.0", features = [ "native-activity" ] }
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 chrono = {version = "0.4.31", features = ["serde"]}
@@ -63,14 +67,6 @@ opencv = "0.92.2"
 [dependencies.uuid]
 version = "1.6.1"
 features = ["v4", "fast-rng", "macro-diagnostics", "serde"]
-
-# [dependencies.windows-sys]
-# version = "0.52.0"
-# features = [
-#     "Win32_Foundation",
-#     "Win32_UI_WindowsAndMessaging",
-#     "Win32_UI_Input_KeyboardAndMouse",
-# ]
 
 [build-dependencies]
 chrono = "0.4.31"

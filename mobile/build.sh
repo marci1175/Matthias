@@ -1,19 +1,14 @@
 
-echo $OPENCV_INCLUDE_PATHS
-echo $OPENSSL_DIR
-
-read
-
 echo "Building Android application. . . "
 
 ANDROID_HOME="C:\Users\marci\AppData\Local\Android\Sdk"
 NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
 
 APK_TARGET_DIR="target/apk"
-RUST_TARGET="x86_64-linux-android"
+RUST_TARGET="armv7-linux-androideabi"
 ARCH="armeabi-v7a"
 
-cargo build --release --target x86_64-linux-android
+cargo build --release --target armv7-linux-androideabi
 
 rm -rf $APK_TARGET_DIR/compiled $APK_TARGET_DIR/root/lib
 
