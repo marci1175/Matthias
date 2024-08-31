@@ -41,7 +41,7 @@ impl Application
                         let connected_clients: std::sync::Arc<DashMap<String, ClientProfile>> =
                             self.server_connected_clients_profile.clone();
 
-                        let shared_fileds_clone = self.client_ui.shared_fields.clone();
+                        let shared_fields_clone = self.client_ui.shared_fields.clone();
 
                         //Move context so we can request_repaint
                         let ctx = ctx.clone();
@@ -61,7 +61,7 @@ impl Application
                                         Ok(shared_fields) => {
                                             //Assign shared fields
                                             tokio::spawn(async move {
-                                                *shared_fileds_clone.lock().unwrap() =
+                                                *shared_fields_clone.lock().unwrap() =
                                                     shared_fields.lock().await.clone();
                                             });
                                         },

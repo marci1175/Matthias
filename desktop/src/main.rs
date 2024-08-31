@@ -56,7 +56,7 @@ async fn main() -> eframe::Result<()>
         .unwrap();
 
         //Display error message
-        display_panic_message(format!("A panic! has occured the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: \n{:?}\nLocation: \n{:?}", {
+        display_panic_message(format!("A panic! has occurred the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: \n{:?}\nLocation: \n{:?}", {
             match info.payload().downcast_ref::<&str>() {
                 Some(msg) => msg,
                 None => {

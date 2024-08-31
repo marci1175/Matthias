@@ -1,0 +1,5 @@
+[default.extend-words]
+caf = "caf"
+
+[files]
+extend-exclude = ["*.vdproj"]

@@ -176,7 +176,7 @@ impl Application
                                         ClientMessage::construct_image_request_msg(picture.signature.clone(), uuid);
                                     let connection = self.client_connection.clone();
                                     tokio::spawn(async move {
-                                        //We only have to send the message it will get recived in a diff place
+                                        //We only have to send the message it will get received in a diff place
                                         connection.clone().send_message(message).await.unwrap();
                                     });
                                 }
@@ -403,7 +403,7 @@ impl Application
                             .get(server_voip_event.uuid.as_str())
                         {
                             Some(profile) => profile,
-                            //If we dont have the profile we ask for it then return to avoid panicing
+                            //If we dont have the profile we ask for it then return to avoid panicking
                             None => {
                                 self.request_client(server_voip_event.uuid.to_string());
 
@@ -430,7 +430,7 @@ impl Application
                             .get(server_voip_event.uuid.as_str())
                         {
                             Some(profile) => profile,
-                            //If we dont have the profile we ask for it then return to avoid panicing
+                            //If we dont have the profile we ask for it then return to avoid panicking
                             None => {
                                 self.request_client(server_voip_event.uuid.to_string());
 
