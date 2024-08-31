@@ -397,7 +397,7 @@ impl Application
                                         let group = ui.group(|ui|{
                                             ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
-                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            //This button shouldnt actually do anything because when this message group gets clicked it throws you to the message
                                             if ui.small_button(inner_message.file_name.to_string()).clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
@@ -412,12 +412,12 @@ impl Application
 
                                         has_search = true;
                                     }
-                                    /* Inner value shouldnt actaully be used since its only used for asking for a file, and to stay compact i wont implement image displaying in search mode */
+                                    /* Inner value shouldnt actually be used since its only used for asking for a file, and to stay compact i wont implement image displaying in search mode */
                                     if let ServerMessageType::Image( _ ) = &message.message_type {
                                         let group = ui.group(|ui|{
                                             ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
-                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            //This button shouldnt actually do anything because when this message group gets clicked it throws you to the message
                                             if ui.small_button("Image").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
@@ -436,7 +436,7 @@ impl Application
                                         let group = ui.group(|ui|{
                                             ui.label(RichText::from(message.author.to_string()).size(self.font_size / 1.3).color(Color32::WHITE));
 
-                                            //This button shouldnt actually do anything becuase when this message group gets clicked it throws you to the message
+                                            //This button shouldnt actually do anything because when this message group gets clicked it throws you to the message
                                             if ui.small_button("Audio").clicked() {
                                                 self.client_ui.scroll_to_message_index = Some(index)
                                             };
@@ -495,7 +495,7 @@ impl Application
                 });
             });
 
-        //Server reciver
+        //Server receiver
         self.client_recv(ctx);
 
         //Client voip thread managemant
@@ -518,7 +518,7 @@ impl Application
 
         match self.audio_save_rx.try_recv() {
             Ok((sink, cursor, index, path_to_audio)) => {
-                //Check if the request was unsuccesful, so we can reset the states
+                //Check if the request was unsuccessful, so we can reset the states
                 if sink.is_none() {
                     //Reset state
                     self.client_ui.audio_playback.settings_list[index].is_loading = false;

@@ -106,7 +106,7 @@ pub enum LuaOutput
     /// Standard output from the lua runtime
     Standard(String),
 
-    /// Displays useful information like a file got modifed (This message will only be added from the rust runtime, for example when saving a file)
+    /// Displays useful information like a file got modified (This message will only be added from the rust runtime, for example when saving a file)
     Info(String),
 }
 
@@ -117,7 +117,7 @@ pub struct Extension
     pub extension_list: Vec<ExtensionProperties>,
 
     #[serde(skip)]
-    /// This list contins all the output from the extensions, panics are logged and stdouts are also logged here as Standard()
+    /// This list contains all the output from the extensions, panics are logged and stdouts are also logged here as Standard()
     pub output: Arc<Mutex<Vec<LuaOutput>>>,
 
     pub output_rect: Rect,
@@ -131,7 +131,7 @@ pub struct Extension
 pub enum EventCall
 {
     /// Triggered when sending a message
-    /// If this Event is invoked the function will recive what the user has sent, this is optional to "recive"
+    /// If this Event is invoked the function will receive what the user has sent, this is optional to "receive"
     /// ``` lua
     /// function OnChatSend(message)
     ///     --Do anything with the message
@@ -142,10 +142,10 @@ pub enum EventCall
     /// ```
     OnChatSend,
 
-    /// Triggered when reciving a message
-    OnChatRecive,
+    /// Triggered when receiving a message
+    OnChatReceive,
 
-    /// Triggered when reciving a message from the server
+    /// Triggered when receiving a message from the server
     /// This is unused and will be reused for something else in the future
     #[allow(dead_code)]
     OnServerChatReceive,
@@ -153,7 +153,7 @@ pub enum EventCall
     /// Triggered when sending a group voice call request
     OnCallSend,
 
-    /// Triggered when reciving a group voice call,
+    /// Triggered when receiving a group voice call,
     OnCallReceive,
 
     /// Triggered every draw of the ui

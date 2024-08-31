@@ -97,7 +97,7 @@ pub struct Application
     #[serde(skip)]
     /// This is used to store the connected client profile
     /// The field get modified by the server_main function (When a server is started this is passed in and is later modified by the server)
-    /// This might seem very similar to ```self.client_ui.incoming_msg.connected_clients_profile```, but that field is only modifed when connecting to a server, so when we start a server but dont connect to it, we wont have the fields
+    /// This might seem very similar to ```self.client_ui.incoming_msg.connected_clients_profile```, but that field is only modified when connecting to a server, so when we start a server but dont connect to it, we wont have the fields
     /// This field gets directly modified by the server thread
     pub server_connected_clients_profile: Arc<DashMap<String, ClientProfile>>,
 
@@ -164,7 +164,7 @@ pub struct Application
     /*
         Client main
     */
-    //We can skip this entry of the table since, we implement Totable separetly
+    //We can skip this entry of the table since, we implement Totable separately
     #[table(skip)]
     pub client_ui: Client,
 
@@ -181,14 +181,14 @@ pub struct Application
     /// Server connection
     /// This channel hosts a Client connection and the sync message sent by the server in a String format
     #[serde(skip)]
-    pub connection_reciver: Arc<mpsc::Receiver<Option<(ClientConnection, String)>>>,
+    pub connection_receiver: Arc<mpsc::Receiver<Option<(ClientConnection, String)>>>,
     #[serde(skip)]
     pub connection_sender: mpsc::Sender<Option<(ClientConnection, String)>>,
 
     /// Voip (UdpSocket) maker
     /// When a successful ```Voip``` instance is created it is sent over from the async thread
     // #[serde(skip)]
-    // pub voip_connection_reciver: Arc<mpsc::Receiver<Voip>>,
+    // pub voip_connection_receiver: Arc<mpsc::Receiver<Voip>>,
     // #[serde(skip)]
     // pub voip_connection_sender: mpsc::Sender<Voip>,
 
@@ -205,8 +205,8 @@ pub struct Application
     pub voip_video_thread: Option<()>,
 
     #[serde(skip)]
-    /// This is what the main thread uses to recive messages from the sync thread
-    pub server_output_reciver: Arc<Receiver<Option<String>>>,
+    /// This is what the main thread uses to receive messages from the sync thread
+    pub server_output_receiver: Arc<Receiver<Option<String>>>,
 
     #[serde(skip)]
     /// This is what the sync thread uses to send messages to the main thread
@@ -233,12 +233,12 @@ impl Default for Application
 
         let (audio_bytes_tx, audio_bytes_rx) = mpsc::channel::<Vec<u8>>();
 
-        let (connection_sender, connection_reciver) =
+        let (connection_sender, connection_receiver) =
             mpsc::channel::<Option<(ClientConnection, String)>>();
 
-        let (server_output_sender, server_output_reciver) = mpsc::channel::<Option<String>>();
+        let (server_output_sender, server_output_receiver) = mpsc::channel::<Option<String>>();
 
-        // let (voip_connection_sender, voip_connection_reciver) = mpsc::channel::<Voip>();
+        // let (voip_connection_sender, voip_connection_receiver) = mpsc::channel::<Voip>();
 
         Self {
             voip_video_thread: None,
@@ -280,7 +280,7 @@ impl Default for Application
             settings_window: false,
 
             //This default value will get overwritten when crating the new server, so we can pass in the token to the thread
-            //Also, the shutdown reciver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D
+            //Also, the shutdown receiver is unnecessary in this context because we never use it, I too lazy to delete a few lines instead of writing this whole paragraph >:D
             server_shutdown_token: CancellationToken::new(),
 
             //thread communication for audio recording
@@ -309,17 +309,17 @@ impl Default for Application
 
             //Server connection
             connection_sender,
-            connection_reciver: Arc::new(connection_reciver),
+            connection_receiver: Arc::new(connection_receiver),
 
             //data sync
             drx: Arc::new(drx),
             dtx: Arc::new(dtx),
             server_sender_thread: None,
 
-            server_output_reciver: Arc::new(server_output_reciver),
+            server_output_receiver: Arc::new(server_output_receiver),
             server_output_sender,
 
-            // voip_connection_reciver: Arc::new(voip_connection_reciver),
+            // voip_connection_receiver: Arc::new(voip_connection_receiver),
             // voip_connection_sender,
             autosync_shutdown_token: CancellationToken::new(),
             server_connected_clients_profile: Arc::new(DashMap::new()),
@@ -644,7 +644,7 @@ fn set_lua_functions(
 //Include emoji image header file
 include!(concat!(env!("OUT_DIR"), "\\emoji_header.rs"));
 
-//Define a deafult for the discriminant
+//Define a default for the discriminant
 impl Default for EmojiTypesDiscriminants
 {
     fn default() -> Self
@@ -766,7 +766,7 @@ pub struct Client
     ///This checks if the text editor is open or not
     pub usr_msg_expanded: bool,
 
-    ///This is the full address of the destionation a message is supposed to be sent to
+    ///This is the full address of the destination a message is supposed to be sent to
     pub send_on_ip: String,
 
     ///self.send_on_ip encoded into base64, this is supposedly for ease of use, I dont know why its even here
@@ -800,7 +800,7 @@ pub struct Client
     #[table(save)]
     pub message_buffer: String,
 
-    ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
+    ///Incoming messages, this is the whole packet which get sent to all the clients, this contains all the messages, and the info about them
     #[serde(skip)]
     #[table(save)]
     pub incoming_messages: ServerMaster,
@@ -827,7 +827,7 @@ pub struct Client
 
     // #[serde(skip)]
     // pub voip: Option<Voip>,
-    /// This entry contains the volume precentage of the microphone, this is modified in the settings
+    /// This entry contains the volume percentage of the microphone, this is modified in the settings
     pub microphone_volume: Arc<Mutex<f32>>,
 }
 
@@ -1043,13 +1043,13 @@ pub struct ClientNormalMessage
 
 // Used for syncing or connecting & disconnecting
 #[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ClientSnycMessage
+pub struct ClientSyncMessage
 {
     /// If its None its used for syncing, false: disconnecting, true: connecting
     /// If you have already registered the client with the server then the true value will be ignored
     pub sync_attribute: Option<ConnectionType>,
 
-    /// This is used to tell the server how many messages it has to send, if its a None it will automaticly sync all messages
+    /// This is used to tell the server how many messages it has to send, if its a None it will automatically sync all messages
     /// This value is ignored if the `sync_attribute` field is Some(_)
     pub client_message_counter: Option<usize>,
 
@@ -1141,7 +1141,7 @@ pub enum ClientMessageType
     NormalMessage(ClientNormalMessage),
 
     ///Used for syncing with client and server
-    SyncMessage(ClientSnycMessage),
+    SyncMessage(ClientSyncMessage),
 
     Reaction(ReactionType),
 
@@ -1295,7 +1295,7 @@ impl ClientMessage
     {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSyncMessage {
                 sync_attribute: None,
                 password: password.to_string(),
                 //This value is not ignored in this context
@@ -1319,7 +1319,7 @@ impl ClientMessage
     {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSyncMessage {
                 sync_attribute: Some(ConnectionType::Connect(profile)),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
@@ -1333,7 +1333,7 @@ impl ClientMessage
     }
 
     /// If its None its used for syncing, false: disconnecting, true: connecting
-    /// Please note that its doesnt really matter what we pass in the author becuase the server identifies us based on our ip address
+    /// Please note that its doesnt really matter what we pass in the author because the server identifies us based on our ip address
     pub fn construct_disconnection_msg(
         password: String,
         author: String,
@@ -1342,7 +1342,7 @@ impl ClientMessage
     {
         ClientMessage {
             replying_to: None,
-            message_type: ClientMessageType::SyncMessage(ClientSnycMessage {
+            message_type: ClientMessageType::SyncMessage(ClientSyncMessage {
                 sync_attribute: Some(ConnectionType::Disconnect),
                 password,
                 //If its used for connecting / disconnecting this value is ignored
@@ -1503,7 +1503,7 @@ impl ClientConnection
             profile,
         );
 
-        //Ping server to recive custom uuid, and to also get if server ip is valid
+        //Ping server to receive custom uuid, and to also get if server ip is valid
         let client_handle = tokio::net::TcpStream::connect(ip).await?;
 
         /*We could return this, this is what the server is supposed to return, when a new user is connected */
@@ -1558,7 +1558,7 @@ impl ClientConnection
         self.state = ConnectionState::default();
     }
 
-    /// This function is used to __DISCONNECT__ from a server, with this the ```ClientConnection``` instance is destoryed (reset to its default values)
+    /// This function is used to __DISCONNECT__ from a server, with this the ```ClientConnection``` instance is destroyed (reset to its default values)
     pub async fn disconnect(
         &mut self,
         author: String,
@@ -1613,7 +1613,7 @@ impl ConnectionPair
 
         let message_bytes = message_string.as_bytes();
 
-        //Send message lenght to server
+        //Send message length to server
         writer
             .write_all(&(message_bytes.len() as u32).to_be_bytes())
             .await?;
@@ -1656,8 +1656,8 @@ impl Debug for ConnectionState
 /*
     Server. . .
 
-    Are used to convert clinet sent messages into a server message, so it can be sent back;
-    Therefor theyre smaller in size
+    Are used to convert client sent messages into a server message, so it can be sent back;
+    Therefor they're smaller in size
 */
 
 /*
@@ -1670,7 +1670,7 @@ impl Debug for ConnectionState
 
 */
 
-///This is what the server sends back (pushes to message vector), when reciving a file
+///This is what the server sends back (pushes to message vector), when receiving a file
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerFileUpload
 {
@@ -1743,7 +1743,7 @@ pub struct ServerAudioReply
     pub file_name: String,
 }
 
-///This is what the server sends back (pushes to message vector), when reciving a normal message
+///This is what the server sends back (pushes to message vector), when receiving a normal message
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerNormalMessage
 {
@@ -1761,7 +1761,7 @@ pub struct ServerAudioUpload
     pub file_name: String,
 }
 
-///This is what gets sent to a client basicly, and they have to ask for the file when the ui containin this gets rendered
+///This is what gets sent to a client basically, and they have to ask for the file when the ui containing this gets rendered
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerImageUpload
 {
@@ -1780,7 +1780,7 @@ pub struct ServerMessageEdit
     pub new_message: Option<String>,
 }
 
-/// This struct contains all the necesarily information for the client to update its own message list's reactions
+/// This struct contains all the necessarily information for the client to update its own message list's reactions
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerMessageReaction
 {
@@ -1874,12 +1874,12 @@ impl ServerOutput
         serde_json::to_string(self).unwrap_or_default()
     }
 
-    /// This function converts a client message to a ServerOutput, which gets sent to all the clients (Its basicly a simplified client message)
+    /// This function converts a client message to a ServerOutput, which gets sent to all the clients (Its basically a simplified client message)
     pub fn convert_clientmsg_to_servermsg(
         normal_msg: ClientMessage,
         // The signature is used to ask bytes from the server, for example in a image message this signature will be used to get the image's byte
         signature: String,
-        //Automaticly generated enum by strum
+        //Automatically generated enum by strum
         upload_type: ServerMessageTypeDiscriminants,
         uuid: String,
         username: String,
@@ -1968,7 +1968,7 @@ impl ServerOutput
                                     ServerMessageReaction { reaction_type: ReactionType::Add(ClientReaction { emoji_name: message.emoji_name, uuid: message.uuid, message_index: message.message_index }) }
                                 },
                                 //The client will decrement its emoji counter
-                                //If the index is 0 the client will automaticly remove that emoji entry
+                                //If the index is 0 the client will automatically remove that emoji entry
                                 ReactionType::Remove(message) => {
                                     ServerMessageReaction { reaction_type: ReactionType::Remove(ClientReaction { emoji_name: message.emoji_name, uuid: message.uuid, message_index: message.message_index }) }
                                 },
@@ -1991,7 +1991,7 @@ impl ServerOutput
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster
 {
-    ///All of the messages recived from the server
+    ///All of the messages received from the server
     pub message_list: Vec<ServerOutput>,
 
     ///All of the messages' reactions are
@@ -2084,11 +2084,11 @@ impl ClientLastSeenMessage
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ClientVoipRequest
 {
-    /// A voip a call will be automaticly issued if there is no ongoing call
-    /// The inner value of conncect is the port the Client ```UdpScoket``` is opened on
+    /// A voip a call will be automatically issued if there is no ongoing call
+    /// The inner value of conncect is the port the Client ```UdpSocket``` is opened on
     Connect(u16),
 
-    /// The voip call will automaticly stop once there are no connected clients
+    /// The voip call will automatically stop once there are no connected clients
     Disconnect,
 }
 
@@ -2119,7 +2119,7 @@ pub enum ServerVoipRequest
     ConnectionClosed(ServerVoipClose),
 }
 
-/// This struct contains all the infomation important for the non connected clients
+/// This struct contains all the information important for the non connected clients
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ServerVoipStart
 {
@@ -2154,8 +2154,8 @@ pub struct ServerVoip
     /// This field contains all the connected client's ```uuid``` with their ```SocketAddr```
     pub connected_clients: Arc<DashMap<String, SocketAddr>>,
 
-    /// This field contains a ```HashMap``` which pairs the SocketAddr to the client's listening thread's sender (So that the reciver thread can recive the ```Vec<u8>``` sent by the sender)
-    /// The secound part of the tuple is for shutting down the client manager thread, if they disconnect
+    /// This field contains a ```HashMap``` which pairs the SocketAddr to the client's listening thread's sender (So that the receiver thread can receive the ```Vec<u8>``` sent by the sender)
+    /// The second part of the tuple is for shutting down the client manager thread, if they disconnect
     pub connected_client_thread_channels:
         Arc<DashMap<SocketAddr, (Arc<tokio::sync::mpsc::Sender<Vec<u8>>>, CancellationToken)>>,
 
@@ -2191,7 +2191,7 @@ impl ServerVoip
         Ok(())
     }
 
-    /// Remove the ```SocketAddr``` to the ```UDP``` server's destiantions
+    /// Remove the ```SocketAddr``` to the ```UDP``` server's destinations
     pub fn disconnect(&self, uuid: String) -> anyhow::Result<()>
     {
         self.connected_clients
@@ -2232,7 +2232,7 @@ impl UdpMessageType
 // #[derive(Clone)]
 // pub struct Voip
 // {
-//     /// The clients socket, which theyre listening on for packets (audio, image)
+//     /// The clients socket, which they're listening on for packets (audio, image)
 //     pub socket: Arc<UdpSocket>,
 
 //     /// This handle is used to take pictures with the host's camera
@@ -2336,7 +2336,7 @@ impl UdpMessageType
 //     }
 
 //     /// This function sends the audio and the uuid in one message, this packet is encrypted (The audio's bytes is appended to the uuid's)
-//     /// Any lenght of audio can be sent because the header is included with the packet
+//     /// Any length of audio can be sent because the header is included with the packet
 //     pub async fn send_audio(
 //         &self,
 //         uuid: String,
@@ -2354,7 +2354,7 @@ impl UdpMessageType
 //     }
 
 //     /// This function sends bytes on the UdpSocket the instance contains
-//     /// The bytes passed to this function are automaticly encrypted by the provided encrytion key
+//     /// The bytes passed to this function are automatically encrypted by the provided encryption key
 //     /// Message type appends a set isize to the message so that the server can identify each message
 //     async fn send_bytes(
 //         &self,
@@ -2369,23 +2369,23 @@ impl UdpMessageType
 //         //Encrypt message
 //         let mut encrypted_message = encrypt_aes256_bytes(&bytes, encryption_key)?;
 
-//         //Get message lenght
-//         let mut message_lenght_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
+//         //Get message length
+//         let mut message_length_in_bytes = (encrypted_message.len() as u32).to_be_bytes().to_vec();
 
-//         //Append message to message lenght
-//         message_lenght_in_bytes.append(&mut encrypted_message);
+//         //Append message to message length
+//         message_length_in_bytes.append(&mut encrypted_message);
 
-//         //Check for packet lenght overflow
-//         let bytes_lenght = message_lenght_in_bytes.len();
+//         //Check for packet length overflow
+//         let bytes_length = message_length_in_bytes.len();
 
-//         if bytes_lenght > 65535 {
+//         if bytes_length > 65535 {
 //             bail!(format!(
-//                 "Udp packet lenght overflow, with lenght of {bytes_lenght}"
+//                 "Udp packet length overflow, with length of {bytes_length}"
 //             ))
 //         }
 
 //         //Send bytes
-//         self.socket.send(&message_lenght_in_bytes).await?;
+//         self.socket.send(&message_length_in_bytes).await?;
 
 //         Ok(())
 //     }
@@ -2436,7 +2436,7 @@ impl UdpMessageType
 //     /// __Image message contents:__
 //     /// - ```[len - 64..]``` = Contains the hash (sha256 hash) of the image part we are sending
 //     /// - ```[..len - 64]``` = Contains the image part we are sending (JPEG image)
-//     /// - **The hash lenght is 64 bytes.**
+//     /// - **The hash length is 64 bytes.**
 //     /// - **The identificator is 64 bytes.**
 //     /// - **The uuid is 36 bytes.**
 //     async fn send_image_parts(
@@ -2715,13 +2715,13 @@ impl UserInformation
         }
     }
 
-    /// Automaticly check hash with argon2 encrypted password (from the file)
+    /// Automatically check hash with argon2 encrypted password (from the file)
     pub fn verify_password(&self, password: String) -> bool
     {
         pass_hash_match(password, self.password.clone())
     }
 
-    /// This serializer function automaticly encrypts the struct with the *encrypt_aes256* fn to string
+    /// This serializer function automatically encrypts the struct with the *encrypt_aes256* fn to string
     pub fn serialize(&self) -> anyhow::Result<String>
     {
         //Hash password so it can be used to encrypt a file
@@ -2731,7 +2731,7 @@ impl UserInformation
         encrypt_aes256(serde_json::to_string(&self)?, &encryption_key)
     }
 
-    /// This deserializer function automaticly decrypts the string the *encrypt_aes256* fn to Self
+    /// This deserializer function automatically decrypts the string the *encrypt_aes256* fn to Self
     pub fn deserialize(serialized_struct: &str, password: String) -> anyhow::Result<Self>
     {
         let hashed_password = sha256::digest(password);
@@ -2993,9 +2993,9 @@ where
     }
 }
 
-/// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
+/// This function fetches the incoming full message's length (it reads the 4 bytes and creates an u32 number from them, which it returns)
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
-pub async fn fetch_incoming_message_lenght<T>(reader: &mut T) -> anyhow::Result<u32>
+pub async fn fetch_incoming_message_length<T>(reader: &mut T) -> anyhow::Result<u32>
 where
     T: AsyncReadExt + Unpin + AsyncRead,
 {
@@ -3098,7 +3098,7 @@ pub fn parse_incoming_message(rhs: String) -> Vec<Message>
     //The regexes we use to capture important information
     let regexes = vec![
         //This regex captures newlines
-        //It doesnt matter when we scan for newlines as theyre not affected by anything
+        //It doesnt matter when we scan for newlines as they're not affected by anything
         (
             MessageDisplayDiscriminants::NewLine,
             Regex::new(r"\n").unwrap(),
@@ -3251,7 +3251,7 @@ fn filter_string(
     regexes: &Vec<(MessageDisplayDiscriminants, Regex)>,
 ) -> Vec<RegexMatch>
 {
-    //We clone the message we need to examine, this value will be modifed by the regexes (Deleting the captured information)
+    //We clone the message we need to examine, this value will be modified by the regexes (Deleting the captured information)
     let mut match_message_part = message_part.clone();
 
     //We back up all the matches from the string into this buffer
@@ -3369,7 +3369,7 @@ pub enum MessageDisplay
 #[derive(PartialEq)]
 pub struct EmojiDisplay
 {
-    /// The name of the emoji wanting to be displayed, we make sure to load in all the emojies into the egui buffer when theyre displayed
+    /// The name of the emoji wanting to be displayed, we make sure to load in all the emojies into the egui buffer when they're displayed
     pub name: String,
 }
 
