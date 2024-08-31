@@ -3,7 +3,7 @@ use egui::{
     ImageButton, Layout, Pos2, RichText, Sense, Stroke,
 };
 use rodio::Decoder;
-use std::sync::atomic::Ordering::Relaxed;
+use std::{net::SocketAddr, sync::atomic::Ordering::Relaxed};
 use tokio_util::sync::CancellationToken;
 
 use crate::app::backend::{display_error_message, ClientMessage, ConnectionState, Voip};
@@ -126,7 +126,7 @@ impl Application
 
                                 //Signal the voice recorder function to stop
                                 let _ = self.record_audio_interrupter.send(());
-
+                                
                                 //Reset state
                                 self.client_ui.voip = None;
                                 self.voip_thread = None;
@@ -148,20 +148,40 @@ impl Application
 
                                     let toasts = self.toasts.clone();
 
-                                    //Spawn thread which will create the ```Voip``` instance
-                                    tokio::spawn(async move {
-                                        match Voip::new().await {
-                                            Ok(voip) => {
-                                                // It is okay to unwrap since it doesnt matter if we panic
-                                                sender.send(voip).unwrap();
-                                            },
-                                            Err(err) => {
-                                                //Avoid panicking when trying to display a Notification
-                                                //This is very rare but can still happen
-                                                display_error_message(err, toasts);
-                                            },
-                                        }
-                                    });
+                                    match self.client_ui.send_on_ip.parse::<SocketAddr>() {
+                                        Ok(socket_addr) => {
+                                            //Spawn thread which will create the ```Voip``` instance
+                                            tokio::spawn(async move {
+                                                match socket_addr.is_ipv6() {
+                                                    true => {
+                                                        match Voip::new("[::]:0".to_string()).await {
+                                                            Ok(voip) => {
+                                                                // It is okay to unwrap since it doesnt matter if we panic
+                                                                sender.send(voip).unwrap();
+                                                            },
+                                                            Err(err_ipv6) => {
+                                                                display_error_message(format!("Could not bind to IPv6: {err_ipv6}"), toasts);
+                                                            },
+                                                        }
+                                                    },
+                                                    false => {
+                                                        match Voip::new("0.0.0.0:0".to_string()).await {
+                                                            Ok(voip) => {
+                                                                sender.send(voip).unwrap();
+                                                            },
+                                                            Err(err_ipv4) => {
+                                                                display_error_message(format!("Could not bind to IPv4: {err_ipv4}"), toasts);
+                                                            },
+                                                        }
+                                                    },
+                                                }
+                                                
+                                            });
+                                        },
+                                        Err(_err) => {
+                                            display_error_message("Invalid address.", self.toasts.clone());
+                                        },
+                                    };
 
                                     //Lua callback
                                     self.client_ui.extension.event_call_extensions(

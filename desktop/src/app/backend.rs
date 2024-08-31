@@ -2258,9 +2258,11 @@ pub struct ServerVoip
     /// This field contains the amount of time the call has been established for
     pub _established_since: chrono::DateTime<Utc>,
 
-    /// The socket the server is listening on for incoming messages
-    /// The only reason this is an option so we can implement ```serde::Deserialize```
-    pub socket: Arc<UdpSocket>,
+    /// The socket the server is listening on for incoming messages from ipv6 addresses
+    pub socket_v6: Option<Arc<UdpSocket>>,
+
+    /// The socket the server is listening on for incoming messages from ipv4 addresses
+    pub socket_v4: Arc<UdpSocket>,
 
     /// The cancellation token cancels threads, which are for listening and relaying (Distributing info)
     pub thread_cancellation_token: CancellationToken,
@@ -2353,9 +2355,9 @@ impl Voip
 {
     /// This function creates a new ```Voip``` instance containing a ```UdpSocket``` and an authentication from the server
     /// Note that this doesnt contain the camera_handle, if you want to add it use the ```add_video_handle()``` function
-    pub async fn new() -> anyhow::Result<Self>
+    pub async fn new(local_addr: String) -> anyhow::Result<Self>
     {
-        let socket_handle = UdpSocket::bind("[::]:0".to_string()).await?;
+        let socket_handle = UdpSocket::bind(local_addr).await?;
         let socket_2 = socket2::Socket::from(socket_handle.into_std()?);
         socket_2.set_reuse_address(true)?;
         let socket_handle = UdpSocket::from_std(socket_2.into())?;
@@ -3111,7 +3113,30 @@ where
     }
 }
 
+
 /// This function fetches the incoming full message's length (it reads the 4 bytes and creates an u32 number from them, which it returns)
+///Display Error message with a messagebox
+pub fn display_info_message<T>(display: T, toasts: Arc<Mutex<Toasts>>)
+where
+    T: ToString + std::marker::Send + 'static,
+{
+    match toasts.lock() {
+        Ok(mut toasts) => {
+            let mut toast = Toast::info(display.to_string());
+
+            toast.set_duration(Some(Duration::from_secs(4)));
+            toast.set_show_progress_bar(true);
+
+            toasts.add(toast);
+        },
+        Err(_err) => {
+            tracing::error!("{}", _err);
+        },
+    }
+}
+
+/// This function fetches the incoming full message's lenght (it reads the 4 bytes and creates an u32 number from them, which it returns)
+
 /// afaik this function blocks until it can read the first 4 bytes out of the ```reader```
 pub async fn fetch_incoming_message_length<T>(reader: &mut T) -> anyhow::Result<u32>
 where

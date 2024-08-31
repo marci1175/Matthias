@@ -91,6 +91,7 @@ impl eframe::App for backend::Application
         /* TODOS:
             TODO: Restructure files
             TODO: Sound effects
+            TODO: Recode regsiter page
 
             TODO: Add AI (Neural network) powered hand drawing recognition
             TODO: Recode audio file playbacking

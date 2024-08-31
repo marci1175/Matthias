@@ -2,8 +2,8 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
-    time::Duration,
+    collections::HashMap, env, fs, future::IntoFuture, io::Write, net::SocketAddr, path::PathBuf,
+    sync::Arc, time::Duration,
 };
 
 use crate::app::client::{HASH_BYTE_OFFSET, IDENTIFICATOR_BYTE_OFFSET, UUID_BYTE_OFFSET};
@@ -39,9 +39,9 @@ use super::backend::{
 
 use tokio::{
     io::AsyncWrite,
-    net::{tcp::OwnedReadHalf, UdpSocket},
+    net::{tcp::OwnedReadHalf, TcpListener, TcpStream, UdpSocket},
     select,
-    sync::{mpsc, mpsc::Receiver},
+    sync::mpsc::{self, Receiver},
     task::JoinHandle,
 };
 
@@ -120,10 +120,24 @@ pub async fn server_main(
     connected_clients_profile_list: Arc<DashMap<String, ClientProfile>>,
     //We pass in ctx so we can request repaint when someone connects
     ctx: Context,
-) -> Result<Arc<tokio::sync::Mutex<SharedFields>>, Box<dyn std::error::Error>>
+) -> anyhow::Result<Arc<tokio::sync::Mutex<SharedFields>>>
 {
-    //Start listening
-    let tcp_listener = net::TcpListener::bind(format!("[::]:{}", port)).await?;
+    //Bind to ipv6 ip address
+    let tcp_listener_ipv6 =
+        match net::TcpListener::bind(format!("[::]:{}", port)).await {
+            Ok(tcp_listener) => tcp_listener,
+            Err(err_v6) => {
+                bail!("\nCould not bind to IPv4: {err_v6}")
+            },
+        };
+    
+    //Bind to ipv4 ip address
+    let tcp_listener_ipv4 = match net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
+        Ok(tcp_listener) => tcp_listener,
+        Err(err_v4) => {
+            bail!("\nCould not bind to IPv4: {err_v4}")
+        },
+    };
 
     //Server default information
     let msg_service = Arc::new(tokio::sync::Mutex::new(MessageService {
@@ -151,7 +165,14 @@ pub async fn server_main(
                     //shutdown server
                     break;
                 }
-                connection = tcp_listener.accept() => {
+
+                //Listen on incoming ipv6 packets
+                connection = tcp_listener_ipv6.accept() => {
+                    connection?
+                }
+
+                //Listen on incoming ipv4 packets
+                connection = tcp_listener_ipv4.accept() => {
                     connection?
                 }
             };
@@ -379,7 +400,10 @@ pub fn create_client_voip_manager(
     //Spawn client management thread
     tokio::spawn(async move {
         loop {
-            let socket = voip.socket.clone();
+            let socket_v6 = voip.socket_v6.clone();
+
+            let socket_v4 = voip.socket_v4.clone();
+
             //Clone so we can move the value
             let voip_connected_clients = voip.connected_clients.clone();
 
@@ -441,8 +465,21 @@ pub fn create_client_voip_manager(
                                     //Append message to header
                                     message_length_header.append(&mut encrypted_packet);
 
-                                    //Send the header indicating message length and send the whole message appended to it
-                                    socket.send_to(&message_length_header, connected_socket_addr).await.unwrap();
+                                    //Math ip type
+                                    match connected_socket_addr.is_ipv6() {
+                                        //The connected client's ip has ipv6 protocol
+                                        true => {
+                                            if let Some(ref socket_v6) = socket_v6 {
+                                                //Send the header indicating message lenght and send the whole message appended to it
+                                                socket_v6.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                            }
+                                        },
+                                        //The connected client's ip has ipv4 protocol
+                                        false => {
+                                            //Send the header indicating message lenght and send the whole message appended to it
+                                            socket_v4.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                        },
+                                    }
                                 }
                             });
                         }
@@ -516,20 +553,41 @@ pub fn create_client_voip_manager(
                                             let header_message =
                                                 ImageHeader::new(author_uuid.clone(), image_parts.clone(), identificator.clone());
 
-                                            // Send image header
-                                            send_bytes(
-                                                serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
-                                                &key,
-                                                UdpMessageType::ImageHeader,
-                                                socket.clone(),
-                                                *socket_addr,
-                                            )
-                                            .await.unwrap();
+                                            match socket_addr.is_ipv6() {
+                                                true => {
+                                                    // Send image header
+                                                    send_bytes(
+                                                        serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
+                                                        &key,
+                                                        UdpMessageType::ImageHeader,
+                                                        socket_v6.clone().unwrap(),
+                                                        *socket_addr,
+                                                    )
+                                                    .await.unwrap();
 
-                                            //Send image parts
-                                            //We have already sent the image header
-                                            send_image_parts(image_parts_tuple.clone(), author_uuid.clone(), &key, identificator.clone(), socket.clone(), *socket_addr)
-                                                .await.unwrap();
+                                                    //Send image parts
+                                                    //We have already sent the image header
+                                                    send_image_parts(image_parts_tuple.clone(), author_uuid.clone(), &key, identificator.clone(), socket_v6.clone().unwrap(), *socket_addr)
+                                                        .await.unwrap();
+                                                },
+                                                false => {
+                                                    // Send image header
+                                                    send_bytes(
+                                                        serde_json::to_string(&header_message).unwrap().as_bytes().to_vec(),
+                                                        &key,
+                                                        UdpMessageType::ImageHeader,
+                                                        socket_v4.clone(),
+                                                        *socket_addr,
+                                                    )
+                                                    .await.unwrap();
+
+                                                    //Send image parts
+                                                    //We have already sent the image header
+                                                    send_image_parts(image_parts_tuple.clone(), author_uuid.clone(), &key, identificator.clone(), socket_v4.clone(), *socket_addr)
+                                                        .await.unwrap();
+                                                },
+                                            }
+
                                         }
                                         });
 
@@ -875,7 +933,8 @@ impl MessageService
                                 //Create handler thread
                                 voip.threads.get_or_insert_with(|| {
                                     //Clone so we can move it into the thread
-                                    let socket = voip.socket.clone();
+                                    let socket_v6 = voip.socket_v6.clone();
+                                    let socket_v4 = voip.socket_v4.clone();
                                     let connected_clients = voip.connected_client_thread_channels.clone();
                                     let cancellation_token = voip.thread_cancellation_token.clone();
 
@@ -883,38 +942,23 @@ impl MessageService
                                     tokio::spawn(async move {
                                         loop {
                                             //Create buffer for header, this is the size of the maximum udp packet so no error will appear
-                                            let mut header_buf = vec![0; 65536];
+                                            let mut header_buf_v6 = vec![0; 65536];
+                                            let mut header_buf_v4 = vec![0; 65536];
+
+                                            let socket_v6 = socket_v6.clone().unwrap();
 
                                             //Wait until we get a new message or until the thread token gets cancelled
                                             select! {
-                                                //Wait until we receive a new message
-                                                //Receive header size
-                                                _ = socket.peek_from(&mut header_buf) => {
-                                                    //Get message length
-                                                    let header_length = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
-
-                                                    //Create body according to message size indicated by the header, make sure to add 4 to the byte length because we peeked the header thus we didnt remove the bytes from the buffer
-                                                    let mut body_buf = vec![0; header_length as usize + 4];
-
-                                                    match socket.recv_from(&mut body_buf).await {
-                                                        Ok((_, socket_addr)) => {
-                                                            match connected_clients.get(&socket_addr) {
-                                                                Some(client) => {
-                                                                    //We send everything from the 4th byte since that is the part of the header
-                                                                    //We dont care about the result since it will panic when the thread is shut down
-                                                                    let _ = client.0.send(body_buf[4..].to_vec()).await;
-                                                                },
-                                                                None => {
-                                                                    tracing::error!("Client hasnt been added to the client connected list");
-                                                                },
-                                                            };
-                                                        },
-
-                                                        Err(err) => {
-                                                            tracing::error!("{err}");
-                                                        },
-                                                    }
+                                                //Wait until we recive a new message from the ipv6 binding
+                                                _ = socket_v6.peek_from(&mut header_buf_v6) => {
+                                                    send_message_to_connected_client(socket_v6.clone(), connected_clients.clone(), header_buf_v6).await;
                                                 }
+
+                                                //Wait until we recive a new message from the ipv6 binding
+                                                _ = socket_v4.peek_from(&mut header_buf_v4) => {
+                                                    send_message_to_connected_client(socket_v4.clone(), connected_clients.clone(), header_buf_v4).await;
+                                                }
+
                                                 //Wait until the token gets cancelled
                                                 _ = cancellation_token.cancelled() => {
                                                     //End loop once the token gets cancelled
@@ -1005,6 +1049,7 @@ impl MessageService
 
                                 //Make sure to drop the reference so we will not deadlock upon calling ```voip.disconnect```
                                 drop(connected_client);
+                                drop(client_manager_thread);
 
                                 //Blocks here
                                 ongoing_voip.disconnect(req.uuid.clone())?;
@@ -1045,6 +1090,7 @@ impl MessageService
                                     self.decryption_key,
                                 )
                                 .await?;
+
                             }
                             else {
                                 tracing::error!("Voip disconnected from an offline server")
@@ -1200,14 +1246,23 @@ impl MessageService
 
     async fn create_voip_server(&self, port: String) -> anyhow::Result<ServerVoip>
     {
-        // Create socket
-        let socket = UdpSocket::bind(format!("[::]:{port}")).await?;
+        // Create sockets
+        let socket_v4 = UdpSocket::bind(format!("0.0.0.0:{port}")).await?;
+        let socket_v6: Option<UdpSocket> = UdpSocket::bind(format!("[::]:{port}")).await.ok();
 
         //Return ServerVoip
         Ok(ServerVoip {
             connected_clients: Arc::new(DashMap::new()),
             _established_since: Utc::now(),
-            socket: Arc::new(socket),
+            socket_v6: {
+                if let Some(socket_v6) = socket_v6 {
+                    Some(Arc::new(socket_v6))
+                }
+                else {
+                    None
+                }
+            },
+            socket_v4: Arc::new(socket_v4),
             thread_cancellation_token: CancellationToken::new(),
             threads: None,
             connected_client_thread_channels: Arc::new(DashMap::new()),
@@ -1774,5 +1829,39 @@ impl MessageService
                 }
             },
         }
+    }
+}
+
+/// This function adds a connecting client to the ```connected_clients``` list
+/// A header_buf must be provided, so that the function can fetsh the entire length of the message
+async fn send_message_to_connected_client(
+    socket: Arc<UdpSocket>,
+    connected_clients: Arc<DashMap<SocketAddr, (Arc<mpsc::Sender<Vec<u8>>>, CancellationToken)>>,
+    header_buf: Vec<u8>,
+)
+{
+    //Get message lenght
+    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
+
+    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the header thus we didnt remove the bytes from the buffer
+    let mut body_buf = vec![0; header_lenght as usize + 4];
+
+    match socket.recv_from(&mut body_buf).await {
+        Ok((_, socket_addr)) => {
+            match connected_clients.get(&socket_addr) {
+                Some(client) => {
+                    //We send everythin from the 4th byte since that is the part of the header
+                    //We dont care about the result since it will panic when the thread is shut down
+                    let _ = client.0.send(body_buf[4..].to_vec()).await;
+                },
+                None => {
+                    tracing::error!("Client hasnt been added to the client connected list");
+                },
+            };
+        },
+
+        Err(err) => {
+            tracing::error!("{err}");
+        },
     }
 }

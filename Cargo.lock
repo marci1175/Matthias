@@ -3343,7 +3343,6 @@ dependencies = [
  "indexmap 2.3.0",
  "log",
  "mlua",
- "mlua-sys",
  "mlua_proc_macro",
  "num-traits",
  "opencv",
@@ -3371,7 +3370,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "winapi",
  "wincam",
- "windows-sys 0.52.0",
  "winres",
 ]
 
