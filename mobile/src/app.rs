@@ -506,7 +506,7 @@ impl backend::Application
 
         let user_information = self.opened_user_information.clone();
 
-        //Reset all messages and everythingg else
+        //Reset all messages and everything else
         self.client_ui.incoming_messages = ServerMaster::default();
 
         //Forget all imaes so the cached imges will be deleted

@@ -413,7 +413,7 @@ impl Application
                 if item.uuid == self.opened_user_information.uuid
                     && item.message_type != ServerMessageType::Deleted
                 {
-                    //We should only display the `edit` button if its abnormal message thus its editable
+                    //We should only display the `edit` button if its a normal message thus its editable
                     if let ServerMessageType::Normal(inner) = &item.message_type {
                         if ui
                             .add(Button::image_and_text(

@@ -1011,7 +1011,7 @@ impl Default for ProfileImage
 }
 
 /// The clients profile, this struct should be sent at a server connection
-/// It hold everythingg which needs to be displayed when viewing someone's profile
+/// It hold everything which needs to be displayed when viewing someone's profile
 /// This struct might look similar too ```Register```, but that one contains more information, and is only made to control the ui
 /// This struct is sent to the server upon successful connection
 /// If you are searching for the uuid in this struct, please note that most of the times this struct is used in a hashmap where the key is the uuid
@@ -1750,7 +1750,7 @@ pub enum ServerReplyType
     Client(ServerClientReply),
 }
 
-/// This struct holds everythingg important so the client can save and handle client profiles
+/// This struct holds everything important so the client can save and handle client profiles
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ServerClientReply
 {
@@ -2061,7 +2061,7 @@ impl ServerOutput
 }
 
 /// Used to put all the messages into 1 big pack (Bundling All the ServerOutput-s), Main packet, this gets to all the clients
-/// This message type is only used when a client is connecting an has to do a full sync (sending everythingg to the client all the messages reactions, etc)
+/// This message type is only used when a client is connecting an has to do a full sync (sending everything to the client all the messages reactions, etc)
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ServerMaster
 {

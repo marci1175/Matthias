@@ -100,7 +100,7 @@ impl Application
                             )));
 
                             if disconnect_button.clicked() {
-                                //Disable camera if it exists before everythingg else
+                                //Disable camera if it exists before everything else
                                 if voip.camera_handle_is_open.load(Relaxed) {
                                     self.disable_camera(voip);
                                 }
@@ -353,7 +353,7 @@ impl Application
                 );
             });
 
-        //We have to render the message area after everythingg else, because then we will be using the area whats left of the ui
+        //We have to render the message area after everything else, because then we will be using the area whats left of the ui
         //msg_area
         egui::CentralPanel::default().show(ctx, |ui| {
             //Drop file warning
@@ -476,7 +476,7 @@ impl Application
                 });
                 ui.separator();
 
-                //For the has_search logic to work and for the rust compiler not to underline everythingg
+                //For the has_search logic to work and for the rust compiler not to underline everything
                 egui::ScrollArea::new([true, true]).auto_shrink([false, true]).show(ui, |ui|{
                     ui.allocate_ui(ui.available_size(), |ui|{
                         let mut has_search = false;

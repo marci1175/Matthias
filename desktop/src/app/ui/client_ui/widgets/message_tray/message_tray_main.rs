@@ -152,7 +152,7 @@ impl Application
 
         //We just pattern match for the sake of never panicking, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
         if let Some(last) = split.last_mut() {
-            //If the last slice of the string (split by @) doesnt contain any spaces we can paint everythingg else
+            //If the last slice of the string (split by @) doesnt contain any spaces we can paint everything else
             if !last.contains(' ') {
                 //Set this var true if the @ menu is being displayed;
                 //* self.get_connected_users function MUST be called before showing the text input widget, so this way we can actually consume the ArrowUp and Down keys
@@ -232,7 +232,7 @@ impl Application
 
         //We just pattern match for the sake of never panicking, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
         if let Some(last) = split.last() {
-            //If the last slice of the string (split by :) doesnt contain any spaces we can paint everythingg else
+            //If the last slice of the string (split by :) doesnt contain any spaces we can paint everything else
             if !last.contains(' ') && !last.is_empty() && split_clone.len() > 1 {
                 let matched_emojis = self.get_emojis(ctx, last.to_string());
 

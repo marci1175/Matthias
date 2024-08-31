@@ -900,7 +900,7 @@ impl MessageService
                                                         Ok((_, socket_addr)) => {
                                                             match connected_clients.get(&socket_addr) {
                                                                 Some(client) => {
-                                                                    //We send everythingg from the 4th byte since that is the part of the header
+                                                                    //We send everything from the 4th byte since that is the part of the header
                                                                     //We dont care about the result since it will panic when the thread is shut down
                                                                     let _ = client.0.send(body_buf[4..].to_vec()).await;
                                                                 },
