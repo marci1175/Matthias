@@ -471,13 +471,13 @@ pub fn create_client_voip_manager(
                                         true => {
                                             if let Some(ref socket_v6) = socket_v6 {
                                                 //Send the header indicating message lenght and send the whole message appended to it
-                                                socket_v6.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                                socket_v6.send_to(&message_length_header, connected_socket_addr).await.unwrap();
                                             }
                                         },
                                         //The connected client's ip has ipv4 protocol
                                         false => {
                                             //Send the header indicating message lenght and send the whole message appended to it
-                                            socket_v4.send_to(&message_lenght_header, connected_socket_addr).await.unwrap();
+                                            socket_v4.send_to(&message_length_header, connected_socket_addr).await.unwrap();
                                         },
                                     }
                                 }

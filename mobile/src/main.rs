@@ -5,6 +5,7 @@ mod app;
 
 use std::env::args;
 
+use app::backend::Application;
 use egui::{Style, ViewportBuilder, Visuals};
 use tokio::fs;
 #[tokio::main]
@@ -48,7 +49,7 @@ async fn main() -> eframe::Result<()>
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            let mut application = matthias_mobile::app::backend::Application::new(cc);
+            let mut application = Application::new(cc);
 
             //Check if there are any custom startup args
             if args.len() > 1 {

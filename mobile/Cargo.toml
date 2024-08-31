@@ -6,7 +6,7 @@ edition = "2021"
 rust-version = "1.71"
 
 [lib]
-crate_type = ["cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 egui = "0.28.1"
@@ -22,8 +22,6 @@ eframe = { version = "0.28.1", default-features = true, features = [
     "default"
 ] }
 log = "0.4"
-android_logger = "0.13"
-android-activity = { version = "0.6.0", features = [ "native-activity" ] }
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 chrono = {version = "0.4.31", features = ["serde"]}
