@@ -71,6 +71,9 @@ Feel free to chat in the official [Matthias discord server](https://discord.gg/6
 
 **When wanting to install both, start by opening up the smaller file (Dependency installer), it will automatically open up the application installer.**
 
+**Github actions**
+Typos: [![typos](https://github.com/marci1175/Matthias/actions/workflows/typos.yml/badge.svg)](https://github.com/marci1175/Matthias/actions/workflows/typos.yml)
+
 # Legacy
 
 - The predecessor of Matthias was [ChatApp](https://github.com/marci1175/ChatApp)
