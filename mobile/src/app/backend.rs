@@ -1,7 +1,5 @@
 use super::{
     client::{connect_to_server, ServerReply},
-    lua::{Extension, LuaOutput},
-    read_extensions_dir,
     server::SharedFields,
 };
 use aes_gcm::{
@@ -20,11 +18,8 @@ use egui::{
 use egui_notify::{Toast, Toasts};
 use image::DynamicImage;
 use indexmap::IndexMap;
-use mlua::Lua;
-use mlua_proc_macro::ToTable;
 use rand::rngs::ThreadRng;
 use regex::Regex;
-use rfd::FileDialog;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::{
     collections::HashMap,
@@ -52,7 +47,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-#[derive(serde::Deserialize, serde::Serialize, ToTable, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(default)]
 pub struct Application
 {
@@ -63,9 +58,6 @@ pub struct Application
     /// This is field is used to display notifications
     #[serde(skip)]
     pub toasts: Arc<Mutex<Toasts>>,
-
-    #[serde(skip)]
-    pub lua: Arc<Lua>,
 
     /*
         Font
@@ -93,7 +85,6 @@ pub struct Application
     #[serde(skip)]
     pub server_has_started: bool,
 
-    #[table(save)]
     #[serde(skip)]
     /// This is used to store the connected client profile
     /// The field get modified by the server_main function (When a server is started this is passed in and is later modified by the server)
@@ -164,11 +155,9 @@ pub struct Application
     /*
         Client main
     */
-    //We can skip this entry of the table since, we implement Totable separetly
-    #[table(skip)]
+    //We can skip this entry of the table since, we implemen separetly
     pub client_ui: Client,
 
-    #[table(save)]
     #[serde(skip)]
     pub client_connection: ClientConnection,
 
@@ -250,9 +239,6 @@ impl Default for Application
             voip_shutdown_token: CancellationToken::new(),
             voip_thread: None,
 
-            //Make it so we can import any kind of library
-            lua: unsafe { Arc::new(Lua::unsafe_new()) },
-
             register: Register::default(),
 
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
@@ -330,315 +316,17 @@ impl Default for Application
 
 impl Application
 {
-    /// Set global lua table so that the luas can use it
-    /// This function is called when creating a new ```Application``` instance
-    pub fn set_global_lua_table(&self)
-    {
-        self.client_ui.clone().set_lua_table_function(&self.lua);
-        self.clone().set_lua_table_function(&self.lua);
-        self.client_connection
-            .clone()
-            .set_lua_table_function(&self.lua);
-        self.opened_user_information
-            .clone()
-            .set_lua_table_function(&self.lua);
-    }
-
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self
     {
         if let Some(storage) = cc.storage {
             let mut data: Application =
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
-            //Read extension dir every startup
-            match read_extensions_dir() {
-                Ok(extension_list) => {
-                    data.client_ui.extension.extension_list = extension_list;
-                },
-                //If there was an error, print it out and create the extensions folder as this is the most likely thing to error
-                Err(err) => {
-                    tracing::error!("{}", err);
-
-                    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
-                },
-            }
-
-            let output_list = data.client_ui.extension.output.clone();
-
-            return set_lua_functions(data, output_list, cc);
+            return data;
         }
 
         Default::default()
     }
-}
-
-fn set_lua_functions(
-    data: Application,
-    output_list: Arc<Mutex<Vec<LuaOutput>>>,
-    cc: &eframe::CreationContext<'_>,
-) -> Application
-{
-    let print = data
-        .lua
-        .create_function(move |_, msg: String| {
-            match output_list.lock() {
-                Ok(mut list) => list.push(LuaOutput::Standard(msg)),
-                Err(err) => {
-                    tracing::error!("{}", err);
-                },
-            }
-
-            Ok(())
-        })
-        .unwrap();
-
-    let ctx_clone_rect = cc.egui_ctx.clone();
-    let ctx_clone_circle = cc.egui_ctx.clone();
-    let ctx_clone_line = cc.egui_ctx.clone();
-    let ctx_clone_text = cc.egui_ctx.clone();
-    let ctx_clone_image = cc.egui_ctx.clone();
-    let ctx_clone_image_buffer_clean = cc.egui_ctx.clone();
-
-    let toasts = data.toasts.clone();
-    let toasts_clone1 = data.toasts.clone();
-    let toasts_clone2 = data.toasts.clone();
-
-    let draw_line = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], [f32; 2], [u8; 4])| {
-            let color = args.2;
-
-            //Create area
-            egui::Area::new("draw_line".into()).show(&ctx_clone_line, |ui| {
-                //Draw line based on args
-                ui.painter().line_segment(
-                    [
-                        Pos2::new(args.0[0], args.0[1]),
-                        Pos2::new(args.1[0], args.1[1]),
-                    ],
-                    Stroke::new(
-                        5.,
-                        Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
-                    ),
-                );
-            });
-
-            Ok(())
-        })
-        .unwrap();
-
-    let draw_rect = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], [f32; 2], bool, [u8; 4])| {
-            let (start_pos, end_pos, is_filled, color) = args;
-
-            //Create area
-            egui::Area::new("draw_rect_filled".into()).show(&ctx_clone_rect, |ui| {
-                match is_filled {
-                    true => {
-                        ui.painter().rect_filled(
-                            Rect::from_points(&[start_pos.into(), end_pos.into()]),
-                            0.,
-                            Color32::from_rgba_premultiplied(
-                                color[0], color[1], color[2], color[3],
-                            ),
-                        );
-                    },
-                    false => {
-                        ui.painter().rect_stroke(
-                            Rect::from_points(&[start_pos.into(), end_pos.into()]),
-                            0.,
-                            Stroke::new(
-                                5.,
-                                Color32::from_rgba_premultiplied(
-                                    color[0], color[1], color[2], color[3],
-                                ),
-                            ),
-                        );
-                    },
-                }
-            });
-
-            Ok(())
-        })
-        .unwrap();
-
-    let draw_circle = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], f32, bool, [u8; 4])| {
-            let (position, radius, is_filled, color) = args;
-
-            //Create area
-            egui::Area::new("draw_circle".into()).show(&ctx_clone_circle, |ui| {
-                let painter = ui.painter();
-
-                //Is the circle filled
-                match is_filled {
-                    true => {
-                        painter.circle_filled(
-                            position.into(),
-                            radius,
-                            Color32::from_rgba_premultiplied(
-                                color[0], color[1], color[2], color[3],
-                            ),
-                        );
-                    },
-                    false => {
-                        painter.circle_stroke(
-                            position.into(),
-                            radius,
-                            Stroke::new(
-                                5.,
-                                Color32::from_rgba_premultiplied(
-                                    color[0], color[1], color[2], color[3],
-                                ),
-                            ),
-                        );
-                    },
-                }
-            });
-
-            Ok(())
-        })
-        .unwrap();
-
-    let draw_text = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], f32, String, [u8; 4])| {
-            let (pos, size, text, color) = args;
-
-            egui::Area::new("draw_text".into()).show(&ctx_clone_text, |ui| {
-                ui.painter().text(
-                    pos.into(),
-                    Align2::LEFT_TOP,
-                    text,
-                    FontId::new(size, egui::FontFamily::Monospace),
-                    Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
-                )
-            });
-
-            Ok(())
-        })
-        .unwrap();
-
-    let draw_image = data
-        .lua
-        .create_function(move |_, args: ([f32; 2], [f32; 2], String)| {
-            let (pos, size, path) = args;
-
-            egui::Area::new("draw_image".into())
-                .anchor(Align2::LEFT_TOP, Vec2::from(pos))
-                .show(&ctx_clone_image, |ui| {
-                    ui.add(
-                        Image::from_uri(format!("file://{}", path)).fit_to_exact_size(size.into()),
-                    );
-                });
-
-            Ok(())
-        })
-        .unwrap();
-
-    let forget_all_images = data
-        .lua
-        .create_function(move |_, ()| {
-            ctx_clone_image_buffer_clean.forget_all_images();
-
-            Ok(())
-        })
-        .unwrap();
-
-    let notification_error = data
-        .lua
-        .create_function(move |_, caption: String| {
-            match toasts.lock() {
-                Ok(mut toasts) => {
-                    let mut toast = Toast::error(caption);
-
-                    toast.set_duration(Some(Duration::from_secs(4)));
-                    toast.set_closable(true);
-
-                    toasts.add(toast);
-                },
-                Err(_err) => {
-                    tracing::error!("{}", _err);
-                },
-            }
-
-            Ok(())
-        })
-        .unwrap();
-
-    let notification_basic = data
-        .lua
-        .create_function(move |_, caption: String| {
-            match toasts_clone1.lock() {
-                Ok(mut toasts) => {
-                    let mut toast = Toast::basic(caption);
-
-                    toast.set_duration(Some(Duration::from_secs(4)));
-                    toast.set_closable(true);
-
-                    toasts.add(toast);
-                },
-                Err(_err) => {
-                    tracing::error!("{}", _err);
-                },
-            }
-
-            Ok(())
-        })
-        .unwrap();
-
-    let notification_info = data
-        .lua
-        .create_function(move |_, caption: String| {
-            match toasts_clone2.lock() {
-                Ok(mut toasts) => {
-                    let mut toast = Toast::info(caption);
-
-                    toast.set_duration(Some(Duration::from_secs(4)));
-                    toast.set_closable(true);
-
-                    toasts.add(toast);
-                },
-                Err(_err) => {
-                    tracing::error!("{}", _err);
-                },
-            }
-
-            Ok(())
-        })
-        .unwrap();
-
-    data.lua.globals().set("draw_line", draw_line).unwrap();
-    data.lua.globals().set("draw_rect", draw_rect).unwrap();
-    data.lua.globals().set("draw_circle", draw_circle).unwrap();
-    data.lua.globals().set("draw_text", draw_text).unwrap();
-
-    data.lua
-        .globals()
-        .set("notification_error", notification_error)
-        .unwrap();
-    data.lua
-        .globals()
-        .set("notification_info", notification_info)
-        .unwrap();
-    data.lua
-        .globals()
-        .set("notification_basic", notification_basic)
-        .unwrap();
-
-    data.lua.globals().set("draw_image", draw_image).unwrap();
-    data.lua.globals().set("print", print).unwrap();
-
-    data.lua
-        .globals()
-        .set("forget_all_images", forget_all_images)
-        .unwrap();
-
-    data.set_global_lua_table();
-
-    data
 }
 
 //Include emoji image header file
@@ -670,40 +358,31 @@ impl ToString for EmojiTypes
 }
 
 /// Client side variables
-#[derive(serde::Deserialize, serde::Serialize, Clone, ToTable)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 pub struct Client
 {
-    #[table(skip)]
-    /// This entry contains all the extensions and their output
-    pub extension: Extension,
-
     #[serde(skip)]
     ///Fields shared with the client
     pub shared_fields: Arc<Mutex<SharedFields>>,
 
     ///When a text_edit_cursor move has been requested this value is a Some
     #[serde(skip)]
-    #[table(save)]
     pub text_edit_cursor_desired_index: Option<usize>,
 
     ///This value shows where the text edit cursor is, if the ```TextEdit``` widget is exited the value will remain
     #[serde(skip)]
-    #[table(save)]
     pub text_edit_cursor_index: usize,
 
     ///The rect of the connected users list (which gets displayed when pressing the @)
     #[serde(skip)]
-    #[table(save)]
     pub connected_users_display_rect: Option<egui::Rect>,
 
     ///The rect of the recommended emojis list (which gets displayed when pressing the :)
     #[serde(skip)]
-    #[table(save)]
     pub emojis_display_rect: Option<egui::Rect>,
 
     ///After pressing @ and the user list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing @ again
     #[serde(skip)]
-    #[table(save)]
     pub user_selector_index: i32,
 
     ///After pressing : and the emoji list pops out, the code logs the up arrow and down arroy actions and increments/ decreases the value, resets after pressing : again
@@ -711,7 +390,6 @@ pub struct Client
     pub emoji_selector_index: i32,
 
     #[serde(skip)]
-    #[table(save)]
     pub display_user_list: bool,
 
     ///Search parameters set by user, to chose what to search for obviously
@@ -719,12 +397,10 @@ pub struct Client
 
     ///Search buffer
     #[serde(skip)]
-    #[table(save)]
     pub search_buffer: String,
 
     ///Check if search panel is open
     #[serde(skip)]
-    #[table(save)]
     pub search_mode: bool,
 
     ///audio playback
@@ -733,12 +409,10 @@ pub struct Client
 
     ///this doesnt really matter if we save or no so whatever, implements scrolling to message element
     #[serde(skip)]
-    #[table(save)]
     pub scroll_to_message: Option<ScrollToMessage>,
 
     ///index of the reply the user clicked on
     #[serde(skip)]
-    #[table(save)]
     pub scroll_to_message_index: Option<usize>,
 
     ///Selected port on sending
@@ -749,7 +423,6 @@ pub struct Client
 
     ///This is set to on when an image is enlarged
     #[serde(skip)]
-    #[table(save)]
     pub image_overlay: bool,
 
     ///Scroll widget rect, text editor's rect
@@ -760,7 +433,6 @@ pub struct Client
 
     ///A vector of all the added files to the buffer, these are the PathBufs which get read, then their bytes get sent
     #[serde(skip)]
-    #[table(save)]
     pub files_to_send: Vec<PathBuf>,
 
     ///This checks if the text editor is open or not
@@ -783,7 +455,6 @@ pub struct Client
 
     ///This checks if a file is dragged above Matthias, so it knows when to display the cool animation 8)
     #[serde(skip)]
-    #[table(save)]
     pub drop_file_animation: bool,
 
     /// This field sets the message edit mode
@@ -792,17 +463,14 @@ pub struct Client
     /// Reply(. . .)
     /// Edit(. . .)
     #[serde(skip)]
-    #[table(save)]
     pub messaging_mode: MessagingMode,
 
     ///Input (Múlt idő) user's message, this is what gets modified in the text editor
     #[serde(skip)]
-    #[table(save)]
     pub message_buffer: String,
 
     ///Incoming messages, this is the whole packet which get sent to all the clients, this cointains all the messages, and the info about them
     #[serde(skip)]
-    #[table(save)]
     pub incoming_messages: ServerMaster,
 
     /// Last seen message's index, this will get sent
@@ -822,7 +490,6 @@ pub struct Client
 
     ///Log when the voice recording has been started so we know how long the recording is
     #[serde(skip)]
-    #[table(save)]
     pub voice_recording_start: Option<DateTime<Utc>>,
 
     // #[serde(skip)]
@@ -836,7 +503,6 @@ impl Default for Client
     fn default() -> Self
     {
         Self {
-            extension: Extension::default(),
             emojis_display_rect: None,
             shared_fields: Default::default(),
             text_edit_cursor_desired_index: None,
@@ -1445,19 +1111,16 @@ impl ClientMessage
 }
 
 ///This manages all the settings and variables for maintaining a connection with the server (from client)
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct ClientConnection
 {
-    #[table(save)]
     #[serde(skip)]
     pub client_secret: Vec<u8>,
 
-    #[table(save)]
     #[serde(skip)]
     ///This enum wraps the server handle ```Connected(_)```, it also functions as a Sort of Option wrapper
     pub state: ConnectionState,
 
-    #[table(save)]
     #[serde(skip)]
     //Password which was used to connect (and could connect with, it has been password matched with the server)
     pub password: String,
@@ -2667,7 +2330,7 @@ pub fn ipv6_get() -> Result<String, std::io::Error>
 /// Account management
 /// This might look similar to ```ClientProfile```
 /// struct containing a new user's info, when serialized / deserialized it gets encrypted or decrypted
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default, ToTable)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 pub struct UserInformation
 {
     pub profile: ClientProfile,
@@ -2915,34 +2578,34 @@ pub fn register(register: Register) -> anyhow::Result<UserInformation>
     Ok(user_info)
 }
 
-///Write general file, this function takes in a custom pathsrc/app/backend.rs
-pub fn write_file(file_response: ServerFileReply) -> Result<()>
-{
-    let files = FileDialog::new()
-        .set_title("Save to")
-        .set_directory("/")
-        .add_filter(
-            file_response
-                .file_name
-                .extension()
-                .unwrap()
-                .to_string_lossy()
-                .to_string(),
-            &[file_response
-                .file_name
-                .extension()
-                .unwrap()
-                .to_string_lossy()
-                .to_string()],
-        )
-        .save_file();
+// ///Write general file, this function takes in a custom pathsrc/app/backend.rs
+// pub fn write_file(file_response: ServerFileReply) -> Result<()>
+// {
+//     let files = FileDialog::new()
+//         .set_title("Save to")
+//         .set_directory("/")
+//         .add_filter(
+//             file_response
+//                 .file_name
+//                 .extension()
+//                 .unwrap()
+//                 .to_string_lossy()
+//                 .to_string(),
+//             &[file_response
+//                 .file_name
+//                 .extension()
+//                 .unwrap()
+//                 .to_string_lossy()
+//                 .to_string()],
+//         )
+//         .save_file();
 
-    if let Some(file) = files {
-        fs::write(file, file_response.bytes)?;
-    }
+//     if let Some(file) = files {
+//         fs::write(file, file_response.bytes)?;
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 ///Write an audio file to the appdata folder
 #[inline]

@@ -1,0 +1,26 @@
+09-01 19:06:01.907  5823  5823 D AndroidRuntime: Shutting down VM
+09-01 19:06:01.909  5823  5823 E AndroidRuntime: FATAL EXCEPTION: main
+09-01 19:06:01.909  5823  5823 E AndroidRuntime: Process: co.realfit.agdkeframe, PID: 5823
+09-01 19:06:01.909  5823  5823 E AndroidRuntime: java.lang.UnsatisfiedLinkError: dlopen failed: cannot locate symbol "inflate" referenced by "/data/app/~~LnnoRSj8nZqi3lv6kvdfGg==/co.realfit.agdkeframe-k0jFEONwighhn-KuH8G-JQ==/base.apk!/lib/arm64-v8a/libmain.so"...
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at java.lang.Runtime.loadLibrary0(Runtime.java:1082)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at java.lang.Runtime.loadLibrary0(Runtime.java:1003)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at java.lang.System.loadLibrary(System.java:1661)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at co.realfit.agdkeframe.MainActivity.<clinit>(MainActivity.java:32)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at java.lang.Class.newInstance(Native Method)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.AppComponentFactory.instantiateActivity(AppComponentFactory.java:95)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at androidx.core.app.CoreComponentFactory.instantiateActivity(CoreComponentFactory.java:45)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.Instrumentation.newActivity(Instrumentation.java:1378)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:3676)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:3922)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:103)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.servertransaction.TransactionExecutor.executeCallbacks(TransactionExecutor.java:139)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:96)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2443)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.os.Handler.dispatchMessage(Handler.java:106)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.os.Looper.loopOnce(Looper.java:205)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.os.Looper.loop(Looper.java:294)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at android.app.ActivityThread.main(ActivityThread.java:8177)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at java.lang.reflect.Method.invoke(Native Method)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+09-01 19:06:01.909  5823  5823 E AndroidRuntime:        at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+09-01 19:06:01.915   595  2125 W ActivityTaskManager:   Force finishing activity co.realfit.agdkeframe/.MainActivity

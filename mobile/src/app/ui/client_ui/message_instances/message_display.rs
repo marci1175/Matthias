@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, Application, ClientMessage, MessageDisplay,
+    parse_incoming_message, Application, ClientMessage, MessageDisplay,
     ServerFileReply, ServerImageUpload, ServerMessageType,
 };
 use rodio::{Decoder, Source};
@@ -92,7 +92,7 @@ impl Application
                                             bytes: bytes.to_vec(),
                                             file_name: PathBuf::from("image.png"),
                                         };
-                                        let _ = crate::app::backend::write_file(image_save);
+                                        // let _ = crate::app::backend::write_file(image_save);
                                     }
                                 });
                                 if self.client_ui.image_overlay {
@@ -472,7 +472,7 @@ impl Application
                                 bytes: image_bytes.clone(),
                                 file_name: PathBuf::from(".png"),
                             };
-                            let _ = write_file(image_save);
+                            // let _ = write_file(image_save);
                         }
                     });
                 });

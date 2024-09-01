@@ -29,12 +29,13 @@ async fn android_main(app: AndroidApp)
             ..Default::default()
         },
         event_loop_builder: Some(Box::new(move |builder| {
-            builder.with_android_app(app);
+            EventLoopBuilderExtAndroid::with_android_app(builder, app);
         })),
+        // renderer: eframe::Renderer::Wgpu,
         ..Default::default()
     };
 
-    application_main(native_options, args).unwrap_or_else(|err| {
+    application_main(native_options, vec![]).unwrap_or_else(|err| {
         log::error!("Failure while running EFrame application: {err:?}");
     });
 }

@@ -233,6 +233,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e999941b234f3131b00bc13c22d06e8c5ff726d1b6318ac7eb276997bbb4fef0"
 
 [[package]]
+name = "android_log-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ecc8056bf6ab9892dcd53216c83d1597487d7dacac16c8df6b877d127df9937"
+
+[[package]]
+name = "android_logger"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b07e8e73d720a1f2e4b6014766e6039fd2e96a4fa44e2a78d0e1fa2ff49826"
+dependencies = [
+ "android_log-sys",
+ "env_filter",
+ "log",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +1945,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f2c92ceda6ceec50f43169f9ee8424fe2db276791afde7b2cd8bc084cb376ab"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3327,6 +3354,7 @@ name = "matthias-mobile"
 version = "1.0.0"
 dependencies = [
  "aes-gcm",
+ "android_logger",
  "anyhow",
  "base64 0.22.1",
  "chrono",
@@ -3344,17 +3372,12 @@ dependencies = [
  "image 0.24.9",
  "indexmap 2.3.0",
  "log",
- "mlua",
- "mlua_proc_macro",
  "num-traits",
- "opencv",
- "opus",
  "phf",
  "phf_macros",
  "rand",
  "regex",
  "reqwest",
- "rfd",
  "rodio",
  "rust-argon2",
  "serde",
@@ -3372,6 +3395,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "winapi",
  "wincam",
+ "winit",
  "winres",
 ]
 
