@@ -1968,6 +1968,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_logger"
+version = "0.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13fa619b91fb2381732789fc5de83b45675e882f66623b7d8cb4f643017018d"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
+]
+
+[[package]]
 name = "epaint"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3309,7 +3322,7 @@ dependencies = [
  "egui",
  "egui-notify",
  "egui_extras",
- "env_logger",
+ "env_logger 0.10.2",
  "hex",
  "hound",
  "image 0.24.9",
@@ -3366,7 +3379,7 @@ dependencies = [
  "egui",
  "egui-notify",
  "egui_extras",
- "env_logger",
+ "env_logger 0.11.5",
  "hex",
  "hound",
  "image 0.24.9",
@@ -3392,7 +3405,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
- "wasm-bindgen-futures",
  "winapi",
  "wincam",
  "winit",

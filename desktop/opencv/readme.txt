@@ -1,2 +1,0 @@
-This dll is necessary for compilation (It doesnt appear as a compile time error, but it is a runtime error).
-This dll should be copied into the release and debug folder at build time, therfor when distribtuing the app it should be done with the installer.

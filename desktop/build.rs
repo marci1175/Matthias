@@ -20,8 +20,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let dll_name = std::env!("OPENCV_LINK_LIBS", "");
 
-    let release_path = PathBuf::from(format!("../target/release/{dll_name}.dll"));
-    let debug_path = PathBuf::from(format!("../target/debug/{dll_name}.dll"));
+    let target_name = std::env::var("CARGO_BUILD_TARGET").unwrap();
+
+    let release_path = PathBuf::from(format!("../target/{target_name}/release/{dll_name}.dll"));
+    let debug_path = PathBuf::from(format!("../target/{target_name}/debug/{dll_name}.dll"));
 
     //Move opencv dll to build folder
     match fs::read(&release_path) {
@@ -29,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Ok(_) => (),
         Err(_err) => {
             //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!("opencv/{dll_name}.dll")))
+            let dll_bytes = fs::read(PathBuf::from(format!("../dependencies/opencv/{dll_name}.dll")))
                 .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path
@@ -167,7 +169,9 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 
     let map_body: Vec<String> = emoji_tuple
         .iter()
-        .map(|(name, path)| format!(r#"    "{name}" => include_bytes!(r"..\\..\\..\..\\{path}"),"#))
+        .map(|(name, path)| {
+                format!(r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#, std::env::var("CARGO_MANIFEST_DIR").unwrap())
+        })
         .collect();
 
     //Create Map of emojis' name and their associated bytes

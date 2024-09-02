@@ -68,8 +68,8 @@ pub fn application_main(native_options: NativeOptions, args: Vec<String>) -> Res
     )
 }
 
-#[cfg(not(target_os = "android"))]
-fn main() -> Result<(), eframe::Error> {
+#[tokio::main]
+async fn main() -> Result<(), eframe::Error> {
     //Get args
     let args: Vec<String> = args().collect();
 
