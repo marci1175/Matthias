@@ -1,5 +1,5 @@
 # Create environment variable to `OPENSSL_DIR`
-export OPENSSL_DIR=$(realpath "mobile/deps/openssl-android-arm64-v8a")
+export OPENSSL_DIR=$(realpath "dependencies/openssl/openssl-android-arm64-v8a")
 
 # This is very important so that we dont have to specify any features
 cd mobile

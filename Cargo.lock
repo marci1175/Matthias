@@ -3408,7 +3408,6 @@ dependencies = [
  "winapi",
  "wincam",
  "winit",
- "winres",
 ]
 
 [[package]]
