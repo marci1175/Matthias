@@ -22,14 +22,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let target_name = std::env::var("TARGET").unwrap();
 
-    let _ = fs::create_dir(format!("../target/{target_name}/release/"));
-    let _ = fs::create_dir(format!("../target/{target_name}/debug/"));
+    let target_dir = format!("../target/desktop/{target_name}");
 
-    let release_path = PathBuf::from(format!("../target/{target_name}/release/{dll_name}.dll"));
-    let debug_path = PathBuf::from(format!("../target/{target_name}/debug/{dll_name}.dll"));
+    let path = PathBuf::from(format!("{target_dir}/{dll_name}.dll"));
 
     //Move opencv dll to build folder
-    match fs::read(&release_path) {
+    match fs::read(&path) {
         //The DLL exists
         Ok(_) => (),
         Err(_err) => {
@@ -38,16 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path
-            let mut release_ancestor = release_path.ancestors();
-            let release_folder_path = release_ancestor.next().unwrap().display();
+            let mut ancestor = path.ancestors();
+            let folder_path = dbg!(ancestor.next().unwrap().display());
 
-            //Get ancestor path
-            let mut debug_ancestor = debug_path.ancestors();
-            let debug_folder_path = dbg!(debug_ancestor.next().unwrap().display());
-
-            //Write dlls to the build folders
-            fs::write(format!("{release_folder_path}"), dll_bytes.clone()).unwrap();
-            fs::write(format!("{debug_folder_path}"), dll_bytes).unwrap();
+            fs::write(format!("{folder_path}"), dll_bytes).unwrap();
         },
     }
 

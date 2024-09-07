@@ -8,14 +8,10 @@ const CUSTOM_URL: &str = "matthias://";
 /// Define the url to the deocumentation
 const DOCUMENTATION_URL: &str = "https://matthias.gitbook.io/matthiasdocu";
 
-use anyhow::Error;
 use base64::{engine::general_purpose, Engine};
 use egui::{
-    vec2, Align, Color32, KeyboardShortcut, Layout, Modifiers, RichText, ScrollArea, Slider,
-    Stroke, TextEdit,
+    vec2, Align, Color32, Layout, RichText, Slider, TextEdit,
 };
-use egui_extras::{Column, TableBuilder};
-use egui_notify::Toast;
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;

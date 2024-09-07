@@ -13,7 +13,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use dashmap::DashMap;
 use egui::{
     load::{BytesPoll, LoadError},
-    vec2, Align2, Color32, FontId, Image, Pos2, Rect, Response, RichText, Stroke, Ui, Vec2,
+    vec2, Color32, Image, Rect, Response, RichText, Ui,
 };
 use egui_notify::{Toast, Toasts};
 use image::DynamicImage;
@@ -319,7 +319,7 @@ impl Application
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self
     {
         if let Some(storage) = cc.storage {
-            let mut data: Application =
+            let data: Application =
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
             return data;
