@@ -20,7 +20,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let dll_name = std::env!("OPENCV_LINK_LIBS", "");
 
-    let target_name = std::env::var("CARGO_BUILD_TARGET").unwrap();
+    let target_name = std::env::var("TARGET").unwrap();
+
+    let _ = fs::create_dir(format!("../target/{target_name}/release/"));
+    let _ = fs::create_dir(format!("../target/{target_name}/debug/"));
 
     let release_path = PathBuf::from(format!("../target/{target_name}/release/{dll_name}.dll"));
     let debug_path = PathBuf::from(format!("../target/{target_name}/debug/{dll_name}.dll"));
@@ -31,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Ok(_) => (),
         Err(_err) => {
             //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!("../dependencies/opencv/{dll_name}.dll")))
+            let dll_bytes = fs::read(PathBuf::from(format!("..\\dependencies\\opencv\\{dll_name}.dll")))
                 .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path

@@ -10,3 +10,4 @@ Write an accurate step-by-step tutorial on how to replicate/exploit a bug in the
 ## Report outcomes
 If the vulnerability report is accepted, a fix for it will most likely be present in the next quickfix/version.
 
+?
