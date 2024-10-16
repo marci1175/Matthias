@@ -9,27 +9,27 @@ use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_audio, ClientMessage,
-    ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
-    ServerSync, ServerVoipReply,
+    decrypt_aes256, display_error_message, write_audio, ClientMessage, ClientMessageType,
+    ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync,
+    ServerVoipReply,
 };
 
 use crate::app::backend::{Application, ServerMessageType};
 
-/// Image byte offset
-/// This value is the end of the hash bytes, the start is ```UUID_BYTE_OFFSET```
-pub const HASH_BYTE_OFFSET: usize = 64 + 64 + 36;
+/// This is the byte lenght of the uuid's text representation (utf8)
+pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 
 /// Hash byte offset
 /// This value is the end of the uuid string bytes, the start is ```IDENTIFICATOR_BYTE_OFFSET```
-pub const UUID_BYTE_OFFSET: usize = 64 + 36;
+pub const UUID_BYTE_OFFSET: usize = 64 + UUID_STRING_BYTE_LENGHT;
+
+/// Image byte offset
+/// This value is the end of the hash bytes, the start is ```UUID_BYTE_OFFSET```
+pub const HASH_BYTE_OFFSET: usize = 64 + UUID_BYTE_OFFSET;
 
 /// Identificator byte offset
 /// This value is the start of the identificator bytes, the end is the end of the message itself
 pub const IDENTIFICATOR_BYTE_OFFSET: usize = 64;
-
-/// This is the byte lenght of the uuid's text representation (utf8)
-pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 
 use super::backend::{fetch_incoming_message_lenght, get_image_header};
 pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;

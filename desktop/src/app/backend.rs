@@ -2920,7 +2920,7 @@ pub fn encrypt_aes256(string_to_be_encrypted: String, key: &[u8]) -> anyhow::Res
         .encrypt(&nonce.into(), &*bytes)
         .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
 
-    let ciphertext = hex::encode(vec![ciphertext, nonce.to_vec()].concat());
+    let ciphertext = hex::encode([ciphertext, nonce.to_vec()].concat());
 
     Ok(ciphertext)
 }
@@ -2942,7 +2942,7 @@ pub fn encrypt_aes256_bytes(bytes: &[u8], key: &[u8]) -> anyhow::Result<Vec<u8>>
         .encrypt(&nonce.into(), bytes)
         .map_err(|_| Error::msg("Invalid key, couldnt encrypt the specified item."))?;
 
-    Ok(vec![encrypted_bytes, nonce.to_vec()].concat())
+    Ok([encrypted_bytes, nonce.to_vec()].concat())
 }
 
 #[inline]

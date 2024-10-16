@@ -40,7 +40,11 @@ async fn android_main(app: AndroidApp)
     });
 }
 
-pub fn application_main(native_options: NativeOptions, args: Vec<String>) -> Result<(), eframe::Error> {
+pub fn application_main(
+    native_options: NativeOptions,
+    args: Vec<String>,
+) -> Result<(), eframe::Error>
+{
     eframe::run_native(
         "Matthias",
         native_options,
@@ -69,7 +73,8 @@ pub fn application_main(native_options: NativeOptions, args: Vec<String>) -> Res
 }
 
 #[tokio::main]
-async fn main() -> Result<(), eframe::Error> {
+async fn main() -> Result<(), eframe::Error>
+{
     //Get args
     let args: Vec<String> = args().collect();
 
@@ -90,7 +95,6 @@ async fn main() -> Result<(), eframe::Error> {
 
     application_main(native_options, args)
 }
-
 
 /*  Gulyásleves recept
 

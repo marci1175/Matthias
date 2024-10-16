@@ -3,8 +3,8 @@ use std::{fs, path::PathBuf};
 use egui::{vec2, Align, Align2, Area, Color32, Context, LayerId, Layout, RichText, Sense, Ui};
 
 use crate::app::backend::{
-    parse_incoming_message, Application, ClientMessage, MessageDisplay,
-    ServerFileReply, ServerImageUpload, ServerMessageType,
+    parse_incoming_message, Application, ClientMessage, MessageDisplay, ServerFileReply,
+    ServerImageUpload, ServerMessageType,
 };
 use rodio::{Decoder, Source};
 

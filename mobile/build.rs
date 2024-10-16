@@ -134,7 +134,10 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     let map_body: Vec<String> = emoji_tuple
         .iter()
         .map(|(name, path)| {
-                format!(r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#, std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            format!(
+                r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#,
+                std::env::var("CARGO_MANIFEST_DIR").unwrap()
+            )
         })
         .collect();
 

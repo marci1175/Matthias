@@ -9,9 +9,7 @@ const CUSTOM_URL: &str = "matthias://";
 const DOCUMENTATION_URL: &str = "https://matthias.gitbook.io/matthiasdocu";
 
 use base64::{engine::general_purpose, Engine};
-use egui::{
-    vec2, Align, Color32, Layout, RichText, Slider, TextEdit,
-};
+use egui::{vec2, Align, Color32, Layout, RichText, Slider, TextEdit};
 use std::fs::{self};
 use tap::TapFallible;
 use tokio_util::sync::CancellationToken;

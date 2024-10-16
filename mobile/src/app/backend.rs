@@ -319,8 +319,7 @@ impl Application
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self
     {
         if let Some(storage) = cc.storage {
-            let data: Application =
-                eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            let data: Application = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
             return data;
         }

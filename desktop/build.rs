@@ -32,8 +32,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         Ok(_) => (),
         Err(_err) => {
             //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!("..\\dependencies\\opencv\\{dll_name}.dll")))
-                .expect("OpenCV library dll was not found in binary folder.");
+            let dll_bytes = fs::read(PathBuf::from(format!(
+                "..\\dependencies\\opencv\\{dll_name}.dll"
+            )))
+            .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path
             let mut ancestor = path.ancestors();
@@ -165,7 +167,10 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
     let map_body: Vec<String> = emoji_tuple
         .iter()
         .map(|(name, path)| {
-                format!(r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#, std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            format!(
+                r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#,
+                std::env::var("CARGO_MANIFEST_DIR").unwrap()
+            )
         })
         .collect();
 

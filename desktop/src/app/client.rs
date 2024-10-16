@@ -168,7 +168,6 @@ impl Application
                                         //Return wav bytes
                                         playbackable_audio
                                     };
-                                    
                                     //Create audio chunks
                                     let audio_chunks = playbackable_audio.chunks(30000);
 
