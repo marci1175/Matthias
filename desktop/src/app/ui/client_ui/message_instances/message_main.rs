@@ -61,7 +61,6 @@ impl Application
                         //Scroll to reply logic
                         if let Some(scroll_to_instance) = self.client_ui.scroll_to_message.as_mut() {
                             ui.scroll_with_delta(egui::Vec2::new(0.0, -10.0));
-                            
                             let message_rect = scroll_to_instance.messages[scroll_to_instance.index].clone();
 
                             message_rect.scroll_to_me(Some(Align::Center));
@@ -102,40 +101,43 @@ impl Application
         let message_group = ui.group(|ui| {
             if let Some(replied_to) = item.replying_to {
                 ui.allocate_ui(vec2(ui.available_width(), self.font_size), |ui| {
-                    let reply_button_area = ui.horizontal(|ui| {
-                        self.display_icon_from_server(
-                            ctx,
-                            self.client_ui.incoming_messages.message_list[replied_to]
-                                .uuid
-                                .clone(),
-                            ui,
-                        );
+                    //Avoid reply area ID match, explicitly push id of this area
+                    let reply_button_area = ui.push_id(ui.next_auto_id(), |ui| {
+                        ui.horizontal(|ui| {
+                            self.display_icon_from_server(
+                                ctx,
+                                self.client_ui.incoming_messages.message_list[replied_to]
+                                    .uuid
+                                    .clone(),
+                                ui,
+                            );
 
-                        ui.add(
-                            egui::widgets::Button::new(
-                                RichText::from(format!(
-                                    "{}: {}",
-                                    self.client_ui.incoming_messages.message_list[replied_to]
-                                        .author,
-                                    match &self.client_ui.incoming_messages.message_list[replied_to]
-                                        .message_type
-                                    {
-                                        ServerMessageType::Deleted => "Deleted message".to_string(),
-                                        ServerMessageType::Audio(audio) =>
-                                            format!("Sound {}", audio.file_name),
-                                        ServerMessageType::Image(_img) => "Image".to_string(),
-                                        ServerMessageType::Upload(upload) =>
-                                            format!("Upload {}", upload.file_name),
-                                        ServerMessageType::Normal(msg) => {
-                                            let mut message_clone = msg.message.clone();
-                                            if message_clone.clone().len() > 20 {
-                                                message_clone.truncate(20);
-                                                message_clone.push_str(" ...");
-                                            }
-                                            message_clone.to_string()
-                                        },
-                                        ServerMessageType::Server(server) =>
-                                            match server {
+                            ui.add(
+                                egui::widgets::Button::new(
+                                    RichText::from(format!(
+                                        "{}: {}",
+                                        self.client_ui.incoming_messages.message_list[replied_to]
+                                            .author,
+                                        match &self.client_ui.incoming_messages.message_list
+                                            [replied_to]
+                                            .message_type
+                                        {
+                                            ServerMessageType::Deleted =>
+                                                "Deleted message".to_string(),
+                                            ServerMessageType::Audio(audio) =>
+                                                format!("Sound {}", audio.file_name),
+                                            ServerMessageType::Image(_img) => "Image".to_string(),
+                                            ServerMessageType::Upload(upload) =>
+                                                format!("Upload {}", upload.file_name),
+                                            ServerMessageType::Normal(msg) => {
+                                                let mut message_clone = msg.message.clone();
+                                                if message_clone.clone().len() > 20 {
+                                                    message_clone.truncate(20);
+                                                    message_clone.push_str(" ...");
+                                                }
+                                                message_clone.to_string()
+                                            },
+                                            ServerMessageType::Server(server) => match server {
                                                 crate::app::backend::ServerMessage::Connect(
                                                     profile,
                                                 ) => {
@@ -155,17 +157,18 @@ impl Application
                                                     )
                                                 },
                                             },
-                                        ServerMessageType::Edit(_) => unreachable!(),
-                                        ServerMessageType::Reaction(_) => unreachable!(),
-                                        ServerMessageType::Sync(_) => unreachable!(),
-                                        ServerMessageType::VoipEvent(_) => unreachable!(),
-                                        ServerMessageType::VoipState(_) => unreachable!(),
-                                    }
-                                ))
-                                .size(self.font_size / 1.5),
-                            )
-                            .frame(false),
-                        );
+                                            ServerMessageType::Edit(_) => unreachable!(),
+                                            ServerMessageType::Reaction(_) => unreachable!(),
+                                            ServerMessageType::Sync(_) => unreachable!(),
+                                            ServerMessageType::VoipEvent(_) => unreachable!(),
+                                            ServerMessageType::VoipState(_) => unreachable!(),
+                                        }
+                                    ))
+                                    .size(self.font_size / 1.5),
+                                )
+                                .frame(false),
+                            );
+                        });
                     });
 
                     reply_area_response = Some(reply_button_area.response.clone());

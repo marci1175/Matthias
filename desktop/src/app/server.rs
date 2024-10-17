@@ -2,8 +2,8 @@ pub const SERVER_UUID: &str = "00000000-0000-0000-0000-000000000000";
 pub const SERVER_AUTHOR: &str = "Server";
 
 use std::{
-    collections::HashMap, env, fs, future::IntoFuture, io::Write, net::SocketAddr, path::PathBuf,
-    sync::Arc, time::Duration,
+    collections::HashMap, env, fs, io::Write, net::SocketAddr, path::PathBuf, sync::Arc,
+    time::Duration,
 };
 
 use crate::app::client::{HASH_BYTE_OFFSET, IDENTIFICATOR_BYTE_OFFSET, UUID_BYTE_OFFSET};
@@ -39,7 +39,7 @@ use super::backend::{
 
 use tokio::{
     io::AsyncWrite,
-    net::{tcp::OwnedReadHalf, TcpListener, TcpStream, UdpSocket},
+    net::{tcp::OwnedReadHalf, UdpSocket},
     select,
     sync::mpsc::{self, Receiver},
     task::JoinHandle,
@@ -123,14 +123,13 @@ pub async fn server_main(
 ) -> anyhow::Result<Arc<tokio::sync::Mutex<SharedFields>>>
 {
     //Bind to ipv6 ip address
-    let tcp_listener_ipv6 =
-        match net::TcpListener::bind(format!("[::]:{}", port)).await {
-            Ok(tcp_listener) => tcp_listener,
-            Err(err_v6) => {
-                bail!("\nCould not bind to IPv4: {err_v6}")
-            },
-        };
-    
+    let tcp_listener_ipv6 = match net::TcpListener::bind(format!("[::]:{}", port)).await {
+        Ok(tcp_listener) => tcp_listener,
+        Err(err_v6) => {
+            bail!("\nCould not bind to IPv4: {err_v6}")
+        },
+    };
+
     //Bind to ipv4 ip address
     let tcp_listener_ipv4 = match net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
         Ok(tcp_listener) => tcp_listener,
@@ -1090,7 +1089,6 @@ impl MessageService
                                     self.decryption_key,
                                 )
                                 .await?;
-
                             }
                             else {
                                 tracing::error!("Voip disconnected from an offline server")
@@ -1254,14 +1252,7 @@ impl MessageService
         Ok(ServerVoip {
             connected_clients: Arc::new(DashMap::new()),
             _established_since: Utc::now(),
-            socket_v6: {
-                if let Some(socket_v6) = socket_v6 {
-                    Some(Arc::new(socket_v6))
-                }
-                else {
-                    None
-                }
-            },
+            socket_v6: { socket_v6.map(Arc::new) },
             socket_v4: Arc::new(socket_v4),
             thread_cancellation_token: CancellationToken::new(),
             threads: None,

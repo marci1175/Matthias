@@ -233,6 +233,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e999941b234f3131b00bc13c22d06e8c5ff726d1b6318ac7eb276997bbb4fef0"
 
 [[package]]
+name = "android_log-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ecc8056bf6ab9892dcd53216c83d1597487d7dacac16c8df6b877d127df9937"
+
+[[package]]
+name = "android_logger"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b07e8e73d720a1f2e4b6014766e6039fd2e96a4fa44e2a78d0e1fa2ff49826"
+dependencies = [
+ "android_log-sys",
+ "env_filter",
+ "log",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1721,6 +1738,7 @@ dependencies = [
  "objc2-foundation",
  "parking_lot",
  "percent-encoding",
+ "pollster",
  "raw-window-handle 0.5.2",
  "raw-window-handle 0.6.2",
  "ron",
@@ -1730,6 +1748,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "wgpu",
  "winapi",
  "winit",
 ]
@@ -1926,6 +1945,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f2c92ceda6ceec50f43169f9ee8424fe2db276791afde7b2cd8bc084cb376ab"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1936,6 +1965,19 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13fa619b91fb2381732789fc5de83b45675e882f66623b7d8cb4f643017018d"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
 ]
 
 [[package]]
@@ -3280,7 +3322,7 @@ dependencies = [
  "egui",
  "egui-notify",
  "egui_extras",
- "env_logger",
+ "env_logger 0.10.2",
  "hex",
  "hound",
  "image 0.24.9",
@@ -3325,6 +3367,7 @@ name = "matthias-mobile"
 version = "1.0.0"
 dependencies = [
  "aes-gcm",
+ "android_logger",
  "anyhow",
  "base64 0.22.1",
  "chrono",
@@ -3336,23 +3379,18 @@ dependencies = [
  "egui",
  "egui-notify",
  "egui_extras",
- "env_logger",
+ "env_logger 0.11.5",
  "hex",
  "hound",
  "image 0.24.9",
  "indexmap 2.3.0",
  "log",
- "mlua",
- "mlua_proc_macro",
  "num-traits",
- "opencv",
- "opus",
  "phf",
  "phf_macros",
  "rand",
  "regex",
  "reqwest",
- "rfd",
  "rodio",
  "rust-argon2",
  "serde",
@@ -3367,10 +3405,9 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
- "wasm-bindgen-futures",
  "winapi",
  "wincam",
- "winres",
+ "winit",
 ]
 
 [[package]]
@@ -4286,6 +4323,12 @@ dependencies = [
  "tracing",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "pollster"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
 
 [[package]]
 name = "polyval"
@@ -6571,6 +6614,7 @@ dependencies = [
  "document-features",
  "js-sys",
  "log",
+ "naga",
  "parking_lot",
  "profiling",
  "raw-window-handle 0.6.2",
@@ -6621,6 +6665,7 @@ dependencies = [
  "arrayvec",
  "ash",
  "bitflags 2.6.0",
+ "block",
  "cfg_aliases",
  "core-graphics-types",
  "glow",

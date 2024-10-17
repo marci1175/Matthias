@@ -252,27 +252,23 @@ impl Application
                                     self.register.image.image_rect = allocated_img.response.rect;
                                 });
                         }
-                        else if ui.button("Upload picture").clicked() {
-                            let app_data_path = rfd::FileDialog::new()
-                                .add_filter("Supported formats", &["png"])
-                                .pick_file();
-
-                            if let Some(app_data_path) = app_data_path {
-                                match read_image(&app_data_path) {
-                                    Ok(image) => {
-                                        //This shouldnt panic as we limit the types of file which can be seletected as a pfp
-                                        self.register.image.selected_image_bytes = Some(image);
-                                    },
-                                    Err(err) => {
-                                        //Avoid panicking when trying to display a Notification
-                                        //This is very rare but can still happen
-                                        display_error_message(err, self.toasts.clone());
-                                    },
-                                }
-                                self.register.image.image_path = app_data_path;
-                                ctx.forget_image("bytes://register_image");
-                            }
-                        }
+                        // else if ui.button("Upload picture").clicked() {
+                        //     if let Some(app_data_path) = app_data_path {
+                        //         match read_image(&app_data_path) {
+                        //             Ok(image) => {
+                        //                 //This shouldnt panic as we limit the types of file which can be seletected as a pfp
+                        //                 self.register.image.selected_image_bytes = Some(image);
+                        //             },
+                        //             Err(err) => {
+                        //                 //Avoid panicking when trying to display a Notification
+                        //                 //This is very rare but can still happen
+                        //                 display_error_message(err, self.toasts.clone());
+                        //             },
+                        //         }
+                        //         self.register.image.image_path = app_data_path;
+                        //         ctx.forget_image("bytes://register_image");
+                        //     }
+                        // }
 
                         if !(self.register.normal_profile_picture.is_empty()
                             && self.register.small_profile_picture.is_empty())

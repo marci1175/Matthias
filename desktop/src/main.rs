@@ -24,7 +24,7 @@ async fn main() -> eframe::Result<()>
     {
         //Enable for ```tokio-console``` feature
         // console_subscriber::init();
-        
+
         let filter = filter::Targets::new()
             .with_default(Level::INFO)
             .with_default(Level::ERROR)

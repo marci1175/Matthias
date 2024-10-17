@@ -5,8 +5,8 @@ use egui::{
 };
 
 use crate::app::backend::{
-    parse_incoming_message, write_file, Application, ClientMessage, ClientProfile, MessageDisplay,
-    ServerFileReply, ServerImageUpload, ServerMessageType,
+    parse_incoming_message, Application, ClientMessage, ClientProfile, MessageDisplay,
+    ServerFileReply, ServerMessageType,
 };
 use rodio::Decoder;
 
@@ -88,11 +88,10 @@ impl Application
                                 let image_widget = ui.add(egui::widgets::Image::from_uri(
                                     format!("bytes://{}", picture.signature),
                                 ));
-                                
                                 if image_widget.interact(Sense::click()).clicked() {
                                     self.client_ui.image_overlay = true;
 
-                                    ctx.include_bytes(format!("bytes://large_image_display"), bytes.clone());
+                                    ctx.include_bytes("bytes://large_image_display".to_string(), bytes.clone());
                                 }
 
                                 image_widget.context_menu(|ui| {
