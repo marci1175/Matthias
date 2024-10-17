@@ -156,7 +156,7 @@ pub struct Application
         Client main
     */
     //We can skip this entry of the table since, we implement Totable separately
-    #[table(skip)]
+    // #[table(skip)]
     pub client_ui: Client,
 
     #[serde(skip)]

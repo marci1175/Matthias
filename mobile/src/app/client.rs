@@ -552,11 +552,11 @@ impl Application
                                                     .push(msg.message.clone());
 
                                                 //Callback
-                                                self.client_ui.extension.event_call_extensions(
-                                                    crate::app::lua::EventCall::OnChatReceive,
-                                                    &self.lua,
-                                                    Some(msg.message._struct_into_string()),
-                                                );
+                                                // self.client_ui.extension.event_call_extensions(
+                                                //     crate::app::lua::EventCall::OnChatReceive,
+                                                //     &self.lua,
+                                                //     Some(msg.message._struct_into_string()),
+                                                // );
                                             },
                                         }
                                     },
