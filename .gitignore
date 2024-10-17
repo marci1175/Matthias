@@ -6,3 +6,6 @@
 /Installer/.vs/
 build_info.szechat_build
 /mobile/target
+/mobile/app/build
+/target-trunk
+/production-builds
