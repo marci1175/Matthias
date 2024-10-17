@@ -189,8 +189,8 @@ impl eframe::App for backend::Application
                 };
             });
 
-        //Connection reciver
-        match self.connection_reciver.try_recv() {
+        //Connection receiver
+        match self.connection_receiver.try_recv() {
             Ok(connection) => {
                 if let Some(connection) = connection {
                     //Modify client_connection
@@ -212,10 +212,10 @@ impl eframe::App for backend::Application
                     }
                 }
                 else {
-                    // A race condition will occur if we connected succesfully after getting a connection error (request timed out)
+                    // A race condition will occur if we connected successfully after getting a connection error (request timed out)
                     // So we check if we have already made the connection before actually modifying the value based on the timed out request
                     if !matches!(self.client_connection.state, ConnectionState::Connected(_)) {
-                        //If we recived a None it means we have an error
+                        //If we received a None it means we have an error
                         self.client_connection.state = ConnectionState::Error;
                     }
                 }
@@ -226,7 +226,7 @@ impl eframe::App for backend::Application
         }
 
         //Voip instance listener
-        // match self.voip_connection_reciver.try_recv() {
+        // match self.voip_connection_receiver.try_recv() {
         //     Ok(voip) => {
         //         self.client_ui.voip = Some(voip.clone());
 
@@ -375,7 +375,7 @@ impl backend::Application
             }
 
             ui.horizontal(|ui| {
-                ui.label("Microphone volume precentage");
+                ui.label("Microphone volume percentage");
                 ui.add(Slider::new(
                     &mut *self.client_ui.microphone_volume.lock().unwrap(),
                     50.0..=500.0,
@@ -406,7 +406,7 @@ impl backend::Application
         //Reset all messages and everything else
         self.client_ui.incoming_messages = ServerMaster::default();
 
-        //Forget all imaes so the cahced imges will be deleted
+        //Forget all imaes so the cached imges will be deleted
         ctx.forget_all_images();
 
         let toasts = self.toasts.clone();

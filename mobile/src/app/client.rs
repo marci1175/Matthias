@@ -31,8 +31,11 @@ pub const HASH_BYTE_OFFSET: usize = 64 + UUID_BYTE_OFFSET;
 /// This value is the start of the identificator bytes, the end is the end of the message itself
 pub const IDENTIFICATOR_BYTE_OFFSET: usize = 64;
 
-use super::backend::{fetch_incoming_message_lenght, get_image_header};
-pub const VOIP_PACKET_BUFFER_LENGHT_MS: usize = 35;
+/// This is the byte length of the uuid's text representation (utf8)
+pub const UUID_STRING_BYTE_LENGTH: usize = 36;
+
+use super::backend::{fetch_incoming_message_length, get_image_header};
+pub const VOIP_PACKET_BUFFER_LENGTH_MS: usize = 35;
 
 use std::io::{BufReader, Cursor};
 
@@ -48,7 +51,7 @@ pub async fn connect_to_server(
 
     let message_bytes = message_as_string.as_bytes();
 
-    //Send message lenght to server
+    //Send message length to server
     connection
         .write_all(&(message_bytes.len() as u32).to_be_bytes())
         .await?;
@@ -56,11 +59,11 @@ pub async fn connect_to_server(
     //Send message to server
     connection.write_all(message_bytes).await?;
 
-    //Read the server reply lenght
+    //Read the server reply length
     //blocks here for unknown reason
-    let msg_len = fetch_incoming_message_lenght(&mut connection).await?;
+    let msg_len = fetch_incoming_message_length(&mut connection).await?;
 
-    //Create buffer with said lenght
+    //Create buffer with said length
     let mut msg_buffer = vec![0; msg_len as usize];
 
     //Read the server reply
@@ -80,10 +83,10 @@ impl ServerReply
     {
         let reader = &mut *self.reader.lock().await;
 
-        // Read the server reply lenght
-        let msg_len = fetch_incoming_message_lenght(reader).await?;
+        // Read the server reply length
+        let msg_len = fetch_incoming_message_length(reader).await?;
 
-        //Create buffer with said lenght
+        //Create buffer with said length
         let mut msg_buffer = vec![0; msg_len as usize];
 
         //Read the server reply
@@ -116,8 +119,8 @@ impl Application
     //         let voice_recording_shutdown = self.voip_video_shutdown_token.clone();
 
     //         self.voip_thread.get_or_insert_with(|| {
-    //             let reciver_socket_part = voip.socket.clone();
-    //             let microphone_precentage = self.client_ui.microphone_volume.clone();
+    //             let receiver_socket_part = voip.socket.clone();
+    //             let microphone_percentage = self.client_ui.microphone_volume.clone();
 
     //             let (tx, rx) = mpsc::channel::<()>();
 
@@ -127,21 +130,21 @@ impl Application
 
     //             //Sender thread
     //             tokio::spawn(async move {
-    //                 //This variable is notifed when the Mutex is set to true, when the audio_buffer lenght reaches ```VOIP_PACKET_BUFFER_LENGHT``` and is resetted when the packet is sent
+    //                 //This variable is notified when the Mutex is set to true, when the audio_buffer length reaches ```VOIP_PACKET_BUFFER_LENGTH``` and is reset when the packet is sent
     //                 let voip_audio_buffer: Arc<std::sync::Mutex<VecDeque<f32>>> = Arc::new(std::sync::Mutex::new(VecDeque::new()));
 
-    //                 //Conect socket to destination
+    //                 //Connect socket to destination
     //                 voip.socket.connect(destination).await.unwrap();
 
     //                 //Start audio recorder
-    //                 let recording_handle = record_audio_with_interrupt(rx, *microphone_precentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
+    //                 let recording_handle = record_audio_with_interrupt(rx, *microphone_percentage.lock().unwrap(), voip_audio_buffer.clone(), enable_microphone.clone()).unwrap();
 
-    //                 //We can just send it becasue we have already set the default destination address
+    //                 //We can just send it because we have already set the default destination address
     //                 loop {
     //                     select! {
     //                         //Wait until we should send the buffer
     //                         //Record 35ms of audio, send it to the server
-    //                         _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGHT_MS as u64)) => {
+    //                         _ = tokio::time::sleep(Duration::from_millis(VOIP_PACKET_BUFFER_LENGTH_MS as u64)) => {
     //                                 //We create this scope to tell the compiler the recording handle wont be sent across any awaits
     //                                 let playbackable_audio: Vec<u8> = {
     //                                     //Lock handle
@@ -150,7 +153,7 @@ impl Application
     //                                     let playbackable_audio: Vec<u8> = create_wav_file(
     //                                         recording_handle.clone().into()
     //                                     );
-    //                                     //Clear out buffer, make the capacity remain (We creted this VecDeque with said default capacity)
+    //                                     //Clear out buffer, make the capacity remain (We created this VecDeque with said default capacity)
     //                                     recording_handle.clear();
     //                                     //Return wav bytes
     //                                     playbackable_audio
@@ -177,7 +180,7 @@ impl Application
     //             let sink = Arc::new(rodio::Sink::try_new(&self.client_ui.audio_playback.stream_handle).unwrap());
     //             let decryption_key = self.client_connection.client_secret.clone();
 
-    //             //Reciver thread
+    //             //Receiver thread
     //             tokio::spawn(async move {
     //                 let ctx_clone = ctx.clone();
 
@@ -192,9 +195,9 @@ impl Application
     //                             break;
     //                         },
 
-    //                         //Recive bytes
-    //                         _recived_bytes_count = async {
-    //                             match recive_server_relay(reciver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone(), &ctx_clone).await {
+    //                         //Receive bytes
+    //                         _received_bytes_count = async {
+    //                             match receive_server_relay(receiver_socket_part.clone(), &decryption_key, sink.clone(), image_buffer.clone(), &ctx_clone).await {
     //                                 Ok(_) => (),
     //                                 Err(err) => {
     //                                     tracing::error!("{}", err);
@@ -251,7 +254,7 @@ impl Application
     //     }
     // }
 
-    ///This functions is used for clients to recive messages from the server (this doesnt not check validity of the order of the messages, altough this may not be needed as tcp takes care of this)
+    ///This functions is used for clients to receive messages from the server (this doesnt not check validity of the order of the messages, although this may not be needed as tcp takes care of this)
     pub fn client_recv(&mut self, ctx: &egui::Context)
     {
         //This should only run when the connection is valid
@@ -285,14 +288,14 @@ impl Application
                         };
 
                         select! {
-                        //Recive input from main thread to shutdown
+                        //Receive input from main thread to shutdown
                             _ = shutdown_token.cancelled() => {
                                 break;
                             },
 
                             reply = ServerReply::wait_for_response(server_reply_handle) => {
                                 match reply {
-                                    //If we have a reponse from the server
+                                    //If we have a response from the server
                                     Ok(response) => {
                                         //Check for special cases like server disconnecting
                                         if response == "Server disconnecting from client." {
@@ -301,14 +304,14 @@ impl Application
 
                                         //Request repaint
                                         context_clone.request_repaint();
-                                        //Send to reciver
-                                        sender_clone.send(Some(response)).expect("Error occured when trying to send message, after reciving message from client");
+                                        //Send to receiver
+                                        sender_clone.send(Some(response)).expect("Error occurred when trying to send message, after receiving message from client");
                                     },
                                     Err(err) => {
                                         tracing::error!("{}", err);
 
-                                        eprintln!("client.rs\nError occured when the client tried to recive a message from the server: {err}");
-                                        eprintln!("Early end of file error is a normal occurence after disconnecting");
+                                        eprintln!("client.rs\nError occurred when the client tried to receive a message from the server: {err}");
+                                        eprintln!("Early end of file error is a normal occurrence after disconnecting");
                                         //Avoid panicking when trying to display a Notification
                                         //This is very rare but can still happen 
                                         display_error_message(err, toasts);
@@ -355,7 +358,7 @@ impl Application
                                 inner.last_seen_message_index = Some(index);
 
                                 //We only send a sync packet if we need to
-                                //We only have to send the sync message, since in the other thread we are reciving every message sent to us
+                                //We only have to send the sync message, since in the other thread we are receiving every message sent to us
                                 match connection_pair.send_message(message.clone()).await {
                                     Ok(_) => {},
                                     Err(err) => {
@@ -376,9 +379,9 @@ impl Application
                 });
             });
 
-            //Try to recive the threads messages
+            //Try to receive the threads messages
             //Get sent to the channel to be displayed, if the connections errors out, do nothing lol cuz its prolly cuz the sender hadnt done anything
-            match self.server_output_reciver.try_recv() {
+            match self.server_output_receiver.try_recv() {
                 Ok(msg) => {
                     //show messages
                     if let Some(message) = msg {
@@ -547,6 +550,13 @@ impl Application
                                                     .incoming_messages
                                                     .message_list
                                                     .push(msg.message.clone());
+
+                                                //Callback
+                                                self.client_ui.extension.event_call_extensions(
+                                                    crate::app::lua::EventCall::OnChatReceive,
+                                                    &self.lua,
+                                                    Some(msg.message._struct_into_string()),
+                                                );
                                             },
                                         }
                                     },
@@ -696,7 +706,7 @@ impl Application
                         // wtf? investigate
 
                         //Then the thread got an error, we should reset the state
-                        tracing::error!("Client reciver or sync thread panicked");
+                        tracing::error!("Client receiver or sync thread panicked");
                     }
                 },
                 Err(_err) => {
@@ -707,12 +717,12 @@ impl Application
     }
 }
 
-/// Recives packets on the given UdpSocket, messages are decrypted with the decrpytion key
-/// Automaticly appends the decrypted audio bytes to the ```Sink``` if its an uadio packet
-/// I might rework this function so that we can see whos talking based on uuid
-async fn recive_server_relay(
+/// Receives packets on the given UdpSocket, messages are decrypted with the decrpytion key
+/// Automatically appends the decrypted audio bytes to the ```Sink``` if its an uadio packet
+/// I might rework this function so that we can see who is talking based on uuid
+async fn receive_server_relay(
     //Socket this function is Listening on
-    reciver_socket_part: Arc<tokio::net::UdpSocket>,
+    receiver_socket_part: Arc<tokio::net::UdpSocket>,
     //Decryption key
     decryption_key: &[u8],
     //The sink its appending the bytes to
@@ -726,20 +736,20 @@ async fn recive_server_relay(
     //Create buffer for header, this is the size of the maximum udp packet so no error will appear
     let mut header_buf = vec![0; 65536];
 
-    //Recive header size
-    reciver_socket_part
+    //Receive header size
+    receiver_socket_part
         .peek_from(&mut header_buf)
         .await
         .unwrap();
 
-    //Get message lenght
-    let header_lenght = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
+    //Get message length
+    let header_length = u32::from_be_bytes(header_buf[..4].try_into().unwrap());
 
-    //Create body according to message size indicated by the header, make sure to add 4 to the byte lenght because we peeked the ehader thus we didnt remove the bytes from the buffer
-    let mut body_buf = vec![0; (header_lenght + 4) as usize];
+    //Create body according to message size indicated by the header, make sure to add 4 to the byte length because we peeked the ehader thus we didnt remove the bytes from the buffer
+    let mut body_buf = vec![0; (header_length + 4) as usize];
 
-    //Recive the whole message
-    reciver_socket_part.recv(&mut body_buf).await.unwrap();
+    //Receive the whole message
+    receiver_socket_part.recv(&mut body_buf).await.unwrap();
 
     //Decrypt message
     let mut decrypted_bytes = decrypt_aes256_bytes(
@@ -755,7 +765,7 @@ async fn recive_server_relay(
             //The generated uuids are always a set amount of bytes, so we can safely extract them, and we know that the the left over bytes are audio
             let uuid = String::from_utf8(
                 decrypted_bytes
-                    .drain(decrypted_bytes.len() - UUID_STRING_BYTE_LENGHT..)
+                    .drain(decrypted_bytes.len() - UUID_STRING_BYTE_LENGTH..)
                     .collect(),
             )?;
 
@@ -763,7 +773,7 @@ async fn recive_server_relay(
             uuid::Uuid::parse_str(&uuid)
                 .map_err(|err| anyhow::Error::msg(format!("Error: {}, in uuid {}", err, uuid)))?;
 
-            //Play recived bytes
+            //Play received bytes
             sink.append(rodio::Decoder::new(BufReader::new(Cursor::new(
                 decrypted_bytes,
             )))?);

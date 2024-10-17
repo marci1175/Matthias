@@ -34,7 +34,6 @@ eframe = { version = "0.28.1", default-features = true, features = [
 ] }
 
 log = "0.4"
-
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 chrono = {version = "0.4.31", features = ["serde"]}

@@ -49,7 +49,7 @@ impl Application
         {
             ctx.input_mut(|reader| {
                 //Check if this key was pressed
-                //We will not consume this key since its not sure we can acually edit the message
+                //We will not consume this key since its not sure we can actually edit the message
                 if reader.key_pressed(Key::ArrowUp) {
                     //Iter over all the messages so we will get the latest message sent by us
                     for (idx, message) in self
@@ -150,7 +150,7 @@ impl Application
         //We will reconstruct the buffer
         let mut split = user_message_clone.split('@').collect::<Vec<_>>();
 
-        //We just pattern match for the sake of never panicing, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
+        //We just pattern match for the sake of never panicking, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
         if let Some(last) = split.last_mut() {
             //If the last slice of the string (split by @) doesnt contain any spaces we can paint everything else
             if !last.contains(' ') {
@@ -158,7 +158,7 @@ impl Application
                 //* self.get_connected_users function MUST be called before showing the text input widget, so this way we can actually consume the ArrowUp and Down keys
                 self.client_ui.display_user_list = self.get_connected_users(ctx);
 
-                //Consume input when we are diplaying the user list
+                //Consume input when we are displaying the user list
                 if self.client_ui.display_user_list {
                     ctx.input_mut(|reader| {
                         //Clone var to avoid error
@@ -203,7 +203,7 @@ impl Application
 
                                     *buffer = &formatted_string;
 
-                                    //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
+                                    //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz they're not present when concatenating a normal vec (constructed from a string, split by @s)
                                     let split_concat = split.join("@");
 
                                     //Set the buffer to the concatenated vector, append the @ to the 0th index
@@ -230,7 +230,7 @@ impl Application
 
         let split_clone = split.clone();
 
-        //We just pattern match for the sake of never panicing, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
+        //We just pattern match for the sake of never panicking, if we called .unwrap() on this it would still (im 99% sure) work, and its still nicer than (...).get(.len() - 1)
         if let Some(last) = split.last() {
             //If the last slice of the string (split by :) doesnt contain any spaces we can paint everything else
             if !last.contains(' ') && !last.is_empty() && split_clone.len() > 1 {
@@ -242,7 +242,7 @@ impl Application
                     return;
                 }
 
-                //Consume input when we are diplaying the user list
+                //Consume input when we are displaying the user list
                 ctx.input_mut(|reader| {
                     //Clone var to avoid error
                     let user_message_clone = self.client_ui.message_buffer.clone();
@@ -262,7 +262,7 @@ impl Application
 
                             *last = &formatted_string;
 
-                            //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz theyre not present when concating a normal vec (constructed from a string, split by @s)
+                            //Concat the vector after modifying it, we know that every piece of string is split by a '@' so we can join them all by one, therefor avoiding deleting previous @s cuz they're not present when concatenating a normal vec (constructed from a string, split by @s)
                             let split_concat = split.join(":");
 
                             //Set the buffer to the concatenated vector, append the @ to the 0th index
@@ -448,7 +448,7 @@ impl Application
                                     .size(self.font_size)
                                     .color(Color32::RED),
                             );
-                            //Display lenght
+                            //Display length
                             ui.label(
                                 RichText::from(format!(
                                     "{}s",
@@ -480,13 +480,13 @@ impl Application
 
                                 //Move into thread
                                 let audio_bytes_sender = self.audio_bytes_tx.clone();
-                                let microphone_precentage =
+                                let microphone_percentage =
                                     self.client_ui.microphone_volume.clone();
 
                                 tokio::spawn(async move {
                                     let bytes = audio_recording_with_recv(
                                         rx,
-                                        microphone_precentage
+                                        microphone_percentage
                                             .load(std::sync::atomic::Ordering::Relaxed)
                                             as f32,
                                     )
@@ -697,7 +697,7 @@ impl Application
 
                 self.client_ui.emojis_display_rect = Some(emoji_group.response.rect);
 
-                //if there are no matched emojis we return to, avoid panicing cuz of the clamping, and to avoid consuming inputs
+                //if there are no matched emojis we return to, avoid panicking cuz of the clamping, and to avoid consuming inputs
                 if matched_emojis.is_empty() {
                     return;
                 }

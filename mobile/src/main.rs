@@ -5,80 +5,30 @@ mod app;
 
 use std::env::args;
 
+use app::backend::Application;
 use egui::{Style, ViewportBuilder, Visuals};
 use tokio::fs;
-use tracing::Level;
-use tracing_subscriber::{filter, layer::SubscriberExt, util::SubscriberInitExt};
-use windows_sys::{
-    w,
-    Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
-};
-
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
     //Get args
     let args: Vec<String> = args().collect();
 
+    #[cfg(not(debug_assertions))]
+    env_logger::init();
+
     #[cfg(debug_assertions)]
-    {
-        //Enable for ```tokio-console``` feature
-        // console_subscriber::init();
+    console_subscriber::init();
 
-        let filter = filter::Targets::new()
-            .with_default(Level::INFO)
-            .with_default(Level::ERROR)
-            //  .with_default(Level::DEBUG)
-            ;
-
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::fmt::layer())
-            .with(filter)
-            .init();
-
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_BACKTRACE", "1");
 
     //set custom panic hook
     #[cfg(not(debug_assertions))]
-    std::panic::set_hook(Box::new(|info| {
-        let appdata_path = std::env!("APPDATA");
-        // Write error message
-        std::fs::write(
-            format!("{appdata_path}/matthias/error.log"),
-            format!(
-                "[DATE]\n{:?}\n[PANIC]\n{:?}\n[STACK_BACKTRACE]\n{}\n",
-                chrono::Local::now(),
-                info.to_string(),
-                std::backtrace::Backtrace::force_capture().to_string()
-            ),
-        )
-        .unwrap();
-
-        //Display error message
-        display_panic_message(format!("A panic! has occurred the error is logged in %appdata%. Please send the generated file or this message to the developer!\nPanic: \n{:?}\nLocation: \n{:?}", {
-            match info.payload().downcast_ref::<&str>() {
-                Some(msg) => msg,
-                None => {
-                    match info.payload().downcast_ref::<String>() {
-                        Some(msg) => msg,
-                        None => "Failed to display panic message",
-                    }
-                },
-            }
-        }, info.location()));
-    }));
+    std::panic::set_hook(Box::new(|info| {}));
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder {
-            icon: Some(std::sync::Arc::new(egui::IconData {
-                rgba: image::load_from_memory(include_bytes!("../../assets/icons/main.png"))
-                    .unwrap()
-                    .to_rgba8()
-                    .to_vec(),
-                width: 1024,
-                height: 1024,
-            })),
             ..Default::default()
         },
         ..Default::default()
@@ -99,7 +49,7 @@ async fn main() -> eframe::Result<()>
             //Load image loaders
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            let mut application = matthias::app::backend::Application::new(cc);
+            let mut application = Application::new(cc);
 
             //Check if there are any custom startup args
             if args.len() > 1 {
@@ -113,22 +63,6 @@ async fn main() -> eframe::Result<()>
     )
 }
 
-pub fn display_panic_message<T>(display: T)
-where
-    T: ToString + std::marker::Send + 'static,
-{
-    unsafe {
-        MessageBoxW(
-            0,
-            str::encode_utf16(display.to_string().as_str())
-                .chain(std::iter::once(0))
-                .collect::<Vec<_>>()
-                .as_ptr(),
-            w!("Panic!"),
-            MB_ICONERROR,
-        )
-    };
-}
 /*  Gulyásleves recept
 
     Heat the oil or lard in a large pot (preferably a Dutch oven). Add the onions along with a few spoonfuls of water (so they don’t brown) and a pinch of the salt. Cook slowly over very low heat for about 15 to 20 minutes, or until the onions are clear and glassy.
@@ -139,3 +73,4 @@ where
     If you are using csipetke or another kind of small pasta, add it to the soup before serving. You can serve this soup with hot pepper or hot pepper paste.
 
 */
+
