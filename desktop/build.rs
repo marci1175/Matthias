@@ -20,29 +20,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let dll_name = std::env!("OPENCV_LINK_LIBS", "");
 
-    let release_path = PathBuf::from(format!("../target/release/{dll_name}.dll"));
-    let debug_path = PathBuf::from(format!("../target/debug/{dll_name}.dll"));
+    let target_name = std::env::var("TARGET").unwrap();
+
+    let target_dir = format!("../target/desktop/{target_name}");
+
+    let path = PathBuf::from(format!("{target_dir}/{dll_name}.dll"));
 
     //Move opencv dll to build folder
-    match fs::read(&release_path) {
+    match fs::read(&path) {
         //The DLL exists
         Ok(_) => (),
         Err(_err) => {
             //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!("opencv/{dll_name}.dll")))
-                .expect("OpenCV library dll was not found in binary folder.");
+            let dll_bytes = fs::read(PathBuf::from(format!(
+                "..\\dependencies\\opencv\\{dll_name}.dll"
+            )))
+            .expect("OpenCV library dll was not found in binary folder.");
 
             //Get ancestor path
-            let mut release_ancestor = release_path.ancestors();
-            let release_folder_path = release_ancestor.next().unwrap().display();
+            let mut ancestor = path.ancestors();
+            let folder_path = dbg!(ancestor.next().unwrap().display());
 
-            //Get ancestor path
-            let mut debug_ancestor = debug_path.ancestors();
-            let debug_folder_path = dbg!(debug_ancestor.next().unwrap().display());
-
-            //Write dlls to the build folders
-            fs::write(format!("{release_folder_path}"), dll_bytes.clone()).unwrap();
-            fs::write(format!("{debug_folder_path}"), dll_bytes).unwrap();
+            fs::write(format!("{folder_path}"), dll_bytes).unwrap();
         },
     }
 
@@ -167,7 +166,12 @@ fn generate_emoji_header() -> Result<(), Box<dyn std::error::Error>>
 
     let map_body: Vec<String> = emoji_tuple
         .iter()
-        .map(|(name, path)| format!(r#"    "{name}" => include_bytes!(r"..\\..\\..\..\\{path}"),"#))
+        .map(|(name, path)| {
+            format!(
+                r#"    "{name}" => include_bytes!(r"{}\\{path}"),"#,
+                std::env::var("CARGO_MANIFEST_DIR").unwrap()
+            )
+        })
         .collect();
 
     //Create Map of emojis' name and their associated bytes

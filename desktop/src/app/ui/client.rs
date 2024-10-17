@@ -126,7 +126,6 @@ impl Application
 
                                 //Signal the voice recorder function to stop
                                 let _ = self.record_audio_interrupter.send(());
-                                
                                 //Reset state
                                 self.client_ui.voip = None;
                                 self.voip_thread = None;
@@ -175,7 +174,6 @@ impl Application
                                                         }
                                                     },
                                                 }
-                                                
                                             });
                                         },
                                         Err(_err) => {

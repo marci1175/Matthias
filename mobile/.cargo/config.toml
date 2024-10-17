@@ -7,3 +7,5 @@ rustflags = ["--cfg=web_sys_unstable_apis"]
 
 [build]
 rustflags = ["--cfg", "tokio_unstable"]
+target-dir = "../target/mobile"
+target = "aarch64-linux-android"

@@ -9,20 +9,23 @@ use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::select;
 
 use crate::app::backend::{
-    decrypt_aes256, display_error_message, write_audio, write_file, ClientMessage,
-    ClientMessageType, ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType,
-    ServerSync, ServerVoipReply,
+    decrypt_aes256, display_error_message, write_audio, ClientMessage, ClientMessageType,
+    ConnectionState, MessageReaction, PlaybackCursor, Reaction, ServerReplyType, ServerSync,
+    ServerVoipReply,
 };
 
 use crate::app::backend::{Application, ServerMessageType};
 
-/// Image byte offset
-/// This value is the end of the hash bytes, the start is ```UUID_BYTE_OFFSET```
-pub const HASH_BYTE_OFFSET: usize = 64 + 64 + 36;
+/// This is the byte lenght of the uuid's text representation (utf8)
+pub const UUID_STRING_BYTE_LENGHT: usize = 36;
 
 /// Hash byte offset
 /// This value is the end of the uuid string bytes, the start is ```IDENTIFICATOR_BYTE_OFFSET```
-pub const UUID_BYTE_OFFSET: usize = 64 + 36;
+pub const UUID_BYTE_OFFSET: usize = 64 + UUID_STRING_BYTE_LENGHT;
+
+/// Image byte offset
+/// This value is the end of the hash bytes, the start is ```UUID_BYTE_OFFSET```
+pub const HASH_BYTE_OFFSET: usize = 64 + UUID_BYTE_OFFSET;
 
 /// Identificator byte offset
 /// This value is the start of the identificator bytes, the end is the end of the message itself
@@ -534,18 +537,6 @@ impl Application
                                                     .ongoing_voip_call
                                                     .connected_clients =
                                                     state.connected_clients.clone();
-
-                                                //This is true only if the call was JUST started
-                                                if was_call_alive
-                                                    || state.connected_clients.is_some()
-                                                {
-                                                    //Callback
-                                                    self.client_ui.extension.event_call_extensions(
-                                                        crate::app::lua::EventCall::OnCallReceive,
-                                                        &self.lua,
-                                                        None,
-                                                    );
-                                                }
                                             },
                                             _ => {
                                                 //Allocate Message vec for the new message
@@ -580,7 +571,7 @@ impl Application
                                             Ok(inner) => {
                                                 match inner {
                                                     ServerReplyType::File(file) => {
-                                                        let _ = write_file(file);
+                                                        // let _ = write_file(file);
                                                     },
                                                     ServerReplyType::Image(image) => {
                                                         //Forget image so itll be able to get displayed

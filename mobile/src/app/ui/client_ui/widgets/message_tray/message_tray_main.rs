@@ -8,7 +8,6 @@ use egui::{
     Modifiers, RichText, Rounding, ScrollArea, Stroke,
 };
 use rand::Rng;
-use rfd::FileDialog;
 
 impl Application
 {
@@ -312,13 +311,6 @@ impl Application
                                     ))
                                 },
                             }
-
-                            //Callback
-                            self.client_ui.extension.event_call_extensions(
-                                crate::app::lua::EventCall::OnChatSend,
-                                &self.lua,
-                                Some(self.client_ui.message_buffer.clone()),
-                            );
                         }
 
                         for file_path in &self.client_ui.files_to_send {
@@ -341,22 +333,22 @@ impl Application
                     }
 
                     //add file button
-                    if ui
-                        .add(egui::widgets::ImageButton::new(egui::include_image!(
-                            "../../../../../../../assets/icons/add_file.png"
-                        )))
-                        .on_hover_text("Send files")
-                        .clicked()
-                    {
-                        let files = FileDialog::new()
-                            .set_title("Pick a file")
-                            .set_directory("/")
-                            .pick_file();
-                        if let Some(file) = files {
-                            //send file
-                            self.client_ui.files_to_send.push(file);
-                        }
-                    }
+                    // if ui
+                    //     .add(egui::widgets::ImageButton::new(egui::include_image!(
+                    //         "../../../../../../../assets/icons/add_file.png"
+                    //     )))
+                    //     .on_hover_text("Send files")
+                    //     .clicked()
+                    // {
+                    //     let files = FileDialog::new()
+                    //         .set_title("Pick a file")
+                    //         .set_directory("/")
+                    //         .pick_file();
+                    //     if let Some(file) = files {
+                    //         //send file
+                    //         self.client_ui.files_to_send.push(file);
+                    //     }
+                    // }
 
                     //Emoji button
                     let emoji_button = ui.menu_button(
