@@ -328,7 +328,8 @@ impl Application
                                                 egui::load::BytesPoll::Pending { .. } => {
                                                     ui.spinner();
                                                 },
-                                                egui::load::BytesPoll::Ready { .. } => {
+                                                egui::load::BytesPoll::Ready { bytes, .. } => {
+                                                    dbg!(bytes.len());
                                                     ui.allocate_ui(vec2(360., 360.), |ui| {
                                                         ui.add(
                                                             Image::from_uri(format!("bytes://video_stream:{connected_client_uuid}"))

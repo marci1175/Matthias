@@ -14,6 +14,7 @@ use windows_sys::{
     Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR},
 };
 
+/// 1000th commit in 2024. - 2024. 12. 30. 17:28
 #[tokio::main]
 async fn main() -> eframe::Result<()>
 {
