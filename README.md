@@ -7,9 +7,9 @@ A (soon to be) multiplatform self-hosted chat application built completely in Ru
 | Features                                                                                                                            | Desktop | Mobile |
 | ----------------------------------------------------------------------------------------------------------------------------------- | ------- | ------ |
 | Encrypted messages ensuring security                                                                                                | ✅      | ✅     |
-| Backend which doesn't rely on any central provider                                                                                  | ✅      | ✅     |
+|               Doesn't rely on any central provider                                                                                  | ✅      | ✅     |
 | Customizable profiles                                                                                                               | ✅      | ✅     |
-| Text, audio, image, file messages, and images                                                                                       | ✅      | ✅     |
+| Text, audio, image, file messages                                                                                                   | ✅      | ✅     |
 | Custom emojis                                                                                                                       | ✅      | ✅     |
 | Intuitive user interface                                                                                                            | ✅      | ✅     |
 | Experimental MD (Markdown) support                                                                                                  | ✅      | ✅     |
@@ -17,7 +17,7 @@ A (soon to be) multiplatform self-hosted chat application built completely in Ru
 | Extensive lua (using luajit) API with documentation at [Gitbook](https://matthias.gitbook.io/) with external libs available         | ✅      | ❌     |
 | Custom connection urls (If the app is installed through the installer) This allows the user to connect to a server with just a link | ✅      | ❌     |
 
-**Disclaimer: The application has never been security audited, and has known flaws.**
+**Disclaimer: The application has never been security audited.**
 
 ### Additional Features (For desktop only):
 
@@ -26,7 +26,7 @@ A (soon to be) multiplatform self-hosted chat application built completely in Ru
 # Children repositories (Crates/Repos created for the purpose of showcasing/improving Matthias)
 
 - [Wincam](https://github.com/marci1175/wincam) (Used to capture images from the host's camera)
-- [Protocol Showcase](https://github.com/marci1175/matthias-tokio-protocol/tree/master) (Used to showcase Matthias's TCP protocol)
+- [Protocol Demo](https://github.com/marci1175/matthias-tokio-protocol/tree/master) (Used to develop Matthias's TCP protocol)
 - [mLua proc macro](https://github.com/marci1175/mlua_proc_macro) (Used in creating the lua API)
 
 ---
