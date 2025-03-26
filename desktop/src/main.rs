@@ -43,7 +43,7 @@ async fn main() -> eframe::Result<()>
     //set custom panic hook
     #[cfg(not(debug_assertions))]
     std::panic::set_hook(Box::new(|info| {
-        let appdata_path = std::env!("APPDATA");
+        let appdata_path = std::env::env("APPDATA").unwrap();
         // Write error message
         std::fs::write(
             format!("{appdata_path}/matthias/error.log"),
@@ -85,7 +85,7 @@ async fn main() -> eframe::Result<()>
         ..Default::default()
     };
 
-    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA"))).await;
+    let _ = fs::create_dir(format!("{}\\matthias\\extensions", std::env::env("APPDATA").unwrap())).await;
 
     eframe::run_native(
         "Matthias",

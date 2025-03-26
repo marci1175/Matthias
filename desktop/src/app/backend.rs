@@ -260,7 +260,7 @@ impl Default for Application
 
             audio_file: Arc::new(Mutex::new(PathBuf::from(format!(
                 "{}\\Matthias\\Client\\voice_recording.wav",
-                env!("APPDATA")
+                std::env::env("APPDATA").unwrap()
             )))),
 
             //fontbook
@@ -363,7 +363,7 @@ impl Application
                 Err(err) => {
                     tracing::error!("{}", err);
 
-                    let _ = fs::create_dir(format!("{}\\matthias\\extensions", env!("APPDATA")));
+                    let _ = fs::create_dir(format!("{}\\matthias\\extensions", std::env::env("APPDATA").unwrap()));
                 },
             }
 
@@ -3071,7 +3071,7 @@ pub fn write_audio(file_response: ServerAudioReply, ip: String) -> Result<()>
     //secondly create the folder labeled with the specified server ip
     let folder_path = format!(
         "{}\\matthias\\Client\\{}\\Audios",
-        env!("APPDATA"),
+        std::env::env("APPDATA").unwrap(),
         general_purpose::URL_SAFE_NO_PAD.encode(ip),
     );
 
