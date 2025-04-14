@@ -26,23 +26,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let path = PathBuf::from(format!("{target_dir}/{dll_name}.dll"));
 
-    //Move opencv dll to build folder
-    match fs::read(&path) {
-        //The DLL exists
-        Ok(_) => (),
-        Err(_err) => {
-            //Dll was not found in the target dir
-            let dll_bytes = fs::read(PathBuf::from(format!(
-                "..\\dependencies\\opencv\\{dll_name}.dll"
-            )))
-            .expect("OpenCV library dll was not found in binary folder.");
+    if !(fs::read(&path).is_ok() && fs::read(&format!("../target/debug/opencv_world4100.dll")).is_ok()) {
+        //Dll was not found in the target dir
+        let dll_bytes = fs::read(PathBuf::from(format!(
+            "..\\dependencies\\opencv\\{dll_name}.dll"
+        )))
+        .expect("OpenCV library dll was not found in binary folder.");
 
-            //Get ancestor path
-            let mut ancestor = path.ancestors();
-            let folder_path = dbg!(ancestor.next().unwrap().display());
+        let destination_path = format!("../target/desktop/{}", std::env::var("TARGET").unwrap());
 
-            fs::write(format!("{folder_path}"), dll_bytes).unwrap();
-        },
+        fs::create_dir_all(&destination_path).unwrap();
+
+        // Get ancestor path
+        fs::write(format!("{destination_path}/opencv_world4100.dll"), dll_bytes.clone()).unwrap();
+        fs::write(format!("../target/debug/opencv_world4100.dll"), dll_bytes.clone()).unwrap();
     }
 
     generate_emoji_header()?;

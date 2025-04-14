@@ -85,7 +85,7 @@ async fn main() -> eframe::Result<()>
         ..Default::default()
     };
 
-    let _ = fs::create_dir(format!("{}\\matthias\\extensions", std::env::env("APPDATA").unwrap())).await;
+    let _ = fs::create_dir(format!("{}\\matthias\\extensions", std::env::var("APPDATA").unwrap())).await;
 
     eframe::run_native(
         "Matthias",

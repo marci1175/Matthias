@@ -606,7 +606,7 @@ impl backend::Application
                     Err(err) => {
                         dbg!(err);
                         let _ =
-                            fs::create_dir(format!("{}\\matthias\\extensions", std::env::env("APPDATA").unwrap()));
+                            fs::create_dir(format!("{}\\matthias\\extensions", std::env::var("APPDATA").unwrap()));
                     },
                 }
             };
@@ -835,7 +835,7 @@ pub fn read_extensions_dir() -> anyhow::Result<Vec<ExtensionProperties>>
 {
     let mut extensions: Vec<ExtensionProperties> = Vec::new();
 
-    for entry in fs::read_dir(format!("{}\\matthias\\extensions", std::env::env("APPDATA").unwrap()))? {
+    for entry in fs::read_dir(format!("{}\\matthias\\extensions", std::env::var("APPDATA").unwrap()))? {
         let dir_entry = entry.map_err(|err| Error::msg(err.to_string()))?;
 
         //If the file doesnt have an extension, then we can ignore it

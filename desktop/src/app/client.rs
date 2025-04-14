@@ -635,7 +635,7 @@ impl Application
 
                                                         let path_to_audio = PathBuf::from(format!(
                                                             "{}\\Matthias\\Client\\{}\\Audios\\{}",
-                                                            std::env::env("APPDATA").unwrap(),
+                                                            std::env::var("APPDATA").unwrap(),
                                                             self.client_ui
                                                                 .send_on_ip_base64_encoded,
                                                             audio.signature
